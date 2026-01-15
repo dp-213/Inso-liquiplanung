@@ -18,13 +18,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate credentials (temporary debug - remove after fixing)
+    // Validate credentials
     if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
       return NextResponse.json(
-        {
-          error: "Ungültige Anmeldedaten",
-          hint: `Erwartet: ${ADMIN_USERNAME} / ${ADMIN_PASSWORD}`
-        },
+        { error: "Ungültige Anmeldedaten" },
         { status: 401 }
       );
     }
