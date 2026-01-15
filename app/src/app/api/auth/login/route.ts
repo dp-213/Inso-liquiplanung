@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { SignJWT } from "jose";
 
-const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "InsolvencyAdmin2026!";
-const SESSION_SECRET = process.env.SESSION_SECRET || "insolvency-liquidity-secret-key-32chars!";
-
 export async function POST(request: NextRequest) {
   try {
+    // Read env vars at runtime
+    const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Liqui2026";
+
     const body = await request.json();
     const { username, password } = body;
 
@@ -27,7 +27,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Create JWT token
-    const secretKey = new TextEncoder().encode(SESSION_SECRET);
+    const secretKey = new TextEncoder().encode(
+      process.env.SESSION_SECRET || "insolvency-liquidity-secret-key-32chars"
+    );
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
     const token = await new SignJWT({
