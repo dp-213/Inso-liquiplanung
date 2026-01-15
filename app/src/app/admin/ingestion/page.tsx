@@ -71,6 +71,8 @@ export default function IngestionCenterPage() {
       if (casesRes.ok) {
         const casesData = await casesRes.json();
         setCases(casesData);
+      } else if (casesRes.status === 500) {
+        setError("Datenbank nicht verfügbar. Für den produktiven Einsatz wird eine Cloud-Datenbank benötigt.");
       }
 
       if (jobsRes.ok) {
@@ -79,7 +81,7 @@ export default function IngestionCenterPage() {
       }
     } catch (err) {
       console.error("Error fetching data:", err);
-      setError("Fehler beim Laden der Daten");
+      setError("Datenbank nicht verfügbar. Für den produktiven Einsatz wird eine Cloud-Datenbank benötigt.");
     } finally {
       setLoading(false);
     }

@@ -1,32 +1,48 @@
 import prisma from "@/lib/db";
 import Link from "next/link";
 
-async function getCases() {
-  const cases = await prisma.case.findMany({
-    include: {
-      project: { select: { name: true } },
-      plans: {
-        where: { isActive: true },
-        include: {
-          versions: {
-            orderBy: { versionNumber: "desc" },
-            take: 1,
+interface CaseWithRelations {
+  id: string;
+  caseNumber: string;
+  debtorName: string;
+  status: string;
+  updatedAt: Date;
+  project: { name: string };
+  plans: { versions: { versionNumber: number }[] }[];
+  shareLinks: { id: string }[];
+}
+
+async function getCases(): Promise<{ cases: CaseWithRelations[]; dbError: boolean }> {
+  try {
+    const cases = await prisma.case.findMany({
+      include: {
+        project: { select: { name: true } },
+        plans: {
+          where: { isActive: true },
+          include: {
+            versions: {
+              orderBy: { versionNumber: "desc" },
+              take: 1,
+            },
           },
         },
+        shareLinks: {
+          where: { isActive: true },
+          select: { id: true },
+        },
       },
-      shareLinks: {
-        where: { isActive: true },
-        select: { id: true },
-      },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
+      orderBy: { updatedAt: "desc" },
+    });
 
-  return cases;
+    return { cases, dbError: false };
+  } catch (error) {
+    console.error("Database error:", error);
+    return { cases: [], dbError: true };
+  }
 }
 
 export default async function CasesListPage() {
-  const cases = await getCases();
+  const { cases, dbError } = await getCases();
 
   const getStatusLabel = (status: string): string => {
     switch (status) {
@@ -57,6 +73,14 @@ export default async function CasesListPage() {
           Neuen Fall anlegen
         </Link>
       </div>
+
+      {dbError && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-sm text-yellow-800">
+            Datenbank nicht verfügbar. Für den produktiven Einsatz wird eine Cloud-Datenbank benötigt.
+          </p>
+        </div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

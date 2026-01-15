@@ -1,47 +1,81 @@
 import prisma from "@/lib/db";
 import Link from "next/link";
 
-async function getDashboardStats() {
-  const [projects, cases, recentJobs] = await Promise.all([
-    prisma.project.findMany({
-      where: { status: "ACTIVE" },
-      include: {
-        _count: { select: { cases: true } },
-      },
-    }),
-    prisma.case.findMany({
-      include: {
-        project: { select: { name: true } },
-        plans: {
-          where: { isActive: true },
-          include: {
-            versions: {
-              orderBy: { versionNumber: "desc" },
-              take: 1,
+interface Project {
+  id: string;
+  name: string;
+  status: string;
+  _count: { cases: number };
+}
+
+interface Case {
+  id: string;
+  caseNumber: string;
+  debtorName: string;
+  status: string;
+  project: { name: string };
+  plans: { versions: { versionNumber: number }[] }[];
+}
+
+interface IngestionJob {
+  id: string;
+  fileName: string;
+  status: string;
+  caseId: string;
+  case: { caseNumber: string; debtorName: string };
+}
+
+async function getDashboardStats(): Promise<{
+  projects: Project[];
+  cases: Case[];
+  recentJobs: IngestionJob[];
+  dbError: boolean;
+}> {
+  try {
+    const [projects, cases, recentJobs] = await Promise.all([
+      prisma.project.findMany({
+        where: { status: "ACTIVE" },
+        include: {
+          _count: { select: { cases: true } },
+        },
+      }),
+      prisma.case.findMany({
+        include: {
+          project: { select: { name: true } },
+          plans: {
+            where: { isActive: true },
+            include: {
+              versions: {
+                orderBy: { versionNumber: "desc" },
+                take: 1,
+              },
             },
           },
         },
-      },
-      orderBy: { updatedAt: "desc" },
-      take: 10,
-    }),
-    prisma.ingestionJob.findMany({
-      where: {
-        status: { in: ["REVIEW", "QUARANTINED", "READY"] },
-      },
-      include: {
-        case: { select: { caseNumber: true, debtorName: true } },
-      },
-      orderBy: { startedAt: "desc" },
-      take: 5,
-    }),
-  ]);
+        orderBy: { updatedAt: "desc" },
+        take: 10,
+      }),
+      prisma.ingestionJob.findMany({
+        where: {
+          status: { in: ["REVIEW", "QUARANTINED", "READY"] },
+        },
+        include: {
+          case: { select: { caseNumber: true, debtorName: true } },
+        },
+        orderBy: { startedAt: "desc" },
+        take: 5,
+      }),
+    ]);
 
-  return { projects, cases, recentJobs };
+    return { projects, cases, recentJobs, dbError: false };
+  } catch (error) {
+    console.error("Database error:", error);
+    return { projects: [], cases: [], recentJobs: [], dbError: true };
+  }
 }
 
 export default async function AdminDashboard() {
-  const { projects, cases, recentJobs } = await getDashboardStats();
+  const { projects, cases, recentJobs, dbError } = await getDashboardStats();
 
   const totalCases = cases.length;
   const preliminaryCases = cases.filter((c) => c.status === "PRELIMINARY").length;
@@ -54,6 +88,22 @@ export default async function AdminDashboard() {
         <h1 className="text-2xl font-bold text-[var(--foreground)]">Übersicht</h1>
         <p className="text-[var(--secondary)] mt-1">Willkommen im Liquiditäts-Kontrollcockpit</p>
       </div>
+
+      {dbError && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <svg className="w-5 h-5 text-yellow-600 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <h3 className="text-sm font-medium text-yellow-800">Datenbank nicht verfügbar</h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                Die Datenbank ist noch nicht eingerichtet. Für den produktiven Einsatz wird eine Cloud-Datenbank (z.B. Turso) benötigt.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

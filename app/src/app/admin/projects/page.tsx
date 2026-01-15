@@ -20,6 +20,7 @@ export default function ProjectsPage() {
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [dbError, setDbError] = useState(false);
   const [showForm, setShowForm] = useState(showNewForm);
   const [formData, setFormData] = useState({ name: "", description: "" });
   const [saving, setSaving] = useState(false);
@@ -35,9 +36,13 @@ export default function ProjectsPage() {
       if (response.ok) {
         const data = await response.json();
         setProjects(data);
+        setDbError(false);
+      } else if (response.status === 500) {
+        setDbError(true);
       }
     } catch (err) {
       console.error("Error fetching projects:", err);
+      setDbError(true);
     } finally {
       setLoading(false);
     }
@@ -100,8 +105,16 @@ export default function ProjectsPage() {
         </button>
       </div>
 
+      {dbError && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-sm text-yellow-800">
+            Datenbank nicht verfügbar. Für den produktiven Einsatz wird eine Cloud-Datenbank benötigt.
+          </p>
+        </div>
+      )}
+
       {/* New Project Form */}
-      {showForm && (
+      {showForm && !dbError && (
         <div className="admin-card p-6">
           <h2 className="text-lg font-semibold mb-4">Neues Projekt erstellen</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
