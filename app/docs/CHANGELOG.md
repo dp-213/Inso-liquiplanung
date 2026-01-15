@@ -54,10 +54,13 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 ### Fehlerbehebungen
 - **Login-Authentifizierung:** Umgebungsvariablen werden jetzt zur Laufzeit gelesen (nicht zur Build-Zeit)
 - **Env-Var-Format:** Zeilenumbrüche in Vercel-Umgebungsvariablen entfernt
+- **Datenbank-Resilienz:** Alle Admin-Seiten zeigen benutzerfreundliche Warnung bei fehlender Datenbank statt Server-Fehler
 
 ### Technische Änderungen
 - Login-Route vereinfacht und robuster gemacht
 - Session-Secret-Handling verbessert
+- Try-Catch für alle Datenbank-Abfragen in Admin-Seiten
+- Graceful Degradation bei fehlender SQLite-Datenbank
 
 ---
 
