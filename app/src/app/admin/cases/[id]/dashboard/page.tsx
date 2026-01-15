@@ -101,70 +101,106 @@ export default function CaseDashboardPage({
       setConfig(configData.config);
       setMetadata(configData.metadata);
 
-      // Trigger calculation
-      const calcRes = await fetch(`/api/cases/${id}/calculate`, {
-        method: "POST",
-      });
+      // Trigger calculation (GET for read-only calculation)
+      const calcRes = await fetch(`/api/cases/${id}/calculate`);
       if (!calcRes.ok) {
         const errData = await calcRes.json();
         throw new Error(errData.error || "Calculation failed");
       }
-      const calcData: CalculationResponse = await calcRes.json();
+      const calcData = await calcRes.json();
 
-      // Transform to DashboardCalculationData
+      // Find minimum balance week
+      let minBalanceWeek = 0;
+      let minBalance = BigInt(calcData.openingBalanceCents || "0");
+      calcData.weeks?.forEach((w: { weekOffset: number; closingBalanceCents: string }) => {
+        const balance = BigInt(w.closingBalanceCents);
+        if (balance < minBalance) {
+          minBalance = balance;
+          minBalanceWeek = w.weekOffset;
+        }
+      });
+
+      // Transform to DashboardCalculationData (GET returns flat structure)
       const transformed: DashboardCalculationData = {
-        caseInfo: calcData.caseInfo || {
+        caseInfo: {
           caseId: id,
-          caseNumber: "",
-          debtorName: "",
+          caseNumber: calcData.caseNumber || "",
+          debtorName: calcData.debtorName || "",
           courtName: "",
-          planStartDate: new Date().toISOString(),
+          planStartDate: calcData.planStartDate || new Date().toISOString(),
         },
         kpis: {
-          openingBalanceCents: BigInt(Math.round(calcData.result.summary.openingBalance)),
-          closingBalanceCents: BigInt(Math.round(calcData.result.summary.closingBalance)),
-          totalInflowsCents: BigInt(Math.round(calcData.result.summary.totalInflows)),
-          totalOutflowsCents: BigInt(Math.round(calcData.result.summary.totalOutflows)),
-          netChangeCents: BigInt(Math.round(calcData.result.summary.netChange)),
-          minBalanceCents: BigInt(Math.round(calcData.result.summary.minimumBalance)),
-          minBalanceWeek: calcData.result.summary.minimumBalanceWeek,
-          negativeWeeksCount: calcData.result.weeks.filter(
-            (w) => BigInt(w.closingBalanceCents) < BigInt(0)
+          openingBalanceCents: BigInt(calcData.openingBalanceCents || "0"),
+          closingBalanceCents: BigInt(calcData.finalClosingBalanceCents || "0"),
+          totalInflowsCents: BigInt(calcData.totalInflowsCents || "0"),
+          totalOutflowsCents: BigInt(calcData.totalOutflowsCents || "0"),
+          netChangeCents: BigInt(calcData.totalNetCashflowCents || "0"),
+          minBalanceCents: minBalance,
+          minBalanceWeek: minBalanceWeek,
+          negativeWeeksCount: (calcData.weeks || []).filter(
+            (w: { closingBalanceCents: string }) => BigInt(w.closingBalanceCents) < BigInt(0)
           ).length,
         },
-        weeks: calcData.result.weeks.map((w) => ({
+        weeks: (calcData.weeks || []).map((w: {
+          weekOffset: number;
+          weekLabel: string;
+          weekStartDate: string;
+          weekEndDate: string;
+          openingBalanceCents: string;
+          closingBalanceCents: string;
+          totalInflowsCents: string;
+          totalOutflowsCents: string;
+          netCashflowCents: string;
+          inflowsAltmasseCents: string;
+          inflowsNeumasseCents: string;
+          outflowsAltmasseCents: string;
+          outflowsNeumasseCents: string;
+        }) => ({
           weekOffset: w.weekOffset,
           weekLabel: w.weekLabel,
           weekStartDate: w.weekStartDate,
           weekEndDate: w.weekEndDate,
-          openingBalanceCents: BigInt(w.openingBalanceCents),
-          closingBalanceCents: BigInt(w.closingBalanceCents),
-          totalInflowsCents: BigInt(w.totalInflowsCents),
-          totalOutflowsCents: BigInt(w.totalOutflowsCents),
-          netCashflowCents: BigInt(w.netCashflowCents),
+          openingBalanceCents: BigInt(w.openingBalanceCents || "0"),
+          closingBalanceCents: BigInt(w.closingBalanceCents || "0"),
+          totalInflowsCents: BigInt(w.totalInflowsCents || "0"),
+          totalOutflowsCents: BigInt(w.totalOutflowsCents || "0"),
+          netCashflowCents: BigInt(w.netCashflowCents || "0"),
           inflowsAltmasseCents: BigInt(w.inflowsAltmasseCents || "0"),
           inflowsNeumasseCents: BigInt(w.inflowsNeumasseCents || "0"),
           outflowsAltmasseCents: BigInt(w.outflowsAltmasseCents || "0"),
           outflowsNeumasseCents: BigInt(w.outflowsNeumasseCents || "0"),
         })),
-        categories: calcData.result.categories.map((c) => ({
-          categoryId: c.categoryId,
-          categoryName: c.categoryName,
+        categories: (calcData.categories || []).map((c: {
+          id: string;
+          name: string;
+          flowType: "INFLOW" | "OUTFLOW";
+          estateType: "ALTMASSE" | "NEUMASSE";
+          totalCents: string;
+          weeklyTotals: string[];
+          lines: Array<{
+            id: string;
+            name: string;
+            totalCents: string;
+            weeklyValues: Array<{ effectiveCents: string }>;
+          }>;
+        }) => ({
+          categoryId: c.id,
+          categoryName: c.name,
           flowType: c.flowType,
           estateType: c.estateType,
-          totalCents: BigInt(c.totalCents),
-          weeklyTotalsCents: c.weeklyTotalsCents.map((v) => BigInt(v)),
-          lines: c.lines.map((l) => ({
-            lineId: l.lineId,
-            lineName: l.lineName,
-            totalCents: BigInt(l.totalCents),
-            weeklyValuesCents: l.weeklyValuesCents.map((v) => BigInt(v)),
+          totalCents: BigInt(c.totalCents || "0"),
+          weeklyTotalsCents: (c.weeklyTotals || []).map((v: string) => BigInt(v || "0")),
+          lines: (c.lines || []).map((l) => ({
+            lineId: l.id,
+            lineName: l.name,
+            totalCents: BigInt(l.totalCents || "0"),
+            weeklyValuesCents: (l.weeklyValues || []).map((wv) => BigInt(wv.effectiveCents || "0")),
           })),
         })),
         calculationMeta: {
-          calculatedAt: calcData.result.calculatedAt,
-          engineVersion: calcData.result.version,
-          dataHash: calcData.result.dataHash,
+          calculatedAt: new Date().toISOString(),
+          engineVersion: "1.0.0",
+          dataHash: calcData.dataHash || "",
         },
       };
 
