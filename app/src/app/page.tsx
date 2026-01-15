@@ -104,7 +104,7 @@ export default function LoginPage() {
 
           <div className="mt-6 pt-6 border-t border-[var(--border)]">
             <p className="text-xs text-[var(--muted)] text-center">
-              Demo-Zugangsdaten: admin / Liqui2026!
+              Demo-Zugangsdaten: admin / Liqui2026
             </p>
           </div>
         </div>
