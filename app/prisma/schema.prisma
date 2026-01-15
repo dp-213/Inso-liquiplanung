@@ -1,0 +1,385 @@
+// Prisma Schema for Insolvency Liquidity Planning System
+// Based on SPECIFICATION.md and DATA_INGESTION_ARCHITECTURE.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// CORE DOMAIN ENTITIES
+// =============================================================================
+
+// Project represents an Insolvency Administrator (client)
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  status      String   @default("ACTIVE") // ACTIVE, ARCHIVED
+  createdAt   DateTime @default(now())
+  createdBy   String
+  updatedAt   DateTime @updatedAt
+  updatedBy   String
+
+  cases Case[]
+
+  @@map("projects")
+}
+
+// InsolvencyCase - The root entity representing a single insolvency proceeding
+model Case {
+  id          String    @id @default(uuid())
+  projectId   String
+  caseNumber  String    @unique
+  debtorName  String
+  courtName   String
+  openingDate DateTime?
+  filingDate  DateTime
+  currency    String    @default("EUR")
+  status      String    @default("PRELIMINARY") // PRELIMINARY, OPENED, CLOSED
+  createdAt   DateTime  @default(now())
+  createdBy   String
+  updatedAt   DateTime  @updatedAt
+  updatedBy   String
+
+  project        Project          @relation(fields: [projectId], references: [id])
+  plans          LiquidityPlan[]
+  ingestionJobs  IngestionJob[]
+  shareLinks     ShareLink[]
+  configurations CaseConfiguration[]
+
+  @@map("cases")
+}
+
+// LiquidityPlan - A liquidity plan instance belonging to a case
+model LiquidityPlan {
+  id            String   @id @default(uuid())
+  caseId        String
+  name          String
+  description   String?
+  planStartDate DateTime
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  createdBy     String
+  updatedAt     DateTime @updatedAt
+  updatedBy     String
+
+  case       Case                   @relation(fields: [caseId], references: [id])
+  versions   LiquidityPlanVersion[]
+  categories CashflowCategory[]
+
+  @@map("liquidity_plans")
+}
+
+// LiquidityPlanVersion - Immutable snapshot of a plan at a point in time
+model LiquidityPlanVersion {
+  id                  String   @id @default(uuid())
+  planId              String
+  versionNumber       Int
+  snapshotDate        DateTime @default(now())
+  snapshotReason      String
+  openingBalanceCents BigInt
+  dataHash            String
+  createdBy           String
+
+  plan LiquidityPlan @relation(fields: [planId], references: [id])
+
+  @@unique([planId, versionNumber])
+  @@map("liquidity_plan_versions")
+}
+
+// CashflowCategory - Categories for grouping cashflow lines
+model CashflowCategory {
+  id           String   @id @default(uuid())
+  planId       String
+  name         String
+  flowType     String // INFLOW, OUTFLOW
+  estateType   String // ALTMASSE, NEUMASSE
+  displayOrder Int
+  isSystem     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  createdBy    String
+
+  plan  LiquidityPlan  @relation(fields: [planId], references: [id])
+  lines CashflowLine[]
+
+  @@unique([planId, name, flowType, estateType])
+  @@map("cashflow_categories")
+}
+
+// CashflowLine - Individual line items within a category
+model CashflowLine {
+  id           String   @id @default(uuid())
+  categoryId   String
+  name         String
+  description  String?
+  displayOrder Int
+  isLocked     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  createdBy    String
+  updatedAt    DateTime @updatedAt
+  updatedBy    String
+
+  category     CashflowCategory @relation(fields: [categoryId], references: [id])
+  weeklyValues WeeklyValue[]
+
+  @@map("cashflow_lines")
+}
+
+// WeeklyValue - The atomic value unit (one value for one line for one week)
+model WeeklyValue {
+  id          String   @id @default(uuid())
+  lineId      String
+  weekOffset  Int // 0-12 (13 weeks)
+  valueType   String // IST, PLAN
+  amountCents BigInt
+  note        String?
+  createdAt   DateTime @default(now())
+  createdBy   String
+  updatedAt   DateTime @updatedAt
+  updatedBy   String
+
+  line CashflowLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+
+  @@unique([lineId, weekOffset, valueType])
+  @@map("weekly_values")
+}
+
+// =============================================================================
+// INGESTION & MAPPING ENTITIES
+// =============================================================================
+
+// IngestionJob - Tracks file upload and processing pipeline
+model IngestionJob {
+  id                      String    @id @default(uuid())
+  caseId                  String
+  planId                  String?
+  mappingConfigId         String?   // Which mapping config was used
+  sourceType              String    // CSV_GENERIC, CSV_BANK_STATEMENT, EXCEL_LIQUIDITY, etc.
+  fileName                String
+  fileHashSha256          String
+  fileSizeBytes           BigInt
+  rawFilePath             String?
+  rawFileContent          String?   // Store file content for re-run capability
+  mimeType                String?
+  encoding                String    @default("UTF-8")
+  status                  String    @default("CREATED") // CREATED, UPLOADING, VALIDATING, PARSING, STAGING, MAPPING, VALIDATING_BUSINESS, READY, REVIEW, QUARANTINED, RESOLVED, COMMITTED, REJECTED
+  errorCount              Int       @default(0)
+  warningCount            Int       @default(0)
+  quarantinedCount        Int       @default(0)
+  recordCountRaw          Int?
+  recordCountValid        Int?
+  recordCountNormalized   Int?
+  qualityScore            Float?    // 0-100 percentage of valid records
+  startedAt               DateTime  @default(now())
+  completedAt             DateTime?
+  createdBy               String
+
+  case    Case              @relation(fields: [caseId], references: [id])
+  records IngestionRecord[]
+
+  @@index([caseId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("ingestion_jobs")
+}
+
+// IngestionRecord - Individual records from parsed file
+model IngestionRecord {
+  id                  String   @id @default(uuid())
+  jobId               String
+  rowNumber           Int
+  sheetName           String?  // For Excel files: which sheet this row came from
+  rawData             String   // JSON stored as string - original values
+  mappedData          String?  // JSON stored as string - after field mapping
+  normalizedData      String?  // JSON stored as string - canonical form
+  status              String   @default("STAGING") // STAGING, MAPPED, VALID, REVIEW, QUARANTINED, REJECTED, READY
+  qualityTier         String?  // TIER_1_VALID, TIER_2_REVIEWABLE, TIER_3_QUARANTINED, TIER_4_REJECTED
+  validationErrors    String?  // JSON stored as string
+  validationWarnings  String?  // JSON stored as string
+
+  job                 IngestionJob          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  stagedEntries       StagedCashflowEntry[]
+  transformations     FieldTransformation[]
+
+  @@unique([jobId, rowNumber])
+  @@index([jobId, status])
+  @@map("ingestion_records")
+}
+
+// StagedCashflowEntry - Normalized form before commit to core schema
+model StagedCashflowEntry {
+  id                       String    @id @default(uuid())
+  jobId                    String
+  sourceRecordId           String
+  targetCategoryName       String
+  targetCategoryFlowType   String
+  targetCategoryEstateType String
+  lineName                 String
+  lineDescription          String?
+  weekOffset               Int
+  valueType                String
+  amountCents              BigInt
+  originalAmountRaw        String?   // Original string value before conversion
+  note                     String?
+  confidenceScore          Float?
+  requiresReview           Boolean   @default(false)
+  reviewReason             String?
+  reviewReasonCode         String?   // Machine-readable reason code
+  reviewedBy               String?
+  reviewedAt               DateTime?
+  reviewAction             String?   // APPROVE, MODIFY, REJECT, NEEDS_CLARIFICATION
+  reviewNote               String?   // Operator note when reviewing
+  modifiedFields           String?   // JSON: which fields were modified during review
+  status                   String    @default("STAGED") // STAGED, REVIEWED, COMMITTED, REJECTED, NEEDS_CLARIFICATION
+
+  sourceRecord IngestionRecord @relation(fields: [sourceRecordId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, status])
+  @@index([requiresReview, status])
+  @@map("staged_cashflow_entries")
+}
+
+// FieldTransformation - Tracks how each field was transformed
+model FieldTransformation {
+  id                    String   @id @default(uuid())
+  recordId              String
+  sourceField           String
+  sourceValue           String
+  targetField           String
+  targetValue           String
+  transformationType    String
+  transformationConfig  String? // JSON
+  timestamp             DateTime @default(now())
+
+  record IngestionRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@map("field_transformations")
+}
+
+// MappingConfiguration - Defines how to map source fields to target schema
+// Can be scoped to: global (projectId=null, caseId=null), per-project, or per-case
+model MappingConfiguration {
+  id               String    @id @default(uuid())
+  name             String
+  description      String?
+  sourceType       String    // CSV_GENERIC, CSV_BANK_STATEMENT, EXCEL_LIQUIDITY, etc.
+  projectId        String?   // Scope: null = global template
+  caseId           String?   // Scope: null = project-level or global
+  version          Int       @default(1)
+  isActive         Boolean   @default(false)
+  fieldMappings    String    // JSON: Array of FieldMapping
+  valueMappings    String    // JSON: Array of ValueMapping
+  categoryMappings String    // JSON: Array of CategoryMapping
+  dateFormat       String    @default("DD.MM.YYYY")
+  decimalSeparator String    @default(",")
+  thousandsSeparator String  @default(".")
+  sheetName        String?   // For Excel: which sheet to use
+  headerRow        Int       @default(1) // 1-indexed row number for headers
+  createdAt        DateTime  @default(now())
+  createdBy        String
+  updatedAt        DateTime  @updatedAt
+  updatedBy        String
+
+  @@index([projectId])
+  @@index([caseId])
+  @@index([sourceType])
+  @@map("mapping_configurations")
+}
+
+// MappingTemplate - Reusable mapping templates that users can apply
+model MappingTemplate {
+  id               String   @id @default(uuid())
+  name             String
+  description      String?
+  sourceType       String
+  projectId        String?  // null = global template available to all
+  isPublic         Boolean  @default(false) // Can be used by other projects
+  fieldMappings    String   // JSON
+  valueMappings    String   // JSON
+  categoryMappings String   // JSON
+  dateFormat       String   @default("DD.MM.YYYY")
+  decimalSeparator String   @default(",")
+  thousandsSeparator String @default(".")
+  usageCount       Int      @default(0)
+  createdAt        DateTime @default(now())
+  createdBy        String
+  updatedAt        DateTime @updatedAt
+  updatedBy        String
+
+  @@index([projectId])
+  @@index([sourceType])
+  @@map("mapping_templates")
+}
+
+// =============================================================================
+// CASE CONFIGURATION (PRESENTATION LAYER)
+// =============================================================================
+
+// CaseConfiguration - Controls presentation settings per case
+model CaseConfiguration {
+  id                String   @id @default(uuid())
+  caseId            String
+  configType        String // ROW_VISIBILITY, ROW_ORDER, GROUPING, CHART_SETTINGS
+  configData        String // JSON
+  createdAt         DateTime @default(now())
+  createdBy         String
+  updatedAt         DateTime @updatedAt
+  updatedBy         String
+
+  case Case @relation(fields: [caseId], references: [id])
+
+  @@unique([caseId, configType])
+  @@map("case_configurations")
+}
+
+// =============================================================================
+// ACCESS CONTROL
+// =============================================================================
+
+// ShareLink - Tokenized read-only links for external users
+model ShareLink {
+  id           String    @id @default(uuid())
+  caseId       String
+  token        String    @unique
+  label        String // e.g., "Dr. Mueller - External Access"
+  expiresAt    DateTime?
+  isActive     Boolean   @default(true)
+  accessCount  Int       @default(0)
+  lastAccessAt DateTime?
+  createdAt    DateTime  @default(now())
+  createdBy    String
+
+  case Case @relation(fields: [caseId], references: [id])
+
+  @@map("share_links")
+}
+
+// =============================================================================
+// AUDIT & LOGGING
+// =============================================================================
+
+// AuditEvent - Complete audit trail
+model AuditEvent {
+  id          String   @id @default(uuid())
+  timestamp   DateTime @default(now())
+  eventType   String
+  entityType  String
+  entityId    String
+  userId      String
+  userIp      String?
+  userAgent   String?
+  action      String // CREATE, READ, UPDATE, DELETE
+  oldValue    String? // JSON
+  newValue    String? // JSON
+  metadata    String? // JSON
+
+  @@index([entityType, entityId])
+  @@index([timestamp])
+  @@index([userId])
+  @@map("audit_events")
+}
