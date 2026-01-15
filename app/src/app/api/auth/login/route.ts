@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSession, validateCredentials } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { SignJWT } from "jose";
+
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "admin";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "InsolvencyAdmin2026!";
+const SESSION_SECRET = process.env.SESSION_SECRET || "insolvency-liquidity-secret-key-32chars!";
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,28 +18,44 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log("Login attempt for user:", username);
-
-    const isValid = await validateCredentials(username, password);
-    console.log("Credentials valid:", isValid);
-
-    if (!isValid) {
+    // Validate credentials
+    if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
       return NextResponse.json(
         { error: "Ungültige Anmeldedaten" },
         { status: 401 }
       );
     }
 
-    console.log("Creating session...");
-    await createSession(username);
-    console.log("Session created successfully");
+    // Create JWT token
+    const secretKey = new TextEncoder().encode(SESSION_SECRET);
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const token = await new SignJWT({
+      userId: "admin",
+      username,
+      isAdmin: true,
+      expiresAt: expiresAt.toISOString(),
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setExpirationTime("24h")
+      .sign(secretKey);
+
+    // Set cookie
+    const cookieStore = await cookies();
+    cookieStore.set("session", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      expires: expiresAt,
+      path: "/",
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Login error:", error instanceof Error ? error.message : error);
-    console.error("Login error stack:", error instanceof Error ? error.stack : "no stack");
+    console.error("Login error:", error);
     return NextResponse.json(
-      { error: "Anmeldung fehlgeschlagen" },
+      { error: "Anmeldung fehlgeschlagen: " + (error instanceof Error ? error.message : "Unbekannt") },
       { status: 500 }
     );
   }

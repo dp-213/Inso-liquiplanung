@@ -1,9 +1,8 @@
 import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 
-const secretKey = new TextEncoder().encode(
-  process.env.SESSION_SECRET || "insolvency-liquidity-secret-key1"
-);
+const SESSION_SECRET = process.env.SESSION_SECRET || "insolvency-liquidity-secret-key-32chars!";
+const secretKey = new TextEncoder().encode(SESSION_SECRET);
 
 export interface SessionData {
   userId: string;
