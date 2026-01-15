@@ -40,6 +40,25 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 - Professionelle Formulierungen für Insolvenzbranche
 - Korrekte Umlaute in allen Texten und PDFs
 
+### Deployment
+- **Vercel-Deployment:** App live unter https://app-beige-kappa-43.vercel.app
+- **GitHub-Repository:** https://github.com/dp-213/Inso-liquiplanung
+- **Authentifizierung:** JWT-basierte Session mit HttpOnly-Cookies
+
+---
+
+## Version 1.0.1 – Bugfixes
+
+**Datum:** 15. Januar 2026
+
+### Fehlerbehebungen
+- **Login-Authentifizierung:** Umgebungsvariablen werden jetzt zur Laufzeit gelesen (nicht zur Build-Zeit)
+- **Env-Var-Format:** Zeilenumbrüche in Vercel-Umgebungsvariablen entfernt
+
+### Technische Änderungen
+- Login-Route vereinfacht und robuster gemacht
+- Session-Secret-Handling verbessert
+
 ---
 
 ## Geplante Änderungen

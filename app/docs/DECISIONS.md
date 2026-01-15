@@ -163,6 +163,22 @@ Dieses Dokument dokumentiert wichtige Produkt-, UX- und technische Entscheidunge
 
 ---
 
+### T004: Vercel-Deployment mit Laufzeit-Umgebungsvariablen
+
+**Entscheidung:** Umgebungsvariablen werden zur Laufzeit gelesen, nicht zur Build-Zeit.
+
+**Begründung:**
+- Vercel-Serverless-Funktionen haben Build-Zeit und Laufzeit getrennt
+- Credentials dürfen nicht im Build-Cache landen
+- Flexiblere Konfiguration ohne Neu-Deployment
+
+**Auswirkungen:**
+- `process.env.*` wird innerhalb der API-Route-Funktion gelesen
+- Keine Top-Level-Konstanten für Secrets
+- Änderungen an Env-Vars erfordern Redeployment
+
+---
+
 ## Entscheidungshistorie
 
 | ID | Datum | Bereich | Kurzbeschreibung |
@@ -176,3 +192,4 @@ Dieses Dokument dokumentiert wichtige Produkt-, UX- und technische Entscheidunge
 | T001 | 2026-01-15 | Technik | SQLite für v1 |
 | T002 | 2026-01-15 | Technik | Unveränderlicher Rechenkern |
 | T003 | 2026-01-15 | Technik | Mehrstufiger Import |
+| T004 | 2026-01-15 | Technik | Laufzeit-Env-Vars |
