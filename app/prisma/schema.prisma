@@ -52,6 +52,7 @@ model Case {
   shareLinks           ShareLink[]
   configurations       CaseConfiguration[]
   aiPreprocessingJobs  AiPreprocessingJob[]
+  customerAccess       CustomerCaseAccess[]
 
   @@map("cases")
 }
@@ -383,6 +384,102 @@ model AuditEvent {
   @@index([timestamp])
   @@index([userId])
   @@map("audit_events")
+}
+
+// =============================================================================
+// CUSTOMER USER MANAGEMENT (EXTERNAL INSOLVENCY ADMINISTRATORS)
+// =============================================================================
+
+// CustomerUser - External users who can view assigned cases
+model CustomerUser {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  passwordHash      String
+  name              String
+  company           String?   // Law firm or company name
+  phone             String?
+  isActive          Boolean   @default(true)
+  emailVerified     Boolean   @default(false)
+  lastLoginAt       DateTime?
+  loginCount        Int       @default(0)
+  failedLoginCount  Int       @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime  @default(now())
+  createdBy         String    // Admin who created the account
+  updatedAt         DateTime  @updatedAt
+  updatedBy         String
+
+  caseAccess        CustomerCaseAccess[]
+  sessions          CustomerSession[]
+  auditLogs         CustomerAuditLog[]
+
+  @@index([email])
+  @@index([isActive])
+  @@map("customer_users")
+}
+
+// CustomerCaseAccess - Links customer users to specific cases they can view
+model CustomerCaseAccess {
+  id              String    @id @default(uuid())
+  customerId      String
+  caseId          String
+  accessLevel     String    @default("VIEW") // VIEW, COMMENT (future), DOWNLOAD
+  grantedAt       DateTime  @default(now())
+  grantedBy       String    // Admin who granted access
+  expiresAt       DateTime? // Optional expiration
+  isActive        Boolean   @default(true)
+  revokedAt       DateTime?
+  revokedBy       String?
+  revokeReason    String?
+  lastAccessedAt  DateTime?
+  accessCount     Int       @default(0)
+
+  customer        CustomerUser @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  case            Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@unique([customerId, caseId])
+  @@index([customerId])
+  @@index([caseId])
+  @@index([isActive])
+  @@map("customer_case_access")
+}
+
+// CustomerSession - Active sessions for customer users
+model CustomerSession {
+  id            String    @id @default(uuid())
+  customerId    String
+  token         String    @unique
+  userAgent     String?
+  ipAddress     String?
+  expiresAt     DateTime
+  createdAt     DateTime  @default(now())
+  lastActivityAt DateTime @default(now())
+
+  customer      CustomerUser @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("customer_sessions")
+}
+
+// CustomerAuditLog - Audit trail for customer actions
+model CustomerAuditLog {
+  id          String   @id @default(uuid())
+  customerId  String
+  action      String   // LOGIN, LOGOUT, VIEW_CASE, DOWNLOAD_REPORT, etc.
+  caseId      String?  // Which case was accessed (if applicable)
+  details     String?  // JSON - additional context
+  ipAddress   String?
+  userAgent   String?
+  timestamp   DateTime @default(now())
+
+  customer    CustomerUser @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([caseId])
+  @@index([timestamp])
+  @@map("customer_audit_logs")
 }
 
 // =============================================================================

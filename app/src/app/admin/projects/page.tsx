@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -14,7 +14,7 @@ interface Project {
   activeCases: number;
 }
 
-export default function ProjectsPage() {
+function ProjectsContent() {
   const searchParams = useSearchParams();
   const showNewForm = searchParams.get("new") === "true";
 
@@ -226,5 +226,33 @@ export default function ProjectsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+function ProjectsLoading() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">Projekte</h1>
+          <p className="text-[var(--secondary)] mt-1">Verwalten Sie Insolvenzverwalter und Mandate</p>
+        </div>
+        <div className="h-10 w-32 bg-gray-200 rounded animate-pulse"></div>
+      </div>
+      <div className="admin-card p-8">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
+          <span className="ml-3 text-[var(--muted)]">Wird geladen...</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function ProjectsPage() {
+  return (
+    <Suspense fallback={<ProjectsLoading />}>
+      <ProjectsContent />
+    </Suspense>
   );
 }

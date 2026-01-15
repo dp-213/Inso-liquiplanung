@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -9,7 +9,7 @@ interface Project {
   name: string;
 }
 
-export default function NewCasePage() {
+function NewCaseContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedProjectId = searchParams.get("projectId");
@@ -275,5 +275,32 @@ export default function NewCasePage() {
         </form>
       )}
     </div>
+  );
+}
+
+function NewCaseLoading() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">Neuen Fall anlegen</h1>
+          <p className="text-[var(--secondary)] mt-1">Erstellen Sie ein neues Insolvenzverfahren</p>
+        </div>
+      </div>
+      <div className="admin-card p-8">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
+          <span className="ml-3 text-[var(--muted)]">Wird geladen...</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function NewCasePage() {
+  return (
+    <Suspense fallback={<NewCaseLoading />}>
+      <NewCaseContent />
+    </Suspense>
   );
 }
