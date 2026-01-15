@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import Link from "next/link";
 import {
   SOURCE_TYPES,
@@ -10,10 +10,12 @@ import {
   IngestionStatus,
 } from "@/lib/ingestion/types";
 
-interface Case {
+interface CaseData {
   id: string;
   caseNumber: string;
   debtorName: string;
+  status: string;
+  project: { name: string };
 }
 
 interface IngestionJob {
@@ -34,17 +36,15 @@ interface IngestionJob {
   startedAt: string;
   completedAt: string | null;
   createdBy: string;
-  case: {
-    caseNumber: string;
-    debtorName: string;
-  };
-  _count: {
-    records: number;
-  };
 }
 
-export default function IngestionCenterPage() {
-  const [cases, setCases] = useState<Case[]>([]);
+export default function CaseIngestionPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const [caseData, setCaseData] = useState<CaseData | null>(null);
   const [jobs, setJobs] = useState<IngestionJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -52,44 +52,43 @@ export default function IngestionCenterPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Upload form state
-  const [selectedCaseId, setSelectedCaseId] = useState<string>("");
-  const [selectedSourceType, setSelectedSourceType] = useState<SourceType>("CSV_GENERIC");
+  const [selectedSourceType, setSelectedSourceType] =
+    useState<SourceType>("CSV_GENERIC");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  // Filter state
-  const [filterCaseId, setFilterCaseId] = useState<string>("");
-  const [filterStatus, setFilterStatus] = useState<string>("");
-
   const fetchData = useCallback(async () => {
     try {
-      const [casesRes, jobsRes] = await Promise.all([
-        fetch("/api/cases"),
-        fetch("/api/ingestion"),
+      const [caseRes, jobsRes] = await Promise.all([
+        fetch(`/api/cases/${id}`),
+        fetch(`/api/ingestion?caseId=${id}`),
       ]);
 
-      if (casesRes.ok) {
-        const casesData = await casesRes.json();
-        setCases(casesData);
-      } else if (casesRes.status === 500) {
-        setError("Datenbank nicht verfügbar. Für den produktiven Einsatz wird eine Cloud-Datenbank benötigt.");
+      if (caseRes.ok) {
+        const data = await caseRes.json();
+        setCaseData(data);
+      } else {
+        setError("Fall nicht gefunden");
       }
 
       if (jobsRes.ok) {
         const jobsData = await jobsRes.json();
-        setJobs(jobsData);
+        // Filter jobs for this case
+        const caseJobs = Array.isArray(jobsData)
+          ? jobsData.filter((j: IngestionJob) => j.caseId === id)
+          : [];
+        setJobs(caseJobs);
       }
     } catch (err) {
       console.error("Error fetching data:", err);
-      setError("Datenbank nicht verfügbar. Für den produktiven Einsatz wird eine Cloud-Datenbank benötigt.");
+      setError("Fehler beim Laden der Daten");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [id]);
 
   useEffect(() => {
     fetchData();
-    // Poll for updates every 10 seconds
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
   }, [fetchData]);
@@ -115,16 +114,14 @@ export default function IngestionCenterPage() {
   };
 
   const handleFileSelect = (file: File) => {
-    // Validate file type
     const validExtensions = [".csv", ".xlsx", ".xls"];
     const ext = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
 
     if (!validExtensions.includes(ext)) {
-      setError("Nur CSV und Excel-Dateien werden unterstützt");
+      setError("Nur CSV und Excel-Dateien werden unterstuetzt");
       return;
     }
 
-    // Auto-detect source type
     if (ext === ".csv") {
       setSelectedSourceType("CSV_GENERIC");
     } else {
@@ -136,8 +133,8 @@ export default function IngestionCenterPage() {
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !selectedCaseId) {
-      setError("Bitte Fall und Datei auswaehlen");
+    if (!selectedFile) {
+      setError("Bitte Datei auswaehlen");
       return;
     }
 
@@ -148,7 +145,7 @@ export default function IngestionCenterPage() {
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
-      formData.append("caseId", selectedCaseId);
+      formData.append("caseId", id);
       formData.append("sourceType", selectedSourceType);
 
       const res = await fetch("/api/ingestion", {
@@ -156,42 +153,19 @@ export default function IngestionCenterPage() {
         body: formData,
       });
 
-      let data;
-      try {
-        data = await res.json();
-      } catch (jsonError) {
-        console.error("Error parsing response:", jsonError);
-        throw new Error("Server-Antwort konnte nicht verarbeitet werden. Bitte versuchen Sie es erneut.");
-      }
+      const data = await res.json();
 
       if (!res.ok) {
-        // Build a detailed error message
-        let errorMsg = data.error || "Upload fehlgeschlagen";
-
-        // If there's a jobId, add link to view details
-        if (data.jobId) {
-          errorMsg += ` (Job-ID: ${data.jobId.substring(0, 8)}...)`;
-        }
-
-        // Log technical details to console for debugging
-        if (data.details) {
-          console.error("Upload error details:", data.details);
-        }
-
-        throw new Error(errorMsg);
+        throw new Error(data.error || "Upload fehlgeschlagen");
       }
 
       setSuccessMessage(
         `Datei erfolgreich hochgeladen: ${data.recordCount} Zeilen erkannt`
       );
       setSelectedFile(null);
-
-      // Refresh job list
       fetchData();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Upload fehlgeschlagen";
-      console.error("Upload error:", errorMessage);
-      setError(errorMessage);
+      setError(err instanceof Error ? err.message : "Upload fehlgeschlagen");
     } finally {
       setUploading(false);
     }
@@ -231,25 +205,24 @@ export default function IngestionCenterPage() {
     }
   };
 
-  const filteredJobs = jobs.filter((job) => {
-    if (filterCaseId && job.caseId !== filterCaseId) return false;
-    if (filterStatus && job.status !== filterStatus) return false;
-    return true;
-  });
-
   if (loading) {
     return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
+      </div>
+    );
+  }
+
+  if (!caseData) {
+    return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-[var(--foreground)]">
-            Daten-Import
-          </h1>
-        </div>
-        <div className="admin-card p-8">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
-            <span className="ml-3 text-[var(--secondary)]">Laden...</span>
-          </div>
+        <div className="admin-card p-8 text-center">
+          <p className="text-[var(--danger)]">
+            {error || "Fall nicht gefunden"}
+          </p>
+          <Link href="/admin/cases" className="btn-secondary mt-4 inline-block">
+            Zurueck zur Uebersicht
+          </Link>
         </div>
       </div>
     );
@@ -257,159 +230,78 @@ export default function IngestionCenterPage() {
 
   return (
     <div className="space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center text-sm text-[var(--muted)]">
+        <Link href="/admin/cases" className="hover:text-[var(--primary)]">
+          Faelle
+        </Link>
+        <svg
+          className="w-4 h-4 mx-2"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5l7 7-7 7"
+          />
+        </svg>
+        <Link
+          href={`/admin/cases/${id}`}
+          className="hover:text-[var(--primary)]"
+        >
+          {caseData.debtorName}
+        </Link>
+        <svg
+          className="w-4 h-4 mx-2"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 5l7 7-7 7"
+          />
+        </svg>
+        <span className="text-[var(--foreground)]">Daten-Import</span>
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-[var(--foreground)]">
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">
             Daten-Import
           </h1>
-          <p className="text-sm text-[var(--secondary)] mt-1">
-            Dateien hochladen und Zuordnungen verwalten
+          <p className="text-[var(--secondary)] mt-1">
+            {caseData.caseNumber} - {caseData.debtorName}
           </p>
         </div>
-        <Link href="/admin/ingestion/review" className="btn-secondary">
-          <span className="flex items-center">
-            <svg
-              className="w-4 h-4 mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
-              />
+        <div className="flex items-center gap-3">
+          <Link href={`/admin/cases/${id}`} className="btn-secondary">
+            Zurueck zum Fall
+          </Link>
+          <Link href={`/admin/cases/${id}/dashboard`} className="btn-primary flex items-center">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
-            Prüfung
-          </span>
-        </Link>
-      </div>
-
-      {/* Requirements Info Box - Enhanced */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-5">
-        <div className="flex items-start">
-          <svg
-            className="w-6 h-6 text-blue-600 mr-3 mt-0.5 flex-shrink-0"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          <div className="flex-1">
-            <h3 className="font-medium text-blue-800 text-lg">
-              Beispieldateien und Datenanforderungen
-            </h3>
-            <p className="text-sm text-blue-700 mt-1">
-              Laden Sie Beispieldateien herunter, um zu sehen, wie Ihre Daten strukturiert sein muessen.
-              Bei unstrukturierten Daten nutzen Sie die <Link href="/admin/ai-preprocessing" className="underline hover:no-underline font-medium">KI-Aufbereitung</Link>.
-            </p>
-            <div className="flex flex-wrap items-center gap-3 mt-3">
-              <a
-                href="/api/examples/minimal-beispiel.xlsx"
-                download="minimal-beispiel.xlsx"
-                className="inline-flex items-center px-3 py-1.5 bg-white border border-blue-300 rounded-md text-sm font-medium text-blue-700 hover:bg-blue-50 hover:border-blue-400 transition-colors"
-              >
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Minimalbeispiel
-              </a>
-              <a
-                href="/api/examples/empfohlene-struktur.xlsx"
-                download="empfohlene-struktur.xlsx"
-                className="inline-flex items-center px-3 py-1.5 bg-white border border-blue-300 rounded-md text-sm font-medium text-blue-700 hover:bg-blue-50 hover:border-blue-400 transition-colors"
-              >
-                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Empfohlene Struktur
-              </a>
-              <Link
-                href="/admin/ingestion/requirements"
-                className="inline-flex items-center px-3 py-1.5 bg-blue-600 rounded-md text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-              >
-                Alle Anforderungen
-                <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
-            </div>
-          </div>
+            Dashboard
+          </Link>
         </div>
       </div>
 
       {/* Messages */}
       {error && (
-        <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
-          <div className="flex items-start">
-            <svg
-              className="w-5 h-5 text-red-500 mr-3 mt-0.5 flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <div className="flex-1">
-              <h4 className="font-medium text-red-800">Fehler beim Import</h4>
-              <p className="text-red-700 mt-1">{error}</p>
-              <p className="text-red-600 text-sm mt-2">
-                Bitte ueberpruefen Sie die Datei und versuchen Sie es erneut. Bei anhaltenden Problemen wenden Sie sich an den Support.
-              </p>
-            </div>
-            <button
-              onClick={() => setError(null)}
-              className="text-red-500 hover:text-red-700 ml-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+          {error}
         </div>
       )}
       {successMessage && (
-        <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
-          <div className="flex items-start">
-            <svg
-              className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <div className="flex-1">
-              <h4 className="font-medium text-green-800">Erfolg</h4>
-              <p className="text-green-700 mt-1">{successMessage}</p>
-            </div>
-            <button
-              onClick={() => setSuccessMessage(null)}
-              className="text-green-500 hover:text-green-700 ml-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+          {successMessage}
         </div>
       )}
 
@@ -421,43 +313,24 @@ export default function IngestionCenterPage() {
           </h2>
         </div>
         <div className="p-6 space-y-6">
-          {/* Case and Source Type Selection */}
-          <div className="grid grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
-                Fall auswählen *
-              </label>
-              <select
-                value={selectedCaseId}
-                onChange={(e) => setSelectedCaseId(e.target.value)}
-                className="input-field"
-              >
-                <option value="">-- Fall wählen --</option>
-                {cases.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.caseNumber} - {c.debtorName}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
-                Dateityp
-              </label>
-              <select
-                value={selectedSourceType}
-                onChange={(e) =>
-                  setSelectedSourceType(e.target.value as SourceType)
-                }
-                className="input-field"
-              >
-                {Object.entries(SOURCE_TYPE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
+          {/* Source Type Selection */}
+          <div className="max-w-md">
+            <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
+              Dateityp
+            </label>
+            <select
+              value={selectedSourceType}
+              onChange={(e) =>
+                setSelectedSourceType(e.target.value as SourceType)
+              }
+              className="input-field"
+            >
+              {Object.entries(SOURCE_TYPE_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* Drop Zone */}
@@ -518,7 +391,7 @@ export default function IngestionCenterPage() {
                 <div>
                   <label className="cursor-pointer">
                     <span className="text-[var(--primary)] hover:underline">
-                      Datei auswählen
+                      Datei auswaehlen
                     </span>
                     <input
                       type="file"
@@ -537,7 +410,7 @@ export default function IngestionCenterPage() {
                   </span>
                 </div>
                 <p className="text-xs text-[var(--muted)]">
-                  Unterstützte Formate: CSV, Excel (XLSX, XLS)
+                  Unterstuetzte Formate: CSV, Excel (XLSX, XLS)
                 </p>
               </div>
             )}
@@ -547,7 +420,7 @@ export default function IngestionCenterPage() {
           <div className="flex justify-end">
             <button
               onClick={handleUpload}
-              disabled={!selectedFile || !selectedCaseId || uploading}
+              disabled={!selectedFile || uploading}
               className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {uploading ? (
@@ -584,45 +457,14 @@ export default function IngestionCenterPage() {
       {/* Jobs List */}
       <div className="admin-card">
         <div className="p-6 border-b border-[var(--border)]">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-[var(--foreground)]">
-              Importvorgänge
-            </h2>
-            <div className="flex items-center space-x-4">
-              {/* Filter by Case */}
-              <select
-                value={filterCaseId}
-                onChange={(e) => setFilterCaseId(e.target.value)}
-                className="input-field text-sm py-1.5"
-              >
-                <option value="">Alle Fälle</option>
-                {cases.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.caseNumber}
-                  </option>
-                ))}
-              </select>
-
-              {/* Filter by Status */}
-              <select
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-                className="input-field text-sm py-1.5"
-              >
-                <option value="">Alle Status</option>
-                {Object.entries(INGESTION_STATUS_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+          <h2 className="text-lg font-medium text-[var(--foreground)]">
+            Import-Historie fuer diesen Fall
+          </h2>
         </div>
 
-        {filteredJobs.length === 0 ? (
+        {jobs.length === 0 ? (
           <div className="p-8 text-center text-[var(--secondary)]">
-            Keine Importvorgänge gefunden
+            Keine Importvorgaenge fuer diesen Fall vorhanden
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -630,17 +472,16 @@ export default function IngestionCenterPage() {
               <thead>
                 <tr>
                   <th>Datei</th>
-                  <th>Fall</th>
                   <th>Typ</th>
                   <th>Status</th>
                   <th>Zeilen</th>
-                  <th>Qualität</th>
+                  <th>Qualitaet</th>
                   <th>Hochgeladen</th>
                   <th>Aktionen</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredJobs.map((job) => (
+                {jobs.map((job) => (
                   <tr key={job.id}>
                     <td>
                       <div>
@@ -650,16 +491,6 @@ export default function IngestionCenterPage() {
                         <div className="text-xs text-[var(--muted)]">
                           {formatFileSize(job.fileSizeBytes)} |{" "}
                           {job.fileHashSha256.substring(0, 12)}...
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="text-sm">
-                        <div className="font-medium">
-                          {job.case.caseNumber}
-                        </div>
-                        <div className="text-[var(--muted)]">
-                          {job.case.debtorName}
                         </div>
                       </div>
                     </td>
@@ -709,19 +540,17 @@ export default function IngestionCenterPage() {
                               }}
                             ></div>
                           </div>
-                          <div className="text-xs text-[var(--muted)] flex justify-between">
-                            <span>
-                              {job.errorCount > 0 && (
-                                <span className="text-[var(--danger)]">
-                                  {job.errorCount} Fehler
-                                </span>
-                              )}
-                              {job.warningCount > 0 && (
-                                <span className="text-[var(--warning)] ml-2">
-                                  {job.warningCount} Warnungen
-                                </span>
-                              )}
-                            </span>
+                          <div className="text-xs text-[var(--muted)]">
+                            {job.errorCount > 0 && (
+                              <span className="text-[var(--danger)]">
+                                {job.errorCount} Fehler
+                              </span>
+                            )}
+                            {job.warningCount > 0 && (
+                              <span className="text-[var(--warning)] ml-2">
+                                {job.warningCount} Warnungen
+                              </span>
+                            )}
                           </div>
                         </div>
                       ) : (
@@ -757,7 +586,7 @@ export default function IngestionCenterPage() {
                             href={`/admin/ingestion/${job.id}/review`}
                             className="text-[var(--warning)] hover:underline text-sm"
                           >
-                            Prüfen
+                            Pruefen
                           </Link>
                         )}
                         {job.status === "READY" && (
@@ -765,7 +594,7 @@ export default function IngestionCenterPage() {
                             href={`/admin/ingestion/${job.id}/commit`}
                             className="text-[var(--success)] hover:underline text-sm"
                           >
-                            Übernehmen
+                            Uebernehmen
                           </Link>
                         )}
                       </div>

@@ -253,7 +253,7 @@ export default async function AdminDashboard() {
           <Link href="/admin/projects?new=true" className="btn-primary">
             Neues Projekt erstellen
           </Link>
-          <Link href="/admin/cases?new=true" className="btn-secondary">
+          <Link href="/admin/cases/new" className="btn-secondary">
             Neuen Fall anlegen
           </Link>
         </div>

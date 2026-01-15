@@ -46,11 +46,12 @@ model Case {
   updatedAt   DateTime  @updatedAt
   updatedBy   String
 
-  project        Project          @relation(fields: [projectId], references: [id])
-  plans          LiquidityPlan[]
-  ingestionJobs  IngestionJob[]
-  shareLinks     ShareLink[]
-  configurations CaseConfiguration[]
+  project              Project              @relation(fields: [projectId], references: [id])
+  plans                LiquidityPlan[]
+  ingestionJobs        IngestionJob[]
+  shareLinks           ShareLink[]
+  configurations       CaseConfiguration[]
+  aiPreprocessingJobs  AiPreprocessingJob[]
 
   @@map("cases")
 }
@@ -382,4 +383,102 @@ model AuditEvent {
   @@index([timestamp])
   @@index([userId])
   @@map("audit_events")
+}
+
+// =============================================================================
+// AI-ASSISTED PREPROCESSING
+// =============================================================================
+
+// AiPreprocessingJob - Tracks an AI preprocessing session
+model AiPreprocessingJob {
+  id                String    @id @default(uuid())
+  caseId            String
+  status            String    @default("CREATED") // CREATED, PROCESSING, REVIEW, CORRECTION, APPROVED, REJECTED, COMMITTED
+  totalFiles        Int       @default(0)
+  processedFiles    Int       @default(0)
+  iterationCount    Int       @default(0) // How many correction iterations
+  lastError         String?
+  createdAt         DateTime  @default(now())
+  createdBy         String
+  updatedAt         DateTime  @updatedAt
+  completedAt       DateTime?
+  approvedAt        DateTime?
+  approvedBy        String?
+
+  case Case                   @relation(fields: [caseId], references: [id])
+  files AiPreprocessingFile[]
+  rows  AiPreprocessingRow[]
+  logs  AiPreprocessingLog[]
+
+  @@index([caseId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("ai_preprocessing_jobs")
+}
+
+// AiPreprocessingFile - Individual files in a preprocessing job
+model AiPreprocessingFile {
+  id                        String   @id @default(uuid())
+  jobId                     String
+  fileName                  String
+  fileType                  String   // CSV, EXCEL, PDF
+  fileSizeBytes             BigInt
+  fileHash                  String
+  mimeType                  String
+  rawContent                String?  // Base64 for binary, text for CSV
+  status                    String   @default("PENDING") // PENDING, PROCESSING, COMPLETED, ERROR
+  errorMessage              String?
+  documentType              String?  // LIQUIDITAETSPLANUNG, GUV_PL, BWA, SUSA, ZAHLUNGSTERMINE, KONTOAUSZUG, GEMISCHTES_FINANZDOKUMENT, UNBEKANNT
+  documentTypeExplanation   String?  // How the document type was detected
+  createdAt                 DateTime @default(now())
+
+  job  AiPreprocessingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  rows AiPreprocessingRow[]
+
+  @@index([jobId])
+  @@map("ai_preprocessing_files")
+}
+
+// AiPreprocessingRow - Individual proposed rows from AI
+model AiPreprocessingRow {
+  id                    String    @id @default(uuid())
+  jobId                 String
+  fileId                String
+  sourceLocation        String    // e.g., "Sheet1:A5" or "row:12"
+  rawData               String    // JSON - original extracted values
+  aiSuggestion          String    // JSON - AI's proposed structured data
+  aiExplanation         String?   // Why the AI interpreted it this way
+  confidenceScore       Float     // 0.0 - 1.0
+  confidenceDetails     String?   // JSON - per-field confidence breakdown
+  status                String    @default("PENDING") // PENDING, APPROVED, REJECTED, MODIFIED, UNCLEAR
+  humanEdits            String?   // JSON - what the human changed
+  reviewedBy            String?
+  reviewedAt            DateTime?
+  rejectionReason       String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  job  AiPreprocessingJob  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  file AiPreprocessingFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([fileId])
+  @@index([status])
+  @@map("ai_preprocessing_rows")
+}
+
+// AiPreprocessingLog - Complete audit trail for AI preprocessing
+model AiPreprocessingLog {
+  id          String   @id @default(uuid())
+  jobId       String
+  action      String   // UPLOAD, AI_PROCESS, AI_REPROCESS, REVIEW, APPROVE, REJECT, MODIFY, COMMIT, ERROR
+  details     String   // JSON - detailed information about the action
+  userId      String
+  timestamp   DateTime @default(now())
+
+  job AiPreprocessingJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([timestamp])
+  @@map("ai_preprocessing_logs")
 }

@@ -1,0 +1,11 @@
+Datum;Einzahlung;Auszahlung;Bezeichnung;Kategorie;Kommentar
+15.01.2026;5000,00;;Umsatzerloese Januar;Umsatzerloese;Sammelzahlung
+22.01.2026;;1500,00;Lohnzahlung KW4;Loehne und Gehaelter;4 Mitarbeiter
+29.01.2026;;800,00;Miete Februar;Raumkosten;Bueromiete
+05.02.2026;3200,00;;Kundenzahlung Meier;Umsatzerloese;Restzahlung
+12.02.2026;;450,00;Versicherungsbeitraege;Versicherungen;Quartalsbeitrag
+19.02.2026;;2100,00;Lieferantenrechnung Schmidt;Wareneinkauf;Materiallieferung
+26.02.2026;1800,00;;Teilzahlung Projekt A;Umsatzerloese;2. Rate
+05.03.2026;;950,00;Energiekosten;Betriebskosten;Strom + Gas
+12.03.2026;4500,00;;Schlusszahlung Mueller;Umsatzerloese;Projektabschluss
+19.03.2026;;1200,00;Lohnzahlung KW12;Loehne und Gehaelter;4 Mitarbeiter

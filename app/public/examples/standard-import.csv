@@ -1,0 +1,11 @@
+Datum;Betrag;Bezeichnung;Kategorie;Konto;Gegenpartei;Referenz;Kommentar
+15.01.2026;5000,00;Umsatzerloese Januar;Umsatzerloese;DE89370400440532013000;Diverse Kunden;RE-2026-001;Sammelzahlung
+22.01.2026;-1500,00;Lohnzahlung KW4;Loehne und Gehaelter;DE89370400440532013000;Mitarbeiter;LN-2026-004;4 Mitarbeiter
+29.01.2026;-800,00;Miete Februar;Raumkosten;DE89370400440532013000;Immobilien GmbH;MI-2026-02;Bueromiete
+05.02.2026;3200,00;Kundenzahlung Meier;Umsatzerloese;DE89370400440532013000;Meier AG;RE-2025-089;Restzahlung
+12.02.2026;-450,00;Versicherungsbeitraege;Versicherungen;DE89370400440532013000;Allianz;VS-2026-Q1;Quartalsbeitrag
+19.02.2026;-2100,00;Lieferantenrechnung Schmidt;Wareneinkauf;DE89370400440532013000;Schmidt GmbH;LI-2026-023;Materiallieferung
+26.02.2026;1800,00;Teilzahlung Projekt A;Umsatzerloese;DE89370400440532013000;Projekt A GmbH;PR-A-003;2. Rate
+05.03.2026;-950,00;Energiekosten;Betriebskosten;DE89370400440532013000;Stadtwerke;EN-2026-03;Strom + Gas
+12.03.2026;4500,00;Schlusszahlung Mueller;Umsatzerloese;DE89370400440532013000;Mueller KG;RE-2025-102;Projektabschluss
+19.03.2026;-1200,00;Lohnzahlung KW12;Loehne und Gehaelter;DE89370400440532013000;Mitarbeiter;LN-2026-012;4 Mitarbeiter

@@ -165,15 +165,39 @@ export default function IngestionJobDetailPage({
     return (
       <div className="space-y-6">
         <div className="admin-card p-8">
-          <div className="text-center text-[var(--danger)]">
-            {error || "Importvorgang nicht gefunden"}
+          <div className="text-center">
+            <svg
+              className="w-12 h-12 text-[var(--danger)] mx-auto mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
+            </svg>
+            <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+              {error || "Importvorgang nicht gefunden"}
+            </h2>
+            <p className="text-[var(--muted)] mb-4">
+              Der Importvorgang konnte nicht geladen werden.
+            </p>
           </div>
-          <div className="mt-4 text-center">
+          <div className="mt-4 flex justify-center gap-3">
             <Link
               href="/admin/ingestion"
-              className="text-[var(--primary)] hover:underline"
+              className="btn-secondary"
             >
-              Zurück zur Übersicht
+              Zur Import-Uebersicht
+            </Link>
+            <Link
+              href="/admin/cases"
+              className="btn-primary"
+            >
+              Zur Fall-Uebersicht
             </Link>
           </div>
         </div>
@@ -254,6 +278,15 @@ export default function IngestionJobDetailPage({
               Daten übernehmen
             </Link>
           )}
+          <Link
+            href={`/admin/cases/${job.caseId}/dashboard`}
+            className="btn-secondary flex items-center"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Dashboard
+          </Link>
         </div>
       </div>
 

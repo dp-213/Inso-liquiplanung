@@ -4,3 +4,5 @@
 
 export * from './types';
 export * from './transformations';
+export * from './canonical-schema';
+export * from './canonical-parser';
