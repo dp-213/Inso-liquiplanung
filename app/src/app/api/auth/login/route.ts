@@ -13,20 +13,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log("Login attempt for user:", username);
+
     const isValid = await validateCredentials(username, password);
+    console.log("Credentials valid:", isValid);
 
     if (!isValid) {
       return NextResponse.json(
-        { error: "Ungueltige Anmeldedaten" },
+        { error: "Ungültige Anmeldedaten" },
         { status: 401 }
       );
     }
 
+    console.log("Creating session...");
     await createSession(username);
+    console.log("Session created successfully");
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Login error:", error);
+    console.error("Login error:", error instanceof Error ? error.message : error);
+    console.error("Login error stack:", error instanceof Error ? error.stack : "no stack");
     return NextResponse.json(
       { error: "Anmeldung fehlgeschlagen" },
       { status: 500 }
