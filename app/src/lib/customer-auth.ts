@@ -18,6 +18,7 @@ export interface CustomerSessionData {
   email: string;
   name: string;
   company: string | null;
+  logoUrl: string | null;
   expiresAt: Date;
 }
 
@@ -46,6 +47,7 @@ export async function decryptCustomerSession(
       email: payload.email as string,
       name: payload.name as string,
       company: payload.company as string | null,
+      logoUrl: (payload.logoUrl as string | null) || null,
       expiresAt: new Date(payload.expiresAt as string),
     };
   } catch {
@@ -74,6 +76,7 @@ export async function createCustomerSession(
     email: string;
     name: string;
     company: string | null;
+    logoUrl: string | null;
   },
   ipAddress?: string,
   userAgent?: string
@@ -87,6 +90,7 @@ export async function createCustomerSession(
     email: customer.email,
     name: customer.name,
     company: customer.company,
+    logoUrl: customer.logoUrl,
     expiresAt,
   };
 
@@ -170,6 +174,7 @@ export async function validateCustomerCredentials(
     email: string;
     name: string;
     company: string | null;
+    logoUrl: string | null;
   };
   error?: string;
 }> {
@@ -252,6 +257,7 @@ export async function validateCustomerCredentials(
       email: customer.email,
       name: customer.name,
       company: customer.company,
+      logoUrl: customer.logoUrl,
     },
   };
 }

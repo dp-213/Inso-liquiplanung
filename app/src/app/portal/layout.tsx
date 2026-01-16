@@ -18,6 +18,7 @@ export default async function PortalLayout({
       <CustomerHeader
         userName={session.name}
         companyName={session.company}
+        logoUrl={session.logoUrl}
       />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}

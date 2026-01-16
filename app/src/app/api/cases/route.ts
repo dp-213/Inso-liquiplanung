@@ -26,6 +26,8 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             name: true,
+            periodType: true,
+            periodCount: true,
             versions: {
               orderBy: { versionNumber: "desc" },
               take: 1,
@@ -35,6 +37,10 @@ export async function GET(request: NextRequest) {
               },
             },
           },
+        },
+        shareLinks: {
+          where: { isActive: true },
+          select: { id: true },
         },
         _count: {
           select: {

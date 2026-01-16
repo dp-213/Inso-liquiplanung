@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 interface CaseWithRelations {
@@ -5,117 +8,188 @@ interface CaseWithRelations {
   caseNumber: string;
   debtorName: string;
   status: string;
-  updatedAt: Date;
+  updatedAt: string;
   owner: { id: string; name: string; email: string; company: string | null };
   plans: {
     periodType: string | null;
     periodCount: number | null;
-    versions: { versionNumber: number }[]
+    versions: { versionNumber: number }[];
   }[];
   shareLinks: { id: string }[];
 }
 
-async function getCases(): Promise<{ cases: CaseWithRelations[]; dbError: boolean; errorMessage?: string }> {
-  console.log("[getCases] Function called");
+export default function CasesListPage() {
+  const [cases, setCases] = useState<CaseWithRelations[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deleteCaseId, setDeleteCaseId] = useState<string | null>(null);
+  const [deleteCaseName, setDeleteCaseName] = useState("");
+  const [deleteInput, setDeleteInput] = useState("");
+  const [deleting, setDeleting] = useState(false);
 
-  try {
-    // Dynamic import to catch initialization errors
-    console.log("[getCases] Importing prisma...");
-    const { default: prisma } = await import("@/lib/db");
-    console.log("[getCases] Prisma imported successfully");
+  useEffect(() => {
+    fetchCases();
+  }, []);
 
-    console.log("[getCases] Starting database query...");
-    const cases = await prisma.case.findMany({
-      include: {
-        owner: { select: { id: true, name: true, email: true, company: true } },
-        plans: {
-          where: { isActive: true },
-          select: {
-            periodType: true,
-            periodCount: true,
-            versions: {
-              orderBy: { versionNumber: "desc" },
-              take: 1,
-              select: { versionNumber: true },
-            },
-          },
-        },
-        shareLinks: {
-          where: { isActive: true },
-          select: { id: true },
-        },
-      },
-      orderBy: { updatedAt: "desc" },
-    });
+  const fetchCases = async () => {
+    try {
+      const response = await fetch("/api/cases");
+      if (response.ok) {
+        const data = await response.json();
+        setCases(data);
+      } else {
+        setError("Fehler beim Laden der Faelle");
+      }
+    } catch (err) {
+      console.error("Error fetching cases:", err);
+      setError("Netzwerkfehler");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    console.log(`[getCases] Successfully loaded ${cases.length} cases`);
-    return { cases, dbError: false };
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
-    console.error("[getCases] Error:", errorMessage);
-    console.error("[getCases] Stack:", errorStack);
-    return { cases: [], dbError: true, errorMessage };
-  }
-}
+  const handlePermanentDelete = async () => {
+    if (deleteInput !== "LOESCHEN" || !deleteCaseId) return;
 
-export default async function CasesListPage() {
-  console.log("[CasesListPage] Starting page render");
+    setDeleting(true);
+    try {
+      const response = await fetch(
+        `/api/cases/${deleteCaseId}?hardDelete=true&confirm=PERMANENTLY_DELETE`,
+        { method: "DELETE" }
+      );
 
-  let pageData: { cases: CaseWithRelations[]; dbError: boolean; errorMessage?: string };
-  try {
-    pageData = await getCases();
-    console.log("[CasesListPage] getCases returned:", {
-      caseCount: pageData.cases.length,
-      dbError: pageData.dbError
-    });
-  } catch (e) {
-    console.error("[CasesListPage] Error calling getCases:", e);
-    pageData = { cases: [], dbError: true, errorMessage: String(e) };
-  }
-
-  const { cases, dbError, errorMessage } = pageData;
+      if (response.ok) {
+        setDeleteCaseId(null);
+        setDeleteCaseName("");
+        setDeleteInput("");
+        fetchCases();
+      } else {
+        const data = await response.json();
+        setError(data.error || "Fehler beim Loeschen");
+      }
+    } catch (err) {
+      console.error("Error deleting case:", err);
+      setError("Netzwerkfehler beim Loeschen");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const getStatusLabel = (status: string): string => {
     switch (status) {
-      case "PRELIMINARY": return "Vorläufig";
-      case "OPENED": return "Eröffnet";
-      case "CLOSED": return "Geschlossen";
-      default: return status;
+      case "PRELIMINARY":
+        return "Vorlaeufig";
+      case "OPENED":
+        return "Eroeffnet";
+      case "CLOSED":
+        return "Geschlossen";
+      default:
+        return status;
     }
   };
 
   const getStatusBadgeClass = (status: string): string => {
     switch (status) {
-      case "PRELIMINARY": return "badge-warning";
-      case "OPENED": return "badge-success";
-      case "CLOSED": return "badge-neutral";
-      default: return "badge-info";
+      case "PRELIMINARY":
+        return "badge-warning";
+      case "OPENED":
+        return "badge-success";
+      case "CLOSED":
+        return "badge-neutral";
+      default:
+        return "badge-info";
     }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">Fälle</h1>
-          <p className="text-[var(--secondary)] mt-1">Alle Insolvenzverfahren verwalten</p>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">Faelle</h1>
+          <p className="text-[var(--secondary)] mt-1">
+            Alle Insolvenzverfahren verwalten
+          </p>
         </div>
         <Link href="/admin/cases/new" className="btn-primary">
           Neuen Fall anlegen
         </Link>
       </div>
 
-      {dbError && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <p className="text-sm text-yellow-800">
-            Datenbank nicht verfuegbar. Fuer den produktiven Einsatz wird eine Cloud-Datenbank benoetigt.
-          </p>
-          {errorMessage && (
-            <p className="text-xs text-yellow-600 mt-2 font-mono">
-              Fehler: {errorMessage}
-            </p>
-          )}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-sm text-red-800">{error}</p>
+          <button
+            onClick={() => setError(null)}
+            className="text-xs text-red-600 mt-1 hover:underline"
+          >
+            Schliessen
+          </button>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteCaseId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h2 className="text-lg font-semibold text-red-600 mb-4">
+              Fall permanent loeschen?
+            </h2>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-red-800 mb-2">
+                <strong>Achtung:</strong> Diese Aktion kann nicht rueckgaengig
+                gemacht werden!
+              </p>
+              <p className="text-sm text-red-700">
+                Alle Daten von <strong>{deleteCaseName}</strong> werden
+                unwiderruflich geloescht:
+              </p>
+              <ul className="text-sm text-red-700 mt-2 list-disc list-inside">
+                <li>Liquiditaetsplaene und Versionen</li>
+                <li>Kategorien und Zeilen</li>
+                <li>Alle Periodenwerte</li>
+                <li>Konfigurationen und Share-Links</li>
+              </ul>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                Geben Sie LOESCHEN ein, um zu bestaetigen:
+              </label>
+              <input
+                type="text"
+                value={deleteInput}
+                onChange={(e) => setDeleteInput(e.target.value)}
+                className="input-field"
+                placeholder="LOESCHEN"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handlePermanentDelete}
+                disabled={deleting || deleteInput !== "LOESCHEN"}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg disabled:opacity-50"
+              >
+                {deleting ? "Loeschen..." : "Permanent loeschen"}
+              </button>
+              <button
+                onClick={() => {
+                  setDeleteCaseId(null);
+                  setDeleteCaseName("");
+                  setDeleteInput("");
+                }}
+                className="btn-secondary"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -123,16 +197,18 @@ export default async function CasesListPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="admin-card p-4">
           <p className="text-sm text-[var(--muted)]">Gesamt</p>
-          <p className="text-2xl font-bold text-[var(--foreground)]">{cases.length}</p>
+          <p className="text-2xl font-bold text-[var(--foreground)]">
+            {cases.length}
+          </p>
         </div>
         <div className="admin-card p-4">
-          <p className="text-sm text-[var(--muted)]">Eröffnet</p>
+          <p className="text-sm text-[var(--muted)]">Eroeffnet</p>
           <p className="text-2xl font-bold text-[var(--success)]">
             {cases.filter((c) => c.status === "OPENED").length}
           </p>
         </div>
         <div className="admin-card p-4">
-          <p className="text-sm text-[var(--muted)]">Vorläufig</p>
+          <p className="text-sm text-[var(--muted)]">Vorlaeufig</p>
           <p className="text-2xl font-bold text-[var(--warning)]">
             {cases.filter((c) => c.status === "PRELIMINARY").length}
           </p>
@@ -151,7 +227,7 @@ export default async function CasesListPage() {
               <th>Planungsart</th>
               <th>Freigaben</th>
               <th>Aktualisiert</th>
-              <th></th>
+              <th>Aktionen</th>
             </tr>
           </thead>
           <tbody>
@@ -170,7 +246,9 @@ export default async function CasesListPage() {
                       {caseItem.debtorName}
                     </Link>
                   </td>
-                  <td className="text-[var(--secondary)]">{caseItem.caseNumber}</td>
+                  <td className="text-[var(--secondary)]">
+                    {caseItem.caseNumber}
+                  </td>
                   <td>
                     <Link
                       href={`/admin/customers/${caseItem.owner.id}`}
@@ -178,12 +256,16 @@ export default async function CasesListPage() {
                     >
                       {caseItem.owner.name}
                       {caseItem.owner.company && (
-                        <span className="text-xs text-[var(--muted)] ml-1">({caseItem.owner.company})</span>
+                        <span className="text-xs text-[var(--muted)] ml-1">
+                          ({caseItem.owner.company})
+                        </span>
                       )}
                     </Link>
                   </td>
                   <td>
-                    <span className={`badge ${getStatusBadgeClass(caseItem.status)}`}>
+                    <span
+                      className={`badge ${getStatusBadgeClass(caseItem.status)}`}
+                    >
                       {getStatusLabel(caseItem.status)}
                     </span>
                   </td>
@@ -191,7 +273,10 @@ export default async function CasesListPage() {
                     {activePlan ? (
                       <div className="text-sm">
                         <span className="text-[var(--foreground)]">
-                          {activePlan.periodCount || 13} {(activePlan.periodType || "WEEKLY") === "MONTHLY" ? "Monate" : "Wochen"}
+                          {activePlan.periodCount || 13}{" "}
+                          {(activePlan.periodType || "WEEKLY") === "MONTHLY"
+                            ? "Monate"
+                            : "Wochen"}
                         </span>
                         <span className="text-[var(--muted)] ml-1 text-xs">
                           (v{latestVersion?.versionNumber || 0})
@@ -203,7 +288,9 @@ export default async function CasesListPage() {
                   </td>
                   <td>
                     {activeShareLinks > 0 ? (
-                      <span className="badge badge-info">{activeShareLinks} aktiv</span>
+                      <span className="badge badge-info">
+                        {activeShareLinks} aktiv
+                      </span>
                     ) : (
                       <span className="text-sm text-[var(--muted)]">-</span>
                     )}
@@ -212,12 +299,24 @@ export default async function CasesListPage() {
                     {new Date(caseItem.updatedAt).toLocaleDateString("de-DE")}
                   </td>
                   <td>
-                    <Link
-                      href={`/admin/cases/${caseItem.id}`}
-                      className="text-[var(--primary)] hover:underline text-sm"
-                    >
-                      Öffnen
-                    </Link>
+                    <div className="flex gap-2">
+                      <Link
+                        href={`/admin/cases/${caseItem.id}`}
+                        className="text-[var(--primary)] hover:underline text-sm"
+                      >
+                        Oeffnen
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setDeleteCaseId(caseItem.id);
+                          setDeleteCaseName(caseItem.debtorName);
+                        }}
+                        className="text-xs py-1 px-2 text-red-700 hover:bg-red-100 rounded font-medium"
+                        title="Permanent loeschen"
+                      >
+                        Loeschen
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -225,7 +324,7 @@ export default async function CasesListPage() {
             {cases.length === 0 && (
               <tr>
                 <td colSpan={8} className="text-center py-8 text-[var(--muted)]">
-                  Keine Fälle vorhanden. Erstellen Sie Ihren ersten Fall.
+                  Keine Faelle vorhanden. Erstellen Sie Ihren ersten Fall.
                 </td>
               </tr>
             )}

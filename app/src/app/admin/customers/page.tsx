@@ -32,6 +32,9 @@ export default function CustomersPage() {
   const [error, setError] = useState("");
   const [createdPassword, setCreatedPassword] = useState<string | null>(null);
   const [createdCustomerName, setCreatedCustomerName] = useState("");
+  const [deleteCustomerId, setDeleteCustomerId] = useState<string | null>(null);
+  const [deleteCustomerName, setDeleteCustomerName] = useState("");
+  const [deleteInput, setDeleteInput] = useState("");
 
   useEffect(() => {
     fetchCustomers();
@@ -137,6 +140,33 @@ export default function CustomersPage() {
     }
   };
 
+  const handlePermanentDelete = async () => {
+    if (deleteInput !== "LOESCHEN" || !deleteCustomerId) return;
+
+    setSaving(true);
+    try {
+      const response = await fetch(
+        `/api/customers/${deleteCustomerId}?hardDelete=true&confirm=PERMANENTLY_DELETE`,
+        { method: "DELETE" }
+      );
+
+      if (response.ok) {
+        setDeleteCustomerId(null);
+        setDeleteCustomerName("");
+        setDeleteInput("");
+        fetchCustomers();
+      } else {
+        const data = await response.json();
+        setError(data.error || "Fehler beim Loeschen");
+      }
+    } catch (err) {
+      console.error("Error deleting customer:", err);
+      setError("Netzwerkfehler beim Loeschen");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const activeCount = customers.filter((c) => c.isActive).length;
   const inactiveCount = customers.filter((c) => !c.isActive).length;
 
@@ -215,6 +245,60 @@ export default function CustomersPage() {
             >
               Verstanden
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteCustomerId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h2 className="text-lg font-semibold text-red-600 mb-4">Kunde permanent loeschen?</h2>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-red-800 mb-2">
+                <strong>Achtung:</strong> Diese Aktion kann nicht rueckgaengig gemacht werden!
+              </p>
+              <p className="text-sm text-red-700">
+                Alle Daten von <strong>{deleteCustomerName}</strong> werden unwiderruflich geloescht.
+              </p>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                Geben Sie LOESCHEN ein, um zu bestaetigen:
+              </label>
+              <input
+                type="text"
+                value={deleteInput}
+                onChange={(e) => setDeleteInput(e.target.value)}
+                className="input-field"
+                placeholder="LOESCHEN"
+              />
+            </div>
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700 mb-4">
+                {error}
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={handlePermanentDelete}
+                disabled={saving || deleteInput !== "LOESCHEN"}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg disabled:opacity-50"
+              >
+                {saving ? "Loeschen..." : "Permanent loeschen"}
+              </button>
+              <button
+                onClick={() => {
+                  setDeleteCustomerId(null);
+                  setDeleteCustomerName("");
+                  setDeleteInput("");
+                  setError("");
+                }}
+                className="btn-secondary"
+              >
+                Abbrechen
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -366,6 +450,16 @@ export default function CustomersPage() {
                           Aktivieren
                         </button>
                       )}
+                      <button
+                        onClick={() => {
+                          setDeleteCustomerId(customer.id);
+                          setDeleteCustomerName(customer.name);
+                        }}
+                        className="text-xs py-1 px-2 text-red-700 hover:bg-red-100 rounded font-medium"
+                        title="Permanent loeschen"
+                      >
+                        Loeschen
+                      </button>
                     </div>
                   </td>
                 </tr>
