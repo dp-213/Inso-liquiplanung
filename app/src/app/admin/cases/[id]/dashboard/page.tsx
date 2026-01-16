@@ -7,6 +7,8 @@ import {
   DashboardCalculationData,
 } from "@/lib/case-dashboard/types";
 import { ConfigurableDashboard } from "@/components/dashboard";
+import EditableCategoryTable from "@/components/admin/EditableCategoryTable";
+import PlanStructureManager from "@/components/admin/PlanStructureManager";
 
 interface ConfigResponse {
   success: boolean;
@@ -84,6 +86,8 @@ export default function CaseDashboardPage({
   const [calculationData, setCalculationData] =
     useState<DashboardCalculationData | null>(null);
   const [viewMode, setViewMode] = useState<"internal" | "external">("internal");
+  const [editMode, setEditMode] = useState(false);
+  const [showStructureManager, setShowStructureManager] = useState(false);
   const [metadata, setMetadata] = useState<ConfigResponse["metadata"] | null>(null);
 
   // Load config and calculate
@@ -316,29 +320,70 @@ export default function CaseDashboardPage({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Edit Mode Toggle */}
+          <button
+            onClick={() => setEditMode(!editMode)}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+              editMode
+                ? "bg-amber-500 text-white hover:bg-amber-600"
+                : "bg-white border border-gray-200 text-[var(--foreground)] hover:bg-gray-50"
+            }`}
+          >
+            {editMode ? (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                Bearbeitung beenden
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Bearbeiten
+              </>
+            )}
+          </button>
+
+          {/* Structure Manager Button */}
+          {editMode && (
+            <button
+              onClick={() => setShowStructureManager(true)}
+              className="px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 bg-white border border-gray-200 text-[var(--foreground)] hover:bg-gray-50"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              Struktur verwalten
+            </button>
+          )}
+
           {/* View Mode Toggle */}
-          <div className="flex items-center bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode("internal")}
-              className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-                viewMode === "internal"
-                  ? "bg-white text-[var(--foreground)] shadow-sm"
-                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
-              }`}
-            >
-              Intern
-            </button>
-            <button
-              onClick={() => setViewMode("external")}
-              className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
-                viewMode === "external"
-                  ? "bg-white text-[var(--foreground)] shadow-sm"
-                  : "text-[var(--muted)] hover:text-[var(--foreground)]"
-              }`}
-            >
-              Extern
-            </button>
-          </div>
+          {!editMode && (
+            <div className="flex items-center bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode("internal")}
+                className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+                  viewMode === "internal"
+                    ? "bg-white text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                Intern
+              </button>
+              <button
+                onClick={() => setViewMode("external")}
+                className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+                  viewMode === "external"
+                    ? "bg-white text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                Extern
+              </button>
+            </div>
+          )}
 
           <Link href={`/admin/cases/${id}/config`} className="btn-secondary">
             <svg
@@ -425,13 +470,59 @@ export default function CaseDashboardPage({
       )}
 
       {/* Dashboard */}
-      <ConfigurableDashboard
-        caseId={id}
-        config={config}
-        calculationData={calculationData}
-        viewMode={viewMode}
-        isPreview={false}
-      />
+      {editMode ? (
+        <div className="admin-card p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-[var(--foreground)]">
+              Liquiditaetsplan bearbeiten
+            </h2>
+            <div className="text-sm text-[var(--muted)]">
+              Klicken Sie auf eine Zelle, um den Wert zu bearbeiten.
+              Aenderungen werden automatisch gespeichert.
+            </div>
+          </div>
+          <EditableCategoryTable
+            caseId={id}
+            categories={calculationData.categories}
+            weeks={calculationData.weeks}
+            openingBalanceCents={calculationData.kpis.openingBalanceCents}
+            onValueChange={loadData}
+            onOpeningBalanceChange={() => loadData()}
+          />
+        </div>
+      ) : (
+        <ConfigurableDashboard
+          caseId={id}
+          config={config}
+          calculationData={calculationData}
+          viewMode={viewMode}
+          isPreview={false}
+        />
+      )}
+
+      {/* Plan Structure Manager Modal */}
+      {showStructureManager && (
+        <PlanStructureManager
+          caseId={id}
+          categories={calculationData.categories.map((c) => ({
+            id: c.categoryId,
+            name: c.categoryName,
+            flowType: c.flowType,
+            estateType: c.estateType,
+            displayOrder: 0,
+            lines: c.lines.map((l) => ({
+              id: l.lineId,
+              name: l.lineName,
+              description: null,
+              displayOrder: 0,
+            })),
+          }))}
+          onUpdate={() => {
+            loadData();
+          }}
+          onClose={() => setShowStructureManager(false)}
+        />
+      )}
     </div>
   );
 }
