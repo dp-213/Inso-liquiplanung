@@ -105,9 +105,60 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 1.2.0 – Admin Dashboard Umbau + Gradify Branding
+
+**Datum:** 16. Januar 2026
+
+### Neue Funktionen
+
+#### Dashboard-Tabs (Externe Ansicht)
+- **5 neue Ansichten:** Uebersicht, Einnahmen, Sicherungsrechte, Masseuebersicht, Vergleich
+- **Tab-Navigation:** ExternalDashboardNav Komponente fuer /view/ Seite
+- **Chart-Marker:** KV-Restzahlung und HZV-Schlusszahlung Ereignisse im Liquiditaetschart
+- **Phasen-Visualisierung:** Fortfuehrung/Nachlauf Bereiche im Chart
+
+#### Admin-Bereich Umbau
+- **Neue Sidebar-Struktur:** Uebersicht, VERWALTUNG (Kunden, Faelle)
+- **Kundenverwaltung:** Komplette CRUD-Funktionalitaet unter /admin/customers
+- **Passwort-Reset:** Admins koennen Kundenpasswoerter zuruecksetzen
+- **Externe Ansicht Button:** Schnellzugriff auf Share-Link von Fall-Detail-Seite
+- **Planungstyp-Anzeige:** Fallliste zeigt "10 Monate" oder "13 Wochen"
+
+#### Gradify Branding
+- **Favicon:** Gradify Logo als Browser-Tab-Icon
+- **Farbschema getrennt:**
+  - Admin: Gradify Rot (#CE353A) fuer Buttons, Navigation
+  - Kunden: Konservatives Blau (#1e40af) fuer Tabellen, Charts
+- **Logo:** Gradify Logo in Admin-Sidebar
+
+#### Portal-Aenderungen
+- **Login verschoben:** /portal/login → /customer-login (vermeidet Redirect-Loop)
+- **Kundenheader:** Logout leitet zu /customer-login
+
+### Neue Komponenten
+- `ExternalDashboardNav.tsx` - Tab-Navigation fuer externe Ansicht
+- `RevenueChart.tsx` - Stacked Bar Chart fuer Einnahmen nach Quelle
+- `EstateComparisonChart.tsx` - Vergleichschart Altmasse/Neumasse
+- `DashboardNav.tsx` - Route-basierte Navigation fuer Portal
+- `CustomerAccessManager.tsx` - Kundenzugriff verwalten
+
+### Technische Aenderungen
+- Share-Link API gibt periodType und periodCount zurueck
+- BalanceChart unterstuetzt Marker und Phasen-Visualisierung
+- PDFExportButton dynamisch fuer Wochen/Monate
+
+### Work in Progress
+- Admin Dashboard (/admin/cases/[id]/dashboard) zeigt WIP-Banner
+- Datenmodell fuer PaymentSource, SecurityRight noch nicht implementiert
+
+---
+
 ## Geplante Änderungen
 
-*Noch keine geplanten Änderungen dokumentiert.*
+### Mobile Responsiveness
+- Admin Dashboard mobile-ready machen
+- Kunden-Dashboards (/view/, /portal/) fuer Mobile optimieren
+- Prioritaet auf Kunden-Ansicht
 
 ---
 
