@@ -103,7 +103,7 @@ export async function POST(
       targetCategoryFlowType: string;
       targetCategoryEstateType: string;
       lineName: string;
-      weekOffset: number;
+      periodIndex: number;
       valueType: string;
       amountCents: bigint;
       originalAmountRaw: string;
@@ -358,7 +358,7 @@ export async function POST(
           targetCategoryFlowType: targetCategory.flowType,
           targetCategoryEstateType: targetCategory.estateType,
           lineName: descriptionValue.substring(0, 255), // Limit length
-          weekOffset,
+          periodIndex: weekOffset,
           valueType,
           amountCents: amountCents < 0 ? -amountCents : amountCents, // Store as positive
           originalAmountRaw: amountValue,
@@ -379,7 +379,7 @@ export async function POST(
           targetCategoryFlowType: entry.targetCategoryFlowType,
           targetCategoryEstateType: entry.targetCategoryEstateType,
           lineName: entry.lineName,
-          weekOffset: entry.weekOffset,
+          periodIndex: entry.periodIndex,
           valueType: entry.valueType,
           amountCents: entry.amountCents,
           originalAmountRaw: entry.originalAmountRaw,

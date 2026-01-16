@@ -130,12 +130,12 @@ export async function POST(
           createdLines++;
         }
 
-        // Create or update weekly value
-        const existingValue = await tx.weeklyValue.findUnique({
+        // Create or update period value
+        const existingValue = await tx.periodValue.findUnique({
           where: {
-            lineId_weekOffset_valueType: {
+            lineId_periodIndex_valueType: {
               lineId: line.id,
-              weekOffset: entry.weekOffset,
+              periodIndex: entry.periodIndex,
               valueType: entry.valueType,
             },
           },
@@ -143,7 +143,7 @@ export async function POST(
 
         if (existingValue) {
           // Update existing value
-          await tx.weeklyValue.update({
+          await tx.periodValue.update({
             where: { id: existingValue.id },
             data: {
               amountCents: entry.amountCents,
@@ -154,10 +154,10 @@ export async function POST(
           updatedValues++;
         } else {
           // Create new value
-          await tx.weeklyValue.create({
+          await tx.periodValue.create({
             data: {
               lineId: line.id,
-              weekOffset: entry.weekOffset,
+              periodIndex: entry.periodIndex,
               valueType: entry.valueType,
               amountCents: entry.amountCents,
               note: entry.note,

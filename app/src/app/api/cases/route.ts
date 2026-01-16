@@ -13,13 +13,13 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const projectId = searchParams.get("projectId");
+    const ownerId = searchParams.get("ownerId");
 
     const cases = await prisma.case.findMany({
-      where: projectId ? { projectId } : undefined,
+      where: ownerId ? { ownerId } : undefined,
       include: {
-        project: {
-          select: { name: true },
+        owner: {
+          select: { id: true, name: true, email: true, company: true },
         },
         plans: {
           where: { isActive: true },
@@ -64,12 +64,24 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { projectId, caseNumber, debtorName, courtName, filingDate, openingDate, status } = body;
+    const { ownerId, caseNumber, debtorName, courtName, filingDate, openingDate, status, customerIds } = body;
 
-    if (!projectId || !caseNumber || !debtorName || !courtName || !filingDate) {
+    if (!ownerId || !caseNumber || !debtorName || !courtName || !filingDate) {
       return NextResponse.json(
         { error: "Alle Pflichtfelder muessen ausgefuellt werden" },
         { status: 400 }
+      );
+    }
+
+    // Verify owner exists
+    const owner = await prisma.customerUser.findUnique({
+      where: { id: ownerId },
+    });
+
+    if (!owner) {
+      return NextResponse.json(
+        { error: "Kunde nicht gefunden" },
+        { status: 404 }
       );
     }
 
@@ -90,7 +102,7 @@ export async function POST(request: NextRequest) {
       // Create the case
       const newCase = await tx.case.create({
         data: {
-          projectId,
+          ownerId,
           caseNumber: caseNumber.trim(),
           debtorName: debtorName.trim(),
           courtName: courtName.trim(),
@@ -130,6 +142,23 @@ export async function POST(request: NextRequest) {
             createdBy: session.username,
           },
         });
+      }
+
+      // Create customer access for additional customers (beyond owner)
+      if (customerIds && Array.isArray(customerIds) && customerIds.length > 0) {
+        for (const customerId of customerIds) {
+          // Don't create duplicate access for the owner
+          if (customerId !== ownerId) {
+            await tx.customerCaseAccess.create({
+              data: {
+                customerId,
+                caseId: newCase.id,
+                accessLevel: "VIEW",
+                grantedBy: session.username,
+              },
+            });
+          }
+        }
       }
 
       return newCase;

@@ -29,7 +29,7 @@ export async function GET(
           },
         },
       },
-      orderBy: { weekOffset: "asc" },
+      orderBy: { periodIndex: "asc" },
     });
 
     const serializedItems = reviewItems.map((item) => ({
@@ -69,7 +69,7 @@ export async function POST(
       action: "APPROVE" | "MODIFY" | "REJECT";
       modifiedData?: {
         lineName?: string;
-        weekOffset?: number;
+        periodIndex?: number;
         amountCents?: string;
         targetCategoryName?: string;
         targetCategoryFlowType?: string;
@@ -128,7 +128,7 @@ export async function POST(
         where: { id: entryId },
         data: {
           ...(modifiedData.lineName && { lineName: modifiedData.lineName }),
-          ...(modifiedData.weekOffset !== undefined && { weekOffset: modifiedData.weekOffset }),
+          ...(modifiedData.periodIndex !== undefined && { periodIndex: modifiedData.periodIndex }),
           ...(modifiedData.amountCents && { amountCents: BigInt(modifiedData.amountCents) }),
           ...(modifiedData.targetCategoryName && { targetCategoryName: modifiedData.targetCategoryName }),
           ...(modifiedData.targetCategoryFlowType && { targetCategoryFlowType: modifiedData.targetCategoryFlowType }),

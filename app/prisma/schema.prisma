@@ -14,26 +14,11 @@ datasource db {
 // CORE DOMAIN ENTITIES
 // =============================================================================
 
-// Project represents an Insolvency Administrator (client)
-model Project {
-  id          String   @id @default(uuid())
-  name        String
-  description String?
-  status      String   @default("ACTIVE") // ACTIVE, ARCHIVED
-  createdAt   DateTime @default(now())
-  createdBy   String
-  updatedAt   DateTime @updatedAt
-  updatedBy   String
-
-  cases Case[]
-
-  @@map("projects")
-}
-
 // InsolvencyCase - The root entity representing a single insolvency proceeding
+// Each case belongs to a CustomerUser (the Insolvenzverwalter/client)
 model Case {
   id          String    @id @default(uuid())
-  projectId   String
+  ownerId     String    // The CustomerUser who owns this case
   caseNumber  String    @unique
   debtorName  String
   courtName   String
@@ -46,14 +31,15 @@ model Case {
   updatedAt   DateTime  @updatedAt
   updatedBy   String
 
-  project              Project              @relation(fields: [projectId], references: [id])
+  owner                CustomerUser         @relation("OwnedCases", fields: [ownerId], references: [id])
   plans                LiquidityPlan[]
   ingestionJobs        IngestionJob[]
   shareLinks           ShareLink[]
   configurations       CaseConfiguration[]
   aiPreprocessingJobs  AiPreprocessingJob[]
-  customerAccess       CustomerCaseAccess[]
+  customerAccess       CustomerCaseAccess[] // Additional access for other customers
 
+  @@index([ownerId])
   @@map("cases")
 }
 
@@ -64,6 +50,8 @@ model LiquidityPlan {
   name          String
   description   String?
   planStartDate DateTime
+  periodType    String   @default("WEEKLY") // WEEKLY, MONTHLY
+  periodCount   Int      @default(13)       // 13 for weekly, variable for monthly
   isActive      Boolean  @default(true)
   createdAt     DateTime @default(now())
   createdBy     String
@@ -127,17 +115,18 @@ model CashflowLine {
   updatedBy    String
 
   category     CashflowCategory @relation(fields: [categoryId], references: [id])
-  weeklyValues WeeklyValue[]
+  periodValues PeriodValue[]
 
   @@map("cashflow_lines")
 }
 
-// WeeklyValue - The atomic value unit (one value for one line for one week)
-model WeeklyValue {
+// PeriodValue - The atomic value unit (one value for one line for one period)
+// Period can be a week (WEEKLY plan) or a month (MONTHLY plan)
+model PeriodValue {
   id          String   @id @default(uuid())
   lineId      String
-  weekOffset  Int // 0-12 (13 weeks)
-  valueType   String // IST, PLAN
+  periodIndex Int      // 0-based index: 0-12 for weekly, 0-11 for monthly, etc.
+  valueType   String   // IST, PLAN
   amountCents BigInt
   note        String?
   createdAt   DateTime @default(now())
@@ -147,8 +136,8 @@ model WeeklyValue {
 
   line CashflowLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
 
-  @@unique([lineId, weekOffset, valueType])
-  @@map("weekly_values")
+  @@unique([lineId, periodIndex, valueType])
+  @@map("period_values")
 }
 
 // =============================================================================
@@ -223,7 +212,7 @@ model StagedCashflowEntry {
   targetCategoryEstateType String
   lineName                 String
   lineDescription          String?
-  weekOffset               Int
+  periodIndex              Int       // 0-based period index (week or month)
   valueType                String
   amountCents              BigInt
   originalAmountRaw        String?   // Original string value before conversion
@@ -390,7 +379,8 @@ model AuditEvent {
 // CUSTOMER USER MANAGEMENT (EXTERNAL INSOLVENCY ADMINISTRATORS)
 // =============================================================================
 
-// CustomerUser - External users who can view assigned cases
+// CustomerUser - Insolvenzverwalter (insolvency administrator / client)
+// Each customer can own multiple cases and view them in the portal
 model CustomerUser {
   id                String    @id @default(uuid())
   email             String    @unique
@@ -409,7 +399,8 @@ model CustomerUser {
   updatedAt         DateTime  @updatedAt
   updatedBy         String
 
-  caseAccess        CustomerCaseAccess[]
+  ownedCases        Case[]               @relation("OwnedCases") // Cases owned by this customer
+  caseAccess        CustomerCaseAccess[] // Additional access to other customers' cases
   sessions          CustomerSession[]
   auditLogs         CustomerAuditLog[]
 
@@ -418,7 +409,8 @@ model CustomerUser {
   @@map("customer_users")
 }
 
-// CustomerCaseAccess - Links customer users to specific cases they can view
+// CustomerCaseAccess - Additional access for customers to cases they don't own
+// Note: Case owners automatically have access - this is for sharing with OTHER customers
 model CustomerCaseAccess {
   id              String    @id @default(uuid())
   customerId      String

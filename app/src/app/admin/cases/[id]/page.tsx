@@ -2,6 +2,7 @@ import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import ShareLinksManager from "@/components/admin/ShareLinksManager";
+import CustomerAccessManager from "@/components/admin/CustomerAccessManager";
 import CaseCalculationPreview from "@/components/admin/CaseCalculationPreview";
 
 interface PageProps {
@@ -12,7 +13,7 @@ async function getCaseData(id: string) {
   const caseData = await prisma.case.findUnique({
     where: { id },
     include: {
-      project: { select: { name: true } },
+      owner: { select: { id: true, name: true, company: true } },
       plans: {
         where: { isActive: true },
         include: {
@@ -24,7 +25,7 @@ async function getCaseData(id: string) {
             include: {
               lines: {
                 include: {
-                  weeklyValues: true,
+                  periodValues: true,
                 },
                 orderBy: { displayOrder: "asc" },
               },
@@ -39,6 +40,20 @@ async function getCaseData(id: string) {
       ingestionJobs: {
         orderBy: { startedAt: "desc" },
         take: 5,
+      },
+      customerAccess: {
+        include: {
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              company: true,
+              isActive: true,
+            },
+          },
+        },
+        orderBy: { grantedAt: "desc" },
       },
     },
   });
@@ -103,7 +118,7 @@ export default async function CaseDetailPage({ params }: PageProps) {
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-[var(--secondary)]">
               <span>Aktenzeichen: {caseData.caseNumber}</span>
               <span>Gericht: {caseData.courtName}</span>
-              <span>Projekt: {caseData.project.name}</span>
+              <span>Kunde: {caseData.owner.name}{caseData.owner.company && ` (${caseData.owner.company})`}</span>
             </div>
             <div className="mt-2 text-sm text-[var(--muted)]">
               {caseData.filingDate && (
@@ -146,13 +161,26 @@ export default async function CaseDetailPage({ params }: PageProps) {
             </Link>
             <Link
               href={`/admin/cases/${id}/dashboard`}
-              className="btn-primary flex items-center"
+              className="btn-secondary flex items-center"
             >
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
-              Dashboard anzeigen
+              Dashboard
             </Link>
+            {caseData.shareLinks.filter(l => l.isActive).length > 0 && (
+              <a
+                href={`/view/${caseData.shareLinks.find(l => l.isActive)?.token}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-primary flex items-center"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                Externe Ansicht
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -166,7 +194,7 @@ export default async function CaseDetailPage({ params }: PageProps) {
 
             {plan ? (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                   <div>
                     <p className="text-sm text-[var(--muted)]">Planname</p>
                     <p className="font-medium text-[var(--foreground)]">{plan.name}</p>
@@ -175,6 +203,12 @@ export default async function CaseDetailPage({ params }: PageProps) {
                     <p className="text-sm text-[var(--muted)]">Version</p>
                     <p className="font-medium text-[var(--foreground)]">
                       {latestVersion ? `v${latestVersion.versionNumber}` : "Keine Version"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-[var(--muted)]">Planungsart</p>
+                    <p className="font-medium text-[var(--foreground)]">
+                      {plan.periodCount || 13} {(plan.periodType || "WEEKLY") === "MONTHLY" ? "Monate" : "Wochen"}
                     </p>
                   </div>
                   <div>
@@ -280,9 +314,10 @@ export default async function CaseDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Share Links Management */}
-        <div className="lg:col-span-1">
+        {/* Share Links and Customer Access Management */}
+        <div className="lg:col-span-1 space-y-6">
           <ShareLinksManager caseId={id} initialLinks={caseData.shareLinks} />
+          <CustomerAccessManager caseId={id} initialAccess={caseData.customerAccess} />
         </div>
       </div>
     </div>

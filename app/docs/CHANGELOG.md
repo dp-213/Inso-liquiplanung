@@ -64,6 +64,47 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 1.1.0 – Flexible Periodenplanung
+
+**Datum:** 16. Januar 2026
+
+### Neue Funktionen
+
+#### Periodentyp-Unterstützung
+- **Wöchentliche und monatliche Planung:** Liquiditätspläne können jetzt entweder als 13-Wochen-Plan (Standard) oder als Monatsplanung konfiguriert werden
+- **Dynamische Periodenzahl:** Statt fester 13 Wochen können nun beliebig viele Perioden definiert werden (z.B. 10 Monate für Nov 2025 - Aug 2026)
+- **Automatische Periodenbeschriftung:** "KW 03" für Wochen, "Nov 25" für Monate
+
+#### HVPlus-Fall implementiert
+- Erster echter Kundenfall mit 10-Monats-Planung (Nov 2025 - Aug 2026)
+- 6 Kategorien: Umsatz, Altforderungen, Insolvenzspezifische Einzahlungen, Personalaufwand, Betriebliche Auszahlungen, Insolvenzspezifische Auszahlungen
+- Vollständige Testdaten aus Excel übernommen
+
+### Technische Änderungen
+
+#### Schema-Änderungen
+- `WeeklyValue` umbenannt zu `PeriodValue`
+- `weekOffset` umbenannt zu `periodIndex`
+- Neue Felder `periodType` (WEEKLY/MONTHLY) und `periodCount` in `LiquidityPlan`
+- `StagedCashflowEntry.weekOffset` umbenannt zu `periodIndex`
+
+#### Berechnungs-Engine
+- `calculateLiquidityPlan()` akzeptiert jetzt `periodType` und `periodCount` Parameter
+- Neue Funktion `generatePeriodLabel()` für dynamische Periodenbeschriftung
+- Neue Funktion `getPeriodDates()` für Start-/Enddatum-Berechnung
+- Legacy-Aliase (`weeks`, `weeklyValues`, `weeklyTotals`) für Abwärtskompatibilität
+
+#### API-Änderungen
+- Alle Endpunkte geben `periodType` und `periodCount` zurück
+- Sowohl neue (`periods`, `periodValues`) als auch Legacy-Felder (`weeks`, `weeklyValues`) werden bereitgestellt
+- Interne Queries verwenden jetzt `periodValues` statt `weeklyValues`
+
+### Abwärtskompatibilität
+- Bestehende Frontend-Komponenten funktionieren weiterhin mit Legacy-Aliase
+- Standard-Werte: `periodType = "WEEKLY"`, `periodCount = 13`
+
+---
+
 ## Geplante Änderungen
 
 *Noch keine geplanten Änderungen dokumentiert.*

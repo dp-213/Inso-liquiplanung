@@ -17,10 +17,14 @@ interface ShareData {
   plan: {
     name: string;
     planStartDate: string;
+    periodType?: "WEEKLY" | "MONTHLY";
+    periodCount?: number;
     versionNumber: number;
     versionDate: string | null;
   };
   calculation: {
+    periodType?: "WEEKLY" | "MONTHLY";
+    periodCount?: number;
     openingBalanceCents: string;
     totalInflowsCents: string;
     totalOutflowsCents: string;
@@ -156,13 +160,16 @@ export default function PDFExportButton({ data, formatCurrency }: PDFExportButto
       }, currentCash);
       const runwayWeek = weeks.findIndex((week) => BigInt(week.closingBalanceCents) <= BigInt(0));
 
-      // KPI Items
-      const kpiWidth = (pageWidth - 2 * margin) / 4;
+      // KPI Items - dynamic based on period type
+      const periodType = data.calculation.periodType || data.plan.periodType || "WEEKLY";
+      const periodCount = data.calculation.periodCount || data.plan.periodCount || 13;
+      const periodLabel = periodType === "MONTHLY" ? "Monate" : "Wochen";
+
+      const kpiWidth = (pageWidth - 2 * margin) / 3;  // 3 KPIs now
       const kpiItems = [
         { label: "Aktueller Bestand", value: formatCurrencyForPDF(currentCash) },
         { label: "Tiefster Stand", value: formatCurrencyForPDF(minCash) },
-        { label: "Liquiditätsreichweite", value: runwayWeek >= 0 ? weeks[runwayWeek].weekLabel : "13+ Wochen" },
-        { label: "Status", value: runwayWeek >= 0 ? "Kritisch" : "Stabil" },
+        { label: "Liquiditaetsreichweite", value: runwayWeek >= 0 ? weeks[runwayWeek].weekLabel : `${periodCount}+ ${periodLabel}` },
       ];
 
       doc.setFontSize(8);
@@ -179,12 +186,12 @@ export default function PDFExportButton({ data, formatCurrency }: PDFExportButto
       });
 
       // Period info
-      const periodLabel = weeks.length > 0
+      const periodRangeText = weeks.length > 0
         ? `Planungszeitraum: ${weeks[0].weekLabel} - ${weeks[weeks.length - 1].weekLabel}`
         : "";
       doc.setFontSize(9);
       doc.setTextColor(148, 163, 184);
-      doc.text(periodLabel, margin, 78);
+      doc.text(periodRangeText, margin, 78);
 
       // Main Table
       const tableData: (string | number)[][] = [];
@@ -202,11 +209,12 @@ export default function PDFExportButton({ data, formatCurrency }: PDFExportButto
       openingRow.push("-");
       tableData.push(openingRow);
 
-      // Inflows
-      const inflowCategories = data.calculation.categories.filter((c) => c.flowType === "INFLOW");
+      // Inflows - filter empty categories
+      const inflowCategories = data.calculation.categories.filter(
+        (c) => c.flowType === "INFLOW" && BigInt(c.totalCents) !== BigInt(0)
+      );
       inflowCategories.forEach((cat) => {
-        const estateLabel = cat.estateType === "ALTMASSE" ? "(Alt)" : "(Neu)";
-        const row = [`${cat.categoryName} ${estateLabel}`];
+        const row = [cat.categoryName];
         cat.weeklyTotals.forEach((val) => row.push(formatCurrencyForPDF(val)));
         row.push(formatCurrencyForPDF(cat.totalCents));
         tableData.push(row);
@@ -218,11 +226,12 @@ export default function PDFExportButton({ data, formatCurrency }: PDFExportButto
       inflowTotalRow.push(formatCurrencyForPDF(data.calculation.totalInflowsCents));
       tableData.push(inflowTotalRow);
 
-      // Outflows
-      const outflowCategories = data.calculation.categories.filter((c) => c.flowType === "OUTFLOW");
+      // Outflows - filter empty categories
+      const outflowCategories = data.calculation.categories.filter(
+        (c) => c.flowType === "OUTFLOW" && BigInt(c.totalCents) !== BigInt(0)
+      );
       outflowCategories.forEach((cat) => {
-        const estateLabel = cat.estateType === "ALTMASSE" ? "(Alt)" : "(Neu)";
-        const row = [`${cat.categoryName} ${estateLabel}`];
+        const row = [cat.categoryName];
         cat.weeklyTotals.forEach((val) => {
           const value = BigInt(val);
           row.push(value > BigInt(0) ? `-${formatCurrencyForPDF(val)}` : formatCurrencyForPDF(val));

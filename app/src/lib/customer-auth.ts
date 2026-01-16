@@ -277,7 +277,23 @@ export async function checkCaseAccess(
 ): Promise<{
   hasAccess: boolean;
   accessLevel?: string;
+  isOwner?: boolean;
 }> {
+  // First check if customer is the owner
+  const caseData = await prisma.case.findUnique({
+    where: { id: caseId },
+    select: { ownerId: true },
+  });
+
+  if (caseData?.ownerId === customerId) {
+    return {
+      hasAccess: true,
+      accessLevel: "OWNER",
+      isOwner: true,
+    };
+  }
+
+  // Then check explicit access grants
   const access = await prisma.customerCaseAccess.findUnique({
     where: {
       customerId_caseId: {
@@ -308,12 +324,32 @@ export async function checkCaseAccess(
   return {
     hasAccess: true,
     accessLevel: access.accessLevel,
+    isOwner: false,
   };
 }
 
-// Get all cases a customer can access
+// Get all cases a customer can access (both owned and shared)
 export async function getAccessibleCases(customerId: string) {
-  const accessRecords = await prisma.customerCaseAccess.findMany({
+  // Get owned cases
+  const ownedCases = await prisma.case.findMany({
+    where: { ownerId: customerId },
+    include: {
+      owner: { select: { id: true, name: true, company: true } },
+      plans: {
+        where: { isActive: true },
+        include: {
+          versions: {
+            orderBy: { versionNumber: "desc" },
+            take: 1,
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  // Get shared cases (via CustomerCaseAccess)
+  const sharedAccessRecords = await prisma.customerCaseAccess.findMany({
     where: {
       customerId,
       isActive: true,
@@ -322,7 +358,7 @@ export async function getAccessibleCases(customerId: string) {
     include: {
       case: {
         include: {
-          project: { select: { name: true } },
+          owner: { select: { id: true, name: true, company: true } },
           plans: {
             where: { isActive: true },
             include: {
@@ -338,10 +374,24 @@ export async function getAccessibleCases(customerId: string) {
     orderBy: { grantedAt: "desc" },
   });
 
-  return accessRecords.map((record) => ({
-    caseId: record.caseId,
-    accessLevel: record.accessLevel,
-    grantedAt: record.grantedAt,
-    case: record.case,
+  // Combine and deduplicate
+  const ownedCaseResults = ownedCases.map((caseData) => ({
+    caseId: caseData.id,
+    accessLevel: "OWNER" as const,
+    grantedAt: caseData.createdAt,
+    isOwner: true,
+    case: caseData,
   }));
+
+  const sharedCaseResults = sharedAccessRecords
+    .filter((record) => record.case.ownerId !== customerId) // Exclude owned cases
+    .map((record) => ({
+      caseId: record.caseId,
+      accessLevel: record.accessLevel,
+      grantedAt: record.grantedAt,
+      isOwner: false,
+      case: record.case,
+    }));
+
+  return [...ownedCaseResults, ...sharedCaseResults];
 }

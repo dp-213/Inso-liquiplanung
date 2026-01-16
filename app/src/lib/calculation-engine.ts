@@ -2,7 +2,7 @@
  * Core Liquidity Calculation Engine
  *
  * CRITICAL: This is the deterministic black-box calculation engine.
- * - Implements the canonical 13-week insolvency liquidity forecast
+ * - Implements period-based insolvency liquidity forecast (weekly or monthly)
  * - All monetary values in euro cents (BigInt)
  * - IST overrides PLAN rule
  * - Altmasse/Neumasse separation
@@ -20,6 +20,7 @@ import { createHash } from "crypto";
 export type FlowType = "INFLOW" | "OUTFLOW";
 export type EstateType = "ALTMASSE" | "NEUMASSE";
 export type ValueType = "IST" | "PLAN";
+export type PeriodType = "WEEKLY" | "MONTHLY";
 
 export interface CategoryInput {
   id: string;
@@ -36,16 +37,21 @@ export interface LineInput {
   displayOrder: number;
 }
 
-export interface WeeklyValueInput {
+export interface PeriodValueInput {
   lineId: string;
-  weekOffset: number; // 0-12
+  periodIndex: number; // 0-based
   valueType: ValueType;
   amountCents: bigint;
 }
 
-export interface WeeklyCalculation {
-  weekOffset: number;
-  weekLabel: string; // e.g., "KW 03"
+// Legacy alias for backwards compatibility
+export type WeeklyValueInput = PeriodValueInput;
+
+export interface PeriodCalculation {
+  periodIndex: number;
+  periodLabel: string; // e.g., "KW 03" or "Nov 25"
+  periodStartDate: Date;
+  periodEndDate: Date;
   openingBalanceCents: bigint;
   inflowsAltmasseCents: bigint;
   inflowsNeumasseCents: bigint;
@@ -57,6 +63,9 @@ export interface WeeklyCalculation {
   closingBalanceCents: bigint;
 }
 
+// Legacy alias
+export type WeeklyCalculation = PeriodCalculation;
+
 export interface LineCalculation {
   lineId: string;
   lineName: string;
@@ -64,8 +73,8 @@ export interface LineCalculation {
   categoryName: string;
   flowType: FlowType;
   estateType: EstateType;
-  weeklyValues: {
-    weekOffset: number;
+  periodValues: {
+    periodIndex: number;
     istCents: bigint | null;
     planCents: bigint | null;
     effectiveCents: bigint;
@@ -79,13 +88,15 @@ export interface CategoryCalculation {
   flowType: FlowType;
   estateType: EstateType;
   lines: LineCalculation[];
-  weeklyTotals: bigint[];
+  periodTotals: bigint[];
   totalCents: bigint;
 }
 
 export interface CalculationResult {
   openingBalanceCents: bigint;
-  weeks: WeeklyCalculation[];
+  periodType: PeriodType;
+  periodCount: number;
+  periods: PeriodCalculation[];
   categories: CategoryCalculation[];
 
   // Aggregated totals
@@ -103,6 +114,9 @@ export interface CalculationResult {
   // Integrity
   dataHash: string;
   calculatedAt: Date;
+
+  // Legacy alias for backwards compatibility
+  weeks: PeriodCalculation[];
 }
 
 // =============================================================================
@@ -110,7 +124,7 @@ export interface CalculationResult {
 // =============================================================================
 
 /**
- * Get the effective value for a line/week combination.
+ * Get the effective value for a line/period combination.
  * IST always overrides PLAN. If neither exists, returns 0.
  */
 function getEffectiveValue(
@@ -127,14 +141,64 @@ function getEffectiveValue(
 }
 
 /**
- * Main calculation function - Deterministic 13-week liquidity forecast.
+ * Generate period label based on period type.
+ */
+function generatePeriodLabel(
+  periodType: PeriodType,
+  periodIndex: number,
+  startDate: Date
+): string {
+  if (periodType === "WEEKLY") {
+    const weekDate = new Date(startDate);
+    weekDate.setDate(weekDate.getDate() + periodIndex * 7);
+    return `KW ${getISOWeek(weekDate).toString().padStart(2, "0")}`;
+  } else {
+    // MONTHLY
+    const monthDate = new Date(startDate);
+    monthDate.setMonth(monthDate.getMonth() + periodIndex);
+    const monthNames = ["Jan", "Feb", "Mrz", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+    const year = monthDate.getFullYear().toString().slice(-2);
+    return `${monthNames[monthDate.getMonth()]} ${year}`;
+  }
+}
+
+/**
+ * Get period start and end dates.
+ */
+function getPeriodDates(
+  periodType: PeriodType,
+  periodIndex: number,
+  planStartDate: Date
+): { start: Date; end: Date } {
+  if (periodType === "WEEKLY") {
+    const start = new Date(planStartDate);
+    start.setDate(start.getDate() + periodIndex * 7);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    return { start, end };
+  } else {
+    // MONTHLY
+    const start = new Date(planStartDate);
+    start.setMonth(start.getMonth() + periodIndex);
+    start.setDate(1);
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + 1);
+    end.setDate(0); // Last day of month
+    return { start, end };
+  }
+}
+
+/**
+ * Main calculation function - Deterministic period-based liquidity forecast.
  */
 export function calculateLiquidityPlan(
   openingBalanceCents: bigint,
   categories: CategoryInput[],
   lines: LineInput[],
-  weeklyValues: WeeklyValueInput[],
-  planStartDate: Date
+  periodValues: PeriodValueInput[],
+  planStartDate: Date,
+  periodType: PeriodType = "WEEKLY",
+  periodCount: number = 13
 ): CalculationResult {
   const calculatedAt = new Date();
 
@@ -149,21 +213,21 @@ export function calculateLiquidityPlan(
     lineMap.set(line.id, line);
   }
 
-  // Build value lookup: lineId -> weekOffset -> valueType -> amount
+  // Build value lookup: lineId -> periodIndex -> valueType -> amount
   const valueMap = new Map<string, Map<number, Map<ValueType, bigint>>>();
-  for (const value of weeklyValues) {
+  for (const value of periodValues) {
     if (!valueMap.has(value.lineId)) {
       valueMap.set(value.lineId, new Map());
     }
-    const weekMap = valueMap.get(value.lineId)!;
-    if (!weekMap.has(value.weekOffset)) {
-      weekMap.set(value.weekOffset, new Map());
+    const periodMap = valueMap.get(value.lineId)!;
+    if (!periodMap.has(value.periodIndex)) {
+      periodMap.set(value.periodIndex, new Map());
     }
-    weekMap.get(value.weekOffset)!.set(value.valueType, value.amountCents);
+    periodMap.get(value.periodIndex)!.set(value.valueType, value.amountCents);
   }
 
-  // Initialize week calculations
-  const weeks: WeeklyCalculation[] = [];
+  // Initialize period calculations
+  const periods: PeriodCalculation[] = [];
   let currentOpeningBalance = openingBalanceCents;
 
   // Aggregate totals
@@ -176,12 +240,12 @@ export function calculateLiquidityPlan(
 
   // Build line calculations first
   const lineCalculations: LineCalculation[] = [];
-  const categoryTotalsMap = new Map<string, { weeklyTotals: bigint[]; totalCents: bigint }>();
+  const categoryTotalsMap = new Map<string, { periodTotals: bigint[]; totalCents: bigint }>();
 
   // Initialize category totals
   for (const category of categories) {
     categoryTotalsMap.set(category.id, {
-      weeklyTotals: Array(13).fill(BigInt(0)),
+      periodTotals: Array(periodCount).fill(BigInt(0)),
       totalCents: BigInt(0)
     });
   }
@@ -191,17 +255,17 @@ export function calculateLiquidityPlan(
     const category = categoryMap.get(line.categoryId);
     if (!category) continue;
 
-    const lineWeeklyValues: LineCalculation["weeklyValues"] = [];
+    const linePeriodValues: LineCalculation["periodValues"] = [];
     let lineTotalCents = BigInt(0);
 
-    for (let weekOffset = 0; weekOffset <= 12; weekOffset++) {
-      const weekValues = valueMap.get(line.id)?.get(weekOffset);
-      const istCents = weekValues?.get("IST") ?? null;
-      const planCents = weekValues?.get("PLAN") ?? null;
+    for (let periodIndex = 0; periodIndex < periodCount; periodIndex++) {
+      const pValues = valueMap.get(line.id)?.get(periodIndex);
+      const istCents = pValues?.get("IST") ?? null;
+      const planCents = pValues?.get("PLAN") ?? null;
       const effectiveCents = getEffectiveValue(istCents, planCents);
 
-      lineWeeklyValues.push({
-        weekOffset,
+      linePeriodValues.push({
+        periodIndex,
         istCents,
         planCents,
         effectiveCents
@@ -211,7 +275,7 @@ export function calculateLiquidityPlan(
 
       // Add to category totals
       const catTotals = categoryTotalsMap.get(category.id)!;
-      catTotals.weeklyTotals[weekOffset] += effectiveCents;
+      catTotals.periodTotals[periodIndex] += effectiveCents;
     }
 
     // Update category total
@@ -225,7 +289,7 @@ export function calculateLiquidityPlan(
       categoryName: category.name,
       flowType: category.flowType,
       estateType: category.estateType,
-      weeklyValues: lineWeeklyValues,
+      periodValues: linePeriodValues,
       totalCents: lineTotalCents
     });
   }
@@ -246,13 +310,13 @@ export function calculateLiquidityPlan(
         const lineB = lineMap.get(b.lineId);
         return (lineA?.displayOrder ?? 0) - (lineB?.displayOrder ?? 0);
       }),
-      weeklyTotals: catTotals.weeklyTotals,
+      periodTotals: catTotals.periodTotals,
       totalCents: catTotals.totalCents
     });
   }
 
-  // Calculate weekly balances
-  for (let weekOffset = 0; weekOffset <= 12; weekOffset++) {
+  // Calculate period balances
+  for (let periodIndex = 0; periodIndex < periodCount; periodIndex++) {
     let inflowsAltmasse = BigInt(0);
     let inflowsNeumasse = BigInt(0);
     let outflowsAltmasse = BigInt(0);
@@ -261,76 +325,81 @@ export function calculateLiquidityPlan(
     // Sum up by category type
     for (const category of categories) {
       const catTotals = categoryTotalsMap.get(category.id)!;
-      const weekAmount = catTotals.weeklyTotals[weekOffset];
+      const periodAmount = catTotals.periodTotals[periodIndex];
 
       if (category.flowType === "INFLOW") {
         if (category.estateType === "ALTMASSE") {
-          inflowsAltmasse += weekAmount;
+          inflowsAltmasse += periodAmount;
         } else {
-          inflowsNeumasse += weekAmount;
+          inflowsNeumasse += periodAmount;
         }
       } else {
         if (category.estateType === "ALTMASSE") {
-          outflowsAltmasse += weekAmount;
+          outflowsAltmasse += periodAmount;
         } else {
-          outflowsNeumasse += weekAmount;
+          outflowsNeumasse += periodAmount;
         }
       }
     }
 
-    const totalWeekInflows = inflowsAltmasse + inflowsNeumasse;
-    const totalWeekOutflows = outflowsAltmasse + outflowsNeumasse;
-    const netCashflow = totalWeekInflows - totalWeekOutflows;
+    const totalPeriodInflows = inflowsAltmasse + inflowsNeumasse;
+    const totalPeriodOutflows = outflowsAltmasse + outflowsNeumasse;
+    const netCashflow = totalPeriodInflows - totalPeriodOutflows;
     const closingBalance = currentOpeningBalance + netCashflow;
 
-    // Generate week label (KW format)
-    const weekDate = new Date(planStartDate);
-    weekDate.setDate(weekDate.getDate() + weekOffset * 7);
-    const weekLabel = `KW ${getISOWeek(weekDate).toString().padStart(2, "0")}`;
+    // Generate period label and dates
+    const periodLabel = generatePeriodLabel(periodType, periodIndex, planStartDate);
+    const { start: periodStartDate, end: periodEndDate } = getPeriodDates(periodType, periodIndex, planStartDate);
 
-    weeks.push({
-      weekOffset,
-      weekLabel,
+    periods.push({
+      periodIndex,
+      periodLabel,
+      periodStartDate,
+      periodEndDate,
       openingBalanceCents: currentOpeningBalance,
       inflowsAltmasseCents: inflowsAltmasse,
       inflowsNeumasseCents: inflowsNeumasse,
-      totalInflowsCents: totalWeekInflows,
+      totalInflowsCents: totalPeriodInflows,
       outflowsAltmasseCents: outflowsAltmasse,
       outflowsNeumasseCents: outflowsNeumasse,
-      totalOutflowsCents: totalWeekOutflows,
+      totalOutflowsCents: totalPeriodOutflows,
       netCashflowCents: netCashflow,
       closingBalanceCents: closingBalance
     });
 
     // Accumulate totals
-    totalInflows += totalWeekInflows;
-    totalOutflows += totalWeekOutflows;
+    totalInflows += totalPeriodInflows;
+    totalOutflows += totalPeriodOutflows;
     totalInflowsAltmasse += inflowsAltmasse;
     totalInflowsNeumasse += inflowsNeumasse;
     totalOutflowsAltmasse += outflowsAltmasse;
     totalOutflowsNeumasse += outflowsNeumasse;
 
-    // Propagate to next week
+    // Propagate to next period
     currentOpeningBalance = closingBalance;
   }
 
   // Calculate data hash for integrity verification
-  const dataHash = calculateDataHash(openingBalanceCents, weeklyValues);
+  const dataHash = calculateDataHash(openingBalanceCents, periodValues);
 
   return {
     openingBalanceCents,
-    weeks,
+    periodType,
+    periodCount,
+    periods,
     categories: categoryCalculations,
     totalInflowsCents: totalInflows,
     totalOutflowsCents: totalOutflows,
     totalNetCashflowCents: totalInflows - totalOutflows,
-    finalClosingBalanceCents: weeks[12].closingBalanceCents,
+    finalClosingBalanceCents: periods[periodCount - 1]?.closingBalanceCents ?? openingBalanceCents,
     totalInflowsAltmasseCents: totalInflowsAltmasse,
     totalInflowsNeumasseCents: totalInflowsNeumasse,
     totalOutflowsAltmasseCents: totalOutflowsAltmasse,
     totalOutflowsNeumasseCents: totalOutflowsNeumasse,
     dataHash,
-    calculatedAt
+    calculatedAt,
+    // Legacy alias
+    weeks: periods
   };
 }
 
@@ -354,12 +423,12 @@ function getISOWeek(date: Date): number {
  */
 export function calculateDataHash(
   openingBalanceCents: bigint,
-  values: WeeklyValueInput[]
+  values: PeriodValueInput[]
 ): string {
   // Sort values for deterministic ordering
   const sortedValues = [...values].sort((a, b) => {
     if (a.lineId !== b.lineId) return a.lineId.localeCompare(b.lineId);
-    if (a.weekOffset !== b.weekOffset) return a.weekOffset - b.weekOffset;
+    if (a.periodIndex !== b.periodIndex) return a.periodIndex - b.periodIndex;
     return a.valueType.localeCompare(b.valueType);
   });
 
@@ -367,7 +436,7 @@ export function calculateDataHash(
   const parts: string[] = [`opening:${openingBalanceCents.toString()}`];
 
   for (const v of sortedValues) {
-    parts.push(`${v.lineId}:${v.weekOffset}:${v.valueType}:${v.amountCents.toString()}`);
+    parts.push(`${v.lineId}:${v.periodIndex}:${v.valueType}:${v.amountCents.toString()}`);
   }
 
   const canonical = parts.join("|");

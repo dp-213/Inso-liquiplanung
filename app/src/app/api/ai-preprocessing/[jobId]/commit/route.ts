@@ -128,7 +128,7 @@ export async function POST(
           targetCategoryEstateType: finalValues.estateType || "NEUMASSE",
           lineName: finalValues.lineName,
           lineDescription: finalValues.description || null,
-          weekOffset: finalValues.weekOffset ?? 0,
+          periodIndex: finalValues.weekOffset ?? 0,
           valueType: finalValues.valueType || "IST",
           amountCents: flowType === "OUTFLOW" ? -amountCents : amountCents,
           originalAmountRaw: finalValues.amountRaw || String(finalValues.amount),

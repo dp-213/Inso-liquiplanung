@@ -3,8 +3,8 @@
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
-  --primary: #1e40af;
-  --primary-light: #3b82f6;
+  --primary: #CE353A;
+  --primary-light: #E05A5F;
   --secondary: #64748b;
   --success: #16a34a;
   --warning: #d97706;
@@ -112,7 +112,7 @@ body {
 .input-field:focus {
   outline: none;
   border-color: var(--primary-light);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 3px rgba(206, 53, 58, 0.1);
 }
 
 .badge {

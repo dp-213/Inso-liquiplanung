@@ -1,0 +1,248 @@
+import { NextRequest, NextResponse } from "next/server";
+import prisma from "@/lib/db";
+import { getSession } from "@/lib/auth";
+import { hashPassword } from "@/lib/customer-auth";
+import crypto from "crypto";
+
+function generateRandomPassword(): string {
+  return crypto.randomBytes(12).toString("base64").slice(0, 12);
+}
+
+// GET /api/customers/[id] - Get customer details
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    const customer = await prisma.customerUser.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        company: true,
+        phone: true,
+        isActive: true,
+        emailVerified: true,
+        lastLoginAt: true,
+        loginCount: true,
+        failedLoginCount: true,
+        lockedUntil: true,
+        createdAt: true,
+        createdBy: true,
+        updatedAt: true,
+        updatedBy: true,
+        caseAccess: {
+          include: {
+            case: {
+              select: {
+                id: true,
+                caseNumber: true,
+                debtorName: true,
+                status: true,
+                owner: {
+                  select: { id: true, name: true, company: true },
+                },
+              },
+            },
+          },
+          orderBy: { grantedAt: "desc" },
+        },
+      },
+    });
+
+    if (!customer) {
+      return NextResponse.json(
+        { error: "Kunde nicht gefunden" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(customer);
+  } catch (error) {
+    console.error("Error fetching customer:", error);
+    return NextResponse.json(
+      { error: "Fehler beim Laden des Kunden" },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/customers/[id] - Update customer
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const body = await request.json();
+    const { name, company, phone, isActive, resetPassword } = body;
+
+    // Check if customer exists
+    const existingCustomer = await prisma.customerUser.findUnique({
+      where: { id },
+    });
+
+    if (!existingCustomer) {
+      return NextResponse.json(
+        { error: "Kunde nicht gefunden" },
+        { status: 404 }
+      );
+    }
+
+    // Build update data
+    const updateData: {
+      name?: string;
+      company?: string | null;
+      phone?: string | null;
+      isActive?: boolean;
+      passwordHash?: string;
+      lockedUntil?: null;
+      failedLoginCount?: number;
+      updatedBy: string;
+    } = {
+      updatedBy: session.username,
+    };
+
+    if (name !== undefined) {
+      if (!name.trim()) {
+        return NextResponse.json(
+          { error: "Name erforderlich" },
+          { status: 400 }
+        );
+      }
+      updateData.name = name.trim();
+    }
+
+    if (company !== undefined) {
+      updateData.company = company?.trim() || null;
+    }
+
+    if (phone !== undefined) {
+      updateData.phone = phone?.trim() || null;
+    }
+
+    if (isActive !== undefined) {
+      updateData.isActive = isActive;
+      // If activating, also unlock the account
+      if (isActive) {
+        updateData.lockedUntil = null;
+        updateData.failedLoginCount = 0;
+      }
+    }
+
+    let temporaryPassword: string | undefined;
+
+    if (resetPassword) {
+      temporaryPassword = generateRandomPassword();
+      updateData.passwordHash = await hashPassword(temporaryPassword);
+      updateData.lockedUntil = null;
+      updateData.failedLoginCount = 0;
+    }
+
+    const customer = await prisma.customerUser.update({
+      where: { id },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        company: true,
+        phone: true,
+        isActive: true,
+        updatedAt: true,
+      },
+    });
+
+    const response: { customer: typeof customer; temporaryPassword?: string } = { customer };
+    if (temporaryPassword) {
+      response.temporaryPassword = temporaryPassword;
+    }
+
+    return NextResponse.json(response);
+  } catch (error) {
+    console.error("Error updating customer:", error);
+    return NextResponse.json(
+      { error: "Fehler beim Aktualisieren des Kunden" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/customers/[id] - Soft delete (deactivate) customer
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    // Check if customer exists
+    const existingCustomer = await prisma.customerUser.findUnique({
+      where: { id },
+    });
+
+    if (!existingCustomer) {
+      return NextResponse.json(
+        { error: "Kunde nicht gefunden" },
+        { status: 404 }
+      );
+    }
+
+    // Soft delete: deactivate customer and revoke all access
+    await prisma.$transaction(async (tx) => {
+      // Deactivate customer
+      await tx.customerUser.update({
+        where: { id },
+        data: {
+          isActive: false,
+          updatedBy: session.username,
+        },
+      });
+
+      // Revoke all active case access
+      await tx.customerCaseAccess.updateMany({
+        where: {
+          customerId: id,
+          isActive: true,
+        },
+        data: {
+          isActive: false,
+          revokedAt: new Date(),
+          revokedBy: session.username,
+          revokeReason: "Kunde deaktiviert",
+        },
+      });
+
+      // Delete active sessions
+      await tx.customerSession.deleteMany({
+        where: { customerId: id },
+      });
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting customer:", error);
+    return NextResponse.json(
+      { error: "Fehler beim Deaktivieren des Kunden" },
+      { status: 500 }
+    );
+  }
+}

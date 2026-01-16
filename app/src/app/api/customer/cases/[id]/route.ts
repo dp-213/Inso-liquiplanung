@@ -8,7 +8,8 @@ import {
   calculateLiquidityPlan,
   CategoryInput,
   LineInput,
-  WeeklyValueInput,
+  PeriodValueInput,
+  PeriodType,
 } from "@/lib/calculation-engine";
 
 // GET /api/customer/cases/[id] - Get case details and calculation
@@ -39,7 +40,7 @@ export async function GET(
     const caseData = await prisma.case.findUnique({
       where: { id: caseId },
       include: {
-        project: { select: { name: true } },
+        owner: { select: { id: true, name: true, company: true } },
         plans: {
           where: { isActive: true },
           include: {
@@ -51,7 +52,7 @@ export async function GET(
               include: {
                 lines: {
                   include: {
-                    weeklyValues: true,
+                    periodValues: true,
                   },
                   orderBy: { displayOrder: "asc" },
                 },
@@ -103,24 +104,30 @@ export async function GET(
       }))
     );
 
-    const weeklyValues: WeeklyValueInput[] = plan.categories.flatMap((cat) =>
+    const periodValues: PeriodValueInput[] = plan.categories.flatMap((cat) =>
       cat.lines.flatMap((line) =>
-        line.weeklyValues.map((wv) => ({
+        line.periodValues.map((pv) => ({
           lineId: line.id,
-          weekOffset: wv.weekOffset,
-          valueType: wv.valueType as "IST" | "PLAN",
-          amountCents: BigInt(wv.amountCents),
+          periodIndex: pv.periodIndex,
+          valueType: pv.valueType as "IST" | "PLAN",
+          amountCents: BigInt(pv.amountCents),
         }))
       )
     );
+
+    // Get period type and count from plan
+    const periodType = (plan.periodType as PeriodType) || "WEEKLY";
+    const periodCount = plan.periodCount || 13;
 
     // Run calculation
     const result = calculateLiquidityPlan(
       openingBalanceCents,
       categories,
       lines,
-      weeklyValues,
-      new Date(plan.planStartDate)
+      periodValues,
+      new Date(plan.planStartDate),
+      periodType,
+      periodCount
     );
 
     // Log access
@@ -144,10 +151,12 @@ export async function GET(
         filingDate: caseData.filingDate,
         openingDate: caseData.openingDate,
       },
-      administrator: caseData.project.name,
+      administrator: caseData.owner.name + (caseData.owner.company ? ` (${caseData.owner.company})` : ""),
       plan: {
         name: plan.name,
         planStartDate: plan.planStartDate,
+        periodType: result.periodType,
+        periodCount: result.periodCount,
         versionNumber: latestVersion?.versionNumber ?? 0,
         versionDate: latestVersion?.snapshotDate ?? null,
       },
@@ -159,27 +168,49 @@ export async function GET(
         finalClosingBalanceCents: result.finalClosingBalanceCents.toString(),
         dataHash: result.dataHash,
         calculatedAt: result.calculatedAt,
-        weeks: result.weeks.map((week) => ({
-          weekOffset: week.weekOffset,
-          weekLabel: week.weekLabel,
-          openingBalanceCents: week.openingBalanceCents.toString(),
-          totalInflowsCents: week.totalInflowsCents.toString(),
-          totalOutflowsCents: week.totalOutflowsCents.toString(),
-          netCashflowCents: week.netCashflowCents.toString(),
-          closingBalanceCents: week.closingBalanceCents.toString(),
+        periodType: result.periodType,
+        periodCount: result.periodCount,
+        // New period-based structure
+        periods: result.periods.map((period) => ({
+          periodIndex: period.periodIndex,
+          periodLabel: period.periodLabel,
+          periodStartDate: period.periodStartDate.toISOString(),
+          periodEndDate: period.periodEndDate.toISOString(),
+          openingBalanceCents: period.openingBalanceCents.toString(),
+          totalInflowsCents: period.totalInflowsCents.toString(),
+          totalOutflowsCents: period.totalOutflowsCents.toString(),
+          netCashflowCents: period.netCashflowCents.toString(),
+          closingBalanceCents: period.closingBalanceCents.toString(),
+        })),
+        // Legacy alias for backwards compatibility
+        weeks: result.periods.map((period) => ({
+          weekOffset: period.periodIndex,
+          weekLabel: period.periodLabel,
+          openingBalanceCents: period.openingBalanceCents.toString(),
+          totalInflowsCents: period.totalInflowsCents.toString(),
+          totalOutflowsCents: period.totalOutflowsCents.toString(),
+          netCashflowCents: period.netCashflowCents.toString(),
+          closingBalanceCents: period.closingBalanceCents.toString(),
         })),
         categories: result.categories.map((cat) => ({
           categoryName: cat.categoryName,
           flowType: cat.flowType,
           estateType: cat.estateType,
           totalCents: cat.totalCents.toString(),
-          weeklyTotals: cat.weeklyTotals.map((t) => t.toString()),
+          periodTotals: cat.periodTotals.map((t) => t.toString()),
+          // Legacy alias
+          weeklyTotals: cat.periodTotals.map((t) => t.toString()),
           lines: cat.lines.map((line) => ({
             lineName: line.lineName,
             totalCents: line.totalCents.toString(),
-            weeklyValues: line.weeklyValues.map((wv) => ({
-              weekOffset: wv.weekOffset,
-              effectiveCents: wv.effectiveCents.toString(),
+            periodValues: line.periodValues.map((pv) => ({
+              periodIndex: pv.periodIndex,
+              effectiveCents: pv.effectiveCents.toString(),
+            })),
+            // Legacy alias
+            weeklyValues: line.periodValues.map((pv) => ({
+              weekOffset: pv.periodIndex,
+              effectiveCents: pv.effectiveCents.toString(),
             })),
           })),
         })),

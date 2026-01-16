@@ -6,7 +6,8 @@ import {
   calculateDataHash,
   CategoryInput,
   LineInput,
-  WeeklyValueInput,
+  PeriodValueInput,
+  PeriodType,
 } from "@/lib/calculation-engine";
 
 // GET /api/cases/[id]/calculate - Calculate liquidity plan
@@ -37,7 +38,7 @@ export async function GET(
               include: {
                 lines: {
                   include: {
-                    weeklyValues: true,
+                    periodValues: true,
                   },
                 },
               },
@@ -86,25 +87,40 @@ export async function GET(
       }))
     );
 
-    const weeklyValues: WeeklyValueInput[] = plan.categories.flatMap((cat) =>
+    const periodValues: PeriodValueInput[] = plan.categories.flatMap((cat) =>
       cat.lines.flatMap((line) =>
-        line.weeklyValues.map((wv) => ({
+        line.periodValues.map((pv) => ({
           lineId: line.id,
-          weekOffset: wv.weekOffset,
-          valueType: wv.valueType as "IST" | "PLAN",
-          amountCents: BigInt(wv.amountCents),
+          periodIndex: pv.periodIndex,
+          valueType: pv.valueType as "IST" | "PLAN",
+          amountCents: BigInt(pv.amountCents),
         }))
       )
     );
+
+    // Get period type and count from plan
+    const periodType = (plan.periodType as PeriodType) || "WEEKLY";
+    const periodCount = plan.periodCount || 13;
 
     // Run calculation engine
     const result = calculateLiquidityPlan(
       openingBalanceCents,
       categories,
       lines,
-      weeklyValues,
-      new Date(plan.planStartDate)
+      periodValues,
+      new Date(plan.planStartDate),
+      periodType,
+      periodCount
     );
+
+    // Guard against undefined result or weeks
+    if (!result || !result.weeks) {
+      console.error("Calculation returned invalid result:", result);
+      return NextResponse.json(
+        { error: "Berechnung fehlgeschlagen - ungültiges Ergebnis" },
+        { status: 500 }
+      );
+    }
 
     // Convert BigInt to string for JSON serialization
     const serializableResult = {
@@ -118,30 +134,57 @@ export async function GET(
       totalInflowsNeumasseCents: result.totalInflowsNeumasseCents.toString(),
       totalOutflowsAltmasseCents: result.totalOutflowsAltmasseCents.toString(),
       totalOutflowsNeumasseCents: result.totalOutflowsNeumasseCents.toString(),
-      weeks: result.weeks.map((week) => ({
-        ...week,
-        openingBalanceCents: week.openingBalanceCents.toString(),
-        inflowsAltmasseCents: week.inflowsAltmasseCents.toString(),
-        inflowsNeumasseCents: week.inflowsNeumasseCents.toString(),
-        totalInflowsCents: week.totalInflowsCents.toString(),
-        outflowsAltmasseCents: week.outflowsAltmasseCents.toString(),
-        outflowsNeumasseCents: week.outflowsNeumasseCents.toString(),
-        totalOutflowsCents: week.totalOutflowsCents.toString(),
-        netCashflowCents: week.netCashflowCents.toString(),
-        closingBalanceCents: week.closingBalanceCents.toString(),
+      periodType: result.periodType,
+      periodCount: result.periodCount,
+      periods: (result.periods || []).map((period) => ({
+        ...period,
+        periodStartDate: period.periodStartDate.toISOString(),
+        periodEndDate: period.periodEndDate.toISOString(),
+        openingBalanceCents: period.openingBalanceCents.toString(),
+        inflowsAltmasseCents: period.inflowsAltmasseCents.toString(),
+        inflowsNeumasseCents: period.inflowsNeumasseCents.toString(),
+        totalInflowsCents: period.totalInflowsCents.toString(),
+        outflowsAltmasseCents: period.outflowsAltmasseCents.toString(),
+        outflowsNeumasseCents: period.outflowsNeumasseCents.toString(),
+        totalOutflowsCents: period.totalOutflowsCents.toString(),
+        netCashflowCents: period.netCashflowCents.toString(),
+        closingBalanceCents: period.closingBalanceCents.toString(),
+      })),
+      // Legacy alias for backwards compatibility
+      weeks: (result.periods || []).map((period) => ({
+        weekOffset: period.periodIndex,
+        weekLabel: period.periodLabel,
+        openingBalanceCents: period.openingBalanceCents.toString(),
+        inflowsAltmasseCents: period.inflowsAltmasseCents.toString(),
+        inflowsNeumasseCents: period.inflowsNeumasseCents.toString(),
+        totalInflowsCents: period.totalInflowsCents.toString(),
+        outflowsAltmasseCents: period.outflowsAltmasseCents.toString(),
+        outflowsNeumasseCents: period.outflowsNeumasseCents.toString(),
+        totalOutflowsCents: period.totalOutflowsCents.toString(),
+        netCashflowCents: period.netCashflowCents.toString(),
+        closingBalanceCents: period.closingBalanceCents.toString(),
       })),
       categories: result.categories.map((cat) => ({
         ...cat,
         totalCents: cat.totalCents.toString(),
-        weeklyTotals: cat.weeklyTotals.map((t) => t.toString()),
+        periodTotals: cat.periodTotals.map((t) => t.toString()),
+        // Legacy alias
+        weeklyTotals: cat.periodTotals.map((t) => t.toString()),
         lines: cat.lines.map((line) => ({
           ...line,
           totalCents: line.totalCents.toString(),
-          weeklyValues: line.weeklyValues.map((wv) => ({
-            ...wv,
-            istCents: wv.istCents?.toString() ?? null,
-            planCents: wv.planCents?.toString() ?? null,
-            effectiveCents: wv.effectiveCents.toString(),
+          periodValues: line.periodValues.map((pv) => ({
+            ...pv,
+            istCents: pv.istCents?.toString() ?? null,
+            planCents: pv.planCents?.toString() ?? null,
+            effectiveCents: pv.effectiveCents.toString(),
+          })),
+          // Legacy alias
+          weeklyValues: line.periodValues.map((pv) => ({
+            weekOffset: pv.periodIndex,
+            istCents: pv.istCents?.toString() ?? null,
+            planCents: pv.planCents?.toString() ?? null,
+            effectiveCents: pv.effectiveCents.toString(),
           })),
         })),
       })),
@@ -193,7 +236,7 @@ export async function POST(
               include: {
                 lines: {
                   include: {
-                    weeklyValues: true,
+                    periodValues: true,
                   },
                 },
               },
@@ -214,20 +257,20 @@ export async function POST(
     const newVersionNumber = (plan.versions[0]?.versionNumber ?? 0) + 1;
 
     // Calculate data hash
-    const weeklyValues: WeeklyValueInput[] = plan.categories.flatMap((cat) =>
+    const periodValues: PeriodValueInput[] = plan.categories.flatMap((cat) =>
       cat.lines.flatMap((line) =>
-        line.weeklyValues.map((wv) => ({
+        line.periodValues.map((pv) => ({
           lineId: line.id,
-          weekOffset: wv.weekOffset,
-          valueType: wv.valueType as "IST" | "PLAN",
-          amountCents: BigInt(wv.amountCents),
+          periodIndex: pv.periodIndex,
+          valueType: pv.valueType as "IST" | "PLAN",
+          amountCents: BigInt(pv.amountCents),
         }))
       )
     );
 
     const dataHash = calculateDataHash(
       BigInt(openingBalanceCents || 0),
-      weeklyValues
+      periodValues
     );
 
     // Create new version

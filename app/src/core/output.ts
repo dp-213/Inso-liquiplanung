@@ -75,6 +75,11 @@ function calculateKPIs(
   result: CalculationResult,
   openingBalanceCents: bigint
 ): KPIs {
+  // Guard against undefined weeks
+  if (!result.weeks || result.weeks.length === 0) {
+    throw new Error("Calculation result has no weeks data");
+  }
+
   // Find minimum weekly closing balance
   let minClosingBalance = result.weeks[0].closingBalanceCents;
   let minBalanceWeek = 0;

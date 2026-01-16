@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Liquiditätsplanung | Insolvenzverwaltung",
-  description: "Internes Kontrollcockpit für Insolvenz-Liquiditätsplanung",
+  title: "Gradify | Inso-Liquiplanung",
+  description: "Liquiditaetsplanung fuer Insolvenzverfahren",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

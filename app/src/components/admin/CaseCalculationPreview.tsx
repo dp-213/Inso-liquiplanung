@@ -64,7 +64,7 @@ export default function CaseCalculationPreview({ caseId }: CalculationPreviewPro
     return null;
   }
 
-  if (error || !data) {
+  if (error || !data || !data.calculation || !data.calculation.weeks) {
     return (
       <div className="pt-4 border-t border-[var(--border)]">
         <p className="text-sm text-[var(--muted)]">Vorschau nicht verfügbar</p>

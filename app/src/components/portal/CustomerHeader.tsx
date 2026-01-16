@@ -17,7 +17,7 @@ export default function CustomerHeader({
   const handleLogout = async () => {
     try {
       await fetch("/api/portal/auth/logout", { method: "POST" });
-      router.push("/portal/login");
+      router.push("/customer-login");
     } catch (error) {
       console.error("Logout failed:", error);
     }

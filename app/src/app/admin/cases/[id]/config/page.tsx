@@ -865,7 +865,7 @@ export default function CaseConfigPage({
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
-                      value={config.styling.primaryColor || "#1e40af"}
+                      value={config.styling.primaryColor || "#CE353A"}
                       onChange={(e) =>
                         updateConfig("styling", { ...config.styling, primaryColor: e.target.value })
                       }
@@ -877,7 +877,7 @@ export default function CaseConfigPage({
                       onChange={(e) =>
                         updateConfig("styling", { ...config.styling, primaryColor: e.target.value })
                       }
-                      placeholder="#1e40af"
+                      placeholder="#CE353A"
                       className="flex-1 px-3 py-2 border border-[var(--border)] rounded-md"
                     />
                     {config.styling.primaryColor && (
@@ -899,7 +899,7 @@ export default function CaseConfigPage({
                   <div className="flex items-center gap-3">
                     <input
                       type="color"
-                      value={config.styling.accentColor || "#3b82f6"}
+                      value={config.styling.accentColor || "#E05A5F"}
                       onChange={(e) =>
                         updateConfig("styling", { ...config.styling, accentColor: e.target.value })
                       }
@@ -911,7 +911,7 @@ export default function CaseConfigPage({
                       onChange={(e) =>
                         updateConfig("styling", { ...config.styling, accentColor: e.target.value })
                       }
-                      placeholder="#3b82f6"
+                      placeholder="#E05A5F"
                       className="flex-1 px-3 py-2 border border-[var(--border)] rounded-md"
                     />
                     {config.styling.accentColor && (

@@ -30,12 +30,14 @@ interface LiquidityTableProps {
   weeks: Week[];
   categories: Category[];
   openingBalance: bigint;
+  showLineItems?: boolean;
 }
 
 export default function LiquidityTable({
   weeks,
   categories,
   openingBalance,
+  showLineItems = false,
 }: LiquidityTableProps) {
   const formatCurrency = (cents: bigint | string): string => {
     const value = typeof cents === "string" ? BigInt(cents) : cents;
@@ -53,9 +55,14 @@ export default function LiquidityTable({
     return "";
   };
 
-  // Group categories by type
-  const inflowCategories = categories.filter((c) => c.flowType === "INFLOW");
-  const outflowCategories = categories.filter((c) => c.flowType === "OUTFLOW");
+  // Group categories by type and filter out empty ones
+  const hasData = (cat: Category): boolean => {
+    const total = BigInt(cat.totalCents || "0");
+    return total !== BigInt(0);
+  };
+
+  const inflowCategories = categories.filter((c) => c.flowType === "INFLOW" && hasData(c));
+  const outflowCategories = categories.filter((c) => c.flowType === "OUTFLOW" && hasData(c));
 
   // Calculate totals
   const totalInflows = weeks.map((w) => BigInt(w.totalInflowsCents));
@@ -97,7 +104,7 @@ export default function LiquidityTable({
           <td colSpan={weeks.length + 2}>Einzahlungen</td>
         </tr>
         {inflowCategories.map((category) => (
-          <CategoryRows key={category.categoryName} category={category} formatCurrency={formatCurrency} getCellClass={getCellClass} />
+          <CategoryRows key={category.categoryName} category={category} formatCurrency={formatCurrency} getCellClass={getCellClass} showLineItems={showLineItems} />
         ))}
         <tr className="row-subtotal">
           <td>Summe Einzahlungen</td>
@@ -114,7 +121,7 @@ export default function LiquidityTable({
           <td colSpan={weeks.length + 2}>Auszahlungen</td>
         </tr>
         {outflowCategories.map((category) => (
-          <CategoryRows key={category.categoryName} category={category} formatCurrency={formatCurrency} getCellClass={getCellClass} isOutflow />
+          <CategoryRows key={category.categoryName} category={category} formatCurrency={formatCurrency} getCellClass={getCellClass} isOutflow showLineItems={showLineItems} />
         ))}
         <tr className="row-subtotal">
           <td>Summe Auszahlungen</td>
@@ -159,17 +166,16 @@ interface CategoryRowsProps {
   formatCurrency: (cents: bigint | string) => string;
   getCellClass: (cents: bigint | string) => string;
   isOutflow?: boolean;
+  showLineItems?: boolean;
 }
 
-function CategoryRows({ category, formatCurrency, getCellClass, isOutflow }: CategoryRowsProps) {
-  const estateLabel = category.estateType === "ALTMASSE" ? "(Alt)" : "(Neu)";
-
+function CategoryRows({ category, formatCurrency, getCellClass, isOutflow, showLineItems = false }: CategoryRowsProps) {
   return (
     <>
       {/* Category header row */}
       <tr className="bg-gray-50">
         <td className="font-medium text-[var(--secondary)]">
-          {category.categoryName} {estateLabel}
+          {category.categoryName}
         </td>
         {category.weeklyTotals.map((value, idx) => (
           <td key={idx} className={`font-medium ${isOutflow ? "" : getCellClass(value)}`}>
@@ -180,8 +186,8 @@ function CategoryRows({ category, formatCurrency, getCellClass, isOutflow }: Cat
           {isOutflow ? `-${formatCurrency(category.totalCents)}` : formatCurrency(category.totalCents)}
         </td>
       </tr>
-      {/* Individual line items */}
-      {category.lines.map((line) => (
+      {/* Individual line items - only show if enabled */}
+      {showLineItems && category.lines.map((line) => (
         <tr key={line.lineName}>
           <td className="pl-6 text-[var(--secondary)]">{line.lineName}</td>
           {line.weeklyValues.map((wv) => (

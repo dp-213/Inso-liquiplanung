@@ -9,8 +9,10 @@ interface CaseAccess {
   debtorName: string;
   courtName: string;
   status: string;
-  projectName: string;
+  ownerName: string;
+  ownerCompany: string | null;
   accessLevel: string;
+  isOwner: boolean;
   grantedAt: string;
   hasPlan: boolean;
   latestVersion: number | null;
@@ -24,7 +26,7 @@ export default function PortalDashboard() {
   useEffect(() => {
     async function fetchCases() {
       try {
-        const response = await fetch("/api/portal/cases");
+        const response = await fetch("/api/customer/cases");
         if (!response.ok) {
           throw new Error("Failed to fetch cases");
         }
@@ -66,6 +68,10 @@ export default function PortalDashboard() {
     }
   };
 
+  // Separate owned cases and shared cases
+  const ownedCases = cases.filter((c) => c.isOwner);
+  const sharedCases = cases.filter((c) => !c.isOwner);
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -74,7 +80,7 @@ export default function PortalDashboard() {
             Meine Faelle
           </h1>
           <p className="text-[var(--secondary)] mt-1">
-            Liquiditaetsplaene Ihrer zugewiesenen Insolvenzverfahren
+            Liquiditaetsplaene Ihrer Insolvenzverfahren
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -126,21 +132,30 @@ export default function PortalDashboard() {
     );
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">
-          Meine Faelle
-        </h1>
-        <p className="text-[var(--secondary)] mt-1">
-          Liquiditaetsplaene Ihrer zugewiesenen Insolvenzverfahren
-        </p>
+  const renderCaseCard = (caseItem: CaseAccess) => (
+    <Link
+      key={caseItem.id}
+      href={`/portal/cases/${caseItem.id}`}
+      className="admin-card p-6 hover:shadow-lg transition-shadow block"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <h2 className="text-lg font-semibold text-[var(--foreground)]">
+          {caseItem.debtorName}
+        </h2>
+        <span
+          className={`badge ${getStatusBadgeClass(caseItem.status)}`}
+        >
+          {getStatusLabel(caseItem.status)}
+        </span>
       </div>
-
-      {cases.length === 0 ? (
-        <div className="admin-card p-8 text-center">
+      <div className="space-y-1 text-sm text-[var(--secondary)] mb-4">
+        <p>Aktenzeichen: {caseItem.caseNumber}</p>
+        <p>Gericht: {caseItem.courtName}</p>
+      </div>
+      {caseItem.hasPlan ? (
+        <div className="flex items-center text-sm text-[var(--success)]">
           <svg
-            className="w-16 h-16 text-[var(--muted)] mx-auto mb-4"
+            className="w-4 h-4 mr-1"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -148,79 +163,96 @@ export default function PortalDashboard() {
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              strokeWidth={2}
+              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">
-            Keine Faelle zugewiesen
-          </h2>
-          <p className="text-[var(--secondary)]">
-            Ihnen wurden noch keine Insolvenzverfahren zur Einsicht freigegeben.
-          </p>
+          Liquiditaetsplan verfuegbar
+          {caseItem.latestVersion && (
+            <span className="ml-1">(v{caseItem.latestVersion})</span>
+          )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {cases.map((caseItem) => (
-            <Link
-              key={caseItem.id}
-              href={`/portal/cases/${caseItem.id}`}
-              className="admin-card p-6 hover:shadow-lg transition-shadow block"
+        <div className="flex items-center text-sm text-[var(--muted)]">
+          <svg
+            className="w-4 h-4 mr-1"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          Plan in Vorbereitung
+        </div>
+      )}
+    </Link>
+  );
+
+  return (
+    <div className="space-y-8">
+      {/* Owned Cases Section */}
+      <div className="space-y-4">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">
+            Meine Faelle
+          </h1>
+          <p className="text-[var(--secondary)] mt-1">
+            Liquiditaetsplaene Ihrer Insolvenzverfahren
+          </p>
+        </div>
+
+        {ownedCases.length === 0 && sharedCases.length === 0 ? (
+          <div className="admin-card p-8 text-center">
+            <svg
+              className="w-16 h-16 text-[var(--muted)] mx-auto mb-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
             >
-              <div className="flex items-start justify-between mb-3">
-                <h2 className="text-lg font-semibold text-[var(--foreground)]">
-                  {caseItem.debtorName}
-                </h2>
-                <span
-                  className={`badge ${getStatusBadgeClass(caseItem.status)}`}
-                >
-                  {getStatusLabel(caseItem.status)}
-                </span>
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
+            <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+              Keine Faelle vorhanden
+            </h2>
+            <p className="text-[var(--secondary)]">
+              Sie haben noch keine Insolvenzverfahren zugewiesen bekommen.
+            </p>
+          </div>
+        ) : (
+          <>
+            {ownedCases.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {ownedCases.map(renderCaseCard)}
               </div>
-              <div className="space-y-1 text-sm text-[var(--secondary)] mb-4">
-                <p>Aktenzeichen: {caseItem.caseNumber}</p>
-                <p>Gericht: {caseItem.courtName}</p>
-              </div>
-              {caseItem.hasPlan ? (
-                <div className="flex items-center text-sm text-[var(--success)]">
-                  <svg
-                    className="w-4 h-4 mr-1"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  Liquiditaetsplan verfuegbar
-                  {caseItem.latestVersion && (
-                    <span className="ml-1">(v{caseItem.latestVersion})</span>
-                  )}
-                </div>
-              ) : (
-                <div className="flex items-center text-sm text-[var(--muted)]">
-                  <svg
-                    className="w-4 h-4 mr-1"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                  Plan in Vorbereitung
-                </div>
-              )}
-            </Link>
-          ))}
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Shared Cases Section */}
+      {sharedCases.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-xl font-semibold text-[var(--foreground)]">
+              Geteilte Faelle
+            </h2>
+            <p className="text-[var(--secondary)] mt-1">
+              Faelle, fuer die Ihnen Lesezugriff gewaehrt wurde
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sharedCases.map(renderCaseCard)}
+          </div>
         </div>
       )}
     </div>

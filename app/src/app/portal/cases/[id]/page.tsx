@@ -5,8 +5,9 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import KPICards from "@/components/external/KPICards";
 import LiquidityTable from "@/components/external/LiquidityTable";
-import BalanceChart from "@/components/external/BalanceChart";
+import BalanceChart, { ChartMarker } from "@/components/external/BalanceChart";
 import PDFExportButton from "@/components/external/PDFExportButton";
+import DashboardNav from "@/components/external/DashboardNav";
 
 interface CaseData {
   case: {
@@ -22,6 +23,8 @@ interface CaseData {
   plan: {
     name: string;
     planStartDate: string;
+    periodType: "WEEKLY" | "MONTHLY";
+    periodCount: number;
     versionNumber: number;
     versionDate: string | null;
   };
@@ -33,6 +36,8 @@ interface CaseData {
     finalClosingBalanceCents: string;
     dataHash: string;
     calculatedAt: string;
+    periodType: "WEEKLY" | "MONTHLY";
+    periodCount: number;
     weeks: {
       weekOffset: number;
       weekLabel: string;
@@ -187,9 +192,6 @@ export default function CustomerCaseDashboard() {
   const runwayWeek = weeks.findIndex(
     (week) => BigInt(week.closingBalanceCents) <= BigInt(0)
   );
-  const criticalWeek = weeks.findIndex(
-    (week) => BigInt(week.closingBalanceCents) < minCash + minCash / BigInt(10)
-  );
 
   const formatCurrency = (cents: bigint): string => {
     const euros = Number(cents) / 100;
@@ -206,6 +208,20 @@ export default function CustomerCaseDashboard() {
     return `${weeks[0].weekLabel} - ${weeks[weeks.length - 1].weekLabel}`;
   };
 
+  const getPlanTitle = (): string => {
+    const periodType = data.calculation.periodType || data.plan.periodType || "WEEKLY";
+    const periodCount = data.calculation.periodCount || data.plan.periodCount || 13;
+    if (periodType === "MONTHLY") {
+      return `${periodCount}-Monats-Planung`;
+    }
+    return `${periodCount}-Wochen-Planung`;
+  };
+
+  const getPeriodTypeName = (): string => {
+    const periodType = data.calculation.periodType || data.plan.periodType || "WEEKLY";
+    return periodType === "MONTHLY" ? "Monate" : "Wochen";
+  };
+
   const getStatusLabel = (status: string): string => {
     switch (status) {
       case "PRELIMINARY":
@@ -217,6 +233,41 @@ export default function CustomerCaseDashboard() {
       default:
         return status;
     }
+  };
+
+  // Generate payment markers based on period data
+  const getPaymentMarkers = (): ChartMarker[] => {
+    const markers: ChartMarker[] = [];
+    const periodType = data.calculation.periodType || "WEEKLY";
+
+    if (periodType === "MONTHLY") {
+      // KV-Restzahlungen typically in Mar, Jun, Sep, Dec (quarterly)
+      const kvMonths = ["Mrz", "Jun", "Sep", "Dez"];
+      // HZV-Schlusszahlung typically in Dec/Jan
+      const hzvMonths = ["Dez", "Jan"];
+
+      weeks.forEach((week) => {
+        const monthAbbrev = week.weekLabel.split(" ")[0];
+        if (kvMonths.some((m) => monthAbbrev.startsWith(m))) {
+          markers.push({
+            periodLabel: week.weekLabel,
+            label: "KV",
+            color: "#10b981",
+            type: "event",
+          });
+        }
+        if (hzvMonths.some((m) => monthAbbrev.startsWith(m))) {
+          markers.push({
+            periodLabel: week.weekLabel,
+            label: "HZV",
+            color: "#8b5cf6",
+            type: "event",
+          });
+        }
+      });
+    }
+
+    return markers;
   };
 
   return (
@@ -279,27 +330,42 @@ export default function CustomerCaseDashboard() {
           currentCash={currentCash}
           minCash={minCash}
           runwayWeek={runwayWeek >= 0 ? weeks[runwayWeek]?.weekLabel : null}
-          criticalWeek={
-            criticalWeek >= 0 && criticalWeek !== runwayWeek
-              ? weeks[criticalWeek]?.weekLabel
-              : null
-          }
           formatCurrency={formatCurrency}
+          periodType={data.calculation.periodType}
+          periodCount={data.calculation.periodCount}
         />
+
+        {/* Dashboard Navigation */}
+        <DashboardNav caseId={caseId} />
 
         {/* Balance Chart */}
         <div className="admin-card p-6">
           <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
             Liquiditaetsverlauf
           </h2>
-          <BalanceChart weeks={weeks} />
+          <BalanceChart
+            weeks={weeks}
+            markers={getPaymentMarkers()}
+            showPhases={data.calculation.periodType === "MONTHLY"}
+          />
+          {/* Marker Legend */}
+          <div className="mt-4 flex flex-wrap gap-4 text-xs text-[var(--secondary)]">
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-0.5 bg-[#10b981]" style={{ borderStyle: "dashed" }}></div>
+              <span>KV-Restzahlung</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-0.5 bg-[#8b5cf6]" style={{ borderStyle: "dashed" }}></div>
+              <span>HZV-Schlusszahlung</span>
+            </div>
+          </div>
         </div>
 
-        {/* 13-Week Table */}
+        {/* Liquidity Table */}
         <div className="admin-card">
           <div className="px-6 py-4 border-b border-[var(--border)]">
             <h2 className="text-lg font-semibold text-[var(--foreground)]">
-              13-Wochen-Planung
+              {getPlanTitle()}
             </h2>
           </div>
           <div className="overflow-x-auto custom-scrollbar">

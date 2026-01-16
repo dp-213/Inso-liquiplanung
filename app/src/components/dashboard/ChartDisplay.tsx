@@ -136,8 +136,8 @@ export default function ChartDisplay({ config, data }: ChartDisplayProps) {
       >
         <defs>
           <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#1e40af" stopOpacity={0.1} />
-            <stop offset="95%" stopColor="#1e40af" stopOpacity={0} />
+            <stop offset="5%" stopColor="#CE353A" stopOpacity={0.1} />
+            <stop offset="95%" stopColor="#CE353A" stopOpacity={0} />
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -168,10 +168,10 @@ export default function ChartDisplay({ config, data }: ChartDisplayProps) {
           type="monotone"
           dataKey="closingBalance"
           name="Endbestand"
-          stroke="#1e40af"
+          stroke="#CE353A"
           strokeWidth={3}
-          dot={{ fill: "#1e40af", strokeWidth: 2, r: 4 }}
-          activeDot={{ fill: "#1e40af", strokeWidth: 0, r: 6 }}
+          dot={{ fill: "#CE353A", strokeWidth: 2, r: 4 }}
+          activeDot={{ fill: "#CE353A", strokeWidth: 0, r: 6 }}
         />
       </ComposedChart>
     </ResponsiveContainer>

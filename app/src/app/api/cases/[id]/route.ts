@@ -18,7 +18,7 @@ export async function GET(
     const caseData = await prisma.case.findUnique({
       where: { id },
       include: {
-        project: true,
+        owner: { select: { id: true, name: true, email: true, company: true } },
         plans: {
           include: {
             versions: {
@@ -28,7 +28,7 @@ export async function GET(
               include: {
                 lines: {
                   include: {
-                    weeklyValues: true,
+                    periodValues: true,
                   },
                   orderBy: { displayOrder: "asc" },
                 },

@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
 import { getCustomerSession } from "@/lib/customer-auth";
 import CustomerHeader from "@/components/portal/CustomerHeader";
+import { redirect } from "next/navigation";
 
 export default async function PortalLayout({
   children,
@@ -10,7 +10,7 @@ export default async function PortalLayout({
   const session = await getCustomerSession();
 
   if (!session) {
-    redirect("/portal/login");
+    redirect("/customer-login");
   }
 
   return (

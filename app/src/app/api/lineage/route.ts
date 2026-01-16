@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const valueId = searchParams.get("valueId");
     const lineId = searchParams.get("lineId");
-    const weekOffset = searchParams.get("weekOffset");
+    const periodIndex = searchParams.get("periodIndex");
     const valueType = searchParams.get("valueType");
 
     if (!valueId && !lineId) {
@@ -24,9 +24,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Find the weekly value
-    let weeklyValue;
+    let periodValue;
     if (valueId) {
-      weeklyValue = await prisma.weeklyValue.findUnique({
+      periodValue = await prisma.periodValue.findUnique({
         where: { id: valueId },
         include: {
           line: {
@@ -36,12 +36,12 @@ export async function GET(request: NextRequest) {
           },
         },
       });
-    } else if (lineId && weekOffset !== null && valueType) {
-      weeklyValue = await prisma.weeklyValue.findUnique({
+    } else if (lineId && periodIndex !== null && valueType) {
+      periodValue = await prisma.periodValue.findUnique({
         where: {
-          lineId_weekOffset_valueType: {
+          lineId_periodIndex_valueType: {
             lineId,
-            weekOffset: parseInt(weekOffset),
+            periodIndex: parseInt(periodIndex),
             valueType,
           },
         },
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    if (!weeklyValue) {
+    if (!periodValue) {
       return NextResponse.json(
         { error: "Wert nicht gefunden" },
         { status: 404 }
@@ -75,9 +75,9 @@ export async function GET(request: NextRequest) {
     // This is a simplified version - in production, you'd have proper commit_action tracking
     const stagedEntries = await prisma.stagedCashflowEntry.findMany({
       where: {
-        lineName: weeklyValue.line.name,
-        weekOffset: weeklyValue.weekOffset,
-        valueType: weeklyValue.valueType,
+        lineName: periodValue.line.name,
+        periodIndex: periodValue.periodIndex,
+        valueType: periodValue.valueType,
         status: "COMMITTED",
       },
       include: {
@@ -145,7 +145,7 @@ export async function GET(request: NextRequest) {
           flowType: stagedEntry.targetCategoryFlowType,
           estateType: stagedEntry.targetCategoryEstateType,
           lineName: stagedEntry.lineName,
-          weekOffset: stagedEntry.weekOffset,
+          periodIndex: stagedEntry.periodIndex,
           amountCents: stagedEntry.amountCents.toString(),
           confidenceScore: stagedEntry.confidenceScore,
         },
@@ -174,8 +174,8 @@ export async function GET(request: NextRequest) {
           timestamp: job.completedAt.toISOString(),
           data: {
             actionType: "CREATE",
-            targetId: weeklyValue.id,
-            targetType: "WeeklyValue",
+            targetId: periodValue.id,
+            targetType: "PeriodValue",
           },
           actor: job.createdBy,
           action: "Uebernommen",
@@ -185,40 +185,40 @@ export async function GET(request: NextRequest) {
       // If no ingestion lineage, show manual creation
       lineage.push({
         stage: "COMMITTED",
-        timestamp: weeklyValue.createdAt.toISOString(),
+        timestamp: periodValue.createdAt.toISOString(),
         data: {
           actionType: "MANUAL",
-          targetId: weeklyValue.id,
-          targetType: "WeeklyValue",
+          targetId: periodValue.id,
+          targetType: "PeriodValue",
         },
-        actor: weeklyValue.createdBy,
+        actor: periodValue.createdBy,
         action: "Manuell erstellt",
       });
     }
 
     // Check for updates
-    if (weeklyValue.updatedAt > weeklyValue.createdAt) {
+    if (periodValue.updatedAt > periodValue.createdAt) {
       lineage.push({
         stage: "COMMITTED",
-        timestamp: weeklyValue.updatedAt.toISOString(),
+        timestamp: periodValue.updatedAt.toISOString(),
         data: {
           actionType: "UPDATE",
-          targetId: weeklyValue.id,
-          targetType: "WeeklyValue",
+          targetId: periodValue.id,
+          targetType: "PeriodValue",
         },
-        actor: weeklyValue.updatedBy,
+        actor: periodValue.updatedBy,
         action: "Aktualisiert",
       });
     }
 
     return NextResponse.json({
-      valueId: weeklyValue.id,
-      lineId: weeklyValue.lineId,
-      lineName: weeklyValue.line.name,
-      categoryName: weeklyValue.line.category.name,
-      weekOffset: weeklyValue.weekOffset,
-      valueType: weeklyValue.valueType,
-      amountCents: weeklyValue.amountCents.toString(),
+      valueId: periodValue.id,
+      lineId: periodValue.lineId,
+      lineName: periodValue.line.name,
+      categoryName: periodValue.line.category.name,
+      periodIndex: periodValue.periodIndex,
+      valueType: periodValue.valueType,
+      amountCents: periodValue.amountCents.toString(),
       lineage,
     });
   } catch (error) {

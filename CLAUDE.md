@@ -9,7 +9,40 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Repository:** https://github.com/dp-213/Inso-liquiplanung.git
 - **Language:** German (all UI, documentation, error messages)
 - **Framework:** Next.js 15 with App Router
-- **Database:** SQLite (Prisma ORM)
+- **Database:** Turso (libSQL) via Prisma ORM
+- **Deployment:** Vercel
+
+## Domain Model (Business Context)
+
+**Wir sind Unternehmensberater** die Insolvenzverwalter bei der Liquiditaetsplanung unterstuetzen.
+
+### Hauptakteure
+
+| Begriff | Rolle | System-Entity |
+|---------|-------|---------------|
+| **Kunden** | Insolvenzverwalter (unsere Mandanten) | `CustomerUser` |
+| **Faelle** | Einzelne Insolvenzverfahren | `Case` |
+| **Wir** | Interne Berater (Admin-Zugang) | Admin-Session |
+
+### Beziehungen
+
+```
+Kunde (Insolvenzverwalter)
+    |
+    +-- Fall 1 (Insolvenzverfahren)
+    |       +-- Liquiditaetsplan
+    |       +-- Daten-Importe
+    |
+    +-- Fall 2 (Insolvenzverfahren)
+            +-- Liquiditaetsplan
+            +-- Daten-Importe
+```
+
+### Hinweis: "Projekte" (Legacy)
+
+Die Entitaet "Projekte" existiert noch im System, ist aber konzeptionell mit "Kunden" identisch. Langfristig sollte dies vereinfacht werden:
+- Projekte = Kunden = Insolvenzverwalter
+- Ein Kunde hat mehrere Faelle
 
 ## Git Repository
 

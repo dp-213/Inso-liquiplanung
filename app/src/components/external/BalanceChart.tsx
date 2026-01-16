@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  LineChart,
   Line,
   XAxis,
   YAxis,
@@ -11,6 +10,7 @@ import {
   ReferenceLine,
   Area,
   ComposedChart,
+  ReferenceArea,
 } from "recharts";
 
 interface Week {
@@ -23,11 +23,21 @@ interface Week {
   closingBalanceCents: string;
 }
 
-interface BalanceChartProps {
-  weeks: Week[];
+export interface ChartMarker {
+  periodLabel: string;  // e.g., "Dez 25"
+  label: string;        // e.g., "KV-Restzahlung"
+  color: string;        // e.g., "#10b981"
+  type: "event" | "phase";  // event = single point, phase = range
+  endPeriodLabel?: string;  // for phase type
 }
 
-export default function BalanceChart({ weeks }: BalanceChartProps) {
+interface BalanceChartProps {
+  weeks: Week[];
+  markers?: ChartMarker[];
+  showPhases?: boolean;  // Show Fortführung/Nachlauf phases
+}
+
+export default function BalanceChart({ weeks, markers = [], showPhases = false }: BalanceChartProps) {
   // Transform data for chart
   const chartData = weeks.map((week) => ({
     name: week.weekLabel,
@@ -35,6 +45,11 @@ export default function BalanceChart({ weeks }: BalanceChartProps) {
     inflows: Number(BigInt(week.totalInflowsCents)) / 100,
     outflows: -Number(BigInt(week.totalOutflowsCents)) / 100,
   }));
+
+  // Find marker positions by period label
+  const getMarkerIndex = (periodLabel: string): number => {
+    return chartData.findIndex((d) => d.name === periodLabel);
+  };
 
   const formatCurrency = (value: number): string => {
     if (Math.abs(value) >= 1000000) {
@@ -113,6 +128,49 @@ export default function BalanceChart({ weeks }: BalanceChartProps) {
           />
           <Tooltip content={<CustomTooltip />} />
           <ReferenceLine y={0} stroke="#dc2626" strokeDasharray="5 5" strokeWidth={2} />
+
+          {/* Phase areas (Fortführung/Nachlauf) */}
+          {showPhases && chartData.length > 3 && (
+            <>
+              <ReferenceArea
+                x1={chartData[0].name}
+                x2={chartData[Math.floor(chartData.length / 2)].name}
+                fill="#10b981"
+                fillOpacity={0.05}
+                label={{ value: "Fortfuehrung", position: "insideTopLeft", fill: "#10b981", fontSize: 11 }}
+              />
+              <ReferenceArea
+                x1={chartData[Math.floor(chartData.length / 2)].name}
+                x2={chartData[chartData.length - 1].name}
+                fill="#f59e0b"
+                fillOpacity={0.05}
+                label={{ value: "Nachlauf", position: "insideTopRight", fill: "#f59e0b", fontSize: 11 }}
+              />
+            </>
+          )}
+
+          {/* Event markers */}
+          {markers.filter(m => m.type === "event").map((marker, idx) => {
+            const markerIdx = getMarkerIndex(marker.periodLabel);
+            if (markerIdx === -1) return null;
+            return (
+              <ReferenceLine
+                key={`marker-${idx}`}
+                x={marker.periodLabel}
+                stroke={marker.color}
+                strokeWidth={2}
+                strokeDasharray="4 4"
+                label={{
+                  value: marker.label,
+                  position: "top",
+                  fill: marker.color,
+                  fontSize: 10,
+                  fontWeight: 500,
+                }}
+              />
+            );
+          })}
+
           <Area
             type="monotone"
             dataKey="balance"

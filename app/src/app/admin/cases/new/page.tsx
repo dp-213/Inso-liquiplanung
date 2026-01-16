@@ -4,23 +4,26 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
-interface Project {
+interface Customer {
   id: string;
   name: string;
+  email: string;
+  company: string | null;
 }
 
 function NewCaseContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const preselectedProjectId = searchParams.get("projectId");
+  const preselectedOwnerId = searchParams.get("ownerId");
 
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [additionalCustomerIds, setAdditionalCustomerIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
-    projectId: "",
+    ownerId: "",
     caseNumber: "",
     debtorName: "",
     courtName: "",
@@ -30,27 +33,28 @@ function NewCaseContent() {
   });
 
   useEffect(() => {
-    async function loadProjects() {
+    async function loadData() {
       try {
-        const res = await fetch("/api/projects");
-        if (res.ok) {
-          const data = await res.json();
-          setProjects(data);
-          // Use preselected project from URL or first project
-          if (preselectedProjectId && data.find((p: Project) => p.id === preselectedProjectId)) {
-            setFormData((prev) => ({ ...prev, projectId: preselectedProjectId }));
-          } else if (data.length > 0) {
-            setFormData((prev) => ({ ...prev, projectId: data[0].id }));
+        const customersRes = await fetch("/api/customers?isActive=true");
+
+        if (customersRes.ok) {
+          const customersData = await customersRes.json();
+          setCustomers(customersData);
+          // Use preselected owner from URL or first customer
+          if (preselectedOwnerId && customersData.find((c: Customer) => c.id === preselectedOwnerId)) {
+            setFormData((prev) => ({ ...prev, ownerId: preselectedOwnerId }));
+          } else if (customersData.length > 0) {
+            setFormData((prev) => ({ ...prev, ownerId: customersData[0].id }));
           }
         }
       } catch (err) {
-        console.error("Error loading projects:", err);
+        console.error("Error loading data:", err);
       } finally {
         setLoading(false);
       }
     }
-    loadProjects();
-  }, [preselectedProjectId]);
+    loadData();
+  }, [preselectedOwnerId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +65,10 @@ function NewCaseContent() {
       const res = await fetch("/api/cases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          ...formData,
+          customerIds: additionalCustomerIds,
+        }),
       });
 
       if (res.ok) {
@@ -71,7 +78,7 @@ function NewCaseContent() {
         const data = await res.json();
         setError(data.error || "Fehler beim Erstellen des Falls");
       }
-    } catch (err) {
+    } catch {
       setError("Netzwerkfehler. Bitte versuchen Sie es erneut.");
     } finally {
       setSubmitting(false);
@@ -83,7 +90,14 @@ function NewCaseContent() {
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    // Clear additional customers if owner changes to prevent duplicates
+    if (name === "ownerId") {
+      setAdditionalCustomerIds((prev) => prev.filter((id) => id !== value));
+    }
   };
+
+  // Filter out the owner from additional customer options
+  const availableAdditionalCustomers = customers.filter((c) => c.id !== formData.ownerId);
 
   if (loading) {
     return (
@@ -109,14 +123,14 @@ function NewCaseContent() {
         </Link>
       </div>
 
-      {projects.length === 0 ? (
+      {customers.length === 0 ? (
         <div className="admin-card p-8 text-center">
           <p className="text-[var(--muted)] mb-4">
-            Sie muessen zuerst ein Projekt erstellen, bevor Sie einen Fall
+            Sie muessen zuerst einen Kunden erstellen, bevor Sie einen Fall
             anlegen koennen.
           </p>
-          <Link href="/admin/projects?new=true" className="btn-primary">
-            Projekt erstellen
+          <Link href="/admin/customers" className="btn-primary">
+            Kunde erstellen
           </Link>
         </div>
       ) : (
@@ -130,25 +144,29 @@ function NewCaseContent() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label
-                htmlFor="projectId"
+                htmlFor="ownerId"
                 className="block text-sm font-medium text-[var(--foreground)] mb-2"
               >
-                Projekt *
+                Kunde (Besitzer) *
               </label>
               <select
-                id="projectId"
-                name="projectId"
-                value={formData.projectId}
+                id="ownerId"
+                name="ownerId"
+                value={formData.ownerId}
                 onChange={handleChange}
                 required
                 className="input-field"
               >
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}
+                {customers.map((customer) => (
+                  <option key={customer.id} value={customer.id}>
+                    {customer.name}
+                    {customer.company && ` (${customer.company})`}
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-[var(--muted)] mt-1">
+                Der Besitzer hat automatisch Zugriff auf diesen Fall.
+              </p>
             </div>
 
             <div>
@@ -263,6 +281,59 @@ function NewCaseContent() {
               </select>
             </div>
           </div>
+
+          {/* Optional Additional Customer Access */}
+          {availableAdditionalCustomers.length > 0 && (
+            <div className="pt-6 border-t border-[var(--border)]">
+              <h3 className="text-sm font-medium text-[var(--foreground)] mb-2">
+                Weitere Kundenzugaenge (optional)
+              </h3>
+              <p className="text-xs text-[var(--muted)] mb-4">
+                Diese Kunden erhalten zusaetzlich Lesezugriff auf den neuen Fall.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-48 overflow-y-auto">
+                {availableAdditionalCustomers.map((customer) => (
+                  <label
+                    key={customer.id}
+                    className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
+                      additionalCustomerIds.includes(customer.id)
+                        ? "border-[var(--primary)] bg-blue-50"
+                        : "border-[var(--border)] hover:bg-gray-50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={additionalCustomerIds.includes(customer.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setAdditionalCustomerIds([...additionalCustomerIds, customer.id]);
+                        } else {
+                          setAdditionalCustomerIds(
+                            additionalCustomerIds.filter((id) => id !== customer.id)
+                          );
+                        }
+                      }}
+                      className="w-4 h-4 text-[var(--primary)] rounded border-gray-300 focus:ring-[var(--primary)]"
+                    />
+                    <div className="ml-3 flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[var(--foreground)] truncate">
+                        {customer.name}
+                      </p>
+                      <p className="text-xs text-[var(--muted)] truncate">
+                        {customer.email}
+                        {customer.company && ` - ${customer.company}`}
+                      </p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              {additionalCustomerIds.length > 0 && (
+                <p className="text-xs text-[var(--primary)] mt-2">
+                  {additionalCustomerIds.length} zusaetzliche(r) Kunde(n) ausgewaehlt
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border)]">
             <Link href="/admin/cases" className="btn-secondary">

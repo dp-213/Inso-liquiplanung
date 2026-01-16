@@ -36,6 +36,11 @@ export default function GlobalError({ error, reset }: ErrorProps) {
         <p className="text-[var(--secondary)] mb-6">
           Ein unerwarteter Fehler ist aufgetreten. Bitte laden Sie die Seite neu oder versuchen Sie es spater erneut.
         </p>
+        {error.message && (
+          <p className="text-xs text-red-600 mb-2 font-mono bg-red-50 p-2 rounded">
+            {error.message}
+          </p>
+        )}
         {error.digest && (
           <p className="text-xs text-[var(--muted)] mb-4 font-mono">
             Fehler-ID: {error.digest}
