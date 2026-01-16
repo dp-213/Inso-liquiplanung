@@ -117,7 +117,7 @@ export default function CustomersPage() {
   };
 
   const handleResetPassword = async (id: string, name: string) => {
-    if (!confirm(`Passwort fuer "${name}" wirklich zuruecksetzen?`)) return;
+    if (!confirm(`Passwort für "${name}" wirklich zurücksetzen?`)) return;
 
     try {
       const response = await fetch(`/api/customers/${id}`, {
@@ -132,16 +132,16 @@ export default function CustomersPage() {
         setCreatedCustomerName(name);
         setCreatedPassword(data.temporaryPassword);
       } else {
-        alert("Fehler beim Zuruecksetzen des Passworts");
+        alert("Fehler beim Zurücksetzen des Passworts");
       }
     } catch (err) {
       console.error("Error resetting password:", err);
-      alert("Fehler beim Zuruecksetzen des Passworts");
+      alert("Fehler beim Zurücksetzen des Passworts");
     }
   };
 
   const handlePermanentDelete = async () => {
-    if (deleteInput !== "LOESCHEN" || !deleteCustomerId) return;
+    if (deleteInput !== "LÖSCHEN" || !deleteCustomerId) return;
 
     setSaving(true);
     try {
@@ -157,11 +157,11 @@ export default function CustomersPage() {
         fetchCustomers();
       } else {
         const data = await response.json();
-        setError(data.error || "Fehler beim Loeschen");
+        setError(data.error || "Fehler beim Löschen");
       }
     } catch (err) {
       console.error("Error deleting customer:", err);
-      setError("Netzwerkfehler beim Loeschen");
+      setError("Netzwerkfehler beim Löschen");
     } finally {
       setSaving(false);
     }
@@ -213,11 +213,11 @@ export default function CustomersPage() {
               <h2 className="text-lg font-semibold">Neues Passwort</h2>
             </div>
             <p className="text-sm text-[var(--secondary)] mb-4">
-              Neues Passwort fuer <strong>{createdCustomerName}</strong>:
+              Neues Passwort für <strong>{createdCustomerName}</strong>:
             </p>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
               <p className="text-sm font-medium text-yellow-800 mb-2">
-                Temporaeres Passwort (nur einmal sichtbar):
+                Temporäres Passwort (nur einmal sichtbar):
               </p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 bg-white px-3 py-2 rounded border font-mono text-lg">
@@ -253,25 +253,25 @@ export default function CustomersPage() {
       {deleteCustomerId && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-            <h2 className="text-lg font-semibold text-red-600 mb-4">Kunde permanent loeschen?</h2>
+            <h2 className="text-lg font-semibold text-red-600 mb-4">Kunde permanent löschen?</h2>
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
               <p className="text-sm text-red-800 mb-2">
-                <strong>Achtung:</strong> Diese Aktion kann nicht rueckgaengig gemacht werden!
+                <strong>Achtung:</strong> Diese Aktion kann nicht rückgängig gemacht werden!
               </p>
               <p className="text-sm text-red-700">
-                Alle Daten von <strong>{deleteCustomerName}</strong> werden unwiderruflich geloescht.
+                Alle Daten von <strong>{deleteCustomerName}</strong> werden unwiderruflich gelöscht.
               </p>
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Geben Sie LOESCHEN ein, um zu bestaetigen:
+                Geben Sie LÖSCHEN ein, um zu bestätigen:
               </label>
               <input
                 type="text"
                 value={deleteInput}
                 onChange={(e) => setDeleteInput(e.target.value)}
                 className="input-field"
-                placeholder="LOESCHEN"
+                placeholder="LÖSCHEN"
               />
             </div>
             {error && (
@@ -282,10 +282,10 @@ export default function CustomersPage() {
             <div className="flex gap-2">
               <button
                 onClick={handlePermanentDelete}
-                disabled={saving || deleteInput !== "LOESCHEN"}
+                disabled={saving || deleteInput !== "LÖSCHEN"}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg disabled:opacity-50"
               >
-                {saving ? "Loeschen..." : "Permanent loeschen"}
+                {saving ? "Löschen..." : "Permanent löschen"}
               </button>
               <button
                 onClick={() => {
@@ -361,7 +361,7 @@ export default function CustomersPage() {
               </div>
             </div>
             <p className="text-sm text-[var(--muted)]">
-              Ein temporaeres Passwort wird automatisch generiert und nach der Erstellung angezeigt.
+              Ein temporäres Passwort wird automatisch generiert und nach der Erstellung angezeigt.
             </p>
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-700">
@@ -396,7 +396,7 @@ export default function CustomersPage() {
                 <th>E-Mail</th>
                 <th>Unternehmen</th>
                 <th>Status</th>
-                <th>Faelle</th>
+                <th>Fälle</th>
                 <th>Letzter Login</th>
                 <th>Aktionen</th>
               </tr>
@@ -421,10 +421,10 @@ export default function CustomersPage() {
                       : "Noch nie"}
                   </td>
                   <td>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                       <Link
                         href={`/admin/customers/${customer.id}`}
-                        className="btn-secondary text-xs py-1 px-2"
+                        className="text-xs py-1 px-2 text-[var(--primary)] hover:bg-blue-50 rounded"
                       >
                         Details
                       </Link>
@@ -455,10 +455,10 @@ export default function CustomersPage() {
                           setDeleteCustomerId(customer.id);
                           setDeleteCustomerName(customer.name);
                         }}
-                        className="text-xs py-1 px-2 text-red-700 hover:bg-red-100 rounded font-medium"
-                        title="Permanent loeschen"
+                        className="text-xs py-1 px-2 text-[var(--danger)] hover:bg-red-50 rounded"
+                        title="Permanent löschen"
                       >
-                        Loeschen
+                        Löschen
                       </button>
                     </div>
                   </td>

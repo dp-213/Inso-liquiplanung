@@ -38,7 +38,7 @@ export default function CasesListPage() {
         const data = await response.json();
         setCases(data);
       } else {
-        setError("Fehler beim Laden der Faelle");
+        setError("Fehler beim Laden der Fälle");
       }
     } catch (err) {
       console.error("Error fetching cases:", err);
@@ -49,7 +49,7 @@ export default function CasesListPage() {
   };
 
   const handlePermanentDelete = async () => {
-    if (deleteInput !== "LOESCHEN" || !deleteCaseId) return;
+    if (deleteInput !== "LÖSCHEN" || !deleteCaseId) return;
 
     setDeleting(true);
     try {
@@ -65,11 +65,11 @@ export default function CasesListPage() {
         fetchCases();
       } else {
         const data = await response.json();
-        setError(data.error || "Fehler beim Loeschen");
+        setError(data.error || "Fehler beim Löschen");
       }
     } catch (err) {
       console.error("Error deleting case:", err);
-      setError("Netzwerkfehler beim Loeschen");
+      setError("Netzwerkfehler beim Löschen");
     } finally {
       setDeleting(false);
     }
@@ -78,9 +78,9 @@ export default function CasesListPage() {
   const getStatusLabel = (status: string): string => {
     switch (status) {
       case "PRELIMINARY":
-        return "Vorlaeufig";
+        return "Vorläufig";
       case "OPENED":
-        return "Eroeffnet";
+        return "Eröffnet";
       case "CLOSED":
         return "Geschlossen";
       default:
@@ -113,7 +113,7 @@ export default function CasesListPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">Faelle</h1>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">Fälle</h1>
           <p className="text-[var(--secondary)] mt-1">
             Alle Insolvenzverfahren verwalten
           </p>
@@ -130,7 +130,7 @@ export default function CasesListPage() {
             onClick={() => setError(null)}
             className="text-xs text-red-600 mt-1 hover:underline"
           >
-            Schliessen
+            Schließen
           </button>
         </div>
       )}
@@ -140,19 +140,19 @@ export default function CasesListPage() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
             <h2 className="text-lg font-semibold text-red-600 mb-4">
-              Fall permanent loeschen?
+              Fall permanent löschen?
             </h2>
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
               <p className="text-sm text-red-800 mb-2">
-                <strong>Achtung:</strong> Diese Aktion kann nicht rueckgaengig
+                <strong>Achtung:</strong> Diese Aktion kann nicht rückgängig
                 gemacht werden!
               </p>
               <p className="text-sm text-red-700">
                 Alle Daten von <strong>{deleteCaseName}</strong> werden
-                unwiderruflich geloescht:
+                unwiderruflich gelöscht:
               </p>
               <ul className="text-sm text-red-700 mt-2 list-disc list-inside">
-                <li>Liquiditaetsplaene und Versionen</li>
+                <li>Liquiditätspläne und Versionen</li>
                 <li>Kategorien und Zeilen</li>
                 <li>Alle Periodenwerte</li>
                 <li>Konfigurationen und Share-Links</li>
@@ -160,23 +160,23 @@ export default function CasesListPage() {
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Geben Sie LOESCHEN ein, um zu bestaetigen:
+                Geben Sie LÖSCHEN ein, um zu bestätigen:
               </label>
               <input
                 type="text"
                 value={deleteInput}
                 onChange={(e) => setDeleteInput(e.target.value)}
                 className="input-field"
-                placeholder="LOESCHEN"
+                placeholder="LÖSCHEN"
               />
             </div>
             <div className="flex gap-2">
               <button
                 onClick={handlePermanentDelete}
-                disabled={deleting || deleteInput !== "LOESCHEN"}
+                disabled={deleting || deleteInput !== "LÖSCHEN"}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg disabled:opacity-50"
               >
-                {deleting ? "Loeschen..." : "Permanent loeschen"}
+                {deleting ? "Löschen..." : "Permanent löschen"}
               </button>
               <button
                 onClick={() => {
@@ -202,13 +202,13 @@ export default function CasesListPage() {
           </p>
         </div>
         <div className="admin-card p-4">
-          <p className="text-sm text-[var(--muted)]">Eroeffnet</p>
+          <p className="text-sm text-[var(--muted)]">Eröffnet</p>
           <p className="text-2xl font-bold text-[var(--success)]">
             {cases.filter((c) => c.status === "OPENED").length}
           </p>
         </div>
         <div className="admin-card p-4">
-          <p className="text-sm text-[var(--muted)]">Vorlaeufig</p>
+          <p className="text-sm text-[var(--muted)]">Vorläufig</p>
           <p className="text-2xl font-bold text-[var(--warning)]">
             {cases.filter((c) => c.status === "PRELIMINARY").length}
           </p>
@@ -299,22 +299,22 @@ export default function CasesListPage() {
                     {new Date(caseItem.updatedAt).toLocaleDateString("de-DE")}
                   </td>
                   <td>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                       <Link
                         href={`/admin/cases/${caseItem.id}`}
-                        className="text-[var(--primary)] hover:underline text-sm"
+                        className="text-xs py-1 px-2 text-[var(--primary)] hover:bg-blue-50 rounded"
                       >
-                        Oeffnen
+                        Öffnen
                       </Link>
                       <button
                         onClick={() => {
                           setDeleteCaseId(caseItem.id);
                           setDeleteCaseName(caseItem.debtorName);
                         }}
-                        className="text-xs py-1 px-2 text-red-700 hover:bg-red-100 rounded font-medium"
-                        title="Permanent loeschen"
+                        className="text-xs py-1 px-2 text-[var(--danger)] hover:bg-red-50 rounded"
+                        title="Permanent löschen"
                       >
-                        Loeschen
+                        Löschen
                       </button>
                     </div>
                   </td>
@@ -324,7 +324,7 @@ export default function CasesListPage() {
             {cases.length === 0 && (
               <tr>
                 <td colSpan={8} className="text-center py-8 text-[var(--muted)]">
-                  Keine Faelle vorhanden. Erstellen Sie Ihren ersten Fall.
+                  Keine Fälle vorhanden. Erstellen Sie Ihren ersten Fall.
                 </td>
               </tr>
             )}

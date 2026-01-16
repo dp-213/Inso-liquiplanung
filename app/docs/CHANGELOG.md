@@ -189,9 +189,52 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
-## Geplante Aenderungen
+## Version 1.4.0 – Löschfunktionen & Kundenlogo
 
-Keine ausstehenden Aenderungen
+**Datum:** 17. Januar 2026
+
+### Neue Funktionen
+
+#### Permanente Löschfunktion
+- **Kunden löschen:** Auf der Kundenliste (/admin/customers) können Kunden jetzt permanent gelöscht werden
+- **Fälle löschen:** Auf der Fallliste (/admin/cases) können Fälle mit allen zugehörigen Daten gelöscht werden
+- **Sichere Bestätigung:** Löschen erfordert Eingabe von "LÖSCHEN" zur Bestätigung
+- **Kaskaden-Löschung für Fälle:** Löscht automatisch alle zugehörigen Daten:
+  - Liquiditätspläne und Versionen
+  - Kategorien, Zeilen und Periodenwerte
+  - Konfigurationen und Share-Links
+  - Kundenzugriffe (CustomerCaseAccess)
+
+#### Kundenlogo im Portal
+- **Logo-URL Feld:** Kunden können jetzt eine Logo-URL im Profil hinterlegen
+- **Portal-Header:** Logo wird anstelle des Standard-Icons im Kundenportal-Header angezeigt
+- **Session-Integration:** Logo-URL wird in der Kundensession gespeichert
+
+#### Admin-Verbesserungen
+- **Kundendetailseite:** Zeigt jetzt zugehörige Fälle (ownedCases) mit Plantyp-Info
+- **Planeinstellungen API:** Neuer Endpunkt /api/cases/[id]/plan/settings für Periodentyp-Konfiguration
+- **Fall-Bearbeitungsseite:** Planeinstellungen (Periodentyp, Periodenzahl, Startdatum) direkt editierbar
+
+### UI-Verbesserungen
+- **Konsistentes Button-Styling:** Alle Aktions-Buttons in Tabellen haben einheitliches Design
+- **Umlaute korrigiert:** Alle deutschen Umlaute (ä, ö, ü) korrekt dargestellt
+
+### API-Änderungen
+- **GET /api/customers/[id]:** Gibt jetzt `ownedCases` zurück
+- **PUT /api/customers/[id]:** Unterstützt `logoUrl` und `resetPassword`
+- **DELETE /api/customers/[id]:** Mit `?hardDelete=true&confirm=PERMANENTLY_DELETE` für permanentes Löschen
+- **DELETE /api/cases/[id]:** Mit `?hardDelete=true&confirm=PERMANENTLY_DELETE` für permanentes Löschen
+- **GET/PUT /api/cases/[id]/plan/settings:** Neuer Endpunkt für Planeinstellungen
+
+### Schema-Änderungen
+- `CustomerUser.logoUrl` – Neues Feld für Kundenlogo-URL
+- `CustomerSessionData.logoUrl` – Logo-URL in JWT-Session integriert
+
+---
+
+## Geplante Änderungen
+
+Keine ausstehenden Änderungen
 
 ---
 
