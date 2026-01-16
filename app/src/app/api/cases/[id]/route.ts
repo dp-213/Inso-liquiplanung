@@ -122,7 +122,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/cases/[id] - Delete case (soft delete / archive)
+// DELETE /api/cases/[id] - Delete case (soft delete by default, hard delete with ?hardDelete=true)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -134,8 +134,86 @@ export async function DELETE(
     }
 
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const hardDelete = searchParams.get("hardDelete") === "true";
+    const confirmDelete = searchParams.get("confirm");
 
-    // Archive the case instead of deleting
+    if (hardDelete) {
+      // Require confirmation for hard delete
+      if (confirmDelete !== "PERMANENTLY_DELETE") {
+        return NextResponse.json(
+          { error: "Bestaetigung erforderlich: confirm=PERMANENTLY_DELETE" },
+          { status: 400 }
+        );
+      }
+
+      // Hard delete - remove all related data
+      await prisma.$transaction(async (tx) => {
+        // Get all plans for this case
+        const plans = await tx.liquidityPlan.findMany({
+          where: { caseId: id },
+          select: { id: true },
+        });
+        const planIds = plans.map((p) => p.id);
+
+        // Get all categories for these plans
+        const categories = await tx.cashflowCategory.findMany({
+          where: { planId: { in: planIds } },
+          select: { id: true },
+        });
+        const categoryIds = categories.map((c) => c.id);
+
+        // Get all lines for these categories
+        const lines = await tx.cashflowLine.findMany({
+          where: { categoryId: { in: categoryIds } },
+          select: { id: true },
+        });
+        const lineIds = lines.map((l) => l.id);
+
+        // Delete in order (deepest first)
+        await tx.periodValue.deleteMany({
+          where: { lineId: { in: lineIds } },
+        });
+        await tx.cashflowLine.deleteMany({
+          where: { categoryId: { in: categoryIds } },
+        });
+        await tx.cashflowCategory.deleteMany({
+          where: { planId: { in: planIds } },
+        });
+        await tx.liquidityPlanVersion.deleteMany({
+          where: { planId: { in: planIds } },
+        });
+        await tx.liquidityPlan.deleteMany({
+          where: { caseId: id },
+        });
+
+        // Delete other related entities
+        await tx.customerCaseAccess.deleteMany({
+          where: { caseId: id },
+        });
+        await tx.shareLink.deleteMany({
+          where: { caseId: id },
+        });
+        await tx.caseConfiguration.deleteMany({
+          where: { caseId: id },
+        });
+        await tx.ingestionJob.deleteMany({
+          where: { caseId: id },
+        });
+        await tx.aiPreprocessingJob.deleteMany({
+          where: { caseId: id },
+        });
+
+        // Finally delete the case
+        await tx.case.delete({
+          where: { id },
+        });
+      });
+
+      return NextResponse.json({ success: true, deleted: true });
+    }
+
+    // Soft delete: archive the case
     await prisma.case.update({
       where: { id },
       data: {
@@ -144,11 +222,11 @@ export async function DELETE(
       },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, archived: true });
   } catch (error) {
-    console.error("Error archiving case:", error);
+    console.error("Error deleting case:", error);
     return NextResponse.json(
-      { error: "Fehler beim Archivieren des Falls" },
+      { error: "Fehler beim Loeschen des Falls" },
       { status: 500 }
     );
   }

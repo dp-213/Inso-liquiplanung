@@ -29,6 +29,7 @@ export async function GET(
         name: true,
         company: true,
         phone: true,
+        logoUrl: true,
         isActive: true,
         emailVerified: true,
         lastLoginAt: true,
@@ -39,6 +40,28 @@ export async function GET(
         createdBy: true,
         updatedAt: true,
         updatedBy: true,
+        ownedCases: {
+          select: {
+            id: true,
+            caseNumber: true,
+            debtorName: true,
+            status: true,
+            courtName: true,
+            createdAt: true,
+            plans: {
+              where: { isActive: true },
+              select: {
+                id: true,
+                name: true,
+                periodType: true,
+                periodCount: true,
+                planStartDate: true,
+              },
+              take: 1,
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
         caseAccess: {
           include: {
             case: {
@@ -88,7 +111,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { name, company, phone, isActive, resetPassword } = body;
+    const { name, company, phone, logoUrl, isActive, resetPassword } = body;
 
     // Check if customer exists
     const existingCustomer = await prisma.customerUser.findUnique({
@@ -107,6 +130,7 @@ export async function PUT(
       name?: string;
       company?: string | null;
       phone?: string | null;
+      logoUrl?: string | null;
       isActive?: boolean;
       passwordHash?: string;
       lockedUntil?: null;
@@ -132,6 +156,10 @@ export async function PUT(
 
     if (phone !== undefined) {
       updateData.phone = phone?.trim() || null;
+    }
+
+    if (logoUrl !== undefined) {
+      updateData.logoUrl = logoUrl?.trim() || null;
     }
 
     if (isActive !== undefined) {
@@ -181,7 +209,7 @@ export async function PUT(
   }
 }
 
-// DELETE /api/customers/[id] - Soft delete (deactivate) customer
+// DELETE /api/customers/[id] - Soft delete by default, hard delete with ?hardDelete=true
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -193,10 +221,16 @@ export async function DELETE(
     }
 
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const hardDelete = searchParams.get("hardDelete") === "true";
+    const confirmDelete = searchParams.get("confirm");
 
     // Check if customer exists
     const existingCustomer = await prisma.customerUser.findUnique({
       where: { id },
+      include: {
+        ownedCases: { select: { id: true, debtorName: true } },
+      },
     });
 
     if (!existingCustomer) {
@@ -204,6 +238,47 @@ export async function DELETE(
         { error: "Kunde nicht gefunden" },
         { status: 404 }
       );
+    }
+
+    if (hardDelete) {
+      // Require confirmation for hard delete
+      if (confirmDelete !== "PERMANENTLY_DELETE") {
+        return NextResponse.json(
+          { error: "Bestaetigung erforderlich: confirm=PERMANENTLY_DELETE" },
+          { status: 400 }
+        );
+      }
+
+      // Check if customer has owned cases
+      if (existingCustomer.ownedCases.length > 0) {
+        return NextResponse.json(
+          {
+            error: `Kunde kann nicht geloescht werden - besitzt noch ${existingCustomer.ownedCases.length} Fall/Faelle. Loeschen Sie zuerst die Faelle oder weisen Sie sie einem anderen Kunden zu.`,
+            ownedCases: existingCustomer.ownedCases,
+          },
+          { status: 400 }
+        );
+      }
+
+      // Hard delete
+      await prisma.$transaction(async (tx) => {
+        // Delete all related data
+        await tx.customerCaseAccess.deleteMany({
+          where: { customerId: id },
+        });
+        await tx.customerSession.deleteMany({
+          where: { customerId: id },
+        });
+        await tx.customerAuditLog.deleteMany({
+          where: { customerId: id },
+        });
+        // Delete customer
+        await tx.customerUser.delete({
+          where: { id },
+        });
+      });
+
+      return NextResponse.json({ success: true, deleted: true });
     }
 
     // Soft delete: deactivate customer and revoke all access
@@ -237,11 +312,11 @@ export async function DELETE(
       });
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, deactivated: true });
   } catch (error) {
     console.error("Error deleting customer:", error);
     return NextResponse.json(
-      { error: "Fehler beim Deaktivieren des Kunden" },
+      { error: "Fehler beim Loeschen des Kunden" },
       { status: 500 }
     );
   }

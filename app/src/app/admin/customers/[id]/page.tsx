@@ -25,12 +25,29 @@ interface CaseAccess {
   };
 }
 
+interface OwnedCase {
+  id: string;
+  caseNumber: string;
+  debtorName: string;
+  status: string;
+  courtName: string;
+  createdAt: string;
+  plans: Array<{
+    id: string;
+    name: string;
+    periodType: string;
+    periodCount: number;
+    planStartDate: string;
+  }>;
+}
+
 interface Customer {
   id: string;
   email: string;
   name: string;
   company: string | null;
   phone: string | null;
+  logoUrl: string | null;
   isActive: boolean;
   emailVerified: boolean;
   lastLoginAt: string | null;
@@ -41,6 +58,7 @@ interface Customer {
   createdBy: string;
   updatedAt: string;
   updatedBy: string;
+  ownedCases: OwnedCase[];
   caseAccess: CaseAccess[];
 }
 
@@ -55,9 +73,11 @@ export default function CustomerDetailPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ name: "", company: "", phone: "" });
+  const [editForm, setEditForm] = useState({ name: "", company: "", phone: "", logoUrl: "" });
   const [saving, setSaving] = useState(false);
   const [newPassword, setNewPassword] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
 
   useEffect(() => {
     fetchCustomer();
@@ -73,6 +93,7 @@ export default function CustomerDetailPage({
           name: data.name,
           company: data.company || "",
           phone: data.phone || "",
+          logoUrl: data.logoUrl || "",
         });
       } else if (res.status === 404) {
         setError("Kunde nicht gefunden");
@@ -155,6 +176,32 @@ export default function CustomerDetailPage({
       fetchCustomer();
     } catch (err) {
       setError(`Fehler beim ${action}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePermanentDelete = async () => {
+    if (deleteInput !== "LOESCHEN") {
+      setError("Bitte geben Sie LOESCHEN ein, um zu bestaetigen");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/customers/${id}?hardDelete=true&confirm=PERMANENTLY_DELETE`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        router.push("/admin/customers");
+      } else {
+        const data = await res.json();
+        setError(data.error || "Fehler beim Loeschen");
+        setShowDeleteConfirm(false);
+      }
+    } catch (err) {
+      setError("Netzwerkfehler beim Loeschen");
     } finally {
       setSaving(false);
     }
@@ -250,6 +297,58 @@ export default function CustomerDetailPage({
         <span className="text-[var(--foreground)]">{customer.name}</span>
       </div>
 
+      {/* Delete Confirm Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h2 className="text-lg font-semibold text-red-600 mb-4">Kunde permanent loeschen?</h2>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-red-800 mb-2">
+                <strong>Achtung:</strong> Diese Aktion kann nicht rueckgaengig gemacht werden!
+              </p>
+              <p className="text-sm text-red-700">
+                Alle Daten dieses Kunden werden unwiderruflich geloescht.
+              </p>
+              {customer.ownedCases.length > 0 && (
+                <p className="text-sm text-red-800 mt-2 font-medium">
+                  Dieser Kunde besitzt noch {customer.ownedCases.length} Fall/Faelle. Diese muessen zuerst geloescht oder einem anderen Kunden zugewiesen werden.
+                </p>
+              )}
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                Geben Sie LOESCHEN ein, um zu bestaetigen:
+              </label>
+              <input
+                type="text"
+                value={deleteInput}
+                onChange={(e) => setDeleteInput(e.target.value)}
+                className="input-field"
+                placeholder="LOESCHEN"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handlePermanentDelete}
+                disabled={saving || deleteInput !== "LOESCHEN" || customer.ownedCases.length > 0}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg disabled:opacity-50"
+              >
+                {saving ? "Loeschen..." : "Permanent loeschen"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeleteInput("");
+                }}
+                className="btn-secondary"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Password Modal */}
       {newPassword && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -290,7 +389,7 @@ export default function CustomerDetailPage({
         {isEditing ? (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-[var(--foreground)]">Kunde bearbeiten</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground)] mb-1">Name</label>
                 <input
@@ -318,6 +417,17 @@ export default function CustomerDetailPage({
                   className="input-field"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-1">Logo URL</label>
+                <input
+                  type="url"
+                  value={editForm.logoUrl}
+                  onChange={(e) => setEditForm({ ...editForm, logoUrl: e.target.value })}
+                  className="input-field"
+                  placeholder="https://..."
+                />
+                <p className="text-xs text-[var(--muted)] mt-1">URL zum Kundenlogo (wird im Portal angezeigt)</p>
+              </div>
             </div>
             <div className="flex gap-2">
               <button onClick={handleSave} disabled={saving} className="btn-primary">
@@ -330,6 +440,7 @@ export default function CustomerDetailPage({
                     name: customer.name,
                     company: customer.company || "",
                     phone: customer.phone || "",
+                    logoUrl: customer.logoUrl || "",
                   });
                 }}
                 className="btn-secondary"
@@ -371,6 +482,13 @@ export default function CustomerDetailPage({
               >
                 {customer.isActive ? "Deaktivieren" : "Aktivieren"}
               </button>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={saving}
+                className="btn-secondary text-red-600 hover:bg-red-50"
+              >
+                Permanent loeschen
+              </button>
             </div>
           </div>
         )}
@@ -402,10 +520,79 @@ export default function CustomerDetailPage({
         </div>
       </div>
 
+      {/* Owned Cases */}
+      <div className="admin-card">
+        <div className="px-6 py-4 border-b border-[var(--border)]">
+          <h2 className="text-lg font-semibold text-[var(--foreground)]">Eigene Faelle ({customer.ownedCases.length})</h2>
+        </div>
+
+        {customer.ownedCases.length === 0 ? (
+          <div className="p-8 text-center text-[var(--muted)]">
+            Dieser Kunde besitzt keine Faelle.
+          </div>
+        ) : (
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>Fall</th>
+                <th>Gericht</th>
+                <th>Status</th>
+                <th>Plantyp</th>
+                <th>Perioden</th>
+                <th>Erstellt</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {customer.ownedCases.map((ownedCase) => {
+                const plan = ownedCase.plans[0];
+                return (
+                  <tr key={ownedCase.id}>
+                    <td>
+                      <Link
+                        href={`/admin/cases/${ownedCase.id}`}
+                        className="font-medium text-[var(--foreground)] hover:text-[var(--primary)]"
+                      >
+                        {ownedCase.debtorName}
+                      </Link>
+                      <div className="text-xs text-[var(--muted)]">{ownedCase.caseNumber}</div>
+                    </td>
+                    <td className="text-[var(--secondary)]">{ownedCase.courtName}</td>
+                    <td>
+                      <span className={`badge ${getStatusBadgeClass(ownedCase.status)}`}>
+                        {getStatusLabel(ownedCase.status)}
+                      </span>
+                    </td>
+                    <td className="text-[var(--secondary)]">
+                      {plan ? (plan.periodType === "WEEKLY" ? "Wöchentlich" : "Monatlich") : "-"}
+                    </td>
+                    <td className="text-[var(--secondary)]">
+                      {plan ? `${plan.periodCount} ${plan.periodType === "WEEKLY" ? "Wochen" : "Monate"}` : "-"}
+                    </td>
+                    <td className="text-sm text-[var(--muted)]">
+                      {new Date(ownedCase.createdAt).toLocaleDateString("de-DE")}
+                    </td>
+                    <td>
+                      <Link
+                        href={`/admin/cases/${ownedCase.id}/dashboard`}
+                        className="text-xs text-[var(--primary)] hover:underline"
+                      >
+                        Dashboard
+                      </Link>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
       {/* Active Case Access */}
       <div className="admin-card">
         <div className="px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">Aktive Fallzugriffe</h2>
+          <h2 className="text-lg font-semibold text-[var(--foreground)]">Zusaetzliche Fallzugriffe</h2>
+          <p className="text-sm text-[var(--muted)]">Zugriffe auf Faelle anderer Kunden</p>
         </div>
 
         {activeAccess.length === 0 ? (

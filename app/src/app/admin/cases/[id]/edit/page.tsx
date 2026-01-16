@@ -4,6 +4,15 @@ import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+interface PlanData {
+  id: string;
+  name: string;
+  periodType: string;
+  periodCount: number;
+  planStartDate: string;
+  description: string | null;
+}
+
 interface CaseData {
   id: string;
   caseNumber: string;
@@ -14,6 +23,16 @@ interface CaseData {
   status: string;
   projectId: string;
   project: { id: string; name: string };
+  owner: { id: string; name: string; email: string };
+  plans: Array<{
+    id: string;
+    name: string;
+    periodType: string;
+    periodCount: number;
+    planStartDate: string;
+    description: string | null;
+    isActive: boolean;
+  }>;
 }
 
 interface Project {
@@ -43,6 +62,15 @@ export default function CaseEditPage({
     status: "",
     projectId: "",
   });
+  const [planFormData, setPlanFormData] = useState({
+    name: "",
+    periodType: "WEEKLY",
+    periodCount: 13,
+    planStartDate: "",
+    description: "",
+  });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
 
   useEffect(() => {
     fetchData();
@@ -71,6 +99,19 @@ export default function CaseEditPage({
           status: data.status,
           projectId: data.projectId,
         });
+        // Set plan data if active plan exists
+        const activePlan = data.plans?.find((p: { isActive: boolean }) => p.isActive);
+        if (activePlan) {
+          setPlanFormData({
+            name: activePlan.name || "",
+            periodType: activePlan.periodType || "WEEKLY",
+            periodCount: activePlan.periodCount || 13,
+            planStartDate: activePlan.planStartDate
+              ? new Date(activePlan.planStartDate).toISOString().split("T")[0]
+              : "",
+            description: activePlan.description || "",
+          });
+        }
       } else {
         setError("Fall nicht gefunden");
       }
@@ -93,7 +134,8 @@ export default function CaseEditPage({
     setError(null);
 
     try {
-      const res = await fetch(`/api/cases/${id}`, {
+      // Save case data
+      const caseRes = await fetch(`/api/cases/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -106,14 +148,60 @@ export default function CaseEditPage({
         }),
       });
 
-      if (res.ok) {
-        router.push(`/admin/cases/${id}`);
-      } else {
-        const data = await res.json();
+      if (!caseRes.ok) {
+        const data = await caseRes.json();
         setError(data.error || "Fehler beim Speichern");
+        return;
       }
+
+      // Save plan settings
+      const planRes = await fetch(`/api/cases/${id}/plan/settings`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: planFormData.name,
+          periodType: planFormData.periodType,
+          periodCount: planFormData.periodCount,
+          planStartDate: planFormData.planStartDate,
+          description: planFormData.description || null,
+        }),
+      });
+
+      if (!planRes.ok) {
+        const data = await planRes.json();
+        setError(data.error || "Fehler beim Speichern der Planeinstellungen");
+        return;
+      }
+
+      router.push(`/admin/cases/${id}`);
     } catch (err) {
       setError("Netzwerkfehler beim Speichern");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handlePermanentDelete = async () => {
+    if (deleteInput !== "LOESCHEN") {
+      setError("Bitte geben Sie LOESCHEN ein, um zu bestaetigen");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/cases/${id}?hardDelete=true&confirm=PERMANENTLY_DELETE`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        router.push("/admin/cases");
+      } else {
+        const data = await res.json();
+        setError(data.error || "Fehler beim Loeschen");
+        setShowDeleteConfirm(false);
+      }
+    } catch (err) {
+      setError("Netzwerkfehler beim Loeschen");
     } finally {
       setSaving(false);
     }
@@ -327,29 +415,186 @@ export default function CaseEditPage({
 
           <div>
             <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
-              Projekt
+              Eigentümer (Kunde)
             </label>
             <input
               type="text"
-              value={caseData.project.name}
+              value={caseData.owner?.name || "Kein Kunde zugewiesen"}
               disabled
               className="input-field bg-gray-100 cursor-not-allowed"
             />
             <p className="text-xs text-[var(--muted)] mt-1">
-              Das Projekt kann nicht geaendert werden
+              {caseData.owner?.email || ""}
             </p>
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border)]">
-          <Link href={`/admin/cases/${id}`} className="btn-secondary">
-            Abbrechen
-          </Link>
-          <button type="submit" disabled={saving} className="btn-primary">
-            {saving ? "Speichern..." : "Aenderungen speichern"}
+        {/* Plan Settings Section */}
+        <div className="pt-6 border-t border-[var(--border)]">
+          <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">Planeinstellungen</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label
+                htmlFor="planName"
+                className="block text-sm font-medium text-[var(--foreground)] mb-2"
+              >
+                Planname
+              </label>
+              <input
+                type="text"
+                id="planName"
+                value={planFormData.name}
+                onChange={(e) => setPlanFormData({ ...planFormData, name: e.target.value })}
+                className="input-field"
+                placeholder="z.B. Hauptplan"
+              />
+            </div>
+
+            <div>
+              <label
+                htmlFor="periodType"
+                className="block text-sm font-medium text-[var(--foreground)] mb-2"
+              >
+                Periodentyp
+              </label>
+              <select
+                id="periodType"
+                value={planFormData.periodType}
+                onChange={(e) => setPlanFormData({ ...planFormData, periodType: e.target.value })}
+                className="input-field"
+              >
+                <option value="WEEKLY">Wöchentlich (13 Wochen Standard)</option>
+                <option value="MONTHLY">Monatlich</option>
+              </select>
+            </div>
+
+            <div>
+              <label
+                htmlFor="periodCount"
+                className="block text-sm font-medium text-[var(--foreground)] mb-2"
+              >
+                Anzahl Perioden
+              </label>
+              <input
+                type="number"
+                id="periodCount"
+                value={planFormData.periodCount}
+                onChange={(e) => setPlanFormData({ ...planFormData, periodCount: parseInt(e.target.value) || 13 })}
+                min={1}
+                max={52}
+                className="input-field"
+              />
+              <p className="text-xs text-[var(--muted)] mt-1">
+                {planFormData.periodType === "WEEKLY" ? "Wochen" : "Monate"} (1-52)
+              </p>
+            </div>
+
+            <div>
+              <label
+                htmlFor="planStartDate"
+                className="block text-sm font-medium text-[var(--foreground)] mb-2"
+              >
+                Planstart
+              </label>
+              <input
+                type="date"
+                id="planStartDate"
+                value={planFormData.planStartDate}
+                onChange={(e) => setPlanFormData({ ...planFormData, planStartDate: e.target.value })}
+                className="input-field"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label
+                htmlFor="planDescription"
+                className="block text-sm font-medium text-[var(--foreground)] mb-2"
+              >
+                Beschreibung (optional)
+              </label>
+              <input
+                type="text"
+                id="planDescription"
+                value={planFormData.description}
+                onChange={(e) => setPlanFormData({ ...planFormData, description: e.target.value })}
+                className="input-field"
+                placeholder="Optionale Beschreibung des Plans"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-between gap-3 pt-4 border-t border-[var(--border)]">
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+          >
+            Fall permanent loeschen
           </button>
+          <div className="flex gap-3">
+            <Link href={`/admin/cases/${id}`} className="btn-secondary">
+              Abbrechen
+            </Link>
+            <button type="submit" disabled={saving} className="btn-primary">
+              {saving ? "Speichern..." : "Aenderungen speichern"}
+            </button>
+          </div>
         </div>
       </form>
+
+      {/* Delete Confirm Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
+            <h2 className="text-lg font-semibold text-red-600 mb-4">Fall permanent loeschen?</h2>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <p className="text-sm text-red-800 mb-2">
+                <strong>Achtung:</strong> Diese Aktion kann nicht rueckgaengig gemacht werden!
+              </p>
+              <p className="text-sm text-red-700">
+                Alle Daten dieses Falls werden unwiderruflich geloescht:
+              </p>
+              <ul className="text-sm text-red-700 mt-2 list-disc list-inside">
+                <li>Liquiditaetsplaene und Versionen</li>
+                <li>Kategorien und Zeilen</li>
+                <li>Alle Periodenwerte</li>
+                <li>Konfigurationen und Share-Links</li>
+              </ul>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                Geben Sie LOESCHEN ein, um zu bestaetigen:
+              </label>
+              <input
+                type="text"
+                value={deleteInput}
+                onChange={(e) => setDeleteInput(e.target.value)}
+                className="input-field"
+                placeholder="LOESCHEN"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handlePermanentDelete}
+                disabled={saving || deleteInput !== "LOESCHEN"}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg disabled:opacity-50"
+              >
+                {saving ? "Loeschen..." : "Permanent loeschen"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setDeleteInput("");
+                }}
+                className="btn-secondary"
+              >
+                Abbrechen
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -388,6 +388,7 @@ model CustomerUser {
   name              String
   company           String?   // Law firm or company name
   phone             String?
+  logoUrl           String?   // URL to customer logo (for portal branding)
   isActive          Boolean   @default(true)
   emailVerified     Boolean   @default(false)
   lastLoginAt       DateTime?
