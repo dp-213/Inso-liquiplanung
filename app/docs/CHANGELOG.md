@@ -153,12 +153,45 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
-## Geplante Änderungen
+## Version 1.3.0 – Mobile Responsiveness
 
-### Mobile Responsiveness
-- Admin Dashboard mobile-ready machen
-- Kunden-Dashboards (/view/, /portal/) fuer Mobile optimieren
-- Prioritaet auf Kunden-Ansicht
+**Datum:** 16. Januar 2026
+
+### Neue Funktionen
+
+#### Kunden-Ansichten (Prioritaet)
+- **Responsive Tabellen:** Liquidity-Tabellen haben jetzt horizontalen Scroll mit smooth scrolling auf Touch-Geraeten
+- **KPI-Cards optimiert:** Bessere Lesbarkeit auf kleinen Bildschirmen mit angepassten Schriftgroessen und Abstaenden
+- **Dashboard-Navigation:** Touch-freundliche Buttons mit 44px Mindesthoehe fuer Mobile
+- **ExternalDashboardNav:** Icons bleiben sichtbar, Labels werden auf kleinen Bildschirmen ausgeblendet
+
+#### Admin Dashboard
+- **Hamburger-Menue:** Sidebar ist auf Mobile versteckt und kann ueber Hamburger-Icon geoeffnet werden
+- **AdminShell-Komponente:** Neue kombinierte Komponente fuer responsive Layout-Verwaltung
+- **Overlay:** Halbtransparenter Hintergrund beim geoeffneten Mobile-Menue
+- **Escape-Taste:** Schliesst Mobile-Menue
+
+#### Globale Styles
+- **Touch-freundliche Buttons:** Mindesthoehe 44px fuer alle Buttons auf Mobile
+- **Form-Inputs:** Groessere Touch-Targets, font-size 16px verhindert Zoom auf iOS
+- **Scrollbar-Styling:** Konsistentes Aussehen auf Desktop und Mobile
+- **Transitions:** Smooth Animationen fuer Mobile-Navigation
+
+### Technische Aenderungen
+- Neue `AdminShell.tsx` Komponente ersetzt separate Sidebar und Header
+- `globals.css` um mobile-spezifische Media Queries erweitert
+- `LiquidityTable.tsx` mit `table-scroll-container` Wrapper
+- Admin Layout verwendet jetzt `AdminShell` statt `AdminSidebar` + `AdminHeader`
+
+### Breakpoints
+- **sm (640px):** Hauptumschaltpunkt fuer Mobile/Desktop
+- **lg (1024px):** Admin-Sidebar wird permanent sichtbar
+
+---
+
+## Geplante Aenderungen
+
+Keine ausstehenden Aenderungen
 
 ---
 

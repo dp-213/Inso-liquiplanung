@@ -75,6 +75,7 @@ export default function LiquidityTable({
   const sumNet = netCashflows.reduce((a, b) => a + b, BigInt(0));
 
   return (
+    <div className="table-scroll-container custom-scrollbar">
     <table className="liquidity-table">
       <thead>
         <tr>
@@ -158,6 +159,7 @@ export default function LiquidityTable({
         </tr>
       </tbody>
     </table>
+    </div>
   );
 }
 

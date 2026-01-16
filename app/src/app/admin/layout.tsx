@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
-import AdminSidebar from "@/components/admin/AdminSidebar";
-import AdminHeader from "@/components/admin/AdminHeader";
+import AdminShell from "@/components/admin/AdminShell";
 
 export default async function AdminLayout({
   children,
@@ -14,13 +13,5 @@ export default async function AdminLayout({
     redirect("/");
   }
 
-  return (
-    <div className="min-h-screen bg-[var(--background)]">
-      <AdminSidebar />
-      <div className="ml-64">
-        <AdminHeader username={session.username} />
-        <main className="p-6">{children}</main>
-      </div>
-    </div>
-  );
+  return <AdminShell username={session.username}>{children}</AdminShell>;
 }

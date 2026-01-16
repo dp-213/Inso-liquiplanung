@@ -53,19 +53,19 @@ export default function ExternalDashboardNav({ activeTab, onTabChange }: Externa
 
   return (
     <div className="admin-card p-2">
-      <nav className="flex flex-wrap gap-1">
+      <nav className="flex flex-wrap gap-1 sm:gap-2">
         {navItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onTabChange(item.id)}
-            className={`flex items-center gap-2 px-5 py-3 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex items-center justify-center gap-1 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm font-semibold transition-all min-h-[44px] flex-1 sm:flex-none ${
               activeTab === item.id
                 ? "bg-[var(--primary)] text-white shadow-md"
                 : "bg-gray-100 text-[var(--secondary)] hover:bg-gray-200 hover:text-[var(--foreground)]"
             }`}
           >
             {getIcon(item.icon)}
-            {item.label}
+            <span className="hidden xs:inline sm:inline">{item.label}</span>
           </button>
         ))}
       </nav>

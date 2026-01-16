@@ -278,6 +278,70 @@ body {
   color: white;
 }
 
+/* Mobile responsive styles */
+@media (max-width: 640px) {
+  /* Smaller padding on mobile */
+  .admin-table th,
+  .admin-table td {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  /* Buttons more touch-friendly */
+  .btn-primary,
+  .btn-secondary {
+    padding: 0.625rem 1rem;
+    min-height: 44px;
+  }
+
+  /* Form inputs more touch-friendly */
+  .input-field {
+    padding: 0.625rem 0.75rem;
+    min-height: 44px;
+    font-size: 1rem; /* Prevents zoom on iOS */
+  }
+}
+
+/* Table scroll container */
+.table-scroll-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0 -1rem;
+  padding: 0 1rem;
+}
+
+@media (min-width: 640px) {
+  .table-scroll-container {
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* Mobile nav transition */
+.mobile-nav-enter {
+  transform: translateX(-100%);
+}
+
+.mobile-nav-enter-active {
+  transform: translateX(0);
+  transition: transform 0.3s ease-out;
+}
+
+.mobile-nav-exit {
+  transform: translateX(0);
+}
+
+.mobile-nav-exit-active {
+  transform: translateX(-100%);
+  transition: transform 0.3s ease-in;
+}
+
+/* Overlay for mobile menu */
+.mobile-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
 /* Print styles */
 @media print {
   .no-print {
