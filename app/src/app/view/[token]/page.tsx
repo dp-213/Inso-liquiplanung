@@ -10,6 +10,43 @@ import PDFExportButton from "@/components/external/PDFExportButton";
 import ExternalDashboardNav from "@/components/external/ExternalDashboardNav";
 import RevenueChart from "@/components/external/RevenueChart";
 import EstateComparisonChart from "@/components/external/EstateComparisonChart";
+import PlanningAssumptions from "@/components/external/PlanningAssumptions";
+import InsolvencyEffectsTable from "@/components/external/InsolvencyEffectsTable";
+import WaterfallChart from "@/components/external/WaterfallChart";
+
+interface Assumption {
+  id: string;
+  categoryName: string;
+  source: string;
+  description: string;
+  riskLevel: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface InsolvencyEffect {
+  name: string;
+  description: string | null;
+  effectType: "INFLOW" | "OUTFLOW";
+  effectGroup: string;
+  periods: {
+    id: string;
+    periodIndex: number;
+    amountCents: string;
+  }[];
+}
+
+interface BankAccountData {
+  id: string;
+  bankName: string;
+  accountName: string;
+  iban: string | null;
+  balanceCents: string;
+  availableCents: string;
+  securityHolder: string | null;
+  status: string;
+  notes: string | null;
+}
 
 interface ShareData {
   case: {
@@ -28,6 +65,28 @@ interface ShareData {
     periodCount?: number;
     versionNumber: number;
     versionDate: string | null;
+  };
+  assumptions?: Assumption[];
+  insolvencyEffects?: {
+    effects: InsolvencyEffect[];
+    rawEffects: {
+      id: string;
+      name: string;
+      description: string | null;
+      effectType: string;
+      effectGroup: string;
+      periodIndex: number;
+      amountCents: string;
+      isActive: boolean;
+    }[];
+  };
+  bankAccounts?: {
+    accounts: BankAccountData[];
+    summary: {
+      totalBalanceCents: string;
+      totalAvailableCents: string;
+      accountCount: number;
+    };
   };
   calculation: {
     openingBalanceCents: string;
@@ -75,12 +134,7 @@ const PAYMENT_SOURCES = [
   { id: "pvs", name: "PVS-Zahlungen", description: "Privatpatienten-Abrechnungen", rhythm: "Laufend", color: "#ec4899" },
 ];
 
-// Demo security data
-const DEMO_BANK_ACCOUNTS = [
-  { id: "1", accountName: "Geschaeftskonto", bankName: "Sparkasse", balance: BigInt(5000000), securityHolder: "Globalzession Bank", status: "gesperrt" },
-  { id: "2", accountName: "Praxiskonto", bankName: "VR-Bank", balance: BigInt(1200000), securityHolder: null, status: "verfügbar" },
-];
-
+// Demo security rights data (not yet in data model)
 const DEMO_SECURITY_RIGHTS = [
   { id: "1", creditorName: "Sparkasse", securityType: "Globalzession", assetDescription: "KV-Forderungen", estimatedValue: BigInt(12000000), settlementStatus: "offen", settlementAmount: null },
   { id: "2", creditorName: "Leasing GmbH", securityType: "Eigentumsvorbehalt", assetDescription: "Medizingeraete", estimatedValue: BigInt(3500000), settlementStatus: "vereinbarung", settlementAmount: BigInt(2800000) },
@@ -232,7 +286,12 @@ export default function ExternalCaseView() {
     weeklyTotals: cat.weeklyTotals.map((t) => BigInt(t)),
   }));
 
-  // Security totals
+  // Bank account totals (from real data)
+  const bankAccounts = data.bankAccounts?.accounts || [];
+  const totalBankBalance = bankAccounts.reduce((sum, acc) => sum + BigInt(acc.balanceCents), BigInt(0));
+  const totalAvailableBalance = bankAccounts.reduce((sum, acc) => sum + BigInt(acc.availableCents), BigInt(0));
+
+  // Security totals (demo data - not yet in data model)
   const totalSecurityValue = DEMO_SECURITY_RIGHTS.reduce((sum, sr) => sum + sr.estimatedValue, BigInt(0));
   const settledAmount = DEMO_SECURITY_RIGHTS.filter((sr) => sr.settlementAmount).reduce((sum, sr) => sum + (sr.settlementAmount || BigInt(0)), BigInt(0));
 
@@ -372,11 +431,11 @@ export default function ExternalCaseView() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="admin-card p-4">
                   <div className="text-sm text-[var(--secondary)]">Bankguthaben Gesamt</div>
-                  <div className="text-2xl font-bold text-[var(--foreground)]">{formatCurrency(DEMO_BANK_ACCOUNTS.reduce((s, a) => s + a.balance, BigInt(0)))}</div>
+                  <div className="text-2xl font-bold text-[var(--foreground)]">{formatCurrency(totalBankBalance)}</div>
                 </div>
                 <div className="admin-card p-4">
                   <div className="text-sm text-[var(--secondary)]">Davon verfügbar</div>
-                  <div className="text-2xl font-bold text-green-600">{formatCurrency(DEMO_BANK_ACCOUNTS.filter((a) => a.status === "verfügbar").reduce((s, a) => s + a.balance, BigInt(0)))}</div>
+                  <div className="text-2xl font-bold text-green-600">{formatCurrency(totalAvailableBalance)}</div>
                 </div>
                 <div className="admin-card p-4">
                   <div className="text-sm text-[var(--secondary)]">Sicherungswerte</div>
@@ -385,29 +444,51 @@ export default function ExternalCaseView() {
               </div>
 
               <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Bankkonto-Übersicht</h2>
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--border)]">
-                      <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Konto</th>
-                      <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Bank</th>
-                      <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">Saldo</th>
-                      <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Sicherungsnehmer</th>
-                      <th className="text-center py-3 px-4 font-medium text-[var(--secondary)]">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DEMO_BANK_ACCOUNTS.map((acc) => (
-                      <tr key={acc.id} className="border-b border-[var(--border)]">
-                        <td className="py-3 px-4 font-medium">{acc.accountName}</td>
-                        <td className="py-3 px-4 text-[var(--secondary)]">{acc.bankName}</td>
-                        <td className="py-3 px-4 text-right font-medium">{formatCurrency(acc.balance)}</td>
-                        <td className="py-3 px-4 text-[var(--secondary)]">{acc.securityHolder || "-"}</td>
-                        <td className="py-3 px-4 text-center">{getStatusBadge(acc.status)}</td>
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Bankkonto-Übersicht (Bankenspiegel)</h2>
+                {bankAccounts.length > 0 ? (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--border)]">
+                        <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Konto</th>
+                        <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Bank</th>
+                        <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">IBAN</th>
+                        <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">Guthaben</th>
+                        <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">Verfügbar</th>
+                        <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Sicherungsnehmer</th>
+                        <th className="text-center py-3 px-4 font-medium text-[var(--secondary)]">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {bankAccounts.map((acc) => (
+                        <tr key={acc.id} className="border-b border-[var(--border)]">
+                          <td className="py-3 px-4 font-medium">{acc.accountName}</td>
+                          <td className="py-3 px-4 text-[var(--secondary)]">{acc.bankName}</td>
+                          <td className="py-3 px-4 text-[var(--secondary)] font-mono text-xs">{acc.iban || "-"}</td>
+                          <td className="py-3 px-4 text-right font-medium">{formatCurrency(acc.balanceCents)}</td>
+                          <td className="py-3 px-4 text-right font-medium text-green-600">{formatCurrency(acc.availableCents)}</td>
+                          <td className="py-3 px-4 text-[var(--secondary)]">{acc.securityHolder || "-"}</td>
+                          <td className="py-3 px-4 text-center">{getStatusBadge(acc.status)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-gray-50 font-medium">
+                        <td className="py-3 px-4" colSpan={3}>Summe ({bankAccounts.length} Konten)</td>
+                        <td className="py-3 px-4 text-right">{formatCurrency(totalBankBalance)}</td>
+                        <td className="py-3 px-4 text-right text-green-600">{formatCurrency(totalAvailableBalance)}</td>
+                        <td colSpan={2}></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                ) : (
+                  <div className="p-8 bg-gray-50 rounded-lg text-center">
+                    <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    <p className="text-[var(--muted)]">Noch keine Bankkonten erfasst</p>
+                    <p className="text-sm text-[var(--secondary)] mt-1">Die Bankkonten können im Admin-Bereich angelegt werden.</p>
+                  </div>
+                )}
               </div>
 
               <div className="admin-card p-6">
@@ -529,6 +610,162 @@ export default function ExternalCaseView() {
                   </div>
                 </div>
               </div>
+            </>
+          )}
+
+          {/* TAB: Waterfall */}
+          {activeTab === "waterfall" && (
+            <>
+              <div className="admin-card p-6">
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Wasserfall-Darstellung</h2>
+                <p className="text-sm text-[var(--secondary)] mb-6">
+                  Die Wasserfall-Darstellung zeigt die Zusammensetzung der Cashflows pro Periode.
+                  Einzahlungen (grün) und Auszahlungen (rot) ergeben den Endbestand (blaue Linie).
+                </p>
+                <WaterfallChart
+                  data={weeks.map((week) => ({
+                    periodLabel: week.weekLabel,
+                    openingBalance: Number(BigInt(week.openingBalanceCents)) / 100,
+                    inflows: Number(BigInt(week.totalInflowsCents)) / 100,
+                    outflows: Number(BigInt(week.totalOutflowsCents)) / 100,
+                    insolvencyEffects: 0,
+                    closingBalance: Number(BigInt(week.closingBalanceCents)) / 100,
+                  }))}
+                  showInsolvencyEffects={false}
+                />
+              </div>
+            </>
+          )}
+
+          {/* TAB: Insolvency Effects */}
+          {activeTab === "insolvency" && (
+            <>
+              {data.insolvencyEffects && data.insolvencyEffects.effects.length > 0 ? (
+                <InsolvencyEffectsTable
+                  effects={data.insolvencyEffects.effects}
+                  periodType={data.calculation.periodType || data.plan.periodType || "WEEKLY"}
+                  periodCount={weeks.length}
+                  periodLabels={weeks.map((w) => w.weekLabel)}
+                  openingBalance={BigInt(data.calculation.openingBalanceCents)}
+                  closingBalancesBeforeEffects={weeks.map((w) => BigInt(w.closingBalanceCents))}
+                />
+              ) : (
+                <div className="admin-card p-6">
+                  <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Insolvenzspezifische Effekte</h2>
+                  <p className="text-sm text-[var(--secondary)] mb-4">
+                    Diese Ansicht trennt insolvenzspezifische Zahlungsströme vom operativen Geschäft.
+                    Die Struktur folgt dem W&P-Industriestandard für professionelle Liquiditätsberichte.
+                  </p>
+                  <div className="p-8 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-blue-800">Datenerfassung erforderlich</h3>
+                        <p className="text-sm text-blue-700 mt-1">
+                          Um insolvenzspezifische Effekte anzuzeigen, müssen diese zunächst im Admin-Bereich erfasst werden.
+                          Typische Positionen umfassen: Anfechtung SV-Beiträge, Halteprämien, Verfahrenskosten.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                      <div className="p-3 bg-white rounded-lg">
+                        <div className="text-blue-600 font-medium">Standard-Positionen</div>
+                        <ul className="text-blue-700 text-xs mt-1 space-y-0.5">
+                          <li>• Anfechtung SV-Beiträge</li>
+                          <li>• Halteprämien</li>
+                          <li>• Unsicherheitsfaktor</li>
+                        </ul>
+                      </div>
+                      <div className="p-3 bg-white rounded-lg">
+                        <div className="text-blue-600 font-medium">Verfahrenskosten</div>
+                        <ul className="text-blue-700 text-xs mt-1 space-y-0.5">
+                          <li>• Sachverwaltung</li>
+                          <li>• Gerichtskosten</li>
+                          <li>• Gläubigerausschuss</li>
+                        </ul>
+                      </div>
+                      <div className="p-3 bg-white rounded-lg">
+                        <div className="text-blue-600 font-medium">Einzahlungen</div>
+                        <ul className="text-blue-700 text-xs mt-1 space-y-0.5">
+                          <li>• Abverkauf Vorräte</li>
+                          <li>• Anfechtungserlöse</li>
+                          <li>• Rückzahlungen</li>
+                        </ul>
+                      </div>
+                      <div className="p-3 bg-white rounded-lg">
+                        <div className="text-blue-600 font-medium">Beratung</div>
+                        <ul className="text-blue-700 text-xs mt-1 space-y-0.5">
+                          <li>• Rechtsberatung</li>
+                          <li>• Inso-Buchhaltung</li>
+                          <li>• Versicherungen</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* TAB: Planning Assumptions */}
+          {activeTab === "assumptions" && (
+            <>
+              {data.assumptions && data.assumptions.length > 0 ? (
+                <PlanningAssumptions assumptions={data.assumptions} />
+              ) : (
+                <div className="admin-card p-6">
+                  <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Planungsprämissen</h2>
+                  <p className="text-sm text-[var(--secondary)] mb-4">
+                    Die Planungsprämissen dokumentieren die Annahmen hinter jeder Planungsposition.
+                    Jede Position hat eine Informationsquelle, Beschreibung und Risikobewertung nach dem W&P-Standard.
+                  </p>
+                  <div className="p-8 bg-amber-50 rounded-lg border border-amber-200">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center">
+                        <svg className="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-amber-800">Dokumentation ausstehend</h3>
+                        <p className="text-sm text-amber-700 mt-1">
+                          Die Planungsprämissen für diesen Fall wurden noch nicht dokumentiert.
+                          Diese können im Admin-Bereich erfasst werden.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg">
+                      <h4 className="font-medium text-amber-800 mb-3">Risiko-Bewertungsskala (W&P-Standard)</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold">○</span>
+                          <span className="text-amber-700">Konservativ</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">◐</span>
+                          <span className="text-amber-700">Gering</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-100 text-yellow-700 text-xs font-bold">◑</span>
+                          <span className="text-amber-700">Mittel</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-orange-100 text-orange-700 text-xs font-bold">●</span>
+                          <span className="text-amber-700">Hoch</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 text-xs font-bold">●●</span>
+                          <span className="text-amber-700">Aggressiv</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
 

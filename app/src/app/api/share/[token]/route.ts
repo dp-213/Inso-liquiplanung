@@ -43,7 +43,21 @@ export async function GET(
                   },
                   orderBy: { displayOrder: "asc" },
                 },
+                assumptions: {
+                  orderBy: { categoryName: "asc" },
+                },
+                insolvencyEffects: {
+                  where: { isActive: true },
+                  orderBy: [
+                    { effectGroup: "asc" },
+                    { name: "asc" },
+                    { periodIndex: "asc" },
+                  ],
+                },
               },
+            },
+            bankAccounts: {
+              orderBy: { displayOrder: "asc" },
             },
           },
         },
@@ -140,6 +154,32 @@ export async function GET(
       periodCount
     );
 
+    // Group insolvency effects by name for easier display
+    const insolvencyEffectsByName = plan.insolvencyEffects.reduce((acc, effect) => {
+      const key = effect.name;
+      if (!acc[key]) {
+        acc[key] = {
+          name: effect.name,
+          description: effect.description,
+          effectType: effect.effectType,
+          effectGroup: effect.effectGroup,
+          periods: [],
+        };
+      }
+      acc[key].periods.push({
+        id: effect.id,
+        periodIndex: effect.periodIndex,
+        amountCents: effect.amountCents.toString(),
+      });
+      return acc;
+    }, {} as Record<string, {
+      name: string;
+      description: string | null;
+      effectType: string;
+      effectGroup: string;
+      periods: { id: string; periodIndex: number; amountCents: string }[];
+    }>);
+
     // Prepare response (limited external view)
     const response = {
       case: {
@@ -158,6 +198,47 @@ export async function GET(
         periodCount: result.periodCount,
         versionNumber: latestVersion?.versionNumber ?? 0,
         versionDate: latestVersion?.snapshotDate ?? null,
+      },
+      // W&P Best Practices data
+      assumptions: plan.assumptions.map((a) => ({
+        id: a.id,
+        categoryName: a.categoryName,
+        source: a.source,
+        description: a.description,
+        riskLevel: a.riskLevel,
+        createdAt: a.createdAt.toISOString(),
+        updatedAt: a.updatedAt.toISOString(),
+      })),
+      insolvencyEffects: {
+        effects: Object.values(insolvencyEffectsByName),
+        rawEffects: plan.insolvencyEffects.map((e) => ({
+          id: e.id,
+          name: e.name,
+          description: e.description,
+          effectType: e.effectType,
+          effectGroup: e.effectGroup,
+          periodIndex: e.periodIndex,
+          amountCents: e.amountCents.toString(),
+          isActive: e.isActive,
+        })),
+      },
+      bankAccounts: {
+        accounts: caseData.bankAccounts.map((acc) => ({
+          id: acc.id,
+          bankName: acc.bankName,
+          accountName: acc.accountName,
+          iban: acc.iban,
+          balanceCents: acc.balanceCents.toString(),
+          availableCents: acc.availableCents.toString(),
+          securityHolder: acc.securityHolder,
+          status: acc.status,
+          notes: acc.notes,
+        })),
+        summary: {
+          totalBalanceCents: caseData.bankAccounts.reduce((sum, acc) => sum + acc.balanceCents, BigInt(0)).toString(),
+          totalAvailableCents: caseData.bankAccounts.reduce((sum, acc) => sum + acc.availableCents, BigInt(0)).toString(),
+          accountCount: caseData.bankAccounts.length,
+        },
       },
       calculation: {
         openingBalanceCents: result.openingBalanceCents.toString(),

@@ -21,8 +21,6 @@ interface CaseData {
   filingDate: string;
   openingDate: string | null;
   status: string;
-  projectId: string;
-  project: { id: string; name: string };
   owner: { id: string; name: string; email: string };
   plans: Array<{
     id: string;
@@ -35,10 +33,6 @@ interface CaseData {
   }>;
 }
 
-interface Project {
-  id: string;
-  name: string;
-}
 
 export default function CaseEditPage({
   params,
@@ -48,7 +42,6 @@ export default function CaseEditPage({
   const { id } = use(params);
   const router = useRouter();
   const [caseData, setCaseData] = useState<CaseData | null>(null);
-  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +53,6 @@ export default function CaseEditPage({
     filingDate: "",
     openingDate: "",
     status: "",
-    projectId: "",
   });
   const [planFormData, setPlanFormData] = useState({
     name: "",
@@ -78,10 +70,7 @@ export default function CaseEditPage({
 
   const fetchData = async () => {
     try {
-      const [caseRes, projectsRes] = await Promise.all([
-        fetch(`/api/cases/${id}`),
-        fetch("/api/projects"),
-      ]);
+      const caseRes = await fetch(`/api/cases/${id}`);
 
       if (caseRes.ok) {
         const data = await caseRes.json();
@@ -97,7 +86,6 @@ export default function CaseEditPage({
             ? new Date(data.openingDate).toISOString().split("T")[0]
             : "",
           status: data.status,
-          projectId: data.projectId,
         });
         // Set plan data if active plan exists
         const activePlan = data.plans?.find((p: { isActive: boolean }) => p.isActive);
@@ -114,11 +102,6 @@ export default function CaseEditPage({
         }
       } else {
         setError("Fall nicht gefunden");
-      }
-
-      if (projectsRes.ok) {
-        const projectsData = await projectsRes.json();
-        setProjects(projectsData);
       }
     } catch (err) {
       console.error("Error fetching data:", err);

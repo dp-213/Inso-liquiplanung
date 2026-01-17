@@ -138,6 +138,29 @@ export interface StylingConfig {
 }
 
 // =============================================================================
+// PDF TEXT CONFIGURATION
+// =============================================================================
+
+/**
+ * Configurable texts for PDF export
+ * All texts support placeholders like {{debtorName}}, {{caseNumber}}, {{planStartDate}}
+ */
+export interface PDFTextConfig {
+  /** Legal disclaimers (Vorbemerkungen) - shown on page 2 */
+  legalDisclaimers: string[];
+  /** Data sources description */
+  dataSources: string[];
+  /** Context text about liquidity planning (Vorbemerkungen zur Liquiditätsplanung) */
+  liquidityPlanningContext: string[];
+  /** Declaration text (Vollständigkeitserklärung) */
+  declarationText: string[];
+  /** Confidentiality notice on title page */
+  confidentialityNotice: string;
+  /** Footer text for all pages */
+  pdfFooterText: string;
+}
+
+// =============================================================================
 // CHART CONFIGURATION
 // =============================================================================
 
@@ -250,6 +273,9 @@ export interface CaseDashboardConfig {
 
   /** KPI configuration */
   kpis: KPIConfig;
+
+  /** PDF text configuration */
+  pdfTexts: PDFTextConfig;
 
   /** Metadata */
   metadata: {
@@ -489,6 +515,15 @@ export const CaseDashboardConfigSchema = z.object({
       'negative_weeks_count',
     ])),
     showTrends: z.boolean(),
+  }),
+
+  pdfTexts: z.object({
+    legalDisclaimers: z.array(z.string()),
+    dataSources: z.array(z.string()),
+    liquidityPlanningContext: z.array(z.string()),
+    declarationText: z.array(z.string()),
+    confidentialityNotice: z.string(),
+    pdfFooterText: z.string(),
   }),
 
   metadata: z.object({

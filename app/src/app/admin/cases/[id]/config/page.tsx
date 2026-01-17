@@ -52,7 +52,7 @@ export default function CaseConfigPage({
   const [config, setConfig] = useState<CaseDashboardConfig | null>(null);
   const [metadata, setMetadata] = useState<ConfigResponse["metadata"] | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "categories" | "display" | "charts" | "styling" | "advanced"
+    "categories" | "display" | "charts" | "styling" | "pdfTexts" | "advanced"
   >("categories");
 
   // Fetch current configuration
@@ -338,6 +338,7 @@ export default function CaseConfigPage({
             { id: "display", label: "Anzeige" },
             { id: "charts", label: "Diagramme" },
             { id: "styling", label: "Styling" },
+            { id: "pdfTexts", label: "PDF-Texte" },
             { id: "advanced", label: "Erweitert" },
           ].map((tab) => (
             <button
@@ -940,6 +941,145 @@ export default function CaseConfigPage({
                 }
                 placeholder="Optionaler Text für die Fußzeile..."
                 rows={2}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* PDF Texts Tab */}
+        {activeTab === "pdfTexts" && (
+          <div className="space-y-8">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-blue-800">
+                Diese Texte erscheinen in der exportierten PDF. Platzhalter:
+                <code className="bg-blue-100 px-1 mx-1 rounded">{"{{debtorName}}"}</code>,
+                <code className="bg-blue-100 px-1 mx-1 rounded">{"{{caseNumber}}"}</code>,
+                <code className="bg-blue-100 px-1 mx-1 rounded">{"{{planStartDate}}"}</code>,
+                <code className="bg-blue-100 px-1 mx-1 rounded">{"{{administrator}}"}</code>
+              </p>
+            </div>
+
+            {/* Legal Disclaimers */}
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+                Rechtliche Vorbemerkungen
+              </h3>
+              <p className="text-sm text-[var(--muted)] mb-4">
+                Erscheinen auf Seite 2 der PDF (eine Zeile pro Absatz)
+              </p>
+              <textarea
+                value={config.pdfTexts?.legalDisclaimers?.join("\n") || ""}
+                onChange={(e) =>
+                  updateConfig("pdfTexts", {
+                    ...config.pdfTexts,
+                    legalDisclaimers: e.target.value.split("\n"),
+                  })
+                }
+                rows={12}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md font-mono text-sm"
+              />
+            </div>
+
+            {/* Data Sources */}
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+                Verwendete Datenquellen
+              </h3>
+              <p className="text-sm text-[var(--muted)] mb-4">
+                Eine Quelle pro Zeile
+              </p>
+              <textarea
+                value={config.pdfTexts?.dataSources?.join("\n") || ""}
+                onChange={(e) =>
+                  updateConfig("pdfTexts", {
+                    ...config.pdfTexts,
+                    dataSources: e.target.value.split("\n"),
+                  })
+                }
+                rows={4}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md font-mono text-sm"
+              />
+            </div>
+
+            {/* Liquidity Planning Context */}
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+                Vorbemerkungen zur Liquiditätsplanung
+              </h3>
+              <p className="text-sm text-[var(--muted)] mb-4">
+                Kontext und Erläuterungen (Seite 4)
+              </p>
+              <textarea
+                value={config.pdfTexts?.liquidityPlanningContext?.join("\n") || ""}
+                onChange={(e) =>
+                  updateConfig("pdfTexts", {
+                    ...config.pdfTexts,
+                    liquidityPlanningContext: e.target.value.split("\n"),
+                  })
+                }
+                rows={10}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md font-mono text-sm"
+              />
+            </div>
+
+            {/* Declaration Text */}
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+                Vollständigkeitserklärung
+              </h3>
+              <p className="text-sm text-[var(--muted)] mb-4">
+                Text auf der letzten Seite
+              </p>
+              <textarea
+                value={config.pdfTexts?.declarationText?.join("\n") || ""}
+                onChange={(e) =>
+                  updateConfig("pdfTexts", {
+                    ...config.pdfTexts,
+                    declarationText: e.target.value.split("\n"),
+                  })
+                }
+                rows={8}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md font-mono text-sm"
+              />
+            </div>
+
+            {/* Confidentiality Notice */}
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+                Vertraulichkeitshinweis
+              </h3>
+              <p className="text-sm text-[var(--muted)] mb-4">
+                Erscheint auf der Titelseite
+              </p>
+              <textarea
+                value={config.pdfTexts?.confidentialityNotice || ""}
+                onChange={(e) =>
+                  updateConfig("pdfTexts", {
+                    ...config.pdfTexts,
+                    confidentialityNotice: e.target.value,
+                  })
+                }
+                rows={2}
+                className="w-full px-3 py-2 border border-[var(--border)] rounded-md"
+              />
+            </div>
+
+            {/* PDF Footer */}
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+                PDF-Fußzeile
+              </h3>
+              <input
+                type="text"
+                value={config.pdfTexts?.pdfFooterText || ""}
+                onChange={(e) =>
+                  updateConfig("pdfTexts", {
+                    ...config.pdfTexts,
+                    pdfFooterText: e.target.value,
+                  })
+                }
+                placeholder="z.B. Gradify oder Ihr Firmenname"
                 className="w-full px-3 py-2 border border-[var(--border)] rounded-md"
               />
             </div>

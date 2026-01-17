@@ -38,6 +38,7 @@ model Case {
   configurations       CaseConfiguration[]
   aiPreprocessingJobs  AiPreprocessingJob[]
   customerAccess       CustomerCaseAccess[] // Additional access for other customers
+  bankAccounts         BankAccount[]
 
   @@index([ownerId])
   @@map("cases")
@@ -58,9 +59,11 @@ model LiquidityPlan {
   updatedAt     DateTime @updatedAt
   updatedBy     String
 
-  case       Case                   @relation(fields: [caseId], references: [id])
-  versions   LiquidityPlanVersion[]
-  categories CashflowCategory[]
+  case        Case                   @relation(fields: [caseId], references: [id])
+  versions    LiquidityPlanVersion[]
+  categories  CashflowCategory[]
+  assumptions PlanningAssumption[]
+  insolvencyEffects InsolvencyEffect[]
 
   @@map("liquidity_plans")
 }
@@ -253,7 +256,8 @@ model FieldTransformation {
 }
 
 // MappingConfiguration - Defines how to map source fields to target schema
-// Can be scoped to: global (projectId=null, caseId=null), per-project, or per-case
+// Can be scoped to: global (projectId=null, caseId=null), per-customer, or per-case
+// Note: projectId refers to CustomerUser.id (legacy naming from "Project" → "Customer" refactor)
 model MappingConfiguration {
   id               String    @id @default(uuid())
   name             String
@@ -351,29 +355,10 @@ model ShareLink {
 }
 
 // =============================================================================
-// AUDIT & LOGGING
+// AUDIT & LOGGING (Note: CustomerAuditLog is used for customer actions)
 // =============================================================================
-
-// AuditEvent - Complete audit trail
-model AuditEvent {
-  id          String   @id @default(uuid())
-  timestamp   DateTime @default(now())
-  eventType   String
-  entityType  String
-  entityId    String
-  userId      String
-  userIp      String?
-  userAgent   String?
-  action      String // CREATE, READ, UPDATE, DELETE
-  oldValue    String? // JSON
-  newValue    String? // JSON
-  metadata    String? // JSON
-
-  @@index([entityType, entityId])
-  @@index([timestamp])
-  @@index([userId])
-  @@map("audit_events")
-}
+// Legacy AuditEvent model removed - was unused
+// Customer audit logging is handled by CustomerAuditLog model below
 
 // =============================================================================
 // CUSTOMER USER MANAGEMENT (EXTERNAL INSOLVENCY ADMINISTRATORS)
@@ -571,4 +556,78 @@ model AiPreprocessingLog {
   @@index([jobId])
   @@index([timestamp])
   @@map("ai_preprocessing_logs")
+}
+
+// =============================================================================
+// DASHBOARD BEST PRACTICES (W&P Standard)
+// =============================================================================
+
+// PlanningAssumption - Documentation of planning assumptions with risk assessment
+// Based on W&P report standard: each position has source, description, and risk indicator
+model PlanningAssumption {
+  id            String   @id @default(uuid())
+  planId        String
+  categoryName  String   // Links to CashflowCategory name
+  source        String   // e.g., "OP-Debitorenliste zum 05.01.2026"
+  description   String   // Detailed description of the planning assumption
+  riskLevel     String   // conservative, low, medium, high, aggressive
+  createdAt     DateTime @default(now())
+  createdBy     String
+  updatedAt     DateTime @updatedAt
+  updatedBy     String
+
+  plan LiquidityPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, categoryName])
+  @@index([planId])
+  @@map("planning_assumptions")
+}
+
+// InsolvencyEffect - Insolvency-specific effects separate from operative cashflow
+// Enables "vor/nach Insolvenzeffekten" view as per W&P standard
+model InsolvencyEffect {
+  id            String   @id @default(uuid())
+  planId        String
+  name          String   // e.g., "Anfechtung SV-Beiträge", "Halteprämien"
+  description   String?
+  effectType    String   // INFLOW, OUTFLOW
+  effectGroup   String   @default("GENERAL") // GENERAL, PROCEDURE_COST (Verfahrenskosten)
+  periodIndex   Int      // 0-based period index
+  amountCents   BigInt
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  createdBy     String
+  updatedAt     DateTime @updatedAt
+  updatedBy     String
+
+  plan LiquidityPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+  @@index([planId, periodIndex])
+  @@map("insolvency_effects")
+}
+
+// BankAccount - Bankenspiegel (bank account overview) as per W&P standard
+// Shows IBAN, balances, security holders, and status
+model BankAccount {
+  id              String   @id @default(uuid())
+  caseId          String
+  bankName        String   // e.g., "Sparkasse", "Münchner Bank"
+  accountName     String   // e.g., "Geschäftskonto", "Treuhandkonto"
+  iban            String?  // DE11701500001009210475
+  balanceCents    BigInt   // Total balance (Guthaben)
+  availableCents  BigInt   // Available for use (Liquide Mittel)
+  securityHolder  String?  // e.g., "Globalzession Bank XY"
+  status          String   @default("available") // available, blocked, restricted
+  notes           String?  // Additional notes about this account
+  displayOrder    Int      @default(0)
+  createdAt       DateTime @default(now())
+  createdBy       String
+  updatedAt       DateTime @updatedAt
+  updatedBy       String
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("bank_accounts")
 }

@@ -20,6 +20,7 @@ import {
   KPIConfig,
   KPIType,
   ChartType,
+  PDFTextConfig,
 } from './types';
 
 import {
@@ -214,6 +215,71 @@ export const DEFAULT_KPIS: KPIConfig = {
 };
 
 // =============================================================================
+// DEFAULT PDF TEXTS
+// =============================================================================
+
+/**
+ * Default PDF text configuration
+ * Placeholders: {{debtorName}}, {{caseNumber}}, {{planStartDate}}, {{administrator}}
+ */
+export const DEFAULT_PDF_TEXTS: PDFTextConfig = {
+  legalDisclaimers: [
+    "Die vorliegende Liquiditätsplanung wurde mit der gebotenen Sorgfalt auf Basis der vom Auftraggeber zur Verfügung gestellten Informationen und Unterlagen erstellt.",
+    "",
+    "Folgende Punkte sind zu beachten:",
+    "",
+    "1. Prognosecharakter",
+    "   Die Liquiditätsplanung stellt eine in die Zukunft gerichtete Prognose dar. Die tatsächliche Entwicklung kann aufgrund von Unsicherheiten und externen Faktoren von den dargestellten Planwerten abweichen.",
+    "",
+    "2. Datengrundlage",
+    "   Die Planung basiert auf den zum Erstellungszeitpunkt verfügbaren Informationen. Für die Richtigkeit und Vollständigkeit der Ausgangsdaten ist der Auftraggeber verantwortlich.",
+    "",
+    "3. Keine Prüfung",
+    "   Es wurde keine prüferische Durchsicht oder Prüfung im Sinne der IDW-Standards durchgeführt. Die Plausibilisierung der Angaben erfolgte auf Basis der übermittelten Informationen.",
+    "",
+    "4. Verwendungszweck",
+    "   Die Liquiditätsplanung dient ausschließlich der Unterstützung des Insolvenzverfahrens und ist nicht zur Weitergabe an Dritte ohne Zustimmung des Erstellers bestimmt.",
+    "",
+    "5. Keine Gewährleistung",
+    "   Eine Gewährleistung für den Eintritt der dargestellten Planwerte wird nicht übernommen. Die Haftung ist auf Vorsatz und grobe Fahrlässigkeit beschränkt.",
+  ],
+  dataSources: [
+    "Bankstand vom {{planStartDate}} (Buchungsschluss)",
+    "Offene-Posten-Listen (Debitoren und Kreditoren)",
+    "Unternehmensplanung und betriebswirtschaftliche Auswertungen",
+  ],
+  liquidityPlanningContext: [
+    "Die Liquiditätsplanung ist ein zentrales Instrument zur Steuerung und Überwachung der Zahlungsfähigkeit im Insolvenzverfahren. Sie ermöglicht eine vorausschauende Beurteilung der finanziellen Situation und unterstützt den Insolvenzverwalter bei strategischen Entscheidungen.",
+    "",
+    "Aufbau der Planung",
+    "",
+    "Die Liquiditätsplanung unterscheidet zwischen:",
+    "",
+    "• Operative Zahlungsströme",
+    "  Einzahlungen und Auszahlungen aus dem laufenden Geschäftsbetrieb, unabhängig von insolvenzspezifischen Effekten.",
+    "",
+    "• Insolvenzspezifische Effekte",
+    "  Zahlungsströme, die unmittelbar aus dem Insolvenzverfahren resultieren, wie z.B. Anfechtungserlöse, Halteprämien oder Verfahrenskosten.",
+    "",
+    "Diese Trennung ermöglicht eine differenzierte Betrachtung und erleichtert die Beurteilung der operativen Leistungsfähigkeit des Unternehmens.",
+  ],
+  declarationText: [
+    "Hiermit bestätigen wir, dass die in dieser Liquiditätsplanung verwendeten Daten und Informationen nach bestem Wissen und Gewissen vollständig und zutreffend sind.",
+    "",
+    "Die Planung basiert auf den folgenden Grundlagen:",
+    "",
+    "• Bankguthaben zum Stichtag {{planStartDate}}",
+    "• Offene-Posten-Listen (Debitoren und Kreditoren) zum Stichtag",
+    "• Unternehmensplanung und interne Forecasts",
+    "• Insolvenzspezifische Planungsannahmen und Schätzungen",
+    "",
+    "Die Verantwortung für die Richtigkeit und Vollständigkeit der Ausgangsdaten liegt beim Auftraggeber.",
+  ],
+  confidentialityNotice: "Dieses Dokument enthält vertrauliche Informationen und ist ausschließlich für den Adressaten bestimmt. Eine Weitergabe an Dritte bedarf der schriftlichen Zustimmung.",
+  pdfFooterText: "Gradify",
+};
+
+// =============================================================================
 // COMPLETE DEFAULT CONFIGURATION
 // =============================================================================
 
@@ -233,6 +299,7 @@ export function createDefaultConfig(userId: string = 'system'): CaseDashboardCon
     charts: { ...DEFAULT_CHARTS },
     table: { ...DEFAULT_TABLE },
     kpis: { ...DEFAULT_KPIS },
+    pdfTexts: { ...DEFAULT_PDF_TEXTS },
     metadata: {
       lastUpdated: new Date().toISOString(),
       lastUpdatedBy: userId,

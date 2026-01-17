@@ -236,6 +236,72 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 1.5.0 – W&P Best Practices Integration
+
+**Datum:** 17. Januar 2026
+
+### Neue Funktionen
+
+#### Dashboard-Erweiterungen (nach W&P-Industriestandard)
+- **Wasserfall-Tab:** Neue Visualisierung der Cashflow-Zusammensetzung pro Periode
+  - Einzahlungen (grün), Auszahlungen (rot), Insolvenzeffekte (lila)
+  - Endbestand als Linie überlagert
+  - Summen-Karten für Gesamtübersicht
+
+- **Insolvenzeffekte-Tab:** Separate Darstellung insolvenzspezifischer Zahlungsströme
+  - Trennung von operativem Geschäft
+  - Gliederung nach Effektgruppen (Allgemein, Verfahrenskosten)
+  - Kumulierte Effektberechnung
+  - Vergleich "vor/nach Insolvenzeffekten"
+
+- **Prämissen-Tab:** Dokumentation der Planungsannahmen
+  - W&P-konformes Risiko-Ampelsystem (○ ◐ ◑ ● ●●)
+  - Informationsquelle pro Position
+  - Detaillierte Prämissenbeschreibung
+
+- **Erweiterte Navigation:** 8 Tabs (Übersicht, Einnahmen, Wasserfall, Insolvenzeffekte, Prämissen, Sicherungsrechte, Masseübersicht, Vergleich)
+
+#### Neue Komponenten
+- `WaterfallChart.tsx` – Recharts-basiertes Wasserfall-Diagramm
+- `InsolvencyEffectsTable.tsx` – Tabelle für Insolvenzeffekte mit Periodenspalten
+- `PlanningAssumptions.tsx` – Prämissen-Tabelle mit Risiko-Legende
+
+### Datenmodell-Erweiterungen
+
+#### Neue Prisma-Modelle
+- **PlanningAssumption:** Dokumentation der Planungsprämissen
+  - `categoryName`, `source`, `description`, `riskLevel`
+  - Risiko-Level: conservative, low, medium, high, aggressive
+
+- **InsolvencyEffect:** Insolvenzspezifische Zahlungseffekte
+  - `name`, `effectType` (INFLOW/OUTFLOW), `effectGroup`
+  - `periodIndex`, `amountCents`
+  - Gruppierung: GENERAL, PROCEDURE_COST
+
+- **BankAccount:** Bankenspiegel nach W&P-Standard
+  - `bankName`, `accountName`, `iban`
+  - `balanceCents`, `availableCents`
+  - `securityHolder`, `status`, `notes`
+
+### API-Erweiterungen
+- **GET/POST/DELETE /api/cases/[id]/plan/assumptions** – Planungsprämissen verwalten
+- **GET/POST/DELETE /api/cases/[id]/plan/insolvency-effects** – Insolvenzeffekte verwalten
+- **GET/POST/PUT/DELETE /api/cases/[id]/bank-accounts** – Bankkonten verwalten
+
+### Dokumentation
+- **DASHBOARD_BEST_PRACTICES.md:** Umfassende Analyse des W&P-Reports
+  - 9 Kapitel mit Best Practices
+  - Priorisierte Feature-Liste (P1/P2/P3)
+  - Gap-Analyse: W&P vs. Gradify
+  - Standard-Katalog für Insolvenzeffekte
+
+### Technische Verbesserungen
+- Erweiterte ExternalDashboardNav mit 3 neuen Icons
+- Responsive Tab-Layout für Mobile
+- BigInt-Handling in allen neuen Komponenten
+
+---
+
 ## Geplante Änderungen
 
 Keine ausstehenden Änderungen
