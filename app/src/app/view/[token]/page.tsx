@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useParams } from "next/navigation";
 import ExternalHeader from "@/components/external/ExternalHeader";
 import KPICards from "@/components/external/KPICards";
@@ -204,16 +204,20 @@ export default function ExternalCaseView() {
     return null;
   }
 
-  // Calculate KPIs
+  // Memoized calculations - only recompute when data changes, not on tab switch
   const weeks = data.calculation.weeks;
-  const currentCash = BigInt(weeks[0]?.openingBalanceCents || "0");
-  const minCash = weeks.reduce((min, week) => {
-    const balance = BigInt(week.closingBalanceCents);
-    return balance < min ? balance : min;
-  }, currentCash);
-  const runwayWeek = weeks.findIndex((week) => BigInt(week.closingBalanceCents) <= BigInt(0));
 
-  const formatCurrency = (cents: bigint | string): string => {
+  const { currentCash, minCash, runwayWeek } = useMemo(() => {
+    const current = BigInt(weeks[0]?.openingBalanceCents || "0");
+    const min = weeks.reduce((m, week) => {
+      const balance = BigInt(week.closingBalanceCents);
+      return balance < m ? balance : m;
+    }, current);
+    const runway = weeks.findIndex((week) => BigInt(week.closingBalanceCents) <= BigInt(0));
+    return { currentCash: current, minCash: min, runwayWeek: runway };
+  }, [weeks]);
+
+  const formatCurrency = useCallback((cents: bigint | string): string => {
     const value = typeof cents === "string" ? BigInt(cents) : cents;
     const euros = Number(value) / 100;
     return euros.toLocaleString("de-DE", {
@@ -222,29 +226,29 @@ export default function ExternalCaseView() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     });
-  };
+  }, []);
 
-  const getPeriodLabel = (): string => {
+  const periodLabel = useMemo(() => {
     if (weeks.length === 0) return "";
     return `${weeks[0].weekLabel} - ${weeks[weeks.length - 1].weekLabel}`;
-  };
+  }, [weeks]);
 
-  const getPlanTitle = (): string => {
+  const planTitle = useMemo(() => {
     const periodType = data.calculation.periodType || data.plan.periodType || "WEEKLY";
     const periodCount = data.calculation.periodCount || data.plan.periodCount || 13;
     return periodType === "MONTHLY" ? `${periodCount}-Monats-Planung` : `${periodCount}-Wochen-Planung`;
-  };
+  }, [data.calculation.periodType, data.calculation.periodCount, data.plan.periodType, data.plan.periodCount]);
 
-  const getStatusLabel = (status: string): string => {
+  const getStatusLabel = useCallback((status: string): string => {
     switch (status) {
       case "PRELIMINARY": return "Vorläufiges Verfahren";
       case "OPENED": return "Eröffnetes Verfahren";
       case "CLOSED": return "Geschlossen";
       default: return status;
     }
-  };
+  }, []);
 
-  const getPaymentMarkers = (): ChartMarker[] => {
+  const paymentMarkers = useMemo((): ChartMarker[] => {
     const markers: ChartMarker[] = [];
     const periodType = data.calculation.periodType || data.plan.periodType || "WEEKLY";
     if (periodType === "MONTHLY") {
@@ -261,39 +265,60 @@ export default function ExternalCaseView() {
       });
     }
     return markers;
-  };
+  }, [weeks, data.calculation.periodType, data.plan.periodType]);
 
-  // Category calculations
-  const inflowCategories = data.calculation.categories.filter((c) => c.flowType === "INFLOW" && BigInt(c.totalCents) > BigInt(0));
-  const outflowCategories = data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && BigInt(c.totalCents) > BigInt(0));
+  // Memoized category calculations
+  const { inflowCategories, outflowCategories } = useMemo(() => ({
+    inflowCategories: data.calculation.categories.filter((c) => c.flowType === "INFLOW" && BigInt(c.totalCents) > BigInt(0)),
+    outflowCategories: data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && BigInt(c.totalCents) > BigInt(0)),
+  }), [data.calculation.categories]);
 
-  // Estate calculations
-  const altmasseInflows = data.calculation.categories.filter((c) => c.flowType === "INFLOW" && c.estateType === "ALTMASSE");
-  const altmasseOutflows = data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && c.estateType === "ALTMASSE");
-  const neumasseInflows = data.calculation.categories.filter((c) => c.flowType === "INFLOW" && c.estateType === "NEUMASSE");
-  const neumasseOutflows = data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && c.estateType === "NEUMASSE");
+  // Memoized estate calculations
+  const {
+    altmasseInflows, altmasseOutflows, neumasseInflows, neumasseOutflows,
+    altmasseInflowTotal, altmasseOutflowTotal, neumasseInflowTotal, neumasseOutflowTotal
+  } = useMemo(() => {
+    const altIn = data.calculation.categories.filter((c) => c.flowType === "INFLOW" && c.estateType === "ALTMASSE");
+    const altOut = data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && c.estateType === "ALTMASSE");
+    const neuIn = data.calculation.categories.filter((c) => c.flowType === "INFLOW" && c.estateType === "NEUMASSE");
+    const neuOut = data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && c.estateType === "NEUMASSE");
+    return {
+      altmasseInflows: altIn,
+      altmasseOutflows: altOut,
+      neumasseInflows: neuIn,
+      neumasseOutflows: neuOut,
+      altmasseInflowTotal: altIn.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0)),
+      altmasseOutflowTotal: altOut.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0)),
+      neumasseInflowTotal: neuIn.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0)),
+      neumasseOutflowTotal: neuOut.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0)),
+    };
+  }, [data.calculation.categories]);
 
-  const altmasseInflowTotal = altmasseInflows.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0));
-  const altmasseOutflowTotal = altmasseOutflows.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0));
-  const neumasseInflowTotal = neumasseInflows.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0));
-  const neumasseOutflowTotal = neumasseOutflows.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0));
+  // Memoized revenue totals
+  const { grandTotal, sourceTotals } = useMemo(() => ({
+    grandTotal: inflowCategories.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0)),
+    sourceTotals: inflowCategories.map((cat) => ({
+      name: cat.categoryName,
+      total: BigInt(cat.totalCents),
+      weeklyTotals: cat.weeklyTotals.map((t) => BigInt(t)),
+    })),
+  }), [inflowCategories]);
 
-  // Revenue totals
-  const grandTotal = inflowCategories.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0));
-  const sourceTotals = inflowCategories.map((cat) => ({
-    name: cat.categoryName,
-    total: BigInt(cat.totalCents),
-    weeklyTotals: cat.weeklyTotals.map((t) => BigInt(t)),
-  }));
+  // Memoized bank account totals
+  const { bankAccounts, totalBankBalance, totalAvailableBalance } = useMemo(() => {
+    const accounts = data.bankAccounts?.accounts || [];
+    return {
+      bankAccounts: accounts,
+      totalBankBalance: accounts.reduce((sum, acc) => sum + BigInt(acc.balanceCents), BigInt(0)),
+      totalAvailableBalance: accounts.reduce((sum, acc) => sum + BigInt(acc.availableCents), BigInt(0)),
+    };
+  }, [data.bankAccounts]);
 
-  // Bank account totals (from real data)
-  const bankAccounts = data.bankAccounts?.accounts || [];
-  const totalBankBalance = bankAccounts.reduce((sum, acc) => sum + BigInt(acc.balanceCents), BigInt(0));
-  const totalAvailableBalance = bankAccounts.reduce((sum, acc) => sum + BigInt(acc.availableCents), BigInt(0));
-
-  // Security totals (demo data - not yet in data model)
-  const totalSecurityValue = DEMO_SECURITY_RIGHTS.reduce((sum, sr) => sum + sr.estimatedValue, BigInt(0));
-  const settledAmount = DEMO_SECURITY_RIGHTS.filter((sr) => sr.settlementAmount).reduce((sum, sr) => sum + (sr.settlementAmount || BigInt(0)), BigInt(0));
+  // Security totals (demo data - memoized)
+  const { totalSecurityValue, settledAmount } = useMemo(() => ({
+    totalSecurityValue: DEMO_SECURITY_RIGHTS.reduce((sum, sr) => sum + sr.estimatedValue, BigInt(0)),
+    settledAmount: DEMO_SECURITY_RIGHTS.filter((sr) => sr.settlementAmount).reduce((sum, sr) => sum + (sr.settlementAmount || BigInt(0)), BigInt(0)),
+  }), []);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -326,7 +351,7 @@ export default function ExternalCaseView() {
                 <span className={`badge ${data.case.status === "OPENED" ? "badge-success" : data.case.status === "PRELIMINARY" ? "badge-warning" : "badge-neutral"}`}>
                   {getStatusLabel(data.case.status)}
                 </span>
-                <span className="text-sm text-[var(--muted)]">Planungszeitraum: {getPeriodLabel()}</span>
+                <span className="text-sm text-[var(--muted)]">Planungszeitraum: {periodLabel}</span>
               </div>
             </div>
           </div>
@@ -348,7 +373,7 @@ export default function ExternalCaseView() {
 
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Liquiditaetsverlauf</h2>
-                <BalanceChart weeks={weeks} markers={getPaymentMarkers()} showPhases={(data.calculation.periodType || data.plan.periodType) === "MONTHLY"} />
+                <BalanceChart weeks={weeks} markers={paymentMarkers} showPhases={(data.calculation.periodType || data.plan.periodType) === "MONTHLY"} />
                 {(data.calculation.periodType || data.plan.periodType) === "MONTHLY" && (
                   <div className="mt-4 flex flex-wrap gap-4 text-xs text-[var(--secondary)]">
                     <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-[#10b981]"></div><span>KV-Restzahlung</span></div>
@@ -359,7 +384,7 @@ export default function ExternalCaseView() {
 
               <div className="admin-card">
                 <div className="px-6 py-4 border-b border-[var(--border)]">
-                  <h2 className="text-lg font-semibold text-[var(--foreground)]">{getPlanTitle()}</h2>
+                  <h2 className="text-lg font-semibold text-[var(--foreground)]">{planTitle}</h2>
                 </div>
                 <div className="overflow-x-auto custom-scrollbar">
                   <LiquidityTable weeks={weeks} categories={data.calculation.categories} openingBalance={BigInt(data.calculation.openingBalanceCents)} />
