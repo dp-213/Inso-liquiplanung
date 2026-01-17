@@ -335,8 +335,8 @@ export default function ExternalCaseView() {
           <ExternalDashboardNav activeTab={activeTab} onTabChange={setActiveTab} />
 
           {/* TAB: Overview */}
-          {activeTab === "overview" && (
-            <>
+          <div className={activeTab === "overview" ? "" : "hidden"}>
+            <div className="space-y-6">
               <KPICards
                 currentCash={currentCash}
                 minCash={minCash}
@@ -365,12 +365,12 @@ export default function ExternalCaseView() {
                   <LiquidityTable weeks={weeks} categories={data.calculation.categories} openingBalance={BigInt(data.calculation.openingBalanceCents)} />
                 </div>
               </div>
-            </>
-          )}
+            </div>
+          </div>
 
           {/* TAB: Revenue */}
-          {activeTab === "revenue" && (
-            <>
+          <div className={activeTab === "revenue" ? "" : "hidden"}>
+            <div className="space-y-6">
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen-Taktung nach Quelle</h2>
                 <div className="overflow-x-auto">
@@ -422,12 +422,12 @@ export default function ExternalCaseView() {
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen-Verlauf</h2>
                 <RevenueChart weeks={weeks} categories={inflowCategories} />
               </div>
-            </>
-          )}
+            </div>
+          </div>
 
           {/* TAB: Security */}
-          {activeTab === "security" && (
-            <>
+          <div className={activeTab === "security" ? "" : "hidden"}>
+            <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="admin-card p-4">
                   <div className="text-sm text-[var(--secondary)]">Bankguthaben Gesamt</div>
@@ -533,12 +533,12 @@ export default function ExternalCaseView() {
                   </div>
                 </div>
               </div>
-            </>
-          )}
+            </div>
+          </div>
 
           {/* TAB: Estate */}
-          {activeTab === "estate" && (
-            <>
+          <div className={activeTab === "estate" ? "" : "hidden"}>
+            <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="admin-card p-4">
                   <div className="text-sm text-[var(--secondary)]">Gesamteinnahmen</div>
@@ -610,12 +610,12 @@ export default function ExternalCaseView() {
                   </div>
                 </div>
               </div>
-            </>
-          )}
+            </div>
+          </div>
 
           {/* TAB: Waterfall */}
-          {activeTab === "waterfall" && (
-            <>
+          <div className={activeTab === "waterfall" ? "" : "hidden"}>
+            <div className="space-y-6">
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Wasserfall-Darstellung</h2>
                 <p className="text-sm text-[var(--secondary)] mb-6">
@@ -634,12 +634,12 @@ export default function ExternalCaseView() {
                   showInsolvencyEffects={false}
                 />
               </div>
-            </>
-          )}
+            </div>
+          </div>
 
           {/* TAB: Insolvency Effects */}
-          {activeTab === "insolvency" && (
-            <>
+          <div className={activeTab === "insolvency" ? "" : "hidden"}>
+            <div className="space-y-6">
               {data.insolvencyEffects && data.insolvencyEffects.effects.length > 0 ? (
                 <InsolvencyEffectsTable
                   effects={data.insolvencyEffects.effects}
@@ -708,12 +708,12 @@ export default function ExternalCaseView() {
                   </div>
                 </div>
               )}
-            </>
-          )}
+            </div>
+          </div>
 
           {/* TAB: Planning Assumptions */}
-          {activeTab === "assumptions" && (
-            <>
+          <div className={activeTab === "assumptions" ? "" : "hidden"}>
+            <div className="space-y-6">
               {data.assumptions && data.assumptions.length > 0 ? (
                 <PlanningAssumptions assumptions={data.assumptions} />
               ) : (
@@ -766,12 +766,12 @@ export default function ExternalCaseView() {
                   </div>
                 </div>
               )}
-            </>
-          )}
+            </div>
+          </div>
 
           {/* TAB: Compare */}
-          {activeTab === "compare" && (
-            <>
+          <div className={activeTab === "compare" ? "" : "hidden"}>
+            <div className="space-y-6">
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">IST vs PLAN Vergleich</h2>
                 <p className="text-sm text-[var(--secondary)] mb-4">
@@ -806,8 +806,8 @@ export default function ExternalCaseView() {
                   </div>
                 </div>
               </div>
-            </>
-          )}
+            </div>
+          </div>
 
           {/* Footer Info */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm text-[var(--muted)] px-1">
