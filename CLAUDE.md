@@ -14,14 +14,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Domain Model (Business Context)
 
-**Wir sind Unternehmensberater** die Insolvenzverwalter bei der Liquiditaetsplanung unterstuetzen.
+**Wir sind Unternehmensberater** die Insolvenzverwalter bei der Liquiditätsplanung unterstützen.
 
 ### Hauptakteure
 
 | Begriff | Rolle | System-Entity |
 |---------|-------|---------------|
 | **Kunden** | Insolvenzverwalter (unsere Mandanten) | `CustomerUser` |
-| **Faelle** | Einzelne Insolvenzverfahren | `Case` |
+| **Fälle** | Einzelne Insolvenzverfahren | `Case` |
 | **Wir** | Interne Berater (Admin-Zugang) | Admin-Session |
 
 ### Beziehungen
@@ -30,19 +30,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Kunde (Insolvenzverwalter)
     |
     +-- Fall 1 (Insolvenzverfahren)
-    |       +-- Liquiditaetsplan
+    |       +-- Liquiditätsplan
     |       +-- Daten-Importe
     |
     +-- Fall 2 (Insolvenzverfahren)
-            +-- Liquiditaetsplan
+            +-- Liquiditätsplan
             +-- Daten-Importe
 ```
 
 ### Hinweis: "Projekte" (Legacy)
 
-Die Entitaet "Projekte" existiert noch im System, ist aber konzeptionell mit "Kunden" identisch. Langfristig sollte dies vereinfacht werden:
+Die Entität "Projekte" existiert noch im System, ist aber konzeptionell mit "Kunden" identisch. Langfristig sollte dies vereinfacht werden:
 - Projekte = Kunden = Insolvenzverwalter
-- Ein Kunde hat mehrere Faelle
+- Ein Kunde hat mehrere Fälle
 
 ## Git Repository
 
@@ -83,6 +83,31 @@ npx prisma db push   # Sync database schema
 3. **Calculation engine is immutable** – presentation layer never modifies calculation logic
 4. **13-week horizon** – fixed industry standard, not configurable
 
+## WICHTIG: Deutsche Umlaute
+
+**IMMER echte Umlaute verwenden, NIEMALS Ersatzschreibweisen!**
+
+| RICHTIG | FALSCH |
+|---------|--------|
+| ä | ae |
+| ö | oe |
+| ü | ue |
+| Ä | Ae |
+| Ö | Oe |
+| Ü | Ue |
+| ß | ss |
+
+Beispiele:
+- ✅ `Fälle`, `Löschen`, `Übersicht`, `für`, `zurück`, `Änderung`
+- ❌ `Faelle`, `Loeschen`, `Uebersicht`, `fuer`, `zurueck`, `Aenderung`
+
+Dies gilt für:
+- Alle UI-Texte (Labels, Buttons, Überschriften)
+- Fehlermeldungen und Bestätigungstexte
+- Kommentare im Code (wenn auf Deutsch)
+- Dokumentation
+- API-Responses mit deutschen Texten
+
 ## Production Infrastructure
 
 ### Vercel Deployment
@@ -105,15 +130,15 @@ npx prisma db push   # Sync database schema
 | `ADMIN_PASSWORD` | Admin Passwort |
 | `SESSION_SECRET` | JWT Session Secret |
 | `NEXT_PUBLIC_APP_URL` | Public App URL |
-| `ANTHROPIC_API_KEY` | Fuer AI-Preprocessing |
+| `ANTHROPIC_API_KEY` | Für AI-Preprocessing |
 
 ### Lokale Entwicklung vs. Production
 - **Lokal:** SQLite (`DATABASE_URL="file:./dev.db"`)
 - **Production:** Turso (automatische Erkennung via `libsql://` Prefix)
 - Code in `src/lib/db.ts` wechselt automatisch basierend auf URL-Format
 
-### Fuer Custom Domain
-In Vercel Dashboard: Settings → Domains → eigene Domain hinzufuegen
+### Für Custom Domain
+In Vercel Dashboard: Settings → Domains → eigene Domain hinzufügen
 
 ## Documentation Requirements
 
