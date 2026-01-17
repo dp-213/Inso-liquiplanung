@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useMemo, memo } from "react";
 import {
   BarChart,
   Bar,
@@ -32,9 +33,58 @@ interface RevenueChartProps {
 
 const COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899", "#06b6d4"];
 
-export default function RevenueChart({ weeks, categories }: RevenueChartProps) {
-  // Transform data for stacked bar chart
-  const chartData = weeks.map((week, weekIdx) => {
+// Helper functions outside component
+const formatCurrency = (value: number): string => {
+  if (Math.abs(value) >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M`;
+  }
+  if (Math.abs(value) >= 1000) {
+    return `${(value / 1000).toFixed(0)}K`;
+  }
+  return value.toFixed(0);
+};
+
+const formatTooltipValue = (value: number): string => {
+  return value.toLocaleString("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+};
+
+// Custom tooltip component outside main component
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ value: number; name: string; color: string }>;
+  label?: string;
+}) => {
+  if (active && payload && payload.length) {
+    const total = payload.reduce((sum, entry) => sum + entry.value, 0);
+    return (
+      <div className="bg-white border border-[var(--border)] rounded-lg shadow-lg p-3">
+        <p className="font-medium text-[var(--foreground)] mb-2">{label}</p>
+        {payload.map((entry, index) => (
+          <p key={index} className="text-sm" style={{ color: entry.color }}>
+            {entry.name}: {formatTooltipValue(entry.value)}
+          </p>
+        ))}
+        <p className="text-sm font-medium text-[var(--foreground)] mt-2 pt-2 border-t border-[var(--border)]">
+          Gesamt: {formatTooltipValue(total)}
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+function RevenueChartComponent({ weeks, categories }: RevenueChartProps) {
+  // Memoize chart data transformation
+  const chartData = useMemo(() => weeks.map((week, weekIdx) => {
     const dataPoint: Record<string, string | number> = {
       name: week.weekLabel,
     };
@@ -45,55 +95,7 @@ export default function RevenueChart({ weeks, categories }: RevenueChartProps) {
     });
 
     return dataPoint;
-  });
-
-  const formatCurrency = (value: number): string => {
-    if (Math.abs(value) >= 1000000) {
-      return `${(value / 1000000).toFixed(1)}M`;
-    }
-    if (Math.abs(value) >= 1000) {
-      return `${(value / 1000).toFixed(0)}K`;
-    }
-    return value.toFixed(0);
-  };
-
-  const formatTooltipValue = (value: number): string => {
-    return value.toLocaleString("de-DE", {
-      style: "currency",
-      currency: "EUR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
-  };
-
-  // Custom tooltip
-  const CustomTooltip = ({
-    active,
-    payload,
-    label,
-  }: {
-    active?: boolean;
-    payload?: Array<{ value: number; name: string; color: string }>;
-    label?: string;
-  }) => {
-    if (active && payload && payload.length) {
-      const total = payload.reduce((sum, entry) => sum + entry.value, 0);
-      return (
-        <div className="bg-white border border-[var(--border)] rounded-lg shadow-lg p-3">
-          <p className="font-medium text-[var(--foreground)] mb-2">{label}</p>
-          {payload.map((entry, index) => (
-            <p key={index} className="text-sm" style={{ color: entry.color }}>
-              {entry.name}: {formatTooltipValue(entry.value)}
-            </p>
-          ))}
-          <p className="text-sm font-medium text-[var(--foreground)] mt-2 pt-2 border-t border-[var(--border)]">
-            Gesamt: {formatTooltipValue(total)}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
+  }), [weeks, categories]);
 
   return (
     <div className="h-[350px] w-full">
@@ -136,3 +138,7 @@ export default function RevenueChart({ weeks, categories }: RevenueChartProps) {
     </div>
   );
 }
+
+// Wrap with memo to prevent re-renders when parent state changes but props don't
+const RevenueChart = memo(RevenueChartComponent);
+export default RevenueChart;

@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useMemo, memo } from "react";
 import {
   BarChart,
   Bar,
@@ -19,13 +20,72 @@ interface EstateComparisonChartProps {
   neumasseOutflows: bigint;
 }
 
-export default function EstateComparisonChart({
+// Helper functions outside component
+const formatCurrency = (value: number): string => {
+  if (Math.abs(value) >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M`;
+  }
+  if (Math.abs(value) >= 1000) {
+    return `${(value / 1000).toFixed(0)}K`;
+  }
+  return value.toFixed(0);
+};
+
+const formatTooltipValue = (value: number): string => {
+  return Math.abs(value).toLocaleString("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+};
+
+// Custom tooltip component outside main component
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{ value: number; name: string; dataKey: string }>;
+  label?: string;
+}) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-white border border-[var(--border)] rounded-lg shadow-lg p-3">
+        <p className="font-medium text-[var(--foreground)] mb-2">{label}</p>
+        {payload.map((entry, index) => {
+          const labelMap: Record<string, string> = {
+            einnahmen: "Einnahmen",
+            ausgaben: "Ausgaben",
+            netto: "Netto",
+          };
+          const colorMap: Record<string, string> = {
+            einnahmen: "#10b981",
+            ausgaben: "#ef4444",
+            netto: entry.value >= 0 ? "#10b981" : "#ef4444",
+          };
+          return (
+            <p key={index} className="text-sm" style={{ color: colorMap[entry.dataKey] }}>
+              {labelMap[entry.dataKey]}: {entry.dataKey === "ausgaben" ? "-" : ""}
+              {formatTooltipValue(entry.value)}
+            </p>
+          );
+        })}
+      </div>
+    );
+  }
+  return null;
+};
+
+function EstateComparisonChartComponent({
   altmasseInflows,
   altmasseOutflows,
   neumasseInflows,
   neumasseOutflows,
 }: EstateComparisonChartProps) {
-  const chartData = [
+  // Memoize chart data
+  const chartData = useMemo(() => [
     {
       name: "Altmasse",
       einnahmen: Number(altmasseInflows) / 100,
@@ -38,64 +98,7 @@ export default function EstateComparisonChart({
       ausgaben: -Number(neumasseOutflows) / 100,
       netto: Number(neumasseInflows - neumasseOutflows) / 100,
     },
-  ];
-
-  const formatCurrency = (value: number): string => {
-    if (Math.abs(value) >= 1000000) {
-      return `${(value / 1000000).toFixed(1)}M`;
-    }
-    if (Math.abs(value) >= 1000) {
-      return `${(value / 1000).toFixed(0)}K`;
-    }
-    return value.toFixed(0);
-  };
-
-  const formatTooltipValue = (value: number): string => {
-    return Math.abs(value).toLocaleString("de-DE", {
-      style: "currency",
-      currency: "EUR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
-  };
-
-  // Custom tooltip
-  const CustomTooltip = ({
-    active,
-    payload,
-    label,
-  }: {
-    active?: boolean;
-    payload?: Array<{ value: number; name: string; dataKey: string }>;
-    label?: string;
-  }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white border border-[var(--border)] rounded-lg shadow-lg p-3">
-          <p className="font-medium text-[var(--foreground)] mb-2">{label}</p>
-          {payload.map((entry, index) => {
-            const labelMap: Record<string, string> = {
-              einnahmen: "Einnahmen",
-              ausgaben: "Ausgaben",
-              netto: "Netto",
-            };
-            const colorMap: Record<string, string> = {
-              einnahmen: "#10b981",
-              ausgaben: "#ef4444",
-              netto: entry.value >= 0 ? "#10b981" : "#ef4444",
-            };
-            return (
-              <p key={index} className="text-sm" style={{ color: colorMap[entry.dataKey] }}>
-                {labelMap[entry.dataKey]}: {entry.dataKey === "ausgaben" ? "-" : ""}
-                {formatTooltipValue(entry.value)}
-              </p>
-            );
-          })}
-        </div>
-      );
-    }
-    return null;
-  };
+  ], [altmasseInflows, altmasseOutflows, neumasseInflows, neumasseOutflows]);
 
   return (
     <div className="h-[300px] w-full">
@@ -142,3 +145,7 @@ export default function EstateComparisonChart({
     </div>
   );
 }
+
+// Wrap with memo to prevent re-renders when parent state changes but props don't
+const EstateComparisonChart = memo(EstateComparisonChartComponent);
+export default EstateComparisonChart;

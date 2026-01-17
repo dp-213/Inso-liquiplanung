@@ -1,5 +1,6 @@
 "use client";
 
+import React, { useMemo, memo } from "react";
 import {
   Bar,
   XAxis,
@@ -27,128 +28,133 @@ interface WaterfallChartProps {
   showInsolvencyEffects?: boolean;
 }
 
-export default function WaterfallChart({
+// Helper functions outside component
+const formatCurrency = (value: number): string => {
+  if (Math.abs(value) >= 1000000) {
+    return `${(value / 1000000).toFixed(1)}M`;
+  }
+  if (Math.abs(value) >= 1000) {
+    return `${(value / 1000).toFixed(0)}K`;
+  }
+  return value.toFixed(0);
+};
+
+const formatTooltipValue = (value: number): string => {
+  return value.toLocaleString("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+};
+
+// Custom tooltip component outside main component
+interface TooltipPayload {
+  value: number;
+  name: string;
+  dataKey: string;
+  payload: {
+    rawOpeningBalance: number;
+    rawInflows: number;
+    rawOutflows: number;
+    rawInsolvencyEffects: number;
+    rawClosingBalance: number;
+  };
+}
+
+const CustomTooltip = ({
+  active,
+  payload,
+  label,
+  showInsolvencyEffects,
+}: {
+  active?: boolean;
+  payload?: TooltipPayload[];
+  label?: string;
+  showInsolvencyEffects?: boolean;
+}) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="bg-white border border-[var(--border)] rounded-lg shadow-lg p-3 min-w-[180px]">
+        <p className="font-medium text-[var(--foreground)] mb-2 border-b pb-2">
+          {label}
+        </p>
+        <div className="space-y-1 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Anfangsbestand:</span>
+            <span className="font-medium">{formatTooltipValue(data.rawOpeningBalance)}</span>
+          </div>
+          <div className="flex justify-between text-green-600">
+            <span>+ Einzahlungen:</span>
+            <span className="font-medium">{formatTooltipValue(data.rawInflows)}</span>
+          </div>
+          <div className="flex justify-between text-red-600">
+            <span>- Auszahlungen:</span>
+            <span className="font-medium">{formatTooltipValue(data.rawOutflows)}</span>
+          </div>
+          {showInsolvencyEffects && data.rawInsolvencyEffects !== 0 && (
+            <div className={`flex justify-between ${data.rawInsolvencyEffects >= 0 ? "text-blue-600" : "text-orange-600"}`}>
+              <span>{data.rawInsolvencyEffects >= 0 ? "+ " : ""}Insolvenzeffekte:</span>
+              <span className="font-medium">{formatTooltipValue(data.rawInsolvencyEffects)}</span>
+            </div>
+          )}
+          <div className="flex justify-between border-t pt-1 mt-1">
+            <span className="text-gray-700 font-medium">Endbestand:</span>
+            <span className={`font-bold ${data.rawClosingBalance < 0 ? "text-red-600" : ""}`}>
+              {formatTooltipValue(data.rawClosingBalance)}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+function WaterfallChartComponent({
   data,
   showInsolvencyEffects = true,
 }: WaterfallChartProps) {
-  // Transform data for stacked waterfall visualization
-  // For a waterfall chart, we need to calculate the "invisible" portion
-  // that positions each bar correctly
-  const chartData = data.map((period, index) => {
-    const base = period.openingBalance;
+  // Memoize chart data transformation
+  const chartData = useMemo(() => data.map((period, index) => ({
+    name: period.periodLabel,
+    opening: index === 0 ? period.openingBalance : 0,
+    inflows: period.inflows,
+    outflows: -period.outflows,
+    insolvencyEffects: showInsolvencyEffects ? period.insolvencyEffects : 0,
+    closingBalance: period.closingBalance,
+    rawOpeningBalance: period.openingBalance,
+    rawInflows: period.inflows,
+    rawOutflows: period.outflows,
+    rawInsolvencyEffects: period.insolvencyEffects,
+    rawClosingBalance: period.closingBalance,
+  })), [data, showInsolvencyEffects]);
 
+  // Memoize min/max for scaling
+  const { minValue, maxValue, padding } = useMemo(() => {
+    const allValues = data.flatMap((d) => [
+      d.openingBalance,
+      d.closingBalance,
+      d.openingBalance + d.inflows,
+      d.openingBalance + d.inflows - d.outflows,
+    ]);
+    const min = Math.min(...allValues, 0);
+    const max = Math.max(...allValues);
     return {
-      name: period.periodLabel,
-      // Opening balance (only show for first period)
-      opening: index === 0 ? period.openingBalance : 0,
-      // Inflows (positive, stacked on top of base)
-      inflows: period.inflows,
-      // Outflows (negative, shown as separate negative bar)
-      outflows: -period.outflows,
-      // Insolvency effects (can be positive or negative)
-      insolvencyEffects: showInsolvencyEffects ? period.insolvencyEffects : 0,
-      // Closing balance for the line
-      closingBalance: period.closingBalance,
-      // Store raw values for tooltip
-      rawOpeningBalance: period.openingBalance,
-      rawInflows: period.inflows,
-      rawOutflows: period.outflows,
-      rawInsolvencyEffects: period.insolvencyEffects,
-      rawClosingBalance: period.closingBalance,
+      minValue: min,
+      maxValue: max,
+      padding: (max - min) * 0.1 || 50000,
     };
-  });
+  }, [data]);
 
-  const formatCurrency = (value: number): string => {
-    if (Math.abs(value) >= 1000000) {
-      return `${(value / 1000000).toFixed(1)}M`;
-    }
-    if (Math.abs(value) >= 1000) {
-      return `${(value / 1000).toFixed(0)}K`;
-    }
-    return value.toFixed(0);
-  };
-
-  const formatTooltipValue = (value: number): string => {
-    return value.toLocaleString("de-DE", {
-      style: "currency",
-      currency: "EUR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    });
-  };
-
-  // Find min/max for scaling
-  const allValues = data.flatMap((d) => [
-    d.openingBalance,
-    d.closingBalance,
-    d.openingBalance + d.inflows,
-    d.openingBalance + d.inflows - d.outflows,
-  ]);
-  const minValue = Math.min(...allValues, 0);
-  const maxValue = Math.max(...allValues);
-  const padding = (maxValue - minValue) * 0.1 || 50000;
-
-  // Custom tooltip
-  interface TooltipPayload {
-    value: number;
-    name: string;
-    dataKey: string;
-    payload: {
-      rawOpeningBalance: number;
-      rawInflows: number;
-      rawOutflows: number;
-      rawInsolvencyEffects: number;
-      rawClosingBalance: number;
-    };
-  }
-
-  const CustomTooltip = ({
-    active,
-    payload,
-    label,
-  }: {
-    active?: boolean;
-    payload?: TooltipPayload[];
-    label?: string;
-  }) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
-      return (
-        <div className="bg-white border border-[var(--border)] rounded-lg shadow-lg p-3 min-w-[180px]">
-          <p className="font-medium text-[var(--foreground)] mb-2 border-b pb-2">
-            {label}
-          </p>
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Anfangsbestand:</span>
-              <span className="font-medium">{formatTooltipValue(data.rawOpeningBalance)}</span>
-            </div>
-            <div className="flex justify-between text-green-600">
-              <span>+ Einzahlungen:</span>
-              <span className="font-medium">{formatTooltipValue(data.rawInflows)}</span>
-            </div>
-            <div className="flex justify-between text-red-600">
-              <span>- Auszahlungen:</span>
-              <span className="font-medium">{formatTooltipValue(data.rawOutflows)}</span>
-            </div>
-            {showInsolvencyEffects && data.rawInsolvencyEffects !== 0 && (
-              <div className={`flex justify-between ${data.rawInsolvencyEffects >= 0 ? "text-blue-600" : "text-orange-600"}`}>
-                <span>{data.rawInsolvencyEffects >= 0 ? "+ " : ""}Insolvenzeffekte:</span>
-                <span className="font-medium">{formatTooltipValue(data.rawInsolvencyEffects)}</span>
-              </div>
-            )}
-            <div className="flex justify-between border-t pt-1 mt-1">
-              <span className="text-gray-700 font-medium">Endbestand:</span>
-              <span className={`font-bold ${data.rawClosingBalance < 0 ? "text-red-600" : ""}`}>
-                {formatTooltipValue(data.rawClosingBalance)}
-              </span>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    return null;
-  };
+  // Memoize summary values
+  const summaryValues = useMemo(() => ({
+    totalInflows: data.reduce((sum, d) => sum + d.inflows, 0),
+    totalOutflows: data.reduce((sum, d) => sum + d.outflows, 0),
+    totalInsolvencyEffects: data.reduce((sum, d) => sum + d.insolvencyEffects, 0),
+    closingBalance: data[data.length - 1]?.closingBalance || 0,
+  }), [data]);
 
   return (
     <div className="space-y-4">
@@ -195,7 +201,7 @@ export default function WaterfallChart({
               axisLine={{ stroke: "#e2e8f0" }}
               domain={[minValue - padding, maxValue + padding]}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip showInsolvencyEffects={showInsolvencyEffects} />} />
             <ReferenceLine y={0} stroke="#dc2626" strokeDasharray="5 5" strokeWidth={2} />
 
             {/* Inflows (positive, green) */}
@@ -242,30 +248,34 @@ export default function WaterfallChart({
         <div className="admin-card p-3">
           <p className="text-xs text-[var(--muted)]">Summe Einzahlungen</p>
           <p className="text-lg font-bold text-green-600">
-            {formatTooltipValue(data.reduce((sum, d) => sum + d.inflows, 0))}
+            {formatTooltipValue(summaryValues.totalInflows)}
           </p>
         </div>
         <div className="admin-card p-3">
           <p className="text-xs text-[var(--muted)]">Summe Auszahlungen</p>
           <p className="text-lg font-bold text-red-600">
-            {formatTooltipValue(data.reduce((sum, d) => sum + d.outflows, 0))}
+            {formatTooltipValue(summaryValues.totalOutflows)}
           </p>
         </div>
         {showInsolvencyEffects && (
           <div className="admin-card p-3">
             <p className="text-xs text-[var(--muted)]">Netto Insolvenzeffekte</p>
-            <p className={`text-lg font-bold ${data.reduce((sum, d) => sum + d.insolvencyEffects, 0) >= 0 ? "text-purple-600" : "text-orange-600"}`}>
-              {formatTooltipValue(data.reduce((sum, d) => sum + d.insolvencyEffects, 0))}
+            <p className={`text-lg font-bold ${summaryValues.totalInsolvencyEffects >= 0 ? "text-purple-600" : "text-orange-600"}`}>
+              {formatTooltipValue(summaryValues.totalInsolvencyEffects)}
             </p>
           </div>
         )}
         <div className="admin-card p-3">
           <p className="text-xs text-[var(--muted)]">Endbestand</p>
-          <p className={`text-lg font-bold ${data[data.length - 1]?.closingBalance < 0 ? "text-red-600" : "text-blue-600"}`}>
-            {formatTooltipValue(data[data.length - 1]?.closingBalance || 0)}
+          <p className={`text-lg font-bold ${summaryValues.closingBalance < 0 ? "text-red-600" : "text-blue-600"}`}>
+            {formatTooltipValue(summaryValues.closingBalance)}
           </p>
         </div>
       </div>
     </div>
   );
 }
+
+// Wrap with memo to prevent re-renders when parent state changes but props don't
+const WaterfallChart = memo(WaterfallChartComponent);
+export default WaterfallChart;
