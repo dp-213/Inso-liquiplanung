@@ -191,13 +191,13 @@ export default function IngestionJobDetailPage({
               href="/admin/ingestion"
               className="btn-secondary"
             >
-              Zur Import-Uebersicht
+              Zur Import-Übersicht
             </Link>
             <Link
               href="/admin/cases"
               className="btn-primary"
             >
-              Zur Fall-Uebersicht
+              Zur Fall-Übersicht
             </Link>
           </div>
         </div>

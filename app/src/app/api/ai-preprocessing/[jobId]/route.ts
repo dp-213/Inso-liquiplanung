@@ -141,7 +141,7 @@ export async function DELETE(
     // Only allow deletion of non-committed jobs
     if (job.status === "COMMITTED") {
       return NextResponse.json(
-        { error: "Uebernommene Vorgaenge koennen nicht geloescht werden" },
+        { error: "Uebernommene Vorgänge können nicht gelöscht werden" },
         { status: 400 }
       );
     }
@@ -154,7 +154,7 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting AI preprocessing job:", error);
     return NextResponse.json(
-      { error: "Fehler beim Loeschen des Aufbereitungsvorgangs" },
+      { error: "Fehler beim Löschen des Aufbereitungsvorgangs" },
       { status: 500 }
     );
   }

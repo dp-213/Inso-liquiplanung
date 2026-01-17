@@ -244,7 +244,7 @@ export async function DELETE(
       // Require confirmation for hard delete
       if (confirmDelete !== "PERMANENTLY_DELETE") {
         return NextResponse.json(
-          { error: "Bestaetigung erforderlich: confirm=PERMANENTLY_DELETE" },
+          { error: "Bestätigung erforderlich: confirm=PERMANENTLY_DELETE" },
           { status: 400 }
         );
       }
@@ -253,7 +253,7 @@ export async function DELETE(
       if (existingCustomer.ownedCases.length > 0) {
         return NextResponse.json(
           {
-            error: `Kunde kann nicht geloescht werden - besitzt noch ${existingCustomer.ownedCases.length} Fall/Faelle. Loeschen Sie zuerst die Faelle oder weisen Sie sie einem anderen Kunden zu.`,
+            error: `Kunde kann nicht gelöscht werden - besitzt noch ${existingCustomer.ownedCases.length} Fall/Fälle. Löschen Sie zuerst die Fälle oder weisen Sie sie einem anderen Kunden zu.`,
             ownedCases: existingCustomer.ownedCases,
           },
           { status: 400 }
@@ -316,7 +316,7 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting customer:", error);
     return NextResponse.json(
-      { error: "Fehler beim Loeschen des Kunden" },
+      { error: "Fehler beim Löschen des Kunden" },
       { status: 500 }
     );
   }

@@ -133,7 +133,7 @@ export default function CustomerDetailPage({
   };
 
   const handleResetPassword = async () => {
-    if (!confirm("Passwort wirklich zuruecksetzen? Ein neues temporaeres Passwort wird generiert.")) return;
+    if (!confirm("Passwort wirklich zurücksetzen? Ein neues temporäres Passwort wird generiert.")) return;
 
     setSaving(true);
     try {
@@ -149,7 +149,7 @@ export default function CustomerDetailPage({
         fetchCustomer();
       } else {
         const data = await res.json();
-        setError(data.error || "Fehler beim Zuruecksetzen");
+        setError(data.error || "Fehler beim Zurücksetzen");
       }
     } catch (err) {
       setError("Netzwerkfehler");
@@ -183,7 +183,7 @@ export default function CustomerDetailPage({
 
   const handlePermanentDelete = async () => {
     if (deleteInput !== "LOESCHEN") {
-      setError("Bitte geben Sie LOESCHEN ein, um zu bestaetigen");
+      setError("Bitte geben Sie LOESCHEN ein, um zu bestätigen");
       return;
     }
 
@@ -197,11 +197,11 @@ export default function CustomerDetailPage({
         router.push("/admin/customers");
       } else {
         const data = await res.json();
-        setError(data.error || "Fehler beim Loeschen");
+        setError(data.error || "Fehler beim Löschen");
         setShowDeleteConfirm(false);
       }
     } catch (err) {
-      setError("Netzwerkfehler beim Loeschen");
+      setError("Netzwerkfehler beim Löschen");
     } finally {
       setSaving(false);
     }
@@ -228,8 +228,8 @@ export default function CustomerDetailPage({
 
   const getStatusLabel = (status: string): string => {
     switch (status) {
-      case "PRELIMINARY": return "Vorlaeufig";
-      case "OPENED": return "Eroeffnet";
+      case "PRELIMINARY": return "Vorläufig";
+      case "OPENED": return "Eröffnet";
       case "CLOSED": return "Geschlossen";
       default: return status;
     }
@@ -274,7 +274,7 @@ export default function CustomerDetailPage({
         <div className="admin-card p-8 text-center">
           <p className="text-[var(--danger)]">{error}</p>
           <Link href="/admin/customers" className="btn-secondary mt-4 inline-block">
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         </div>
       </div>
@@ -301,23 +301,23 @@ export default function CustomerDetailPage({
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-            <h2 className="text-lg font-semibold text-red-600 mb-4">Kunde permanent loeschen?</h2>
+            <h2 className="text-lg font-semibold text-red-600 mb-4">Kunde permanent löschen?</h2>
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
               <p className="text-sm text-red-800 mb-2">
-                <strong>Achtung:</strong> Diese Aktion kann nicht rueckgaengig gemacht werden!
+                <strong>Achtung:</strong> Diese Aktion kann nicht rückgängig gemacht werden!
               </p>
               <p className="text-sm text-red-700">
-                Alle Daten dieses Kunden werden unwiderruflich geloescht.
+                Alle Daten dieses Kunden werden unwiderruflich gelöscht.
               </p>
               {customer.ownedCases.length > 0 && (
                 <p className="text-sm text-red-800 mt-2 font-medium">
-                  Dieser Kunde besitzt noch {customer.ownedCases.length} Fall/Faelle. Diese muessen zuerst geloescht oder einem anderen Kunden zugewiesen werden.
+                  Dieser Kunde besitzt noch {customer.ownedCases.length} Fall/Fälle. Diese müssen zuerst gelöscht oder einem anderen Kunden zugewiesen werden.
                 </p>
               )}
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Geben Sie LOESCHEN ein, um zu bestaetigen:
+                Geben Sie LOESCHEN ein, um zu bestätigen:
               </label>
               <input
                 type="text"
@@ -333,7 +333,7 @@ export default function CustomerDetailPage({
                 disabled={saving || deleteInput !== "LOESCHEN" || customer.ownedCases.length > 0}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg disabled:opacity-50"
               >
-                {saving ? "Loeschen..." : "Permanent loeschen"}
+                {saving ? "Löschen..." : "Permanent löschen"}
               </button>
               <button
                 onClick={() => {
@@ -356,7 +356,7 @@ export default function CustomerDetailPage({
             <h2 className="text-lg font-semibold mb-4">Neues Passwort</h2>
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
               <p className="text-sm font-medium text-yellow-800 mb-2">
-                Temporaeres Passwort (nur einmal sichtbar):
+                Temporäres Passwort (nur einmal sichtbar):
               </p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 bg-white px-3 py-2 rounded border font-mono text-lg">
@@ -473,7 +473,7 @@ export default function CustomerDetailPage({
             <div className="flex flex-wrap gap-2">
               <button onClick={() => setIsEditing(true)} className="btn-secondary">Bearbeiten</button>
               <button onClick={handleResetPassword} disabled={saving} className="btn-secondary">
-                Passwort zuruecksetzen
+                Passwort zurücksetzen
               </button>
               <button
                 onClick={handleToggleActive}
@@ -487,7 +487,7 @@ export default function CustomerDetailPage({
                 disabled={saving}
                 className="btn-secondary text-red-600 hover:bg-red-50"
               >
-                Permanent loeschen
+                Permanent löschen
               </button>
             </div>
           </div>
@@ -523,12 +523,12 @@ export default function CustomerDetailPage({
       {/* Owned Cases */}
       <div className="admin-card">
         <div className="px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">Eigene Faelle ({customer.ownedCases.length})</h2>
+          <h2 className="text-lg font-semibold text-[var(--foreground)]">Eigene Fälle ({customer.ownedCases.length})</h2>
         </div>
 
         {customer.ownedCases.length === 0 ? (
           <div className="p-8 text-center text-[var(--muted)]">
-            Dieser Kunde besitzt keine Faelle.
+            Dieser Kunde besitzt keine Fälle.
           </div>
         ) : (
           <table className="admin-table">
@@ -592,12 +592,12 @@ export default function CustomerDetailPage({
       <div className="admin-card">
         <div className="px-6 py-4 border-b border-[var(--border)]">
           <h2 className="text-lg font-semibold text-[var(--foreground)]">Zusaetzliche Fallzugriffe</h2>
-          <p className="text-sm text-[var(--muted)]">Zugriffe auf Faelle anderer Kunden</p>
+          <p className="text-sm text-[var(--muted)]">Zugriffe auf Fälle anderer Kunden</p>
         </div>
 
         {activeAccess.length === 0 ? (
           <div className="p-8 text-center text-[var(--muted)]">
-            Keine aktiven Fallzugriffe. Weisen Sie Faelle ueber die Falldetailseite zu.
+            Keine aktiven Fallzugriffe. Weisen Sie Fälle ueber die Falldetailseite zu.
           </div>
         ) : (
           <table className="admin-table">

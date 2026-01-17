@@ -147,13 +147,13 @@ const AVAILABLE_FILES: Record<string, FileConfig> = {
     data: SPLIT_AMOUNT_DATA,
     format: "xlsx",
     displayName: "Einzahlung/Auszahlung getrennt (Excel)",
-    description: "Getrennte Spalten fuer Einzahlung und Auszahlung statt einzelnem Betrag",
+    description: "Getrennte Spalten für Einzahlung und Auszahlung statt einzelnem Betrag",
   },
   "split-amount-import.csv": {
     data: SPLIT_AMOUNT_DATA,
     format: "csv",
     displayName: "Einzahlung/Auszahlung getrennt (CSV)",
-    description: "Getrennte Spalten fuer Einzahlung und Auszahlung statt einzelnem Betrag",
+    description: "Getrennte Spalten für Einzahlung und Auszahlung statt einzelnem Betrag",
   },
 
   // Bank statement format

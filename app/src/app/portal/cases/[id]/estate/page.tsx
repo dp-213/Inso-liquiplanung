@@ -79,7 +79,7 @@ export default function EstateSummaryPage() {
       <div className="space-y-6">
         <div className="flex items-center text-sm text-[var(--muted)]">
           <Link href="/portal" className="hover:text-[var(--primary)]">
-            Meine Faelle
+            Meine Fälle
           </Link>
           <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -88,7 +88,7 @@ export default function EstateSummaryPage() {
         </div>
         <div className="admin-card p-8 text-center">
           <div className="w-12 h-12 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-[var(--secondary)]">Masseuebersicht wird geladen...</p>
+          <p className="mt-4 text-[var(--secondary)]">Masseübersicht wird geladen...</p>
         </div>
       </div>
     );
@@ -99,9 +99,9 @@ export default function EstateSummaryPage() {
       <div className="space-y-6">
         <div className="admin-card p-8 text-center">
           <h1 className="text-xl font-bold text-[var(--foreground)] mb-2">Fehler</h1>
-          <p className="text-[var(--secondary)] mb-4">{error || "Daten nicht verfuegbar"}</p>
+          <p className="text-[var(--secondary)] mb-4">{error || "Daten nicht verfügbar"}</p>
           <Link href="/portal" className="btn-primary">
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         </div>
       </div>
@@ -152,7 +152,7 @@ export default function EstateSummaryPage() {
       {/* Breadcrumb */}
       <div className="flex items-center text-sm text-[var(--muted)]">
         <Link href="/portal" className="hover:text-[var(--primary)]">
-          Meine Faelle
+          Meine Fälle
         </Link>
         <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -163,13 +163,13 @@ export default function EstateSummaryPage() {
         <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
-        <span className="text-[var(--foreground)]">Masseuebersicht</span>
+        <span className="text-[var(--foreground)]">Masseübersicht</span>
       </div>
 
       {/* Case Header */}
       <div className="admin-card p-6">
         <h1 className="text-2xl font-bold text-[var(--foreground)]">
-          Masseuebersicht
+          Masseübersicht
         </h1>
         <p className="mt-1 text-sm text-[var(--secondary)]">
           {data.case.debtorName} | {data.case.caseNumber}
@@ -225,7 +225,7 @@ export default function EstateSummaryPage() {
             </h2>
           </div>
           <p className="text-sm text-[var(--secondary)] mb-4">
-            Forderungen und Verbindlichkeiten, die vor Insolvenzeroeffnung entstanden sind
+            Forderungen und Verbindlichkeiten, die vor Insolvenzeröffnung entstanden sind
           </p>
 
           {/* Altmasse Inflows */}
@@ -302,7 +302,7 @@ export default function EstateSummaryPage() {
             </h2>
           </div>
           <p className="text-sm text-[var(--secondary)] mb-4">
-            Forderungen und Verbindlichkeiten, die nach Insolvenzeroeffnung entstanden sind
+            Forderungen und Verbindlichkeiten, die nach Insolvenzeröffnung entstanden sind
           </p>
 
           {/* Neumasse Inflows */}
@@ -380,13 +380,13 @@ export default function EstateSummaryPage() {
           <div>
             <h3 className="text-sm font-medium text-amber-800">Unterscheidung Altmasse / Neumasse</h3>
             <p className="text-sm text-amber-700 mt-1">
-              <strong>Altmasse:</strong> Alle Vermoegenswerte und Forderungen, die vor dem Insolvenzantrag bzw.
-              der Eroeffnung des Insolvenzverfahrens entstanden sind. Diese unterliegen besonderen Regelungen
-              fuer die Glaeubigerbefriedigung.
+              <strong>Altmasse:</strong> Alle Vermögenswerte und Forderungen, die vor dem Insolvenzantrag bzw.
+              der Eröffnung des Insolvenzverfahrens entstanden sind. Diese unterliegen besonderen Regelungen
+              für die Gläubigerbefriedigung.
             </p>
             <p className="text-sm text-amber-700 mt-2">
-              <strong>Neumasse:</strong> Alle Vermoegenswerte, die nach Insolvenzeroeffnung entstehen, z.B. aus
-              der Fortfuehrung des Geschaeftsbetriebs. Diese stehen vorrangig fuer Masseverbindlichkeiten zur Verfuegung.
+              <strong>Neumasse:</strong> Alle Vermögenswerte, die nach Insolvenzeröffnung entstehen, z.B. aus
+              der Fortführung des Geschäftsbetriebs. Diese stehen vorrangig für Masseverbindlichkeiten zur Verfuegung.
             </p>
           </div>
         </div>

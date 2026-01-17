@@ -72,7 +72,7 @@ export default function CustomerAccessManager({
   const createAccess = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCustomerId) {
-      alert("Bitte waehlen Sie einen Kunden aus");
+      alert("Bitte wählen Sie einen Kunden aus");
       return;
     }
 
@@ -183,7 +183,7 @@ export default function CustomerAccessManager({
                 <div className="input-field bg-gray-100 text-[var(--muted)]">Wird geladen...</div>
               ) : customers.length === 0 ? (
                 <div className="input-field bg-gray-100 text-[var(--muted)]">
-                  Keine verfuegbaren Kunden. Alle aktiven Kunden haben bereits Zugriff.
+                  Keine verfügbaren Kunden. Alle aktiven Kunden haben bereits Zugriff.
                 </div>
               ) : (
                 <select
@@ -192,7 +192,7 @@ export default function CustomerAccessManager({
                   className="input-field"
                   required
                 >
-                  <option value="">Kunde auswaehlen...</option>
+                  <option value="">Kunde auswählen...</option>
                   {customers.map((customer) => (
                     <option key={customer.id} value={customer.id}>
                       {customer.name}
@@ -232,7 +232,7 @@ export default function CustomerAccessManager({
                 className="input-field"
               />
               <p className="text-xs text-[var(--muted)] mt-1">
-                Leer lassen fuer unbegrenzten Zugang
+                Leer lassen für unbegrenzten Zugang
               </p>
             </div>
             <div className="flex gap-2">

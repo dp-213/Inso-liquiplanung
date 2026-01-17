@@ -394,13 +394,13 @@ function monthlyToWeekly(monthlyAmount: number): { weeklyAmounts: number[]; expl
 function getDocumentTypeInstructions(docType: DocumentType): string {
   switch (docType) {
     case 'LIQUIDITAETSPLANUNG':
-      return `Dies ist eine Liquiditaetsplanung. Die Werte koennen direkt als Cashflows verwendet werden.
+      return `Dies ist eine Liquiditätsplanung. Die Werte können direkt als Cashflows verwendet werden.
 - Einzahlungen und Auszahlungen sind bereits getrennt
 - Wochenbezug sollte aus Spaltenkoepfen ersichtlich sein
 - valueType ist typischerweise PLAN`;
 
     case 'GUV_PL':
-      return `Dies ist eine GuV/Gewinn- und Verlustrechnung. WICHTIG: Ertraege und Aufwendungen muessen in Cashflows umgewandelt werden.
+      return `Dies ist eine GuV/Gewinn- und Verlustrechnung. WICHTIG: Ertraege und Aufwendungen müssen in Cashflows umgewandelt werden.
 - Ertraege (Umsatzerlöse, sonstige Erträge) -> EINZAHLUNGEN
 - Aufwendungen (Personalaufwand, Materialaufwand, etc.) -> AUSZAHLUNGEN
 - Typischerweise Monatswerte -> auf Wochen verteilen (÷ 4.33)
@@ -415,14 +415,14 @@ function getDocumentTypeInstructions(docType: DocumentType): string {
 - valueType ist typischerweise IST`;
 
     case 'SUSA':
-      return `Dies ist eine Summen- und Saldenliste. Konten muessen nach Art klassifiziert werden.
+      return `Dies ist eine Summen- und Saldenliste. Konten müssen nach Art klassifiziert werden.
 - Konten der Klasse 4 (Erlöse) -> EINZAHLUNGEN
 - Konten der Klasse 5-7 (Aufwendungen) -> AUSZAHLUNGEN
 - Salden repraesentieren oft Monats- oder Periodenwerte
 - Beachte Soll/Haben-Logik: Haben bei Erloesen = positiv, Soll bei Aufwendungen = positiv`;
 
     case 'ZAHLUNGSTERMINE':
-      return `Dies ist eine Zahlungsterminuebersicht. Verwende die Faelligkeitsdaten direkt.
+      return `Dies ist eine Zahlungsterminübersicht. Verwende die Fälligkeitsdaten direkt.
 - KV-Termine -> KV_ZAHLUNGEN (EINZAHLUNG)
 - HZV-Termine -> HZV_ZAHLUNGEN (EINZAHLUNG)
 - Mietzahlungen -> MIETE_LEASING (AUSZAHLUNG)
@@ -452,7 +452,7 @@ export async function POST(request: NextRequest) {
   let stepInfo = "Initialisierung";
   try {
     // Step 1: Session validation
-    stepInfo = "Sitzungspruefung";
+    stepInfo = "Sitzungsprüfung";
     const session = await getSession();
     if (!session) {
       return NextResponse.json(
@@ -481,14 +481,14 @@ export async function POST(request: NextRequest) {
     stepInfo = "Eingabevalidierung";
     if (!caseId) {
       return NextResponse.json(
-        { error: "Fall-ID fehlt. Bitte einen Fall auswaehlen." },
+        { error: "Fall-ID fehlt. Bitte einen Fall auswählen." },
         { status: 400 }
       );
     }
 
     if (files.length === 0) {
       return NextResponse.json(
-        { error: "Keine Dateien ausgewaehlt. Bitte mindestens eine Datei hochladen." },
+        { error: "Keine Dateien ausgewählt. Bitte mindestens eine Datei hochladen." },
         { status: 400 }
       );
     }
@@ -510,7 +510,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 4: Verify case exists
-    stepInfo = "Fall-Pruefung in Datenbank";
+    stepInfo = "Fall-Prüfung in Datenbank";
     let caseRecord;
     try {
       caseRecord = await prisma.case.findUnique({
@@ -519,7 +519,7 @@ export async function POST(request: NextRequest) {
     } catch (dbError) {
       console.error("Database error during case lookup:", dbError);
       return NextResponse.json(
-        { error: "Datenbankfehler bei der Fall-Pruefung. Bitte spaeter erneut versuchen." },
+        { error: "Datenbankfehler bei der Fall-Prüfung. Bitte später erneut versuchen." },
         { status: 500 }
       );
     }
@@ -649,7 +649,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 9: Process files with AI (synchronously for serverless)
-    stepInfo = "KI-Verarbeitung durchfuehren";
+    stepInfo = "KI-Verarbeitung durchführen";
     try {
       await processFilesWithAI(job.id, session.username);
     } catch (aiError) {
@@ -725,7 +725,7 @@ export async function GET(request: NextRequest) {
     } catch (dbError) {
       console.error("Database error fetching AI preprocessing jobs:", dbError);
       return NextResponse.json(
-        { error: "Datenbankfehler beim Laden der Aufbereitungsvorgaenge. Bitte spaeter erneut versuchen." },
+        { error: "Datenbankfehler beim Laden der Aufbereitungsvorgänge. Bitte später erneut versuchen." },
         { status: 500 }
       );
     }
@@ -794,7 +794,7 @@ export async function GET(request: NextRequest) {
     const errorMessage =
       error instanceof Error ? error.message : "Unbekannter Fehler";
     return NextResponse.json(
-      { error: `Fehler beim Laden der Aufbereitungsvorgaenge: ${errorMessage}` },
+      { error: `Fehler beim Laden der Aufbereitungsvorgänge: ${errorMessage}` },
       { status: 500 }
     );
   }
@@ -1122,7 +1122,7 @@ async function analyzeWithClaude(
   for (let i = 0; i < data.rows.length; i += batchSize) {
     const batch = data.rows.slice(i, i + batchSize);
 
-    const prompt = `Du bist ein Experte fuer die Analyse von Finanzdaten im Kontext eines deutschen Insolvenzverfahrens.
+    const prompt = `Du bist ein Experte für die Analyse von Finanzdaten im Kontext eines deutschen Insolvenzverfahrens.
 
 === DOKUMENT-KONTEXT ===
 Datei: "${fileName}"
@@ -1142,12 +1142,12 @@ ${dateColumn ? `Datum-Spalte: ${dateColumn}` : 'ACHTUNG: Keine Datum-Spalte erka
 ${descColumn ? `Beschreibungs-Spalte: ${descColumn}` : ''}
 
 === PFLICHT-KATEGORIEN FUER EINZAHLUNGEN (isInflow: true) ===
-1. ALTFORDERUNGEN - Forderungen VOR Verfahrenseroeffnung (Debitoren aus Altgeschaeft)
-2. NEUFORDERUNGEN - Forderungen NACH Verfahrenseroeffnung (laufende Umsaetze)
+1. ALTFORDERUNGEN - Forderungen VOR Verfahrenseröffnung (Debitoren aus Altgeschäft)
+2. NEUFORDERUNGEN - Forderungen NACH Verfahrenseröffnung (laufende Umsätze)
 3. KV_ZAHLUNGEN - Zahlungen aus Kaufvertraegen
 4. HZV_ZAHLUNGEN - Zahlungen aus Handwerkervertraegen
-5. SONSTIGE_ERLOESE - Andere Einnahmen (Mietertraege, Lizenzgebuehren)
-6. EINMALIGE_SONDERZUFLUESSE - Einmalige Zufluesse (Verkaeufe, Rueckerstattungen)
+5. SONSTIGE_ERLOESE - Andere Einnahmen (Mietertraege, Lizenzgebühren)
+6. EINMALIGE_SONDERZUFLUESSE - Einmalige Zuflüsse (Verkäufe, Rückerstattungen)
 
 === PFLICHT-KATEGORIEN FUER AUSZAHLUNGEN (isInflow: false) ===
 1. PERSONALKOSTEN - Loehne, Gehaelter, Abfindungen
@@ -1155,7 +1155,7 @@ ${descColumn ? `Beschreibungs-Spalte: ${descColumn}` : ''}
 3. LIEFERANTEN - Lieferantenzahlungen
 4. SOZIALABGABEN_STEUERN - SV-Beitraege, Steuern
 5. MASSEKOSTEN - Verfahrenskosten
-6. BANK_SICHERUNGSRECHTE - Bankgebuehren, Kredite
+6. BANK_SICHERUNGSRECHTE - Bankgebühren, Kredite
 7. SONSTIGE_LAUFENDE_KOSTEN - Versicherungen, Energie, IT
 8. EINMALIGE_SONDERABFLUESSE - Einmalige Sonderzahlungen
 
@@ -1175,7 +1175,7 @@ ${batch.map((row, idx) => `Zeile ${i + idx + 1}: ${JSON.stringify(row)}`).join("
 === KRITISCHE AUSGABE-REGELN ===
 1. JEDE Zeile mit einem erkennbaren Betrag MUSS verarbeitet werden
 2. Wenn ein Betrag erkennbar ist (auch in unerwarteten Spalten), MUSS er extrahiert werden
-3. NIEMALS 0 EUR zurueckgeben wenn die Originaldaten einen Betrag enthalten
+3. NIEMALS 0 EUR zurückgeben wenn die Originaldaten einen Betrag enthalten
 4. Bei fehlender Kategorie-Information: Basierend auf Vorzeichen klassifizieren
 5. Bei monatlichen Werten: Pro-rata auf Wochen verteilen und "weekConversionNote" hinzufuegen
 
@@ -1204,7 +1204,7 @@ Antworte NUR mit validem JSON in dieser Struktur:
         "categoryUncertainty": "<SICHER|WAHRSCHEINLICH|UNSICHER|UNBEKANNT>",
         "amountUncertainty": "<SICHER|WAHRSCHEINLICH|UNSICHER|UNBEKANNT>",
         "weekUncertainty": "<SICHER|WAHRSCHEINLICH|UNSICHER|UNBEKANNT>",
-        "uncertaintyExplanation": "<bei Unsicherheit: Erklaerung>",
+        "uncertaintyExplanation": "<bei Unsicherheit: Erklärung>",
         "weekConversionNote": "<falls monatlich zu woechentlich konvertiert>"
       },
       "explanation": "<Zusammenfassung>",
@@ -1262,7 +1262,7 @@ Antworte NUR mit validem JSON in dieser Struktur:
                 sourceLocation: `row:${row.rowIndex}`,
                 rawData: batch[row.rowIndex - i - 1] || {},
                 suggestion: row.suggestion || {},
-                explanation: row.explanation || "Keine Erklaerung verfuegbar",
+                explanation: row.explanation || "Keine Erklärung verfügbar",
                 confidence: row.confidence || 0.5,
                 fieldConfidences: row.fieldConfidences || [],
               });
@@ -1443,7 +1443,7 @@ function createBasicParsedRow(
     fieldConfidences.push({
       field: "category",
       confidence: 0.3,
-      reason: "Standardkategorie basierend auf Vorzeichen - manuelle Pruefung erforderlich",
+      reason: "Standardkategorie basierend auf Vorzeichen - manuelle Prüfung erforderlich",
     });
   }
 
@@ -1502,7 +1502,7 @@ function createBasicParsedRow(
   if (!suggestion.categoryUncertainty) suggestion.categoryUncertainty = "UNSICHER";
   if (!suggestion.amountUncertainty) suggestion.amountUncertainty = "UNSICHER";
   if (!suggestion.uncertaintyExplanation) {
-    suggestion.uncertaintyExplanation = "Automatische Erkennung ohne KI - manuelle Pruefung erforderlich";
+    suggestion.uncertaintyExplanation = "Automatische Erkennung ohne KI - manuelle Prüfung erforderlich";
   }
 
   // Calculate overall confidence
@@ -1516,7 +1516,7 @@ function createBasicParsedRow(
     rawData,
     suggestion,
     explanation: hasAmount
-      ? `Automatisch erkannt: ${suggestion.isInflow ? 'Einzahlung' : 'Auszahlung'} ${suggestion.amount} EUR. Kategorie: ${suggestion.category || 'nicht bestimmt'}. Manuelle Pruefung empfohlen.`
+      ? `Automatisch erkannt: ${suggestion.isInflow ? 'Einzahlung' : 'Auszahlung'} ${suggestion.amount} EUR. Kategorie: ${suggestion.category || 'nicht bestimmt'}. Manuelle Prüfung empfohlen.`
       : "Kein Betrag erkannt - manuelle Eingabe erforderlich.",
     confidence,
     fieldConfidences,
@@ -1644,7 +1644,7 @@ async function createDemoRows(
             ...parsed.suggestion,
             categoryUncertainty: "UNBEKANNT",
             amountUncertainty: "UNBEKANNT",
-            uncertaintyExplanation: "Kein numerischer Betrag in dieser Zeile erkannt. Bitte manuell pruefen.",
+            uncertaintyExplanation: "Kein numerischer Betrag in dieser Zeile erkannt. Bitte manuell prüfen.",
           }),
           aiExplanation: `Zeile ohne erkennbaren Betrag. Rohdaten: ${Object.values(row).slice(0, 3).join(', ')}... (Demo-Modus)`,
           confidenceScore: 0.1,

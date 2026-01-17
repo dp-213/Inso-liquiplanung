@@ -33,7 +33,7 @@ export const STANDARD_CATEGORIES: CategoryInput[] = [
   },
   {
     id: 'cat-inflow-altmasse-2',
-    name: 'Anlagenverkaeufe',
+    name: 'Anlagenverkäufe',
     flowType: 'INFLOW',
     estateType: 'ALTMASSE',
     displayOrder: 1,
@@ -243,7 +243,7 @@ export const NEGATIVE_VALUES_FIXTURE: LiquidityCalculationInput = {
     {
       id: 'line-refund',
       categoryId: 'cat-revenue',
-      name: 'Rueckerstattung',
+      name: 'Rückerstattung',
       displayOrder: 1,
     },
     {

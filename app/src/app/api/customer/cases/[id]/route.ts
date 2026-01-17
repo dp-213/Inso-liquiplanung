@@ -75,7 +75,7 @@ export async function GET(
 
     if (!plan) {
       return NextResponse.json(
-        { error: "Kein Liquiditaetsplan verfuegbar" },
+        { error: "Kein Liquiditätsplan verfügbar" },
         { status: 404 }
       );
     }

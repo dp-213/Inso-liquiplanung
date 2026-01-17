@@ -183,7 +183,7 @@ export default function CaseEditPage({
 
   const handlePermanentDelete = async () => {
     if (deleteInput !== "LOESCHEN") {
-      setError("Bitte geben Sie LOESCHEN ein, um zu bestaetigen");
+      setError("Bitte geben Sie LOESCHEN ein, um zu bestätigen");
       return;
     }
 
@@ -197,11 +197,11 @@ export default function CaseEditPage({
         router.push("/admin/cases");
       } else {
         const data = await res.json();
-        setError(data.error || "Fehler beim Loeschen");
+        setError(data.error || "Fehler beim Löschen");
         setShowDeleteConfirm(false);
       }
     } catch (err) {
-      setError("Netzwerkfehler beim Loeschen");
+      setError("Netzwerkfehler beim Löschen");
     } finally {
       setSaving(false);
     }
@@ -230,7 +230,7 @@ export default function CaseEditPage({
             {error || "Fall nicht gefunden"}
           </p>
           <Link href="/admin/cases" className="btn-secondary mt-4 inline-block">
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         </div>
       </div>
@@ -242,7 +242,7 @@ export default function CaseEditPage({
       {/* Breadcrumb */}
       <div className="flex items-center text-sm text-[var(--muted)]">
         <Link href="/admin/cases" className="hover:text-[var(--primary)]">
-          Faelle
+          Fälle
         </Link>
         <svg
           className="w-4 h-4 mx-2"
@@ -372,8 +372,8 @@ export default function CaseEditPage({
               onChange={handleChange}
               className="input-field"
             >
-              <option value="PRELIMINARY">Vorlaeufig</option>
-              <option value="OPENED">Eroeffnet</option>
+              <option value="PRELIMINARY">Vorläufig</option>
+              <option value="OPENED">Eröffnet</option>
               <option value="CLOSED">Geschlossen</option>
             </select>
           </div>
@@ -401,7 +401,7 @@ export default function CaseEditPage({
               htmlFor="openingDate"
               className="block text-sm font-medium text-[var(--foreground)] mb-2"
             >
-              Eroeffnungsdatum
+              Eröffnungsdatum
             </label>
             <input
               type="date"
@@ -530,14 +530,14 @@ export default function CaseEditPage({
             onClick={() => setShowDeleteConfirm(true)}
             className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
           >
-            Fall permanent loeschen
+            Fall permanent löschen
           </button>
           <div className="flex gap-3">
             <Link href={`/admin/cases/${id}`} className="btn-secondary">
               Abbrechen
             </Link>
             <button type="submit" disabled={saving} className="btn-primary">
-              {saving ? "Speichern..." : "Aenderungen speichern"}
+              {saving ? "Speichern..." : "Änderungen speichern"}
             </button>
           </div>
         </div>
@@ -547,16 +547,16 @@ export default function CaseEditPage({
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
-            <h2 className="text-lg font-semibold text-red-600 mb-4">Fall permanent loeschen?</h2>
+            <h2 className="text-lg font-semibold text-red-600 mb-4">Fall permanent löschen?</h2>
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
               <p className="text-sm text-red-800 mb-2">
-                <strong>Achtung:</strong> Diese Aktion kann nicht rueckgaengig gemacht werden!
+                <strong>Achtung:</strong> Diese Aktion kann nicht rückgängig gemacht werden!
               </p>
               <p className="text-sm text-red-700">
-                Alle Daten dieses Falls werden unwiderruflich geloescht:
+                Alle Daten dieses Falls werden unwiderruflich gelöscht:
               </p>
               <ul className="text-sm text-red-700 mt-2 list-disc list-inside">
-                <li>Liquiditaetsplaene und Versionen</li>
+                <li>Liquiditätspläne und Versionen</li>
                 <li>Kategorien und Zeilen</li>
                 <li>Alle Periodenwerte</li>
                 <li>Konfigurationen und Share-Links</li>
@@ -564,7 +564,7 @@ export default function CaseEditPage({
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Geben Sie LOESCHEN ein, um zu bestaetigen:
+                Geben Sie LOESCHEN ein, um zu bestätigen:
               </label>
               <input
                 type="text"
@@ -580,7 +580,7 @@ export default function CaseEditPage({
                 disabled={saving || deleteInput !== "LOESCHEN"}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg disabled:opacity-50"
               >
-                {saving ? "Loeschen..." : "Permanent loeschen"}
+                {saving ? "Löschen..." : "Permanent löschen"}
               </button>
               <button
                 onClick={() => {

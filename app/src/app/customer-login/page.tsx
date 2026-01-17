@@ -61,7 +61,7 @@ export default function CustomerLoginPage() {
               Kundenportal
             </h1>
             <p className="text-[var(--muted)] mt-2">
-              Liquiditaetsplanung fuer Insolvenzverwalter
+              Liquiditätsplanung für Insolvenzverwalter
             </p>
           </div>
 

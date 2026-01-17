@@ -39,7 +39,7 @@ export default function ConfigurableDashboard({
     if (viewConfig.titleOverride) {
       return viewConfig.titleOverride;
     }
-    return `Liquiditaetsplan - ${calculationData.caseInfo.debtorName}`;
+    return `Liquiditätsplan - ${calculationData.caseInfo.debtorName}`;
   }, [viewConfig.titleOverride, calculationData.caseInfo.debtorName]);
 
   const subtitle = useMemo(() => {
@@ -68,7 +68,7 @@ export default function ConfigurableDashboard({
     return (
       <div className="admin-card p-8 text-center">
         <p className="text-[var(--muted)]">
-          Diese Ansicht ist fuer diesen Fall nicht aktiviert.
+          Diese Ansicht ist für diesen Fall nicht aktiviert.
         </p>
       </div>
     );
@@ -100,7 +100,7 @@ export default function ConfigurableDashboard({
               />
             </svg>
             <span className="text-sm text-amber-800">
-              Vorschau-Modus - Aenderungen wurden noch nicht gespeichert
+              Vorschau-Modus - Änderungen wurden noch nicht gespeichert
             </span>
           </div>
         </div>
@@ -194,8 +194,8 @@ export default function ConfigurableDashboard({
       <DashboardCard
         title={
           config.aggregations.groupBy === "week"
-            ? "13-Wochen Liquiditaetsplan"
-            : "Monatliche Uebersicht"
+            ? "13-Wochen Liquiditätsplan"
+            : "Monatliche Übersicht"
         }
         subtitle={`${formatDate(calculationData.caseInfo.planStartDate)} - ${formatDate(
           calculationData.weeks[calculationData.weeks.length - 1]?.weekEndDate ||

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Gradify | Inso-Liquiplanung",
-  description: "Liquiditaetsplanung fuer Insolvenzverfahren",
+  description: "Liquiditätsplanung für Insolvenzverfahren",
   icons: {
     icon: "/favicon.png",
   },

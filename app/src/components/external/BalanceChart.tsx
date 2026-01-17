@@ -137,7 +137,7 @@ export default function BalanceChart({ weeks, markers = [], showPhases = false }
                 x2={chartData[Math.floor(chartData.length / 2)].name}
                 fill="#10b981"
                 fillOpacity={0.05}
-                label={{ value: "Fortfuehrung", position: "insideTopLeft", fill: "#10b981", fontSize: 11 }}
+                label={{ value: "Fortführung", position: "insideTopLeft", fill: "#10b981", fontSize: 11 }}
               />
               <ReferenceArea
                 x1={chartData[Math.floor(chartData.length / 2)].name}

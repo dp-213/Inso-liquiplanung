@@ -99,7 +99,7 @@ export async function DELETE(
 
     if (job.status === "COMMITTED") {
       return NextResponse.json(
-        { error: "Ein abgeschlossener Import kann nicht geloescht werden" },
+        { error: "Ein abgeschlossener Import kann nicht gelöscht werden" },
         { status: 400 }
       );
     }
@@ -113,7 +113,7 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting job:", error);
     return NextResponse.json(
-      { error: "Fehler beim Loeschen des Importvorgangs" },
+      { error: "Fehler beim Löschen des Importvorgangs" },
       { status: 500 }
     );
   }

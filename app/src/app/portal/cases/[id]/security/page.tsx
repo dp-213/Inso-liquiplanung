@@ -37,7 +37,7 @@ const DEMO_BANK_ACCOUNTS = [
     iban: "DE89 3806 0186 0123 4567 89",
     balance: BigInt(1200000), // 12,000 EUR
     securityHolder: null,
-    status: "verfuegbar",
+    status: "verfügbar",
   },
 ];
 
@@ -114,8 +114,8 @@ export default function SecurityRightsPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "verfuegbar":
-        return <span className="badge badge-success">Verfuegbar</span>;
+      case "verfügbar":
+        return <span className="badge badge-success">Verfügbar</span>;
       case "gesperrt":
         return <span className="badge badge-warning">Gesperrt</span>;
       case "offen":
@@ -134,7 +134,7 @@ export default function SecurityRightsPage() {
       <div className="space-y-6">
         <div className="flex items-center text-sm text-[var(--muted)]">
           <Link href="/portal" className="hover:text-[var(--primary)]">
-            Meine Faelle
+            Meine Fälle
           </Link>
           <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -154,9 +154,9 @@ export default function SecurityRightsPage() {
       <div className="space-y-6">
         <div className="admin-card p-8 text-center">
           <h1 className="text-xl font-bold text-[var(--foreground)] mb-2">Fehler</h1>
-          <p className="text-[var(--secondary)] mb-4">{error || "Daten nicht verfuegbar"}</p>
+          <p className="text-[var(--secondary)] mb-4">{error || "Daten nicht verfügbar"}</p>
           <Link href="/portal" className="btn-primary">
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         </div>
       </div>
@@ -166,7 +166,7 @@ export default function SecurityRightsPage() {
   // Calculate totals
   const totalBankBalance = DEMO_BANK_ACCOUNTS.reduce((sum, acc) => sum + acc.balance, BigInt(0));
   const availableBalance = DEMO_BANK_ACCOUNTS
-    .filter((acc) => acc.status === "verfuegbar")
+    .filter((acc) => acc.status === "verfügbar")
     .reduce((sum, acc) => sum + acc.balance, BigInt(0));
 
   const totalSecurityValue = DEMO_SECURITY_RIGHTS.reduce((sum, sr) => sum + sr.estimatedValue, BigInt(0));
@@ -181,7 +181,7 @@ export default function SecurityRightsPage() {
       {/* Breadcrumb */}
       <div className="flex items-center text-sm text-[var(--muted)]">
         <Link href="/portal" className="hover:text-[var(--primary)]">
-          Meine Faelle
+          Meine Fälle
         </Link>
         <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -217,7 +217,7 @@ export default function SecurityRightsPage() {
           </div>
         </div>
         <div className="admin-card p-4">
-          <div className="text-sm text-[var(--secondary)]">Davon verfuegbar</div>
+          <div className="text-sm text-[var(--secondary)]">Davon verfügbar</div>
           <div className="text-2xl font-bold text-green-600">
             {formatCurrency(availableBalance)}
           </div>
@@ -233,7 +233,7 @@ export default function SecurityRightsPage() {
       {/* Section 1: Bank Accounts */}
       <div className="admin-card p-6">
         <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
-          Bankkonto-Uebersicht
+          Bankkonto-Übersicht
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

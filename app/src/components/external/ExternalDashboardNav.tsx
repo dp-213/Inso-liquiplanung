@@ -6,10 +6,10 @@ interface ExternalDashboardNavProps {
 }
 
 const navItems = [
-  { id: "overview", label: "Uebersicht", icon: "chart" },
+  { id: "overview", label: "Übersicht", icon: "chart" },
   { id: "revenue", label: "Einnahmen", icon: "money" },
   { id: "security", label: "Sicherungsrechte", icon: "shield" },
-  { id: "estate", label: "Masseuebersicht", icon: "folder" },
+  { id: "estate", label: "Masseübersicht", icon: "folder" },
   { id: "compare", label: "Vergleich", icon: "compare" },
 ];
 

@@ -69,7 +69,7 @@ export default function AiPreprocessingPage() {
         const casesData = await casesRes.json();
         setCases(casesData);
       } else if (casesRes.status === 500) {
-        setError("Datenbank nicht verfuegbar.");
+        setError("Datenbank nicht verfügbar.");
       }
 
       if (jobsRes.ok) {
@@ -78,7 +78,7 @@ export default function AiPreprocessingPage() {
       }
     } catch (err) {
       console.error("Error fetching data:", err);
-      setError("Datenbank nicht verfuegbar.");
+      setError("Datenbank nicht verfügbar.");
     } finally {
       setLoading(false);
     }
@@ -139,7 +139,7 @@ export default function AiPreprocessingPage() {
 
   const handleUpload = async () => {
     if (selectedFiles.length === 0 || !selectedCaseId) {
-      setError("Bitte Fall und mindestens eine Datei auswaehlen");
+      setError("Bitte Fall und mindestens eine Datei auswählen");
       return;
     }
 
@@ -247,7 +247,7 @@ export default function AiPreprocessingPage() {
             Intelligente Datenaufbereitung (Vorschlag)
           </h1>
           <p className="text-sm text-[var(--secondary)] mt-1">
-            KI-gestuetzte Analyse heterogener Dateien mit manueller Pruefung
+            KI-gestuetzte Analyse heterogener Dateien mit manueller Prüfung
           </p>
         </div>
       </div>
@@ -274,14 +274,14 @@ export default function AiPreprocessingPage() {
             </h3>
             <div className="text-amber-700 mt-2 space-y-2">
               <p>
-                <strong>Alle KI-Ergebnisse sind Vorschlaege</strong> und muessen
-                vor der Uebernahme manuell geprueft und freigegeben werden.
+                <strong>Alle KI-Ergebnisse sind Vorschlaege</strong> und müssen
+                vor der Übernahme manuell geprüft und freigegeben werden.
               </p>
               <ul className="list-disc list-inside ml-2 text-sm">
                 <li>Die KI analysiert Dateien und schlaegt Strukturen vor</li>
-                <li>Jeder Vorschlag zeigt Konfidenzwerte und Erklaerungen</li>
-                <li>Sie koennen jeden Eintrag einzeln pruefen, korrigieren oder ablehnen</li>
-                <li>Keine automatische Uebernahme - explizite Freigabe erforderlich</li>
+                <li>Jeder Vorschlag zeigt Konfidenzwerte und Erklärungen</li>
+                <li>Sie können jeden Eintrag einzeln prüfen, korrigieren oder ablehnen</li>
+                <li>Keine automatische Übernahme - explizite Freigabe erforderlich</li>
               </ul>
             </div>
           </div>
@@ -309,14 +309,14 @@ export default function AiPreprocessingPage() {
               Wann diese Funktion nutzen?
             </h3>
             <p className="text-sm text-purple-700 mt-1">
-              Ideal fuer heterogene, unstrukturierte Dateien von Insolvenzverwaltern:
+              Ideal für heterogene, unstrukturierte Dateien von Insolvenzverwaltern:
               gemischte Excel-Dateien, unvollstaendige Kontoauszuege, oder Dateien
               ohne klare Spaltenzuordnung. Die KI versucht, die Daten zu verstehen
               und schlaegt eine Strukturierung vor.
             </p>
             <div className="mt-4 p-3 bg-white border border-purple-200 rounded-md">
               <p className="text-sm text-purple-800">
-                <strong>Sieht Ihre Datei strukturiert aus?</strong> Mit klaren Spalten fuer Datum, Betrag und Bezeichnung?
+                <strong>Sieht Ihre Datei strukturiert aus?</strong> Mit klaren Spalten für Datum, Betrag und Bezeichnung?
               </p>
               <div className="flex flex-wrap items-center gap-3 mt-2">
                 <Link
@@ -369,14 +369,14 @@ export default function AiPreprocessingPage() {
           {/* Case Selection */}
           <div>
             <label className="block text-sm font-medium text-[var(--foreground)] mb-2">
-              Fall auswaehlen *
+              Fall auswählen *
             </label>
             <select
               value={selectedCaseId}
               onChange={(e) => setSelectedCaseId(e.target.value)}
               className="input-field max-w-md"
             >
-              <option value="">-- Fall waehlen --</option>
+              <option value="">-- Fall wählen --</option>
               {cases.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.caseNumber} - {c.debtorName}
@@ -414,7 +414,7 @@ export default function AiPreprocessingPage() {
               <div>
                 <label className="cursor-pointer">
                   <span className="text-[var(--primary)] hover:underline">
-                    Dateien auswaehlen
+                    Dateien auswählen
                   </span>
                   <input
                     type="file"
@@ -443,7 +443,7 @@ export default function AiPreprocessingPage() {
           {selectedFiles.length > 0 && (
             <div className="space-y-2">
               <h3 className="text-sm font-medium text-[var(--foreground)]">
-                Ausgewaehlte Dateien ({selectedFiles.length})
+                Ausgewählte Dateien ({selectedFiles.length})
               </h3>
               <div className="space-y-2">
                 {selectedFiles.map((file, index) => (
@@ -557,7 +557,7 @@ export default function AiPreprocessingPage() {
         <div className="p-6 border-b border-[var(--border)]">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-medium text-[var(--foreground)]">
-              KI-Aufbereitungsvorgaenge
+              KI-Aufbereitungsvorgänge
             </h2>
             <div className="flex items-center space-x-4">
               {/* Filter by Case */}
@@ -566,7 +566,7 @@ export default function AiPreprocessingPage() {
                 onChange={(e) => setFilterCaseId(e.target.value)}
                 className="input-field text-sm py-1.5"
               >
-                <option value="">Alle Faelle</option>
+                <option value="">Alle Fälle</option>
                 {cases.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.caseNumber}
@@ -593,7 +593,7 @@ export default function AiPreprocessingPage() {
 
         {filteredJobs.length === 0 ? (
           <div className="p-8 text-center text-[var(--secondary)]">
-            Keine KI-Aufbereitungsvorgaenge gefunden
+            Keine KI-Aufbereitungsvorgänge gefunden
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -681,7 +681,7 @@ export default function AiPreprocessingPage() {
                             href={`/admin/ai-preprocessing/${job.id}/review`}
                             className="btn-secondary text-sm py-1 px-3"
                           >
-                            Pruefen
+                            Prüfen
                           </Link>
                         )}
                         {job.status === "CORRECTION" && (
@@ -697,7 +697,7 @@ export default function AiPreprocessingPage() {
                             href={`/admin/ai-preprocessing/${job.id}/commit`}
                             className="btn-primary text-sm py-1 px-3"
                           >
-                            Uebernehmen
+                            Übernehmen
                           </Link>
                         )}
                         <Link

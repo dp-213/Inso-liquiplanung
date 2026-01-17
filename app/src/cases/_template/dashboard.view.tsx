@@ -47,7 +47,7 @@ export default function CustomDashboard(props: DashboardProps) {
       <DashboardCard title="Zusaetzliche Informationen">
         <div className="text-[var(--secondary)]">
           <p>
-            Hier koennen fall-spezifische zusaetzliche Informationen angezeigt werden.
+            Hier können fall-spezifische zusaetzliche Informationen angezeigt werden.
           </p>
           <p className="mt-2 text-sm text-[var(--muted)]">
             Case ID: {caseId}
@@ -66,7 +66,7 @@ export default function CustomDashboard(props: DashboardProps) {
       <div className="admin-card p-6">
         <h1 className="text-2xl font-bold text-[var(--foreground)]">
           {config.viewVariants[viewMode].config.titleOverride ||
-            `Liquiditaetsplan - ${calculationData.caseInfo.debtorName}`}
+            `Liquiditätsplan - ${calculationData.caseInfo.debtorName}`}
         </h1>
         <p className="text-[var(--secondary)] mt-1">
           {calculationData.caseInfo.caseNumber} | {calculationData.caseInfo.courtName}

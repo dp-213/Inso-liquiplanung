@@ -58,7 +58,7 @@ export async function POST(
 
     if (!customerId) {
       return NextResponse.json(
-        { error: "Kunde muss ausgewaehlt werden" },
+        { error: "Kunde muss ausgewählt werden" },
         { status: 400 }
       );
     }

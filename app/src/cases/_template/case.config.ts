@@ -79,7 +79,7 @@ const config: CaseCodeConfig = {
       // firmName: 'Musterkanzlei GmbH',
 
       // Custom footer text
-      // footerText: 'Vertraulich - Nur fuer internen Gebrauch',
+      // footerText: 'Vertraulich - Nur für internen Gebrauch',
     },
 
     // ========================================================================
@@ -120,7 +120,7 @@ const config: CaseCodeConfig = {
     //     config: {
     //       showEstateTypes: true,
     //       showDataSources: true,
-    //       titleOverride: 'Liquiditaetsplan - Interne Ansicht',
+    //       titleOverride: 'Liquiditätsplan - Interne Ansicht',
     //     },
     //   },
     //   external: {
@@ -128,7 +128,7 @@ const config: CaseCodeConfig = {
     //     config: {
     //       showEstateTypes: false,
     //       showDataSources: false,
-    //       titleOverride: 'Liquiditaetsuebersicht',
+    //       titleOverride: 'Liquiditaetsübersicht',
     //     },
     //   },
     // },

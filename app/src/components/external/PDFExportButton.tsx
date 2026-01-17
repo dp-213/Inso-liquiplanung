@@ -320,7 +320,7 @@ export default function PDFExportButton({ data, formatCurrency }: PDFExportButto
       );
 
       // Save PDF
-      const fileName = `Liquiditaetsplan_${data.case.caseNumber.replace(/[^a-zA-Z0-9]/g, "_")}_v${data.plan.versionNumber}_${now.toISOString().split("T")[0]}.pdf`;
+      const fileName = `Liquiditätsplan_${data.case.caseNumber.replace(/[^a-zA-Z0-9]/g, "_")}_v${data.plan.versionNumber}_${now.toISOString().split("T")[0]}.pdf`;
       doc.save(fileName);
     } catch (error) {
       console.error("PDF generation failed:", error);

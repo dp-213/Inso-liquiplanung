@@ -367,10 +367,10 @@ export default function PlanStructureManager({
             <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">
               {modalType === "addCategory" && "Neue Kategorie erstellen"}
               {modalType === "editCategory" && "Kategorie bearbeiten"}
-              {modalType === "deleteCategory" && "Kategorie loeschen"}
+              {modalType === "deleteCategory" && "Kategorie löschen"}
               {modalType === "addLine" && "Neue Zeile erstellen"}
               {modalType === "editLine" && "Zeile bearbeiten"}
-              {modalType === "deleteLine" && "Zeile loeschen"}
+              {modalType === "deleteLine" && "Zeile löschen"}
             </h3>
 
             {error && (
@@ -387,16 +387,16 @@ export default function PlanStructureManager({
                   <span className="font-semibold text-[var(--foreground)]">
                     {formState.name}
                   </span>{" "}
-                  wirklich loeschen?
+                  wirklich löschen?
                 </p>
                 {modalType === "deleteCategory" && (
                   <p className="text-sm text-amber-600 mt-2">
-                    Hinweis: Kategorien mit Werten koennen nicht geloescht werden.
+                    Hinweis: Kategorien mit Werten können nicht gelöscht werden.
                   </p>
                 )}
                 {modalType === "deleteLine" && (
                   <p className="text-sm text-amber-600 mt-2">
-                    Alle zugehoerigen Werte werden ebenfalls geloescht.
+                    Alle zugehörigen Werte werden ebenfalls gelöscht.
                   </p>
                 )}
               </div>
@@ -537,7 +537,7 @@ export default function PlanStructureManager({
                     Speichern...
                   </span>
                 ) : modalType === "deleteCategory" || modalType === "deleteLine" ? (
-                  "Loeschen"
+                  "Löschen"
                 ) : (
                   "Speichern"
                 )}
@@ -652,7 +652,7 @@ function CategoryItem({
           <button
             onClick={onDelete}
             className="p-1.5 hover:bg-white/50 rounded transition-colors"
-            title="Loeschen"
+            title="Löschen"
           >
             <svg
               className="w-4 h-4 text-red-500"
@@ -712,7 +712,7 @@ function CategoryItem({
                 <button
                   onClick={() => onDeleteLine(line)}
                   className="p-1 hover:bg-gray-100 rounded transition-colors"
-                  title="Loeschen"
+                  title="Löschen"
                 >
                   <svg
                     className="w-3.5 h-3.5 text-red-500"

@@ -8,10 +8,10 @@ interface DashboardNavProps {
 }
 
 const navItems = [
-  { href: "", label: "Uebersicht", icon: "chart" },
+  { href: "", label: "Übersicht", icon: "chart" },
   { href: "/revenue", label: "Einnahmen", icon: "money" },
   { href: "/security", label: "Sicherungsrechte", icon: "shield" },
-  { href: "/estate", label: "Masseuebersicht", icon: "folder" },
+  { href: "/estate", label: "Masseübersicht", icon: "folder" },
   { href: "/compare", label: "Vergleich", icon: "compare" },
 ];
 

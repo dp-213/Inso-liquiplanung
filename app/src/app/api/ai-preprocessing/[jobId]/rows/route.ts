@@ -121,7 +121,7 @@ export async function POST(
 
     if (!["REVIEW", "CORRECTION"].includes(job.status)) {
       return NextResponse.json(
-        { error: "Vorgang ist nicht im Pruefungs-Status" },
+        { error: "Vorgang ist nicht im Prüfungs-Status" },
         { status: 400 }
       );
     }

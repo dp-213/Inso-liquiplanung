@@ -94,7 +94,7 @@ export default function AiPreprocessingJobPage() {
   }, [fetchJob, job?.status]);
 
   const handleDelete = async () => {
-    if (!confirm("Sind Sie sicher, dass Sie diesen Vorgang loeschen moechten?")) {
+    if (!confirm("Sind Sie sicher, dass Sie diesen Vorgang löschen moechten?")) {
       return;
     }
 
@@ -108,10 +108,10 @@ export default function AiPreprocessingJobPage() {
         router.push("/admin/ai-preprocessing");
       } else {
         const data = await res.json();
-        setError(data.error || "Fehler beim Loeschen");
+        setError(data.error || "Fehler beim Löschen");
       }
     } catch (err) {
-      setError("Fehler beim Loeschen");
+      setError("Fehler beim Löschen");
     } finally {
       setDeleting(false);
     }
@@ -188,7 +188,7 @@ export default function AiPreprocessingJobPage() {
             href="/admin/ai-preprocessing"
             className="text-[var(--primary)] hover:underline mt-2 inline-block"
           >
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         </div>
       </div>
@@ -300,7 +300,7 @@ export default function AiPreprocessingJobPage() {
                 href={`/admin/ai-preprocessing/${jobId}/review`}
                 className="btn-primary"
               >
-                Zur Pruefung
+                Zur Prüfung
               </Link>
             )}
             {job.status === "APPROVED" && (
@@ -308,7 +308,7 @@ export default function AiPreprocessingJobPage() {
                 href={`/admin/ai-preprocessing/${jobId}/commit`}
                 className="btn-primary"
               >
-                Daten uebernehmen
+                Daten übernehmen
               </Link>
             )}
             {job.status !== "COMMITTED" && (
@@ -317,7 +317,7 @@ export default function AiPreprocessingJobPage() {
                 disabled={deleting}
                 className="btn-secondary text-red-600 border-red-200 hover:bg-red-50"
               >
-                {deleting ? "Wird geloescht..." : "Loeschen"}
+                {deleting ? "Wird gelöscht..." : "Löschen"}
               </button>
             )}
           </div>

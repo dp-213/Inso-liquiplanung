@@ -126,8 +126,8 @@ function NewCaseContent() {
       {customers.length === 0 ? (
         <div className="admin-card p-8 text-center">
           <p className="text-[var(--muted)] mb-4">
-            Sie muessen zuerst einen Kunden erstellen, bevor Sie einen Fall
-            anlegen koennen.
+            Sie müssen zuerst einen Kunden erstellen, bevor Sie einen Fall
+            anlegen können.
           </p>
           <Link href="/admin/customers" className="btn-primary">
             Kunde erstellen
@@ -249,7 +249,7 @@ function NewCaseContent() {
                 htmlFor="openingDate"
                 className="block text-sm font-medium text-[var(--foreground)] mb-2"
               >
-                Eroeffnungsdatum
+                Eröffnungsdatum
               </label>
               <input
                 type="date"
@@ -275,8 +275,8 @@ function NewCaseContent() {
                 onChange={handleChange}
                 className="input-field"
               >
-                <option value="PRELIMINARY">Vorlaeufig</option>
-                <option value="OPENED">Eroeffnet</option>
+                <option value="PRELIMINARY">Vorläufig</option>
+                <option value="OPENED">Eröffnet</option>
                 <option value="CLOSED">Geschlossen</option>
               </select>
             </div>
@@ -329,7 +329,7 @@ function NewCaseContent() {
               </div>
               {additionalCustomerIds.length > 0 && (
                 <p className="text-xs text-[var(--primary)] mt-2">
-                  {additionalCustomerIds.length} zusaetzliche(r) Kunde(n) ausgewaehlt
+                  {additionalCustomerIds.length} zusaetzliche(r) Kunde(n) ausgewählt
                 </p>
               )}
             </div>

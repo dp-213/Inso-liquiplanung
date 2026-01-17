@@ -120,7 +120,7 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting line:", error);
     return NextResponse.json(
-      { error: "Fehler beim Loeschen der Zeile" },
+      { error: "Fehler beim Löschen der Zeile" },
       { status: 500 }
     );
   }

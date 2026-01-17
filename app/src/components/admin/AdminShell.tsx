@@ -22,13 +22,13 @@ interface NavSection {
 
 const navigation: NavSection[] = [
   {
-    items: [{ name: "Uebersicht", href: "/admin", icon: "chart" }],
+    items: [{ name: "Übersicht", href: "/admin", icon: "chart" }],
   },
   {
     label: "VERWALTUNG",
     items: [
       { name: "Kunden", href: "/admin/customers", icon: "users" },
-      { name: "Faelle", href: "/admin/cases", icon: "briefcase" },
+      { name: "Fälle", href: "/admin/cases", icon: "briefcase" },
     ],
   },
 ];

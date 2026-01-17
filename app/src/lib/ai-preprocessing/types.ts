@@ -27,11 +27,11 @@ export const DOCUMENT_TYPES = {
 export type DocumentType = typeof DOCUMENT_TYPES[keyof typeof DOCUMENT_TYPES];
 
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
-  LIQUIDITAETSPLANUNG: 'Liquiditaetsplanung',
+  LIQUIDITAETSPLANUNG: 'Liquiditätsplanung',
   GUV_PL: 'GuV / Gewinn- und Verlustrechnung',
   BWA: 'Betriebswirtschaftliche Auswertung (BWA)',
   SUSA: 'Summen- und Saldenliste (SuSa)',
-  ZAHLUNGSTERMINE: 'Zahlungsterminuebersicht (KV/HZV)',
+  ZAHLUNGSTERMINE: 'Zahlungsterminübersicht (KV/HZV)',
   KONTOAUSZUG: 'Kontoauszug / Banktransaktionen',
   GEMISCHTES_FINANZDOKUMENT: 'Gemischtes Finanzdokument',
   UNBEKANNT: 'Dokumenttyp nicht erkannt',
@@ -44,7 +44,7 @@ export const DOCUMENT_TYPE_DESCRIPTIONS: Record<DocumentType, string> = {
   SUSA: 'Kontensalden nach Kontonummer - wird nach Kontoart klassifiziert',
   ZAHLUNGSTERMINE: 'Kalenderartige Aufstellung von Zahlungsterminen (KV, HZV, Mieten)',
   KONTOAUSZUG: 'Einzeltransaktionen mit Datum und Betrag - direkte IST-Werte',
-  GEMISCHTES_FINANZDOKUMENT: 'Dokument mit verschiedenen Finanzdaten - manuelle Pruefung empfohlen',
+  GEMISCHTES_FINANZDOKUMENT: 'Dokument mit verschiedenen Finanzdaten - manuelle Prüfung empfohlen',
   UNBEKANNT: 'Dokumenttyp konnte nicht automatisch erkannt werden',
 };
 
@@ -75,7 +75,7 @@ export const DOCUMENT_TYPE_INTERPRETATION: Record<DocumentType, {
   BWA: {
     usesDirectCashflow: false,
     requiresConversion: true,
-    conversionNote: 'Aus BWA abgeleitet - Zeitverzoegerung beruecksichtigt',
+    conversionNote: 'Aus BWA abgeleitet - Zeitverzögerung beruecksichtigt',
     timeGranularity: 'monthly',
     valueNature: 'IST',
   },
@@ -103,7 +103,7 @@ export const DOCUMENT_TYPE_INTERPRETATION: Record<DocumentType, {
   GEMISCHTES_FINANZDOKUMENT: {
     usesDirectCashflow: false,
     requiresConversion: true,
-    conversionNote: 'Gemischte Daten - individuelle Pruefung jeder Position',
+    conversionNote: 'Gemischte Daten - individuelle Prüfung jeder Position',
     timeGranularity: 'unknown',
     valueNature: 'mixed',
   },
@@ -135,7 +135,7 @@ export type AiJobStatus = typeof AI_JOB_STATUS[keyof typeof AI_JOB_STATUS];
 export const AI_JOB_STATUS_LABELS: Record<AiJobStatus, string> = {
   CREATED: 'Erstellt',
   PROCESSING: 'KI-Verarbeitung',
-  REVIEW: 'Zur Pruefung',
+  REVIEW: 'Zur Prüfung',
   CORRECTION: 'Korrektur',
   APPROVED: 'Freigegeben',
   REJECTED: 'Abgelehnt',
@@ -177,7 +177,7 @@ export const AI_ROW_STATUS = {
 export type AiRowStatus = typeof AI_ROW_STATUS[keyof typeof AI_ROW_STATUS];
 
 export const AI_ROW_STATUS_LABELS: Record<AiRowStatus, string> = {
-  PENDING: 'Zu pruefen',
+  PENDING: 'Zu prüfen',
   APPROVED: 'Genehmigt',
   REJECTED: 'Abgelehnt',
   MODIFIED: 'Korrigiert',

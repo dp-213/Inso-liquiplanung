@@ -45,7 +45,7 @@ export default function KPICards({
             </svg>
           </div>
         </div>
-        <p className="mt-2 sm:mt-3 text-xs text-[var(--muted)]">Eroeffnungssaldo Planungszeitraum</p>
+        <p className="mt-2 sm:mt-3 text-xs text-[var(--muted)]">Eröffnungssaldo Planungszeitraum</p>
       </div>
 
       {/* Minimum Cash */}

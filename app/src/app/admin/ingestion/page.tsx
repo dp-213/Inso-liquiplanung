@@ -137,7 +137,7 @@ export default function IngestionCenterPage() {
 
   const handleUpload = async () => {
     if (!selectedFile || !selectedCaseId) {
-      setError("Bitte Fall und Datei auswaehlen");
+      setError("Bitte Fall und Datei auswählen");
       return;
     }
 
@@ -308,7 +308,7 @@ export default function IngestionCenterPage() {
               Beispieldateien und Datenanforderungen
             </h3>
             <p className="text-sm text-blue-700 mt-1">
-              Laden Sie Beispieldateien herunter, um zu sehen, wie Ihre Daten strukturiert sein muessen.
+              Laden Sie Beispieldateien herunter, um zu sehen, wie Ihre Daten strukturiert sein müssen.
               Bei unstrukturierten Daten nutzen Sie die <Link href="/admin/ai-preprocessing" className="underline hover:no-underline font-medium">KI-Aufbereitung</Link>.
             </p>
             <div className="flex flex-wrap items-center gap-3 mt-3">
@@ -367,7 +367,7 @@ export default function IngestionCenterPage() {
               <h4 className="font-medium text-red-800">Fehler beim Import</h4>
               <p className="text-red-700 mt-1">{error}</p>
               <p className="text-red-600 text-sm mt-2">
-                Bitte ueberpruefen Sie die Datei und versuchen Sie es erneut. Bei anhaltenden Problemen wenden Sie sich an den Support.
+                Bitte ueberprüfen Sie die Datei und versuchen Sie es erneut. Bei anhaltenden Problemen wenden Sie sich an den Support.
               </p>
             </div>
             <button

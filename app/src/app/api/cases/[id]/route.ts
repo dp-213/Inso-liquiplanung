@@ -142,7 +142,7 @@ export async function DELETE(
       // Require confirmation for hard delete
       if (confirmDelete !== "PERMANENTLY_DELETE") {
         return NextResponse.json(
-          { error: "Bestaetigung erforderlich: confirm=PERMANENTLY_DELETE" },
+          { error: "Bestätigung erforderlich: confirm=PERMANENTLY_DELETE" },
           { status: 400 }
         );
       }
@@ -226,7 +226,7 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting case:", error);
     return NextResponse.json(
-      { error: "Fehler beim Loeschen des Falls" },
+      { error: "Fehler beim Löschen des Falls" },
       { status: 500 }
     );
   }

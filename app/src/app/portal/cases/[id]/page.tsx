@@ -101,7 +101,7 @@ export default function CustomerCaseDashboard() {
       <div className="space-y-6">
         <div className="flex items-center text-sm text-[var(--muted)]">
           <Link href="/portal" className="hover:text-[var(--primary)]">
-            Meine Faelle
+            Meine Fälle
           </Link>
           <svg
             className="w-4 h-4 mx-2"
@@ -121,7 +121,7 @@ export default function CustomerCaseDashboard() {
         <div className="admin-card p-8 text-center">
           <div className="w-12 h-12 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="mt-4 text-[var(--secondary)]">
-            Liquiditaetsplan wird geladen...
+            Liquiditätsplan wird geladen...
           </p>
         </div>
       </div>
@@ -133,7 +133,7 @@ export default function CustomerCaseDashboard() {
       <div className="space-y-6">
         <div className="flex items-center text-sm text-[var(--muted)]">
           <Link href="/portal" className="hover:text-[var(--primary)]">
-            Meine Faelle
+            Meine Fälle
           </Link>
           <svg
             className="w-4 h-4 mx-2"
@@ -171,7 +171,7 @@ export default function CustomerCaseDashboard() {
           </h1>
           <p className="text-[var(--secondary)] mb-4">{error}</p>
           <Link href="/portal" className="btn-primary">
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         </div>
       </div>
@@ -225,9 +225,9 @@ export default function CustomerCaseDashboard() {
   const getStatusLabel = (status: string): string => {
     switch (status) {
       case "PRELIMINARY":
-        return "Vorlaeufiges Verfahren";
+        return "Vorläufiges Verfahren";
       case "OPENED":
-        return "Eroeffnetes Verfahren";
+        return "Eröffnetes Verfahren";
       case "CLOSED":
         return "Geschlossen";
       default:
@@ -275,7 +275,7 @@ export default function CustomerCaseDashboard() {
       {/* Breadcrumb */}
       <div className="flex items-center text-sm text-[var(--muted)]">
         <Link href="/portal" className="hover:text-[var(--primary)]">
-          Meine Faelle
+          Meine Fälle
         </Link>
         <svg
           className="w-4 h-4 mx-2"

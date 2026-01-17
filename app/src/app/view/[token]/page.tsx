@@ -78,7 +78,7 @@ const PAYMENT_SOURCES = [
 // Demo security data
 const DEMO_BANK_ACCOUNTS = [
   { id: "1", accountName: "Geschaeftskonto", bankName: "Sparkasse", balance: BigInt(5000000), securityHolder: "Globalzession Bank", status: "gesperrt" },
-  { id: "2", accountName: "Praxiskonto", bankName: "VR-Bank", balance: BigInt(1200000), securityHolder: null, status: "verfuegbar" },
+  { id: "2", accountName: "Praxiskonto", bankName: "VR-Bank", balance: BigInt(1200000), securityHolder: null, status: "verfügbar" },
 ];
 
 const DEMO_SECURITY_RIGHTS = [
@@ -124,7 +124,7 @@ export default function ExternalCaseView() {
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-[var(--secondary)]">Liquiditaetsplan wird geladen...</p>
+          <p className="mt-4 text-[var(--secondary)]">Liquiditätsplan wird geladen...</p>
         </div>
       </div>
     );
@@ -183,8 +183,8 @@ export default function ExternalCaseView() {
 
   const getStatusLabel = (status: string): string => {
     switch (status) {
-      case "PRELIMINARY": return "Vorlaeufiges Verfahren";
-      case "OPENED": return "Eroeffnetes Verfahren";
+      case "PRELIMINARY": return "Vorläufiges Verfahren";
+      case "OPENED": return "Eröffnetes Verfahren";
       case "CLOSED": return "Geschlossen";
       default: return status;
     }
@@ -238,7 +238,7 @@ export default function ExternalCaseView() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "verfuegbar": return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Verfuegbar</span>;
+      case "verfügbar": return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Verfügbar</span>;
       case "gesperrt": return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Gesperrt</span>;
       case "offen": return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Offen</span>;
       case "vereinbarung": return <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">In Vereinbarung</span>;
@@ -375,8 +375,8 @@ export default function ExternalCaseView() {
                   <div className="text-2xl font-bold text-[var(--foreground)]">{formatCurrency(DEMO_BANK_ACCOUNTS.reduce((s, a) => s + a.balance, BigInt(0)))}</div>
                 </div>
                 <div className="admin-card p-4">
-                  <div className="text-sm text-[var(--secondary)]">Davon verfuegbar</div>
-                  <div className="text-2xl font-bold text-green-600">{formatCurrency(DEMO_BANK_ACCOUNTS.filter((a) => a.status === "verfuegbar").reduce((s, a) => s + a.balance, BigInt(0)))}</div>
+                  <div className="text-sm text-[var(--secondary)]">Davon verfügbar</div>
+                  <div className="text-2xl font-bold text-green-600">{formatCurrency(DEMO_BANK_ACCOUNTS.filter((a) => a.status === "verfügbar").reduce((s, a) => s + a.balance, BigInt(0)))}</div>
                 </div>
                 <div className="admin-card p-4">
                   <div className="text-sm text-[var(--secondary)]">Sicherungswerte</div>
@@ -385,7 +385,7 @@ export default function ExternalCaseView() {
               </div>
 
               <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Bankkonto-Uebersicht</h2>
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Bankkonto-Übersicht</h2>
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-[var(--border)]">
@@ -484,7 +484,7 @@ export default function ExternalCaseView() {
                     <div className="w-3 h-3 rounded-full bg-amber-500" />
                     <h2 className="text-lg font-semibold text-[var(--foreground)]">Altmasse</h2>
                   </div>
-                  <p className="text-sm text-[var(--secondary)] mb-4">Vor Insolvenzeroeffnung entstanden</p>
+                  <p className="text-sm text-[var(--secondary)] mb-4">Vor Insolvenzeröffnung entstanden</p>
                   <div className="space-y-2">
                     {altmasseInflows.map((cat) => (
                       <div key={cat.categoryName} className="flex justify-between py-2 px-3 bg-green-50 rounded">
@@ -509,7 +509,7 @@ export default function ExternalCaseView() {
                     <div className="w-3 h-3 rounded-full bg-blue-500" />
                     <h2 className="text-lg font-semibold text-[var(--foreground)]">Neumasse</h2>
                   </div>
-                  <p className="text-sm text-[var(--secondary)] mb-4">Nach Insolvenzeroeffnung entstanden</p>
+                  <p className="text-sm text-[var(--secondary)] mb-4">Nach Insolvenzeröffnung entstanden</p>
                   <div className="space-y-2">
                     {neumasseInflows.map((cat) => (
                       <div key={cat.categoryName} className="flex justify-between py-2 px-3 bg-green-50 rounded">
@@ -538,7 +538,7 @@ export default function ExternalCaseView() {
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">IST vs PLAN Vergleich</h2>
                 <p className="text-sm text-[var(--secondary)] mb-4">
-                  Der Vergleich zwischen geplanten und tatsaechlichen Werten wird verfuegbar sein, sobald IST-Daten erfasst werden.
+                  Der Vergleich zwischen geplanten und tatsächlichen Werten wird verfügbar sein, sobald IST-Daten erfasst werden.
                 </p>
                 <div className="p-8 bg-gray-50 rounded-lg text-center">
                   <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -111,7 +111,7 @@ export async function DELETE(
     const hasValues = category.lines.some((line) => line.periodValues.length > 0);
     if (hasValues) {
       return NextResponse.json(
-        { error: "Kategorie kann nicht geloescht werden - enthaelt noch Werte. Loeschen Sie zuerst die Zeilen." },
+        { error: "Kategorie kann nicht gelöscht werden - enthält noch Werte. Löschen Sie zuerst die Zeilen." },
         { status: 400 }
       );
     }
@@ -130,7 +130,7 @@ export async function DELETE(
   } catch (error) {
     console.error("Error deleting category:", error);
     return NextResponse.json(
-      { error: "Fehler beim Loeschen der Kategorie" },
+      { error: "Fehler beim Löschen der Kategorie" },
       { status: 500 }
     );
   }

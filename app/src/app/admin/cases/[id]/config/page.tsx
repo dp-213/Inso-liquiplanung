@@ -114,7 +114,7 @@ export default function CaseConfigPage({
 
   // Reset to defaults
   const resetToDefaults = async () => {
-    if (!confirm("Konfiguration auf Standardwerte zuruecksetzen?")) return;
+    if (!confirm("Konfiguration auf Standardwerte zurücksetzen?")) return;
 
     try {
       setSaving(true);
@@ -131,7 +131,7 @@ export default function CaseConfigPage({
       const data = await res.json();
       setConfig(data.config);
       setMetadata(data.metadata);
-      setSuccessMessage("Konfiguration zurueckgesetzt");
+      setSuccessMessage("Konfiguration zurückgesetzt");
 
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
@@ -245,7 +245,7 @@ export default function CaseConfigPage({
       <div className="admin-card p-8 text-center">
         <p className="text-[var(--danger)]">{error}</p>
         <Link href="/admin/cases" className="btn-secondary mt-4 inline-block">
-          Zurueck zur Uebersicht
+          Zurück zur Übersicht
         </Link>
       </div>
     );
@@ -258,7 +258,7 @@ export default function CaseConfigPage({
       {/* Breadcrumb */}
       <div className="flex items-center text-sm text-[var(--muted)]">
         <Link href="/admin/cases" className="hover:text-[var(--primary)]">
-          Faelle
+          Fälle
         </Link>
         <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -284,7 +284,7 @@ export default function CaseConfigPage({
         </div>
         <div className="flex gap-2">
           <button onClick={resetToDefaults} className="btn-secondary" disabled={saving}>
-            Zuruecksetzen
+            Zurücksetzen
           </button>
           <Link href={`/admin/cases/${id}/dashboard`} className="btn-secondary">
             Vorschau
@@ -323,7 +323,7 @@ export default function CaseConfigPage({
                 {metadata.codeConfig && ` (${metadata.codeConfig.displayName} v${metadata.codeConfig.version})`}.
                 {metadata.codeConfig?.replaceUIConfig
                   ? " Der Code ersetzt die UI-Konfiguration vollstaendig."
-                  : " Aenderungen hier werden mit dem Code zusammengefuehrt."}
+                  : " Änderungen hier werden mit dem Code zusammengeführt."}
               </p>
             </div>
           </div>
@@ -931,14 +931,14 @@ export default function CaseConfigPage({
 
             <div>
               <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">
-                Fusszeile
+                Fußzeile
               </h3>
               <textarea
                 value={config.styling.footerText || ""}
                 onChange={(e) =>
                   updateConfig("styling", { ...config.styling, footerText: e.target.value })
                 }
-                placeholder="Optionaler Text fuer die Fusszeile..."
+                placeholder="Optionaler Text für die Fußzeile..."
                 rows={2}
                 className="w-full px-3 py-2 border border-[var(--border)] rounded-md"
               />
@@ -974,7 +974,7 @@ export default function CaseConfigPage({
                         },
                       })
                     }
-                    placeholder="Standard: Liquiditaetsplan - [Schuldner]"
+                    placeholder="Standard: Liquiditätsplan - [Schuldner]"
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md"
                   />
                 </div>
@@ -997,7 +997,7 @@ export default function CaseConfigPage({
                         },
                       })
                     }
-                    placeholder="Standard: Liquiditaetsplan - [Schuldner]"
+                    placeholder="Standard: Liquiditätsplan - [Schuldner]"
                     className="w-full px-3 py-2 border border-[var(--border)] rounded-md"
                   />
                 </div>
@@ -1014,11 +1014,11 @@ export default function CaseConfigPage({
                   <span className="font-medium">Schema-Version:</span> {config.schemaVersion}
                 </p>
                 <p>
-                  <span className="font-medium">Letzte Aenderung:</span>{" "}
+                  <span className="font-medium">Letzte Änderung:</span>{" "}
                   {new Date(config.metadata.lastUpdated).toLocaleString("de-DE")}
                 </p>
                 <p>
-                  <span className="font-medium">Geaendert von:</span> {config.metadata.lastUpdatedBy}
+                  <span className="font-medium">Geändert von:</span> {config.metadata.lastUpdatedBy}
                 </p>
                 {metadata?.configSource && (
                   <p>
@@ -1029,7 +1029,7 @@ export default function CaseConfigPage({
                       ? "Datenbank"
                       : metadata.configSource === "code"
                       ? "Code"
-                      : "Zusammengefuehrt"}
+                      : "Zusammengeführt"}
                   </p>
                 )}
               </div>

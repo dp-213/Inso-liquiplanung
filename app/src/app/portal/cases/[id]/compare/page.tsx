@@ -97,7 +97,7 @@ export default function CompareViewPage() {
       <div className="space-y-6">
         <div className="flex items-center text-sm text-[var(--muted)]">
           <Link href="/portal" className="hover:text-[var(--primary)]">
-            Meine Faelle
+            Meine Fälle
           </Link>
           <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -117,9 +117,9 @@ export default function CompareViewPage() {
       <div className="space-y-6">
         <div className="admin-card p-8 text-center">
           <h1 className="text-xl font-bold text-[var(--foreground)] mb-2">Fehler</h1>
-          <p className="text-[var(--secondary)] mb-4">{error || "Daten nicht verfuegbar"}</p>
+          <p className="text-[var(--secondary)] mb-4">{error || "Daten nicht verfügbar"}</p>
           <Link href="/portal" className="btn-primary">
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         </div>
       </div>
@@ -163,7 +163,7 @@ export default function CompareViewPage() {
       {/* Breadcrumb */}
       <div className="flex items-center text-sm text-[var(--muted)]">
         <Link href="/portal" className="hover:text-[var(--primary)]">
-          Meine Faelle
+          Meine Fälle
         </Link>
         <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -301,7 +301,7 @@ export default function CompareViewPage() {
                 <h3 className="text-sm font-medium text-blue-800">Hinweis</h3>
                 <p className="text-sm text-blue-700 mt-1">
                   Die IST-Daten in dieser Demo sind simuliert. In der produktiven Umgebung werden
-                  tatsaechliche Ist-Werte aus dem Buchhaltungssystem oder manuellen Eingaben importiert.
+                  tatsächliche Ist-Werte aus dem Buchhaltungssystem oder manuellen Eingaben importiert.
                 </p>
               </div>
             </div>
@@ -379,7 +379,7 @@ export default function CompareViewPage() {
                 <h3 className="text-sm font-medium text-amber-800">Versionshistorie</h3>
                 <p className="text-sm text-amber-700 mt-1">
                   Die Versionierung ermoeglicht es, aeltere Planstaende mit der aktuellen Version
-                  zu vergleichen. Bei jeder wesentlichen Aenderung der Planung wird automatisch
+                  zu vergleichen. Bei jeder wesentlichen Änderung der Planung wird automatisch
                   eine neue Version erstellt.
                 </p>
               </div>

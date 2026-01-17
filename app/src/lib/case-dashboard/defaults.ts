@@ -432,7 +432,7 @@ export const KPI_TYPE_LABELS: Record<KPIType, string> = {
   closing_balance: 'Endsaldo',
   total_inflows: 'Gesamteinnahmen',
   total_outflows: 'Gesamtausgaben',
-  net_change: 'Nettoveraenderung',
+  net_change: 'Nettoveränderung',
   min_balance: 'Minimalsaldo',
   min_balance_week: 'Woche mit Minimalsaldo',
   negative_weeks_count: 'Wochen mit negativem Saldo',

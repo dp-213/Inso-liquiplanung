@@ -199,7 +199,7 @@ export async function POST(
   } catch (error) {
     console.error("Error committing data:", error);
     return NextResponse.json(
-      { error: "Fehler beim Uebernehmen der Daten" },
+      { error: "Fehler beim Übernehmen der Daten" },
       { status: 500 }
     );
   }

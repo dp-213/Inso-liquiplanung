@@ -26,16 +26,16 @@ export const INFLOW_CATEGORY_LABELS: Record<InflowCategory, string> = {
   KV_ZAHLUNGEN: 'KV-Zahlungen',
   HZV_ZAHLUNGEN: 'HZV-Zahlungen',
   SONSTIGE_ERLOESE: 'Sonstige Erloese',
-  EINMALIGE_SONDERZUFLUESSE: 'Einmalige Sonderzufluesse',
+  EINMALIGE_SONDERZUFLUESSE: 'Einmalige Sonderzuflüsse',
 };
 
 export const INFLOW_CATEGORY_DESCRIPTIONS: Record<InflowCategory, string> = {
-  ALTFORDERUNGEN: 'Forderungen, die vor Eroeffnung des Insolvenzverfahrens entstanden sind',
-  NEUFORDERUNGEN: 'Forderungen, die nach Eroeffnung des Insolvenzverfahrens entstanden sind',
+  ALTFORDERUNGEN: 'Forderungen, die vor Eröffnung des Insolvenzverfahrens entstanden sind',
+  NEUFORDERUNGEN: 'Forderungen, die nach Eröffnung des Insolvenzverfahrens entstanden sind',
   KV_ZAHLUNGEN: 'Zahlungen aus Kaufvertraegen (Kundenanzahlungen, Restzahlungen)',
   HZV_ZAHLUNGEN: 'Zahlungen aus Handwerkervertraegen und Werkleistungen',
-  SONSTIGE_ERLOESE: 'Andere laufende Einnahmen (z.B. Mietertraege, Lizenzgebuehren)',
-  EINMALIGE_SONDERZUFLUESSE: 'Einmalige ausserordentliche Zufluesse (z.B. Verkaeufe, Rueckerstattungen)',
+  SONSTIGE_ERLOESE: 'Andere laufende Einnahmen (z.B. Mietertraege, Lizenzgebühren)',
+  EINMALIGE_SONDERZUFLUESSE: 'Einmalige außerordentliche Zuflüsse (z.B. Verkäufe, Rückerstattungen)',
 };
 
 // =============================================================================
@@ -68,13 +68,13 @@ export const OUTFLOW_CATEGORY_LABELS: Record<OutflowCategory, string> = {
 
 export const OUTFLOW_CATEGORY_DESCRIPTIONS: Record<OutflowCategory, string> = {
   PERSONALKOSTEN: 'Loehne, Gehaelter, Abfindungen, Insolvenzgeld-Vorfinanzierung',
-  MIETE_LEASING: 'Mietaufwendungen, Leasing-Raten fuer Fahrzeuge/Maschinen',
-  LIEFERANTEN: 'Zahlungen an Lieferanten fuer Waren und Dienstleistungen',
+  MIETE_LEASING: 'Mietaufwendungen, Leasing-Raten für Fahrzeuge/Maschinen',
+  LIEFERANTEN: 'Zahlungen an Lieferanten für Waren und Dienstleistungen',
   SOZIALABGABEN_STEUERN: 'Sozialversicherungsbeitraege, Lohnsteuer, Umsatzsteuer',
   MASSEKOSTEN: 'Kosten des Insolvenzverfahrens (Verwalterverguetung, Gerichtskosten)',
-  BANK_SICHERUNGSRECHTE: 'Bankgebuehren, Sicherungsuebertragungen, Kreditrueckfuehrung',
+  BANK_SICHERUNGSRECHTE: 'Bankgebühren, Sicherungsübertragungen, Kreditrückführung',
   SONSTIGE_LAUFENDE_KOSTEN: 'Versicherungen, Energie, Kommunikation, sonstige Betriebskosten',
-  EINMALIGE_SONDERABFLUESSE: 'Einmalige ausserordentliche Abfluesse (z.B. Vergleichszahlungen)',
+  EINMALIGE_SONDERABFLUESSE: 'Einmalige außerordentliche Abfluesse (z.B. Vergleichszahlungen)',
 };
 
 // =============================================================================
@@ -96,8 +96,8 @@ export const ESTATE_TYPE_LABELS: Record<EstateType, string> = {
 };
 
 export const ESTATE_TYPE_DESCRIPTIONS: Record<EstateType, string> = {
-  ALTMASSE: 'Vermoegen, das bei Verfahrenseroeffnung vorhanden war',
-  NEUMASSE: 'Vermoegen, das nach Verfahrenseroeffnung erworben wurde',
+  ALTMASSE: 'Vermögen, das bei Verfahrenseröffnung vorhanden war',
+  NEUMASSE: 'Vermögen, das nach Verfahrenseröffnung erworben wurde',
   NICHT_ZUORDENBAR: 'Zuordnung zur Masse kann nicht eindeutig bestimmt werden',
 };
 
@@ -114,7 +114,7 @@ export const VALUE_TYPES = {
 export type ValueType = typeof VALUE_TYPES[keyof typeof VALUE_TYPES];
 
 export const VALUE_TYPE_LABELS: Record<ValueType, string> = {
-  IST: 'IST-Wert (tatsaechlich)',
+  IST: 'IST-Wert (tatsächlich)',
   PLAN: 'PLAN-Wert (geplant)',
   UNSICHER: 'Unsicher (nicht eindeutig)',
 };
@@ -411,12 +411,12 @@ export const AI_INSOLVENCY_CONTEXT = `
 Du analysierst Finanzdaten im Kontext eines deutschen Insolvenzverfahrens.
 
 PFLICHT-KATEGORIEN FUER EINZAHLUNGEN:
-1. ALTFORDERUNGEN - Forderungen vor Verfahrenseroeffnung (Debitoren aus Altgeschaeft)
-2. NEUFORDERUNGEN - Forderungen nach Verfahrenseroeffnung (laufende Umsaetze)
+1. ALTFORDERUNGEN - Forderungen vor Verfahrenseröffnung (Debitoren aus Altgeschäft)
+2. NEUFORDERUNGEN - Forderungen nach Verfahrenseröffnung (laufende Umsätze)
 3. KV_ZAHLUNGEN - Zahlungen aus Kaufvertraegen
 4. HZV_ZAHLUNGEN - Zahlungen aus Handwerkervertraegen
 5. SONSTIGE_ERLOESE - Andere laufende Einnahmen
-6. EINMALIGE_SONDERZUFLUESSE - Einmalige ausserordentliche Zufluesse
+6. EINMALIGE_SONDERZUFLUESSE - Einmalige außerordentliche Zuflüsse
 
 PFLICHT-KATEGORIEN FUER AUSZAHLUNGEN:
 1. PERSONALKOSTEN - Loehne, Gehaelter, Abfindungen
@@ -424,13 +424,13 @@ PFLICHT-KATEGORIEN FUER AUSZAHLUNGEN:
 3. LIEFERANTEN - Lieferantenrechnungen
 4. SOZIALABGABEN_STEUERN - SV-Beitraege, Steuern
 5. MASSEKOSTEN - Verfahrenskosten
-6. BANK_SICHERUNGSRECHTE - Bankgebuehren, Kredite
+6. BANK_SICHERUNGSRECHTE - Bankgebühren, Kredite
 7. SONSTIGE_LAUFENDE_KOSTEN - Sonstige Betriebskosten
 8. EINMALIGE_SONDERABFLUESSE - Einmalige Sonderzahlungen
 
 ALTMASSE vs NEUMASSE:
-- ALTMASSE: Vermoegen bei Verfahrenseroeffnung vorhanden
-- NEUMASSE: Vermoegen nach Verfahrenseroeffnung erworben
+- ALTMASSE: Vermögen bei Verfahrenseröffnung vorhanden
+- NEUMASSE: Vermögen nach Verfahrenseröffnung erworben
 - Bei Unklarheit: "NICHT_ZUORDENBAR" mit Begruendung
 
 UNSICHERHEITS-MARKIERUNGEN (PFLICHT):
@@ -441,7 +441,7 @@ UNSICHERHEITS-MARKIERUNGEN (PFLICHT):
 
 REGELN:
 1. NIEMALS raten - bei Unsicherheit immer markieren
-2. IMMER begruenden, warum eine Kategorie gewaehlt wurde
+2. IMMER begruenden, warum eine Kategorie gewählt wurde
 3. Datum/Woche aus Kontext ableiten, nicht erfinden
 4. IST vs PLAN unterscheiden wenn moeglich
 5. Wiederkehrende Zahlungen erkennen und markieren

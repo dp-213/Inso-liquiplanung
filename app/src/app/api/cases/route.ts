@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Error fetching cases:", error);
     return NextResponse.json(
-      { error: "Fehler beim Laden der Faelle" },
+      { error: "Fehler beim Laden der Fälle" },
       { status: 500 }
     );
   }
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     if (!ownerId || !caseNumber || !debtorName || !courtName || !filingDate) {
       return NextResponse.json(
-        { error: "Alle Pflichtfelder muessen ausgefuellt werden" },
+        { error: "Alle Pflichtfelder müssen ausgefuellt werden" },
         { status: 400 }
       );
     }
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
         data: {
           caseId: newCase.id,
           name: "Hauptplan",
-          description: "Automatisch erstellter Liquiditaetsplan",
+          description: "Automatisch erstellter Liquiditätsplan",
           planStartDate,
           isActive: true,
           createdBy: session.username,

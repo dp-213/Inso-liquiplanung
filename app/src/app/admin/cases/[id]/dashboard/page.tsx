@@ -255,7 +255,7 @@ export default function CaseDashboardPage({
               Erneut versuchen
             </button>
             <Link href={`/admin/cases/${id}`} className="btn-secondary">
-              Zurueck zum Fall
+              Zurück zum Fall
             </Link>
           </div>
         </div>
@@ -266,7 +266,7 @@ export default function CaseDashboardPage({
   if (!config || !calculationData) {
     return (
       <div className="admin-card p-8 text-center">
-        <p className="text-[var(--muted)]">Keine Daten verfuegbar</p>
+        <p className="text-[var(--muted)]">Keine Daten verfügbar</p>
       </div>
     );
   }
@@ -285,7 +285,7 @@ export default function CaseDashboardPage({
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
         <div className="flex items-center text-sm text-[var(--muted)]">
           <Link href="/admin/cases" className="hover:text-[var(--primary)]">
-            Faelle
+            Fälle
           </Link>
           <svg
             className="w-4 h-4 mx-2"
@@ -439,7 +439,7 @@ export default function CaseDashboardPage({
                 ? "Gespeichert"
                 : metadata.configSource === "code"
                 ? "Code"
-                : "Zusammengefuehrt"}
+                : "Zusammengeführt"}
             </span>
           </span>
           {metadata.usesCustomCode && (
@@ -474,11 +474,11 @@ export default function CaseDashboardPage({
         <div className="admin-card p-6">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-[var(--foreground)]">
-              Liquiditaetsplan bearbeiten
+              Liquiditätsplan bearbeiten
             </h2>
             <div className="text-sm text-[var(--muted)]">
               Klicken Sie auf eine Zelle, um den Wert zu bearbeiten.
-              Aenderungen werden automatisch gespeichert.
+              Änderungen werden automatisch gespeichert.
             </div>
           </div>
           <EditableCategoryTable

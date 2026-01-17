@@ -93,8 +93,8 @@ export default async function AdminDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">Uebersicht</h1>
-        <p className="text-[var(--secondary)] mt-1">Liquiditaetsplanung fuer Insolvenzverfahren verwalten</p>
+        <h1 className="text-2xl font-bold text-[var(--foreground)]">Übersicht</h1>
+        <p className="text-[var(--secondary)] mt-1">Liquiditätsplanung für Insolvenzverfahren verwalten</p>
       </div>
 
       {dbError && (
@@ -104,7 +104,7 @@ export default async function AdminDashboard() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             <div>
-              <h3 className="text-sm font-medium text-yellow-800">Datenbank nicht verfuegbar</h3>
+              <h3 className="text-sm font-medium text-yellow-800">Datenbank nicht verfügbar</h3>
               <p className="text-sm text-yellow-700 mt-1">
                 Die Datenbank ist noch nicht eingerichtet.
               </p>
@@ -169,7 +169,7 @@ export default async function AdminDashboard() {
                 <span className="font-medium text-[var(--foreground)]">Fall anlegen</span>
               </div>
               <p className="text-xs text-[var(--secondary)] mb-3">
-                Legen Sie einen Insolvenzfall fuer einen Kunden an
+                Legen Sie einen Insolvenzfall für einen Kunden an
               </p>
               {hasCustomers && !hasCases && (
                 <Link href="/admin/cases/new" className="text-xs text-blue-600 hover:underline font-medium">
@@ -191,7 +191,7 @@ export default async function AdminDashboard() {
                 <span className="font-medium text-[var(--foreground)]">Zugriff</span>
               </div>
               <p className="text-xs text-[var(--secondary)] mb-3">
-                Teilen Sie Faelle mit weiteren Kunden (optional)
+                Teilen Sie Fälle mit weiteren Kunden (optional)
               </p>
               {hasCases && !hasAccessConfigured && cases[0] && (
                 <Link href={`/admin/cases/${cases[0].id}`} className="text-xs text-blue-600 hover:underline font-medium">
@@ -207,7 +207,7 @@ export default async function AdminDashboard() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span className="text-sm text-green-800 font-medium">
-                Einrichtung abgeschlossen! Ihre Kunden koennen sich nun unter /customer-login anmelden.
+                Einrichtung abgeschlossen! Ihre Kunden können sich nun unter /customer-login anmelden.
               </span>
             </div>
           )}
@@ -220,7 +220,7 @@ export default async function AdminDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-[var(--secondary)] uppercase tracking-wide">
-                Faelle
+                Fälle
               </div>
               <div className="mt-2 text-3xl font-bold text-[var(--foreground)]">
                 {totalCases}
@@ -281,7 +281,7 @@ export default async function AdminDashboard() {
             </div>
           </div>
           <div className="mt-1 text-sm text-[var(--muted)]">
-            Faelle mit geteiltem Zugang
+            Fälle mit geteiltem Zugang
           </div>
         </div>
 
@@ -302,7 +302,7 @@ export default async function AdminDashboard() {
             </div>
           </div>
           <div className="mt-1 text-sm text-[var(--muted)]">
-            Faelle mit aktivem Link
+            Fälle mit aktivem Link
           </div>
         </div>
       </div>
@@ -311,7 +311,7 @@ export default async function AdminDashboard() {
         {/* Recent Cases with Status */}
         <div className="admin-card">
           <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-[var(--foreground)]">Aktuelle Faelle</h2>
+            <h2 className="text-lg font-semibold text-[var(--foreground)]">Aktuelle Fälle</h2>
             <Link href="/admin/cases/new" className="text-sm text-[var(--primary)] hover:underline">
               + Neuer Fall
             </Link>
@@ -355,7 +355,7 @@ export default async function AdminDashboard() {
                 <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
-                <p className="text-[var(--muted)] mb-3">Noch keine Faelle vorhanden</p>
+                <p className="text-[var(--muted)] mb-3">Noch keine Fälle vorhanden</p>
                 {hasCustomers ? (
                   <Link href="/admin/cases/new" className="btn-primary text-sm">
                     Ersten Fall anlegen
@@ -394,7 +394,7 @@ export default async function AdminDashboard() {
                     </div>
                   </div>
                   <span className="text-sm text-[var(--muted)] bg-gray-100 px-2 py-1 rounded">
-                    {customer._count.ownedCases} {customer._count.ownedCases === 1 ? "Fall" : "Faelle"}
+                    {customer._count.ownedCases} {customer._count.ownedCases === 1 ? "Fall" : "Fälle"}
                   </span>
                 </div>
               </Link>
@@ -426,7 +426,7 @@ export default async function AdminDashboard() {
             <div className="flex-1">
               <h3 className="font-semibold text-[var(--foreground)]">Kundenportal</h3>
               <p className="text-sm text-[var(--secondary)] mt-1">
-                Ihre Kunden (Insolvenzverwalter) koennen sich unter folgender URL anmelden, um ihre Faelle einzusehen:
+                Ihre Kunden (Insolvenzverwalter) können sich unter folgender URL anmelden, um ihre Fälle einzusehen:
               </p>
               <div className="mt-3 flex items-center gap-3">
                 <code className="text-sm bg-white px-3 py-2 rounded border border-green-200 text-green-800">

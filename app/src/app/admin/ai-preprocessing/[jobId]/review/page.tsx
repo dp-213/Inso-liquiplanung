@@ -140,7 +140,7 @@ export default function BusinessLevelReviewPage() {
     if (!validationCategory) return;
 
     if (validationAction === "REJECT" && !rejectionReason.trim()) {
-      setError("Bitte geben Sie einen Grund fuer die Ablehnung an");
+      setError("Bitte geben Sie einen Grund für die Ablehnung an");
       return;
     }
 
@@ -183,7 +183,7 @@ export default function BusinessLevelReviewPage() {
     if (!businessView) return;
 
     if (businessView.pendingEntries > 0) {
-      setError("Es gibt noch offene Positionen zur Pruefung");
+      setError("Es gibt noch offene Positionen zur Prüfung");
       return;
     }
 
@@ -202,7 +202,7 @@ export default function BusinessLevelReviewPage() {
         throw new Error(data.error || "Fehler bei der Freigabe");
       }
 
-      setSuccessMessage("Vorgang freigegeben! Sie koennen die Daten nun uebernehmen.");
+      setSuccessMessage("Vorgang freigegeben! Sie können die Daten nun übernehmen.");
       router.push(`/admin/ai-preprocessing/${jobId}/commit`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler bei der Freigabe");
@@ -243,7 +243,7 @@ export default function BusinessLevelReviewPage() {
         <div className="admin-card p-8 text-center">
           <p className="text-[var(--danger)]">{error || "Aufbereitungsvorgang nicht gefunden"}</p>
           <Link href="/admin/ai-preprocessing" className="text-[var(--primary)] hover:underline mt-2 inline-block">
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         </div>
       </div>
@@ -260,7 +260,7 @@ export default function BusinessLevelReviewPage() {
               KI-Aufbereitung
             </Link>
             <span>/</span>
-            <span>Pruefung</span>
+            <span>Prüfung</span>
           </div>
           <h1 className="text-2xl font-semibold text-[var(--foreground)]">
             So versteht die KI Ihre Daten
@@ -289,10 +289,10 @@ export default function BusinessLevelReviewPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <div>
-            <h3 className="font-medium text-amber-800">Geschaeftliche Interpretation pruefen</h3>
+            <h3 className="font-medium text-amber-800">Geschaeftliche Interpretation prüfen</h3>
             <p className="text-sm text-amber-700 mt-1">
               Die KI hat die hochgeladenen Daten in insolvenzspezifische Kategorien eingeteilt.
-              Pruefen Sie jede Kategorie und bestaetigen oder korrigieren Sie die Zuordnung.
+              Prüfen Sie jede Kategorie und bestätigen oder korrigieren Sie die Zuordnung.
             </p>
           </div>
         </div>
@@ -516,11 +516,11 @@ export default function BusinessLevelReviewPage() {
 
         {/* Document Type Legend */}
         <div className="px-4 pb-4 border-t border-[var(--border)] mt-2 pt-3">
-          <h4 className="text-xs font-medium text-[var(--muted)] mb-2">Dokumenttyp-Erklaerung</h4>
+          <h4 className="text-xs font-medium text-[var(--muted)] mb-2">Dokumenttyp-Erklärung</h4>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
             <div className="flex items-center space-x-1">
               <span className="w-2 h-2 rounded-full bg-green-500"></span>
-              <span>Liquiditaetsplanung = direkt verwendbar</span>
+              <span>Liquiditätsplanung = direkt verwendbar</span>
             </div>
             <div className="flex items-center space-x-1">
               <span className="w-2 h-2 rounded-full bg-blue-500"></span>
@@ -532,7 +532,7 @@ export default function BusinessLevelReviewPage() {
             </div>
             <div className="flex items-center space-x-1">
               <span className="w-2 h-2 rounded-full bg-gray-500"></span>
-              <span>Andere = manuelle Pruefung</span>
+              <span>Andere = manuelle Prüfung</span>
             </div>
           </div>
         </div>
@@ -561,7 +561,7 @@ export default function BusinessLevelReviewPage() {
               <>
                 <div className="mb-4">
                   <label className="block text-sm font-medium mb-1">
-                    Grund fuer Ablehnung / Korrektur *
+                    Grund für Ablehnung / Korrektur *
                   </label>
                   <textarea
                     value={rejectionReason}
@@ -573,7 +573,7 @@ export default function BusinessLevelReviewPage() {
 
                 <div className="mb-4">
                   <label className="block text-sm font-medium mb-1">
-                    Richtige Kategorie (optional - fuer automatische Korrektur)
+                    Richtige Kategorie (optional - für automatische Korrektur)
                   </label>
                   <select
                     value={correctionCategory}
@@ -597,7 +597,7 @@ export default function BusinessLevelReviewPage() {
                     </optgroup>
                   </select>
                   <p className="text-xs text-[var(--muted)] mt-1">
-                    Wenn Sie eine Kategorie waehlen, werden alle Positionen zur erneuten Pruefung zurueckgesetzt
+                    Wenn Sie eine Kategorie wählen, werden alle Positionen zur erneuten Prüfung zurückgesetzt
                   </p>
                 </div>
               </>
@@ -865,7 +865,7 @@ function CategoryRow({
             </div>
           ) : (
             <div className="p-4 text-center text-[var(--secondary)] text-sm">
-              Keine Detaildaten verfuegbar
+              Keine Detaildaten verfügbar
             </div>
           )}
         </div>

@@ -164,7 +164,7 @@ export default function CaseResultsPage({
             {error || "Fall nicht gefunden"}
           </p>
           <Link href="/admin/cases" className="btn-secondary mt-4 inline-block">
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         </div>
       </div>
@@ -179,7 +179,7 @@ export default function CaseResultsPage({
       {/* Breadcrumb */}
       <div className="flex items-center text-sm text-[var(--muted)]">
         <Link href="/admin/cases" className="hover:text-[var(--primary)]">
-          Faelle
+          Fälle
         </Link>
         <svg
           className="w-4 h-4 mx-2"
@@ -213,14 +213,14 @@ export default function CaseResultsPage({
             d="M9 5l7 7-7 7"
           />
         </svg>
-        <span className="text-[var(--foreground)]">Liquiditaetsplan</span>
+        <span className="text-[var(--foreground)]">Liquiditätsplan</span>
       </div>
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-[var(--foreground)]">
-            Liquiditaetsplan
+            Liquiditätsplan
           </h1>
           <p className="text-[var(--secondary)] mt-1">
             {caseData.caseNumber} - {caseData.debtorName}
@@ -235,7 +235,7 @@ export default function CaseResultsPage({
             {calculating ? "Berechne..." : "Neu berechnen"}
           </button>
           <Link href={`/admin/cases/${id}`} className="btn-secondary">
-            Zurueck zum Fall
+            Zurück zum Fall
           </Link>
         </div>
       </div>
@@ -264,10 +264,10 @@ export default function CaseResultsPage({
             />
           </svg>
           <h3 className="text-lg font-medium text-[var(--foreground)] mb-2">
-            Kein Liquiditaetsplan vorhanden
+            Kein Liquiditätsplan vorhanden
           </h3>
           <p className="text-[var(--muted)] mb-4">
-            Importieren Sie zuerst Daten, um einen Liquiditaetsplan zu erstellen.
+            Importieren Sie zuerst Daten, um einen Liquiditätsplan zu erstellen.
           </p>
           <Link
             href={`/admin/cases/${id}/ingestion`}
@@ -397,7 +397,7 @@ export default function CaseResultsPage({
               <div className="admin-card">
                 <div className="px-6 py-4 border-b border-[var(--border)]">
                   <h2 className="text-lg font-semibold text-[var(--foreground)]">
-                    Woechentliche Uebersicht
+                    Woechentliche Übersicht
                   </h2>
                 </div>
                 <div className="overflow-x-auto">
@@ -468,7 +468,7 @@ export default function CaseResultsPage({
           {!calculation && !calculating && (
             <div className="admin-card p-8 text-center">
               <p className="text-[var(--muted)]">
-                Klicken Sie auf &quot;Neu berechnen&quot;, um den Liquiditaetsplan zu
+                Klicken Sie auf &quot;Neu berechnen&quot;, um den Liquiditätsplan zu
                 erstellen.
               </p>
             </div>
@@ -479,7 +479,7 @@ export default function CaseResultsPage({
             <div className="admin-card p-8 text-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)] mx-auto mb-3"></div>
               <p className="text-[var(--muted)]">
-                Liquiditaetsplan wird berechnet...
+                Liquiditätsplan wird berechnet...
               </p>
             </div>
           )}

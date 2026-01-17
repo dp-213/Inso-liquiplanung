@@ -84,7 +84,7 @@ export default function AiPreprocessingCommitPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Fehler beim Uebertragen");
+        throw new Error(data.error || "Fehler beim Übertragen");
       }
 
       setSuccessMessage(data.message);
@@ -96,7 +96,7 @@ export default function AiPreprocessingCommitPage() {
       // Refresh job data
       fetchJob();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Fehler beim Uebertragen");
+      setError(err instanceof Error ? err.message : "Fehler beim Übertragen");
     } finally {
       setCommitting(false);
     }
@@ -134,7 +134,7 @@ export default function AiPreprocessingCommitPage() {
             href="/admin/ai-preprocessing"
             className="text-[var(--primary)] hover:underline mt-2 inline-block"
           >
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         </div>
       </div>
@@ -151,10 +151,10 @@ export default function AiPreprocessingCommitPage() {
               KI-Aufbereitung
             </Link>
             <span>/</span>
-            <span>Uebernahme</span>
+            <span>Übernahme</span>
           </div>
           <h1 className="text-2xl font-semibold text-[var(--foreground)]">
-            Daten uebernehmen
+            Daten übernehmen
           </h1>
           <p className="text-sm text-[var(--secondary)] mt-1">
             {job.case.caseNumber} - {job.case.debtorName}
@@ -191,19 +191,19 @@ export default function AiPreprocessingCommitPage() {
                 d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <h2 className="text-xl font-semibold">Daten wurden uebertragen</h2>
+            <h2 className="text-xl font-semibold">Daten wurden übertragen</h2>
           </div>
           <p className="text-[var(--secondary)] mb-4">
-            Die aufbereiteten Daten wurden erfolgreich in die Staging-Tabelle uebertragen.
-            Sie koennen nun im regulaeren Daten-Import-Bereich die endgueltige Uebernahme
-            in das System durchfuehren.
+            Die aufbereiteten Daten wurden erfolgreich in die Staging-Tabelle übertragen.
+            Sie können nun im regulaeren Daten-Import-Bereich die endgültige Übernahme
+            in das System durchführen.
           </p>
           <div className="flex space-x-3">
             <Link href="/admin/ingestion" className="btn-primary">
               Zum Daten-Import
             </Link>
             <Link href="/admin/ai-preprocessing" className="btn-secondary">
-              Zurueck zur Uebersicht
+              Zurück zur Übersicht
             </Link>
           </div>
         </div>
@@ -226,7 +226,7 @@ export default function AiPreprocessingCommitPage() {
             <h2 className="text-xl font-semibold">Vorgang nicht freigegeben</h2>
           </div>
           <p className="text-[var(--secondary)] mb-4">
-            Dieser Aufbereitungsvorgang wurde noch nicht freigegeben. Bitte pruefen Sie
+            Dieser Aufbereitungsvorgang wurde noch nicht freigegeben. Bitte prüfen Sie
             zuerst alle Vorschlaege und geben Sie den Vorgang frei.
           </p>
           <div className="flex space-x-3">
@@ -234,10 +234,10 @@ export default function AiPreprocessingCommitPage() {
               href={`/admin/ai-preprocessing/${jobId}/review`}
               className="btn-primary"
             >
-              Zur Pruefung
+              Zur Prüfung
             </Link>
             <Link href="/admin/ai-preprocessing" className="btn-secondary">
-              Zurueck zur Uebersicht
+              Zurück zur Übersicht
             </Link>
           </div>
         </div>
@@ -275,7 +275,7 @@ export default function AiPreprocessingCommitPage() {
                   </div>
                   <div className="flex justify-between border-t pt-2">
                     <span className="text-[var(--foreground)] font-medium">
-                      Zu uebertragen:
+                      Zu übertragen:
                     </span>
                     <span className="font-semibold text-[var(--primary)]">
                       {job.rowStats.approved + job.rowStats.modified}
@@ -324,11 +324,11 @@ export default function AiPreprocessingCommitPage() {
                   />
                 </svg>
                 <div>
-                  <h3 className="font-medium text-amber-800">Vor der Uebernahme</h3>
+                  <h3 className="font-medium text-amber-800">Vor der Übernahme</h3>
                   <p className="text-sm text-amber-700 mt-1">
-                    Die Daten werden in die Staging-Tabelle uebertragen. Von dort aus
-                    koennen Sie die endgueltige Uebernahme im regulaeren Daten-Import-Bereich
-                    durchfuehren. Dieser Schritt kann nicht rueckgaengig gemacht werden.
+                    Die Daten werden in die Staging-Tabelle übertragen. Von dort aus
+                    können Sie die endgültige Übernahme im regulaeren Daten-Import-Bereich
+                    durchführen. Dieser Schritt kann nicht rückgängig gemacht werden.
                   </p>
                 </div>
               </div>
@@ -340,7 +340,7 @@ export default function AiPreprocessingCommitPage() {
                 href={`/admin/ai-preprocessing/${jobId}/review`}
                 className="btn-secondary"
               >
-                Zurueck zur Pruefung
+                Zurück zur Prüfung
               </Link>
               <button
                 onClick={handleCommit}
@@ -368,7 +368,7 @@ export default function AiPreprocessingCommitPage() {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       ></path>
                     </svg>
-                    Wird uebertragen...
+                    Wird übertragen...
                   </span>
                 ) : (
                   <span className="flex items-center">
@@ -385,7 +385,7 @@ export default function AiPreprocessingCommitPage() {
                         d="M5 13l4 4L19 7"
                       />
                     </svg>
-                    Daten uebertragen
+                    Daten übertragen
                   </span>
                 )}
               </button>
@@ -409,18 +409,18 @@ export default function AiPreprocessingCommitPage() {
                     d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                   />
                 </svg>
-                <h3 className="font-semibold">Erfolgreich uebertragen!</h3>
+                <h3 className="font-semibold">Erfolgreich übertragen!</h3>
               </div>
               <p className="text-[var(--secondary)] mb-4">
                 <strong>{commitResult.stagedEntries}</strong> Eintraege wurden in die
-                Staging-Tabelle uebertragen. Sie koennen nun im Daten-Import-Bereich
-                die endgueltige Uebernahme durchfuehren.
+                Staging-Tabelle übertragen. Sie können nun im Daten-Import-Bereich
+                die endgültige Übernahme durchführen.
               </p>
               <Link
                 href={`/admin/ingestion/${commitResult.ingestionJobId}/commit`}
                 className="btn-primary"
               >
-                Zur endgueltigen Uebernahme
+                Zur endgültigen Übernahme
               </Link>
             </div>
           )}

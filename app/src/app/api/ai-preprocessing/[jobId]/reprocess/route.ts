@@ -22,7 +22,7 @@ export async function POST(
 
     if (!rowIds || rowIds.length === 0) {
       return NextResponse.json(
-        { error: "Keine Zeilen ausgewaehlt" },
+        { error: "Keine Zeilen ausgewählt" },
         { status: 400 }
       );
     }
@@ -51,7 +51,7 @@ export async function POST(
 
     if (!["REVIEW", "CORRECTION"].includes(job.status)) {
       return NextResponse.json(
-        { error: "Vorgang ist nicht im Pruefungs-Status" },
+        { error: "Vorgang ist nicht im Prüfungs-Status" },
         { status: 400 }
       );
     }
@@ -108,7 +108,7 @@ export async function POST(
           where: { id: row.id },
           data: {
             status: "PENDING",
-            aiExplanation: `Korrektur angefordert: "${correctionText}" - Bitte manuell pruefen. (Demo-Modus)`,
+            aiExplanation: `Korrektur angefordert: "${correctionText}" - Bitte manuell prüfen. (Demo-Modus)`,
             humanEdits: null,
             reviewedBy: null,
             reviewedAt: null,
@@ -125,7 +125,7 @@ export async function POST(
       return NextResponse.json({
         success: true,
         reprocessedCount: rows.length,
-        message: "Demo-Modus: Zeilen zum erneuten Pruefen zurueckgesetzt",
+        message: "Demo-Modus: Zeilen zum erneuten Prüfen zurückgesetzt",
       });
     }
 
@@ -135,7 +135,7 @@ export async function POST(
         const rawData = JSON.parse(row.rawData);
         const currentSuggestion = JSON.parse(row.aiSuggestion);
 
-        const prompt = `Du bist ein Assistent fuer die Analyse von Finanzdaten im Kontext eines Insolvenzverfahrens.
+        const prompt = `Du bist ein Assistent für die Analyse von Finanzdaten im Kontext eines Insolvenzverfahrens.
 
 Ein Benutzer hat Feedback zu deiner vorherigen Analyse gegeben:
 "${correctionText}"
@@ -146,7 +146,7 @@ ${JSON.stringify(currentSuggestion, null, 2)}
 Originaldaten aus ${row.file.fileName}, ${row.sourceLocation}:
 ${JSON.stringify(rawData, null, 2)}
 
-Bitte analysiere die Daten erneut unter Beruecksichtigung des Feedbacks.
+Bitte analysiere die Daten erneut unter Berücksichtigung des Feedbacks.
 
 Gib eine JSON-Antwort mit folgender Struktur:
 {
@@ -162,7 +162,7 @@ Gib eine JSON-Antwort mit folgender Struktur:
     "valueType": "<IST oder PLAN>",
     "description": "<zusaetzliche Beschreibung>"
   },
-  "explanation": "<Erklaerung warum so interpretiert, unter Beruecksichtigung des Feedbacks>",
+  "explanation": "<Erklärung warum so interpretiert, unter Berücksichtigung des Feedbacks>",
   "confidence": <0.0-1.0>,
   "fieldConfidences": [
     {"field": "amount", "confidence": 0.9, "reason": "Korrigiert basierend auf Feedback"}
@@ -230,7 +230,7 @@ WICHTIG:
             where: { id: row.id },
             data: {
               status: "PENDING",
-              aiExplanation: `Korrektur angefordert: "${correctionText}" - KI-Analyse fehlgeschlagen, bitte manuell pruefen.`,
+              aiExplanation: `Korrektur angefordert: "${correctionText}" - KI-Analyse fehlgeschlagen, bitte manuell prüfen.`,
               humanEdits: null,
               reviewedBy: null,
               reviewedAt: null,
@@ -244,7 +244,7 @@ WICHTIG:
             where: { id: row.id },
             data: {
               status: "PENDING",
-              aiExplanation: `Korrektur angefordert: "${correctionText}" - Fehler bei KI-Analyse, bitte manuell pruefen.`,
+              aiExplanation: `Korrektur angefordert: "${correctionText}" - Fehler bei KI-Analyse, bitte manuell prüfen.`,
               humanEdits: null,
               reviewedBy: null,
               reviewedAt: null,

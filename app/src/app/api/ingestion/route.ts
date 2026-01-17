@@ -38,9 +38,9 @@ function createDetailedError(
   // Map common errors to German user-friendly messages
   const userMessages: Record<string, string> = {
     // Database errors
-    "Foreign key constraint failed": "Der ausgewaehlte Fall existiert nicht in der Datenbank",
+    "Foreign key constraint failed": "Der ausgewählte Fall existiert nicht in der Datenbank",
     "Unique constraint failed": "Diese Datei wurde bereits importiert (Duplikat erkannt)",
-    "Connection refused": "Datenbankverbindung fehlgeschlagen. Bitte versuchen Sie es spaeter erneut",
+    "Connection refused": "Datenbankverbindung fehlgeschlagen. Bitte versuchen Sie es später erneut",
     "SQLITE_BUSY": "Datenbank ist beschaeftigt. Bitte versuchen Sie es erneut",
     "relation": "Datenbankfehler: Tabelle oder Beziehung nicht gefunden",
     // File errors
@@ -101,13 +101,13 @@ export async function POST(request: NextRequest) {
     stage = "Validierung der Eingaben";
     if (!file) {
       return NextResponse.json(
-        { error: "Keine Datei ausgewaehlt. Bitte waehlen Sie eine CSV- oder Excel-Datei aus." },
+        { error: "Keine Datei ausgewählt. Bitte wählen Sie eine CSV- oder Excel-Datei aus." },
         { status: 400 }
       );
     }
     if (!caseId) {
       return NextResponse.json(
-        { error: "Kein Fall ausgewaehlt. Bitte waehlen Sie einen Fall aus der Liste." },
+        { error: "Kein Fall ausgewählt. Bitte wählen Sie einen Fall aus der Liste." },
         { status: 400 }
       );
     }
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     fileNameForError = file.name;
 
     // Stage 4: Verify case exists
-    stage = "Pruefen des Falls";
+    stage = "Prüfen des Falls";
     const caseExists = await prisma.case.findUnique({
       where: { id: caseId },
       select: { id: true, caseNumber: true },
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
 
     if (!caseExists) {
       return NextResponse.json(
-        { error: `Der ausgewaehlte Fall (ID: ${caseId.substring(0, 8)}...) existiert nicht. Bitte aktualisieren Sie die Seite.` },
+        { error: `Der ausgewählte Fall (ID: ${caseId.substring(0, 8)}...) existiert nicht. Bitte aktualisieren Sie die Seite.` },
         { status: 400 }
       );
     }
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
         sheetNames = workbook.SheetNames;
 
         if (sheetNames.length === 0) {
-          parseError = "Die Excel-Datei enthaelt keine Tabellenblaetter.";
+          parseError = "Die Excel-Datei enthält keine Tabellenblaetter.";
           parseErrorDetails = "SheetNames array is empty";
         } else {
           const firstSheet = workbook.Sheets[sheetNames[0]];
@@ -194,14 +194,14 @@ export async function POST(request: NextRequest) {
               parseError = `Das Tabellenblatt '${sheetNames[0]}' ist leer.`;
               parseErrorDetails = "sheet_to_json returned empty array";
             } else if (jsonData.length === 1) {
-              parseError = "Die Datei enthaelt nur eine Kopfzeile, aber keine Daten. Bitte fuegen Sie mindestens eine Datenzeile hinzu.";
+              parseError = "Die Datei enthält nur eine Kopfzeile, aber keine Daten. Bitte fuegen Sie mindestens eine Datenzeile hinzu.";
               parseErrorDetails = "Only header row found, no data rows";
             } else {
               // First row is headers
               const firstRow = jsonData[0] as unknown[];
 
               if (firstRow.length === 0 || firstRow.every((h) => !h)) {
-                parseError = "Die erste Zeile (Kopfzeile) ist leer. Bitte stellen Sie sicher, dass die Spaltenueberschriften in der ersten Zeile stehen.";
+                parseError = "Die erste Zeile (Kopfzeile) ist leer. Bitte stellen Sie sicher, dass die Spaltenüberschriften in der ersten Zeile stehen.";
                 parseErrorDetails = "Header row is empty";
               } else {
                 // Extract headers - preserve original names for mapping
@@ -220,7 +220,7 @@ export async function POST(request: NextRequest) {
                   .map(([name]) => name);
 
                 if (duplicates.length > 0) {
-                  parseError = `Doppelte Spaltenueberschriften gefunden: ${duplicates.join(", ")}. Jede Spalte muss einen eindeutigen Namen haben.`;
+                  parseError = `Doppelte Spaltenüberschriften gefunden: ${duplicates.join(", ")}. Jede Spalte muss einen eindeutigen Namen haben.`;
                   parseErrorDetails = `Duplicate headers: ${duplicates.join(", ")}`;
                 } else {
                   // Convert to records using original header names
@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
                     });
 
                   if (rawRecords.length === 0) {
-                    parseError = "Alle Datenzeilen sind leer. Bitte stellen Sie sicher, dass die Datei Daten enthaelt.";
+                    parseError = "Alle Datenzeilen sind leer. Bitte stellen Sie sicher, dass die Datei Daten enthält.";
                     parseErrorDetails = "All data rows filtered out as empty";
                   }
                 }
@@ -268,7 +268,7 @@ export async function POST(request: NextRequest) {
       } catch (e) {
         console.error("Error reading CSV file as text:", e);
         return NextResponse.json(
-          { error: `Die Datei '${file.name}' konnte nicht als Text gelesen werden. Bitte ueberpruefen Sie die Zeichenkodierung (UTF-8 empfohlen).` },
+          { error: `Die Datei '${file.name}' konnte nicht als Text gelesen werden. Bitte ueberprüfen Sie die Zeichenkodierung (UTF-8 empfohlen).` },
           { status: 400 }
         );
       }
@@ -299,10 +299,10 @@ export async function POST(request: NextRequest) {
           }
           parseErrorDetails = JSON.stringify(firstError);
         } else if (!parsed.data || parsed.data.length === 0) {
-          parseError = "Die CSV-Datei enthaelt keine Daten nach der Kopfzeile.";
+          parseError = "Die CSV-Datei enthält keine Daten nach der Kopfzeile.";
           parseErrorDetails = "parsed.data is empty";
         } else if (!parsed.meta.fields || parsed.meta.fields.length === 0) {
-          parseError = "Keine Spalten in der CSV-Datei erkannt. Bitte stellen Sie sicher, dass die erste Zeile Spaltenueberschriften enthaelt.";
+          parseError = "Keine Spalten in der CSV-Datei erkannt. Bitte stellen Sie sicher, dass die erste Zeile Spaltenüberschriften enthält.";
           parseErrorDetails = "No fields detected";
         } else {
           rawRecords = parsed.data;
@@ -643,7 +643,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Error fetching jobs:", error);
     return NextResponse.json(
-      { error: "Fehler beim Laden der Importvorgaenge" },
+      { error: "Fehler beim Laden der Importvorgänge" },
       { status: 500 }
     );
   }

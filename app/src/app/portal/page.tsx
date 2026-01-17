@@ -33,7 +33,7 @@ export default function PortalDashboard() {
         const data = await response.json();
         setCases(data.cases);
       } catch {
-        setError("Faelle konnten nicht geladen werden");
+        setError("Fälle konnten nicht geladen werden");
       } finally {
         setLoading(false);
       }
@@ -45,9 +45,9 @@ export default function PortalDashboard() {
   const getStatusLabel = (status: string): string => {
     switch (status) {
       case "PRELIMINARY":
-        return "Vorlaeufig";
+        return "Vorläufig";
       case "OPENED":
-        return "Eroeffnet";
+        return "Eröffnet";
       case "CLOSED":
         return "Geschlossen";
       default:
@@ -77,10 +77,10 @@ export default function PortalDashboard() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-[var(--foreground)]">
-            Meine Faelle
+            Meine Fälle
           </h1>
           <p className="text-[var(--secondary)] mt-1">
-            Liquiditaetsplaene Ihrer Insolvenzverfahren
+            Liquiditätspläne Ihrer Insolvenzverfahren
           </p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -101,7 +101,7 @@ export default function PortalDashboard() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-[var(--foreground)]">
-            Meine Faelle
+            Meine Fälle
           </h1>
         </div>
         <div className="admin-card p-8 text-center">
@@ -167,7 +167,7 @@ export default function PortalDashboard() {
               d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
             />
           </svg>
-          Liquiditaetsplan verfuegbar
+          Liquiditätsplan verfügbar
           {caseItem.latestVersion && (
             <span className="ml-1">(v{caseItem.latestVersion})</span>
           )}
@@ -199,10 +199,10 @@ export default function PortalDashboard() {
       <div className="space-y-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--foreground)]">
-            Meine Faelle
+            Meine Fälle
           </h1>
           <p className="text-[var(--secondary)] mt-1">
-            Liquiditaetsplaene Ihrer Insolvenzverfahren
+            Liquiditätspläne Ihrer Insolvenzverfahren
           </p>
         </div>
 
@@ -222,7 +222,7 @@ export default function PortalDashboard() {
               />
             </svg>
             <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">
-              Keine Faelle vorhanden
+              Keine Fälle vorhanden
             </h2>
             <p className="text-[var(--secondary)]">
               Sie haben noch keine Insolvenzverfahren zugewiesen bekommen.
@@ -244,10 +244,10 @@ export default function PortalDashboard() {
         <div className="space-y-4">
           <div>
             <h2 className="text-xl font-semibold text-[var(--foreground)]">
-              Geteilte Faelle
+              Geteilte Fälle
             </h2>
             <p className="text-[var(--secondary)] mt-1">
-              Faelle, fuer die Ihnen Lesezugriff gewaehrt wurde
+              Fälle, für die Ihnen Lesezugriff gewährt wurde
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

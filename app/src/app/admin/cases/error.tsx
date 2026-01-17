@@ -17,7 +17,7 @@ export default function CasesError({ error, reset }: ErrorProps) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">Faelle</h1>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">Fälle</h1>
           <p className="text-[var(--secondary)] mt-1">
             Alle Insolvenzverfahren verwalten
           </p>
@@ -42,7 +42,7 @@ export default function CasesError({ error, reset }: ErrorProps) {
             </svg>
           </div>
           <h2 className="text-xl font-bold text-[var(--foreground)] mb-2">
-            Faelle konnten nicht geladen werden
+            Fälle konnten nicht geladen werden
           </h2>
           <p className="text-[var(--secondary)] mb-6">
             Die Daten konnten nicht abgerufen werden. Dies kann an einer Verbindungsstorung

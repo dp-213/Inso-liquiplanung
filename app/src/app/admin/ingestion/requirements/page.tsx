@@ -97,7 +97,7 @@ const OPTIONAL_FIELDS = [
   { name: "Gegenpartei", description: "Geschaeftspartner", example: "Meier GmbH" },
   { name: "Referenz", description: "Rechnungs- oder Belegnummer", example: "RE-2026-001" },
   { name: "Kommentar", description: "Freitext-Anmerkung", example: "Anzahlung" },
-  { name: "Unsicherheit", description: "Kennzeichen fuer geschaetzte Werte", example: "geschaetzt" },
+  { name: "Unsicherheit", description: "Kennzeichen für geschaetzte Werte", example: "geschaetzt" },
   { name: "Quelle", description: "Datenherkunft", example: "Kontoauszug" },
   { name: "Werttyp", description: "IST oder PLAN", example: "IST" },
 ];
@@ -111,7 +111,7 @@ export default function DataRequirementsPage() {
           Kanonisches Import-Schema
         </h1>
         <p className="text-sm text-[var(--secondary)] mt-1">
-          Ein einheitliches, erweiterbares Schema fuer alle Datenimporte
+          Ein einheitliches, erweiterbares Schema für alle Datenimporte
         </p>
       </div>
 
@@ -165,7 +165,7 @@ export default function DataRequirementsPage() {
             </h2>
           </div>
           <p className="text-sm text-[var(--secondary)] mt-2">
-            Alle Dateien verwenden das kanonische Schema. Waehlen Sie das passende Format.
+            Alle Dateien verwenden das kanonische Schema. Wählen Sie das passende Format.
           </p>
         </div>
         <div className="p-6">
@@ -234,7 +234,7 @@ export default function DataRequirementsPage() {
                 Ihre Daten entsprechen dem kanonischen Schema (mind. Datum, Betrag, Bezeichnung).
               </p>
               <div className="mb-4">
-                <div className="text-sm font-medium text-green-800 mb-2">Geeignet fuer:</div>
+                <div className="text-sm font-medium text-green-800 mb-2">Geeignet für:</div>
                 <ul className="text-sm text-green-700 space-y-1">
                   <li className="flex items-start">
                     <svg className="w-4 h-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -329,7 +329,7 @@ export default function DataRequirementsPage() {
             </h2>
           </div>
           <p className="text-sm text-[var(--secondary)] mt-2">
-            Diese Felder muessen vorhanden sein. Der Import schlaegt nur fehl, wenn diese fehlen.
+            Diese Felder müssen vorhanden sein. Der Import schlaegt nur fehl, wenn diese fehlen.
           </p>
         </div>
         <div className="p-6">
@@ -427,7 +427,7 @@ export default function DataRequirementsPage() {
             </h2>
           </div>
           <p className="text-sm text-purple-700 mt-2">
-            <strong>Wichtig:</strong> Ihre Dateien koennen beliebige zusaetzliche Spalten enthalten!
+            <strong>Wichtig:</strong> Ihre Dateien können beliebige zusaetzliche Spalten enthalten!
           </p>
         </div>
         <div className="p-6 space-y-4">
@@ -447,13 +447,13 @@ export default function DataRequirementsPage() {
             <div className="p-4 bg-white border border-purple-200 rounded-lg">
               <div className="font-medium text-purple-800 mb-2">Zukunftssicher</div>
               <p className="text-sm text-purple-600">
-                Neue Features koennen diese Daten spaeter nutzen
+                Neue Features können diese Daten später nutzen
               </p>
             </div>
           </div>
 
           <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
-            <h4 className="font-medium text-purple-800 mb-2">Beispiele fuer Zusatzspalten:</h4>
+            <h4 className="font-medium text-purple-800 mb-2">Beispiele für Zusatzspalten:</h4>
             <div className="flex flex-wrap gap-2">
               {["Kostenstelle", "Projekt", "Buchungskreis", "Sachbearbeiter", "Mandant", "Abteilung", "Standort", "..."].map((col) => (
                 <span key={col} className="px-3 py-1 bg-white border border-purple-300 rounded-full text-sm text-purple-700">
@@ -508,7 +508,7 @@ export default function DataRequirementsPage() {
                 <ul className="text-sm text-amber-700 mt-1 list-disc list-inside space-y-1">
                   <li>Spaltenreihenfolge ist <strong>nicht</strong> wichtig</li>
                   <li>Spaltennamen werden <strong>nicht</strong> case-sensitiv erkannt</li>
-                  <li>Leere Zeilen werden uebersprungen</li>
+                  <li>Leere Zeilen werden übersprungen</li>
                 </ul>
               </div>
             </div>
@@ -531,7 +531,7 @@ export default function DataRequirementsPage() {
           <div className="space-y-3">
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
               <div className="font-medium text-red-800 mb-1">Pflichtfeld fehlt: Datum</div>
-              <p className="text-sm text-red-600">Die Datei enthaelt keine erkennbare Datumsspalte.</p>
+              <p className="text-sm text-red-600">Die Datei enthält keine erkennbare Datumsspalte.</p>
             </div>
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
               <div className="font-medium text-red-800 mb-1">Pflichtfeld fehlt: Betrag</div>
@@ -539,7 +539,7 @@ export default function DataRequirementsPage() {
             </div>
             <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
               <div className="font-medium text-red-800 mb-1">Pflichtfeld fehlt: Bezeichnung</div>
-              <p className="text-sm text-red-600">Keine Spalte fuer Beschreibung/Verwendungszweck gefunden.</p>
+              <p className="text-sm text-red-600">Keine Spalte für Beschreibung/Verwendungszweck gefunden.</p>
             </div>
           </div>
 

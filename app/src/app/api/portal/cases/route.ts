@@ -30,7 +30,7 @@ export async function GET() {
   } catch (error) {
     console.error("Error fetching customer cases:", error);
     return NextResponse.json(
-      { error: "Faelle konnten nicht geladen werden" },
+      { error: "Fälle konnten nicht geladen werden" },
       { status: 500 }
     );
   }

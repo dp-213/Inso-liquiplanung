@@ -125,7 +125,7 @@ export default function RevenueAnalysisPage() {
       <div className="space-y-6">
         <div className="flex items-center text-sm text-[var(--muted)]">
           <Link href="/portal" className="hover:text-[var(--primary)]">
-            Meine Faelle
+            Meine Fälle
           </Link>
           <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -145,9 +145,9 @@ export default function RevenueAnalysisPage() {
       <div className="space-y-6">
         <div className="admin-card p-8 text-center">
           <h1 className="text-xl font-bold text-[var(--foreground)] mb-2">Fehler</h1>
-          <p className="text-[var(--secondary)] mb-4">{error || "Daten nicht verfuegbar"}</p>
+          <p className="text-[var(--secondary)] mb-4">{error || "Daten nicht verfügbar"}</p>
           <Link href="/portal" className="btn-primary">
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         </div>
       </div>
@@ -173,7 +173,7 @@ export default function RevenueAnalysisPage() {
       {/* Breadcrumb */}
       <div className="flex items-center text-sm text-[var(--muted)]">
         <Link href="/portal" className="hover:text-[var(--primary)]">
-          Meine Faelle
+          Meine Fälle
         </Link>
         <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -303,7 +303,7 @@ export default function RevenueAnalysisPage() {
       {/* Section 4: Payment Schedule Table */}
       <div className="admin-card p-6">
         <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
-          Zahlungseingangs-Uebersicht
+          Zahlungseingangs-Übersicht
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

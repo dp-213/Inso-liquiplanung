@@ -90,7 +90,7 @@ export async function PUT(
       data: {
         planId: plan.id,
         versionNumber: newVersionNumber,
-        snapshotReason: "Eroeffnungssaldo geaendert",
+        snapshotReason: "Eröffnungssaldo geändert",
         openingBalanceCents: BigInt(openingBalanceCents),
         dataHash,
         createdBy: session.username,
@@ -108,7 +108,7 @@ export async function PUT(
   } catch (error) {
     console.error("Error updating opening balance:", error);
     return NextResponse.json(
-      { error: "Fehler beim Aktualisieren des Eroeffnungssaldos" },
+      { error: "Fehler beim Aktualisieren des Eröffnungssaldos" },
       { status: 500 }
     );
   }
@@ -161,7 +161,7 @@ export async function GET(
   } catch (error) {
     console.error("Error fetching opening balance:", error);
     return NextResponse.json(
-      { error: "Fehler beim Laden des Eroeffnungssaldos" },
+      { error: "Fehler beim Laden des Eröffnungssaldos" },
       { status: 500 }
     );
   }

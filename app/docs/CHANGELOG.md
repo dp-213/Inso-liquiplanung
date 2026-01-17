@@ -217,7 +217,11 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ### UI-Verbesserungen
 - **Konsistentes Button-Styling:** Alle Aktions-Buttons in Tabellen haben einheitliches Design
-- **Umlaute korrigiert:** Alle deutschen Umlaute (ä, ö, ü) korrekt dargestellt
+- **Umlaute korrigiert:** Alle deutschen Umlaute (ä, ö, ü) im gesamten Codebase korrekt dargestellt
+  - Admin Dashboard, Kundenlisten, Fälle-Listen
+  - Kundenportal und alle Unterseiten
+  - API-Fehlermeldungen und Bestätigungstexte
+  - Alle Formulare, Modals und Statusmeldungen
 
 ### API-Änderungen
 - **GET /api/customers/[id]:** Gibt jetzt `ownedCases` zurück

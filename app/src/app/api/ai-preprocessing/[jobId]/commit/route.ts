@@ -181,12 +181,12 @@ export async function POST(
       success: true,
       ingestionJobId: ingestionJob.id,
       stagedEntries: stagedEntries.length,
-      message: `${stagedEntries.length} Eintraege wurden in die Staging-Tabelle uebertragen. Gehen Sie zum Daten-Import, um die Daten endgueltig zu uebernehmen.`,
+      message: `${stagedEntries.length} Eintraege wurden in die Staging-Tabelle übertragen. Gehen Sie zum Daten-Import, um die Daten endgültig zu übernehmen.`,
     });
   } catch (error) {
     console.error("Error committing AI preprocessing job:", error);
     return NextResponse.json(
-      { error: "Fehler beim Uebertragen der Daten" },
+      { error: "Fehler beim Übertragen der Daten" },
       { status: 500 }
     );
   }

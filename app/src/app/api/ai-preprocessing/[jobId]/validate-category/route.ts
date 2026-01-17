@@ -55,7 +55,7 @@ export async function POST(
 
     if (!["REVIEW", "CORRECTION"].includes(job.status)) {
       return NextResponse.json(
-        { error: "Vorgang ist nicht im Pruefungs-Status" },
+        { error: "Vorgang ist nicht im Prüfungs-Status" },
         { status: 400 }
       );
     }
@@ -199,7 +199,7 @@ export async function POST(
         return NextResponse.json({
           success: true,
           reprocessedCount: categoryRows.length,
-          message: `${categoryRows.length} Positionen zur Korrektur zurueckgesetzt (${category} -> ${correctionCategory})`,
+          message: `${categoryRows.length} Positionen zur Korrektur zurückgesetzt (${category} -> ${correctionCategory})`,
         });
       } else {
         // Just reject without correction
@@ -264,7 +264,7 @@ async function reprocessCategoryWithAI(
     const rawData = JSON.parse(row.rawData);
     const currentSuggestion = JSON.parse(row.aiSuggestion);
 
-    const prompt = `Du bist ein Experte fuer Insolvenzbuchhaltung.
+    const prompt = `Du bist ein Experte für Insolvenzbuchhaltung.
 
 Ein Benutzer hat die Kategorisierung korrigiert:
 - Original-Kategorie: ${originalCategory}
@@ -279,7 +279,7 @@ ${JSON.stringify(rawData, null, 2)}
 Vorherige Interpretation:
 ${JSON.stringify(currentSuggestion, null, 2)}
 
-Bitte analysiere die Daten erneut unter Beruecksichtigung der Korrektur.
+Bitte analysiere die Daten erneut unter Berücksichtigung der Korrektur.
 Die Kategorie sollte "${targetCategory}" sein (wie vom Benutzer korrigiert).
 
 Gib eine JSON-Antwort:
@@ -299,7 +299,7 @@ Gib eine JSON-Antwort:
     "amountUncertainty": "<SICHER | WAHRSCHEINLICH | UNSICHER>",
     "weekUncertainty": "<SICHER | WAHRSCHEINLICH | UNSICHER>"
   },
-  "explanation": "<Erklaerung unter Beruecksichtigung der Korrektur>"
+  "explanation": "<Erklärung unter Berücksichtigung der Korrektur>"
 }`;
 
     try {

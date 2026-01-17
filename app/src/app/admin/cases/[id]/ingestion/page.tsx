@@ -134,7 +134,7 @@ export default function CaseIngestionPage({
 
   const handleUpload = async () => {
     if (!selectedFile) {
-      setError("Bitte Datei auswaehlen");
+      setError("Bitte Datei auswählen");
       return;
     }
 
@@ -221,7 +221,7 @@ export default function CaseIngestionPage({
             {error || "Fall nicht gefunden"}
           </p>
           <Link href="/admin/cases" className="btn-secondary mt-4 inline-block">
-            Zurueck zur Uebersicht
+            Zurück zur Übersicht
           </Link>
         </div>
       </div>
@@ -233,7 +233,7 @@ export default function CaseIngestionPage({
       {/* Breadcrumb */}
       <div className="flex items-center text-sm text-[var(--muted)]">
         <Link href="/admin/cases" className="hover:text-[var(--primary)]">
-          Faelle
+          Fälle
         </Link>
         <svg
           className="w-4 h-4 mx-2"
@@ -282,7 +282,7 @@ export default function CaseIngestionPage({
         </div>
         <div className="flex items-center gap-3">
           <Link href={`/admin/cases/${id}`} className="btn-secondary">
-            Zurueck zum Fall
+            Zurück zum Fall
           </Link>
           <Link href={`/admin/cases/${id}/dashboard`} className="btn-primary flex items-center">
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -391,7 +391,7 @@ export default function CaseIngestionPage({
                 <div>
                   <label className="cursor-pointer">
                     <span className="text-[var(--primary)] hover:underline">
-                      Datei auswaehlen
+                      Datei auswählen
                     </span>
                     <input
                       type="file"
@@ -458,13 +458,13 @@ export default function CaseIngestionPage({
       <div className="admin-card">
         <div className="p-6 border-b border-[var(--border)]">
           <h2 className="text-lg font-medium text-[var(--foreground)]">
-            Import-Historie fuer diesen Fall
+            Import-Historie für diesen Fall
           </h2>
         </div>
 
         {jobs.length === 0 ? (
           <div className="p-8 text-center text-[var(--secondary)]">
-            Keine Importvorgaenge fuer diesen Fall vorhanden
+            Keine Importvorgänge für diesen Fall vorhanden
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -586,7 +586,7 @@ export default function CaseIngestionPage({
                             href={`/admin/ingestion/${job.id}/review`}
                             className="text-[var(--warning)] hover:underline text-sm"
                           >
-                            Pruefen
+                            Prüfen
                           </Link>
                         )}
                         {job.status === "READY" && (
@@ -594,7 +594,7 @@ export default function CaseIngestionPage({
                             href={`/admin/ingestion/${job.id}/commit`}
                             className="text-[var(--success)] hover:underline text-sm"
                           >
-                            Uebernehmen
+                            Übernehmen
                           </Link>
                         )}
                       </div>

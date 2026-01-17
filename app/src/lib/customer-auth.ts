@@ -193,7 +193,7 @@ export async function validateCustomerCredentials(
     );
     return {
       success: false,
-      error: `Konto temporaer gesperrt. Bitte versuchen Sie es in ${remainingMinutes} Minuten erneut.`,
+      error: `Konto temporär gesperrt. Bitte versuchen Sie es in ${remainingMinutes} Minuten erneut.`,
     };
   }
 
@@ -243,7 +243,7 @@ export async function validateCustomerCredentials(
     if (newFailedCount >= MAX_FAILED_ATTEMPTS) {
       return {
         success: false,
-        error: `Zu viele fehlgeschlagene Versuche. Konto fuer ${LOCKOUT_DURATION_MINUTES} Minuten gesperrt.`,
+        error: `Zu viele fehlgeschlagene Versuche. Konto für ${LOCKOUT_DURATION_MINUTES} Minuten gesperrt.`,
       };
     }
 

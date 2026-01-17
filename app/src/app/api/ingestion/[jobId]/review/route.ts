@@ -45,7 +45,7 @@ export async function GET(
   } catch (error) {
     console.error("Error fetching review items:", error);
     return NextResponse.json(
-      { error: "Fehler beim Laden der zu pruefenden Eintraege" },
+      { error: "Fehler beim Laden der zu prüfenden Eintraege" },
       { status: 500 }
     );
   }
@@ -165,7 +165,7 @@ export async function POST(
   } catch (error) {
     console.error("Error processing review:", error);
     return NextResponse.json(
-      { error: "Fehler bei der Verarbeitung der Pruefung" },
+      { error: "Fehler bei der Verarbeitung der Prüfung" },
       { status: 500 }
     );
   }

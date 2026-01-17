@@ -522,7 +522,7 @@ export function getCurrentMonday(): Date {
 export const STANDARD_CATEGORIES: Omit<CategoryInput, "id">[] = [
   // Inflows - Altmasse
   { name: "Forderungseinzuege", flowType: "INFLOW", estateType: "ALTMASSE", displayOrder: 1 },
-  { name: "Anlagenverkaeufe", flowType: "INFLOW", estateType: "ALTMASSE", displayOrder: 2 },
+  { name: "Anlagenverkäufe", flowType: "INFLOW", estateType: "ALTMASSE", displayOrder: 2 },
   { name: "Sonstige Einzahlungen Alt", flowType: "INFLOW", estateType: "ALTMASSE", displayOrder: 3 },
 
   // Inflows - Neumasse
