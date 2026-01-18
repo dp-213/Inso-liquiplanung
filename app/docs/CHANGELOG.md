@@ -302,6 +302,103 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.0.0 – LedgerEntry als Single Source of Truth
+
+**Datum:** 18. Januar 2026
+
+### Grundlegende Architekturänderung
+
+#### LedgerEntry-basiertes Datenmodell
+Die Anwendung wurde grundlegend umgestellt: **LedgerEntry** ist jetzt die einzige Quelle der Wahrheit für alle Buchungen.
+
+- **Keine Kategorien/Zeilen mehr für Datenerfassung** – nur noch für Präsentation
+- **Steuerungsdimensionen** direkt am LedgerEntry:
+  - `valueType` (IST/PLAN)
+  - `legalBucket` (MASSE, ABSONDERUNG, NEUTRAL)
+  - `counterpartyId` (Gegenpartei)
+  - `locationId` (Standort)
+  - `bankAccountId` (Bankkonto)
+- **Governance-Status** (reviewStatus): UNREVIEWED → CONFIRMED/ADJUSTED
+
+#### Classification Engine
+Neue Rule-basierte Klassifikationsvorschläge:
+- `ClassificationRule` Modell für Musterabgleich
+- Automatische Vorschläge beim Import (niemals Auto-Commit für IST)
+- Bulk-Review für effiziente Massenbearbeitung
+- Regel-Erstellung direkt aus LedgerEntry-Details
+
+### Neue Funktionen
+
+#### Zahlungsregister (Ledger)
+- **Sortierbare Tabellen** – Alle Spalten klickbar zum Sortieren
+- **Filterung** nach reviewStatus, legalBucket, valueType
+- **Regel erstellen Button** – Direkt aus Einzeleintrag eine Klassifikationsregel erstellen
+- **Detail-Ansicht** mit vollständiger Bearbeitungsmöglichkeit
+
+#### Stammdaten-Verwaltung
+- **Gegenparteien (Counterparties)** – CRUD für Geschäftspartner, Gläubiger, Debitoren
+- **Standorte (Locations)** – Verwaltung von Betriebsstätten, Filialen
+- **Bankkonten** – Zuordnung von Ein-/Auszahlungen zu Konten
+
+#### Regelverwaltung
+- **Neue Rules-Seite** unter /admin/cases/[id]/rules
+- **Match-Typen:** CONTAINS, STARTS_WITH, ENDS_WITH, EQUALS, REGEX, AMOUNT_RANGE
+- **Match-Felder:** description, bookingReference
+- **Vorschläge:** suggestedLegalBucket, suggestedCategory, confidence
+
+#### Navigation Umbau
+- **Neue Struktur:** Ledger | Stammdaten | Recht
+- **Ledger:** Zahlungsregister, Datenimport
+- **Stammdaten:** Bankkonten, Gegenparteien, Standorte
+- **Recht:** Regeln
+- **Dashboard-Button** verlinkt jetzt direkt zur externen Ansicht (wenn Share-Link existiert)
+
+### Schema-Änderungen
+
+#### Neue Modelle
+```prisma
+model ClassificationRule {
+  id, caseId, name, matchField, matchType, matchValue,
+  suggestedLegalBucket, suggestedCategory, isActive, priority
+}
+
+model Counterparty {
+  id, caseId, name, type (CREDITOR/DEBITOR/OTHER), taxId, notes
+}
+
+model Location {
+  id, caseId, name, address, type, notes
+}
+```
+
+#### LedgerEntry Erweiterungen
+```prisma
+model LedgerEntry {
+  // Neu:
+  counterpartyId, locationId, bankAccountId
+  suggestedLegalBucket, suggestedCategory, suggestedConfidence
+  suggestedRuleId, suggestedReason
+}
+```
+
+### API-Erweiterungen
+- **GET/POST /api/cases/[id]/counterparties** – Gegenparteien verwalten
+- **GET/POST /api/cases/[id]/locations** – Standorte verwalten
+- **GET/POST /api/cases/[id]/rules** – Klassifikationsregeln verwalten
+- **POST /api/cases/[id]/intake** – Vereinfachter Import-Endpunkt
+- **POST /api/cases/[id]/ledger/bulk-review** – Massen-Review mit Filtern
+
+### Bugfixes
+- **React Hooks Fehler** in externer Ansicht behoben (Hooks vor conditional returns)
+- **Datums-Parsing** für verschiedene Formate verbessert
+- **Betrags-Parsing** für negative Werte und Komma-Notation korrigiert
+
+### Dokumentation
+- **Veraltete Dateien gelöscht:** `app/CLAUDE_CONTEXT.md`
+- **Plan-Dokumentation:** Detaillierter Implementierungsplan erstellt
+
+---
+
 ## Geplante Änderungen
 
 Keine ausstehenden Änderungen
