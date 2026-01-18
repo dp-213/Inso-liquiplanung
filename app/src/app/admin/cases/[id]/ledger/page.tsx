@@ -71,8 +71,8 @@ export default function CaseLedgerPage({
       const url = `/api/cases/${id}/ledger${queryString ? `?${queryString}` : ""}`;
 
       const [caseRes, ledgerRes] = await Promise.all([
-        fetch(`/api/cases/${id}`),
-        fetch(url),
+        fetch(`/api/cases/${id}`, { credentials: 'include' }),
+        fetch(url, { credentials: 'include' }),
       ]);
 
       if (caseRes.ok) {
@@ -166,6 +166,7 @@ export default function CaseLedgerPage({
       const res = await fetch(`/api/cases/${id}/ledger/sync`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: 'include',
       });
 
       const data = await res.json();
