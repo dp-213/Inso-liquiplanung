@@ -408,8 +408,12 @@ export async function GET(
     return NextResponse.json(response);
   } catch (error) {
     console.error("Error fetching share data:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: "Fehler beim Laden der Daten" },
+      {
+        error: "Fehler beim Laden der Daten",
+        debug: errorMessage,
+      },
       { status: 500 }
     );
   }
