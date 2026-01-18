@@ -79,7 +79,14 @@ export default function CaseLedgerPage({
         const data = await caseRes.json();
         setCaseData(data);
       } else {
-        setError("Fall nicht gefunden");
+        const errorData = await caseRes.json().catch(() => ({}));
+        if (caseRes.status === 401) {
+          setError("Nicht angemeldet - bitte neu einloggen");
+        } else if (caseRes.status === 404) {
+          setError("Fall nicht gefunden");
+        } else {
+          setError(errorData.error || `Fehler: ${caseRes.status}`);
+        }
         return;
       }
 
