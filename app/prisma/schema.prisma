@@ -684,6 +684,13 @@ model LedgerEntry {
   changeReason      String?   // Pflicht bei ADJUSTED
   previousAmountCents BigInt? // Ursprünglicher Betrag vor Korrektur
 
+  // === KLASSIFIKATIONS-VORSCHLÄGE (von Rule Engine) ===
+  suggestedLegalBucket    String?   // MASSE, ABSONDERUNG, NEUTRAL - Vorschlag
+  suggestedCategory       String?   // Optional: Kategorie-Name Vorschlag
+  suggestedConfidence     Float?    // 0.0 - 1.0 Confidence-Score
+  suggestedRuleId         String?   // Welche ClassificationRule hat gematcht
+  suggestedReason         String?   // Erklärungstext für den Vorschlag
+
   // === AUDIT ===
   createdAt         DateTime  @default(now())
   createdBy         String
@@ -698,6 +705,7 @@ model LedgerEntry {
   @@index([caseId, transactionDate])
   @@index([caseId, valueType])
   @@index([caseId, reviewStatus])
+  @@index([caseId, reviewStatus, suggestedLegalBucket])
   @@index([importJobId])
   @@map("ledger_entries")
 }

@@ -20,9 +20,15 @@ import {
 import { LedgerEntry } from '@prisma/client';
 
 /**
- * Serialize a LedgerEntry to LedgerEntryResponse (including governance fields)
+ * Serialize a LedgerEntry to LedgerEntryResponse (including governance and classification fields)
  */
-function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
+function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse & {
+  suggestedLegalBucket: string | null;
+  suggestedCategory: string | null;
+  suggestedConfidence: number | null;
+  suggestedRuleId: string | null;
+  suggestedReason: string | null;
+} {
   return {
     id: entry.id,
     caseId: entry.caseId,
@@ -46,6 +52,12 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
     reviewNote: entry.reviewNote,
     changeReason: entry.changeReason,
     previousAmountCents: entry.previousAmountCents?.toString() || null,
+    // Classification suggestion fields
+    suggestedLegalBucket: entry.suggestedLegalBucket,
+    suggestedCategory: entry.suggestedCategory,
+    suggestedConfidence: entry.suggestedConfidence,
+    suggestedRuleId: entry.suggestedRuleId,
+    suggestedReason: entry.suggestedReason,
     // Audit
     createdAt: entry.createdAt.toISOString(),
     createdBy: entry.createdBy,
@@ -77,6 +89,8 @@ export async function GET(
     const valueType = searchParams.get('valueType') as ValueType | null;
     const legalBucket = searchParams.get('legalBucket') as LegalBucket | null;
     const bookingSource = searchParams.get('bookingSource') as BookingSource | null;
+    const reviewStatus = searchParams.get('reviewStatus') as ReviewStatus | null;
+    const suggestedLegalBucket = searchParams.get('suggestedLegalBucket');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 100;
@@ -104,6 +118,18 @@ export async function GET(
 
     if (bookingSource && Object.values(BOOKING_SOURCES).includes(bookingSource)) {
       where.bookingSource = bookingSource;
+    }
+
+    if (reviewStatus && Object.values(REVIEW_STATUS).includes(reviewStatus)) {
+      where.reviewStatus = reviewStatus;
+    }
+
+    if (suggestedLegalBucket !== null) {
+      if (suggestedLegalBucket === 'null') {
+        where.suggestedLegalBucket = null;
+      } else if (suggestedLegalBucket) {
+        where.suggestedLegalBucket = suggestedLegalBucket;
+      }
     }
 
     if (from || to) {

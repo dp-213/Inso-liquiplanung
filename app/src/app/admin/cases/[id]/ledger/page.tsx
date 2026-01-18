@@ -8,6 +8,8 @@ import {
   ValueType,
   LegalBucket,
   LedgerEntryResponse,
+  ReviewStatus,
+  REVIEW_STATUS,
 } from "@/lib/ledger";
 
 const VALUE_TYPE_LABELS: Record<ValueType, string> = {
@@ -20,6 +22,12 @@ const LEGAL_BUCKET_LABELS: Record<LegalBucket, string> = {
   ABSONDERUNG: "Absonderung",
   NEUTRAL: "Neutral",
   UNKNOWN: "Unbekannt",
+};
+
+const REVIEW_STATUS_LABELS: Record<ReviewStatus, string> = {
+  UNREVIEWED: "Ungeprüft",
+  CONFIRMED: "Bestätigt",
+  ADJUSTED: "Korrigiert",
 };
 
 interface CaseData {
@@ -36,6 +44,15 @@ interface LedgerStats {
   netAmount: string;
 }
 
+interface ClassificationStats {
+  byReviewStatus: Record<string, number>;
+  classification: {
+    withSuggestion: number;
+    withoutSuggestion: number;
+    byLegalBucket: Record<string, number>;
+  };
+}
+
 export default function CaseLedgerPage({
   params,
 }: {
@@ -49,10 +66,16 @@ export default function CaseLedgerPage({
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [classificationStats, setClassificationStats] = useState<ClassificationStats | null>(null);
+  const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [viewMode, setViewMode] = useState<"table" | "grouped">("table");
 
   // Filter state
   const [filterValueType, setFilterValueType] = useState<ValueType | "">("");
   const [filterLegalBucket, setFilterLegalBucket] = useState<LegalBucket | "">("");
+  const [filterReviewStatus, setFilterReviewStatus] = useState<ReviewStatus | "">("");
+  const [filterSuggestedBucket, setFilterSuggestedBucket] = useState<string>("");
   const [filterFrom, setFilterFrom] = useState<string>("");
   const [filterTo, setFilterTo] = useState<string>("");
 
@@ -64,15 +87,18 @@ export default function CaseLedgerPage({
       const queryParams = new URLSearchParams();
       if (filterValueType) queryParams.set("valueType", filterValueType);
       if (filterLegalBucket) queryParams.set("legalBucket", filterLegalBucket);
+      if (filterReviewStatus) queryParams.set("reviewStatus", filterReviewStatus);
+      if (filterSuggestedBucket) queryParams.set("suggestedLegalBucket", filterSuggestedBucket);
       if (filterFrom) queryParams.set("from", filterFrom);
       if (filterTo) queryParams.set("to", filterTo);
 
       const queryString = queryParams.toString();
       const url = `/api/cases/${id}/ledger${queryString ? `?${queryString}` : ""}`;
 
-      const [caseRes, ledgerRes] = await Promise.all([
+      const [caseRes, ledgerRes, intakeRes] = await Promise.all([
         fetch(`/api/cases/${id}`, { credentials: 'include' }),
         fetch(url, { credentials: 'include' }),
+        fetch(`/api/cases/${id}/intake`, { credentials: 'include' }),
       ]);
 
       if (caseRes.ok) {
@@ -102,13 +128,19 @@ export default function CaseLedgerPage({
       } else {
         setError("Fehler beim Laden der Ledger-Einträge");
       }
+
+      // Lade Klassifikations-Statistiken
+      if (intakeRes.ok) {
+        const intakeData = await intakeRes.json();
+        setClassificationStats(intakeData);
+      }
     } catch (err) {
       console.error("Error fetching data:", err);
       setError("Fehler beim Laden der Daten");
     } finally {
       setLoading(false);
     }
-  }, [id, filterValueType, filterLegalBucket, filterFrom, filterTo]);
+  }, [id, filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterFrom, filterTo]);
 
   useEffect(() => {
     fetchData();
@@ -151,11 +183,133 @@ export default function CaseLedgerPage({
   const clearFilters = () => {
     setFilterValueType("");
     setFilterLegalBucket("");
+    setFilterReviewStatus("");
+    setFilterSuggestedBucket("");
     setFilterFrom("");
     setFilterTo("");
   };
 
-  const hasActiveFilters = filterValueType || filterLegalBucket || filterFrom || filterTo;
+  const hasActiveFilters = filterValueType || filterLegalBucket || filterReviewStatus || filterSuggestedBucket || filterFrom || filterTo;
+
+  // Bulk Actions
+  const handleBulkConfirm = async (filter?: { suggestedLegalBucket?: string; minConfidence?: number }) => {
+    setBulkProcessing(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const body: Record<string, unknown> = {
+        action: "CONFIRM",
+        note: "Bulk-Bestätigung",
+      };
+
+      if (filter) {
+        body.filter = {
+          reviewStatus: "UNREVIEWED",
+          ...filter,
+        };
+      } else if (selectedEntries.size > 0) {
+        body.entryIds = Array.from(selectedEntries);
+      } else {
+        setError("Keine Einträge ausgewählt");
+        return;
+      }
+
+      const res = await fetch(`/api/cases/${id}/ledger/bulk-review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Bulk-Bestätigung fehlgeschlagen");
+      }
+
+      setSuccessMessage(data.message || `${data.processed} Einträge bestätigt`);
+      setSelectedEntries(new Set());
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bulk-Bestätigung fehlgeschlagen");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const handleApplyClassification = async (suggestedLegalBucket: string) => {
+    setBulkProcessing(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/bulk-review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "ADJUST",
+          filter: {
+            reviewStatus: "UNREVIEWED",
+            suggestedLegalBucket,
+          },
+          reason: `Klassifikation "${suggestedLegalBucket}" übernommen`,
+          applyClassificationSuggestions: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Klassifikations-Übernahme fehlgeschlagen");
+      }
+
+      setSuccessMessage(data.message || `${data.processed} Einträge klassifiziert`);
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Klassifikations-Übernahme fehlgeschlagen");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const toggleEntrySelection = (entryId: string) => {
+    const newSelected = new Set(selectedEntries);
+    if (newSelected.has(entryId)) {
+      newSelected.delete(entryId);
+    } else {
+      newSelected.add(entryId);
+    }
+    setSelectedEntries(newSelected);
+  };
+
+  const toggleAllEntries = () => {
+    if (selectedEntries.size === entries.length) {
+      setSelectedEntries(new Set());
+    } else {
+      setSelectedEntries(new Set(entries.map((e) => e.id)));
+    }
+  };
+
+  const getReviewStatusBadgeClass = (status: ReviewStatus): string => {
+    switch (status) {
+      case "CONFIRMED":
+        return "badge-success";
+      case "ADJUSTED":
+        return "badge-warning";
+      case "UNREVIEWED":
+      default:
+        return "badge-neutral";
+    }
+  };
+
+  const getConfidenceBadgeClass = (confidence: number | null): string => {
+    if (!confidence) return "badge-neutral";
+    if (confidence >= 0.8) return "badge-success";
+    if (confidence >= 0.5) return "badge-warning";
+    return "badge-danger";
+  };
 
   const handleSync = async () => {
     setSyncing(true);
@@ -286,6 +440,96 @@ export default function CaseLedgerPage({
         </div>
       )}
 
+      {/* Review Status Cards */}
+      {classificationStats && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="admin-card p-4 border-l-4 border-gray-400">
+            <p className="text-sm text-[var(--muted)]">Ungeprüft</p>
+            <p className="text-2xl font-bold text-[var(--foreground)]">
+              {classificationStats.byReviewStatus?.UNREVIEWED || 0}
+            </p>
+            {classificationStats.classification?.withSuggestion > 0 && (
+              <p className="text-xs text-[var(--secondary)] mt-1">
+                {classificationStats.classification.withSuggestion} mit Vorschlag
+              </p>
+            )}
+          </div>
+          <div className="admin-card p-4 border-l-4 border-green-500">
+            <p className="text-sm text-[var(--muted)]">Bestätigt</p>
+            <p className="text-2xl font-bold text-[var(--success)]">
+              {classificationStats.byReviewStatus?.CONFIRMED || 0}
+            </p>
+          </div>
+          <div className="admin-card p-4 border-l-4 border-amber-500">
+            <p className="text-sm text-[var(--muted)]">Korrigiert</p>
+            <p className="text-2xl font-bold text-amber-600">
+              {classificationStats.byReviewStatus?.ADJUSTED || 0}
+            </p>
+          </div>
+          <div className="admin-card p-4 border-l-4 border-purple-500">
+            <p className="text-sm text-[var(--muted)]">Klassifikation</p>
+            <div className="flex flex-wrap gap-1 mt-1">
+              {Object.entries(classificationStats.classification?.byLegalBucket || {}).map(([bucket, count]) => (
+                bucket !== "null" && (
+                  <span key={bucket} className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded">
+                    {bucket}: {count}
+                  </span>
+                )
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Actions Bar */}
+      {classificationStats && (classificationStats.byReviewStatus?.UNREVIEWED || 0) > 0 && (
+        <div className="admin-card p-4 bg-blue-50 border-blue-200">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm font-medium text-blue-800">Bulk-Aktionen:</span>
+
+            {classificationStats.classification?.byLegalBucket?.MASSE && (
+              <button
+                onClick={() => handleApplyClassification("MASSE")}
+                disabled={bulkProcessing}
+                className="btn-secondary text-sm bg-white disabled:opacity-50"
+              >
+                MASSE bestätigen ({classificationStats.classification.byLegalBucket.MASSE})
+              </button>
+            )}
+
+            {classificationStats.classification?.byLegalBucket?.ABSONDERUNG && (
+              <button
+                onClick={() => handleApplyClassification("ABSONDERUNG")}
+                disabled={bulkProcessing}
+                className="btn-secondary text-sm bg-white disabled:opacity-50"
+              >
+                ABSONDERUNG bestätigen ({classificationStats.classification.byLegalBucket.ABSONDERUNG})
+              </button>
+            )}
+
+            {classificationStats.classification?.withSuggestion > 0 && (
+              <button
+                onClick={() => handleBulkConfirm({ minConfidence: 0.8 })}
+                disabled={bulkProcessing}
+                className="btn-primary text-sm disabled:opacity-50"
+              >
+                Hohe Konfidenz (&gt;80%) bestätigen
+              </button>
+            )}
+
+            {selectedEntries.size > 0 && (
+              <button
+                onClick={() => handleBulkConfirm()}
+                disabled={bulkProcessing}
+                className="btn-primary text-sm disabled:opacity-50"
+              >
+                Ausgewählte bestätigen ({selectedEntries.size})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="admin-card p-4">
         <div className="flex flex-wrap items-end gap-4">
@@ -318,6 +562,39 @@ export default function CaseLedgerPage({
               {Object.entries(LEGAL_BUCKET_LABELS).map(([key, label]) => (
                 <option key={key} value={key}>{label}</option>
               ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+              Review-Status
+            </label>
+            <select
+              value={filterReviewStatus}
+              onChange={(e) => setFilterReviewStatus(e.target.value as ReviewStatus | "")}
+              className="input-field min-w-[150px]"
+            >
+              <option value="">Alle</option>
+              {Object.entries(REVIEW_STATUS_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+              Vorschlag
+            </label>
+            <select
+              value={filterSuggestedBucket}
+              onChange={(e) => setFilterSuggestedBucket(e.target.value)}
+              className="input-field min-w-[150px]"
+            >
+              <option value="">Alle</option>
+              <option value="MASSE">MASSE</option>
+              <option value="ABSONDERUNG">ABSONDERUNG</option>
+              <option value="NEUTRAL">NEUTRAL</option>
+              <option value="null">Ohne Vorschlag</option>
             </select>
           </div>
 
@@ -391,12 +668,21 @@ export default function CaseLedgerPage({
             <table className="admin-table">
               <thead>
                 <tr>
+                  <th className="w-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedEntries.size === entries.length && entries.length > 0}
+                      onChange={toggleAllEntries}
+                      className="rounded border-gray-300"
+                    />
+                  </th>
                   <th>Datum</th>
                   <th>Beschreibung</th>
                   <th className="text-right">Betrag</th>
                   <th>Typ</th>
                   <th>Rechtsstatus</th>
-                  <th>Quelle</th>
+                  <th>Review</th>
+                  <th>Vorschlag</th>
                   <th>Aktionen</th>
                 </tr>
               </thead>
@@ -404,9 +690,22 @@ export default function CaseLedgerPage({
                 {entries.map((entry) => {
                   const amount = parseInt(entry.amountCents);
                   const isInflow = amount >= 0;
+                  const entryWithExtras = entry as LedgerEntryResponse & {
+                    suggestedLegalBucket?: string | null;
+                    suggestedConfidence?: number | null;
+                    suggestedReason?: string | null;
+                  };
 
                   return (
-                    <tr key={entry.id}>
+                    <tr key={entry.id} className={selectedEntries.has(entry.id) ? "bg-blue-50" : ""}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selectedEntries.has(entry.id)}
+                          onChange={() => toggleEntrySelection(entry.id)}
+                          className="rounded border-gray-300"
+                        />
+                      </td>
                       <td className="whitespace-nowrap">
                         {formatDate(entry.transactionDate)}
                       </td>
@@ -438,13 +737,24 @@ export default function CaseLedgerPage({
                         </span>
                       </td>
                       <td>
-                        <div className="text-sm text-[var(--secondary)]">
-                          {entry.bookingSource || "-"}
-                        </div>
-                        {entry.importSource && (
-                          <div className="text-xs text-[var(--muted)] truncate max-w-[150px]">
-                            {entry.importSource}
+                        <span className={`badge ${getReviewStatusBadgeClass(entry.reviewStatus as ReviewStatus)}`}>
+                          {REVIEW_STATUS_LABELS[entry.reviewStatus as ReviewStatus] || entry.reviewStatus}
+                        </span>
+                      </td>
+                      <td>
+                        {entryWithExtras.suggestedLegalBucket ? (
+                          <div className="flex flex-col gap-1">
+                            <span className="badge badge-info text-xs">
+                              {entryWithExtras.suggestedLegalBucket}
+                            </span>
+                            {entryWithExtras.suggestedConfidence && (
+                              <span className={`text-xs ${getConfidenceBadgeClass(entryWithExtras.suggestedConfidence)}`}>
+                                {Math.round(entryWithExtras.suggestedConfidence * 100)}%
+                              </span>
+                            )}
                           </div>
+                        ) : (
+                          <span className="text-xs text-[var(--muted)]">-</span>
                         )}
                       </td>
                       <td>
