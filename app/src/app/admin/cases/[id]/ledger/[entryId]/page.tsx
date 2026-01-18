@@ -1,0 +1,398 @@
+"use client";
+
+import { useState, useEffect, use } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  VALUE_TYPES,
+  LEGAL_BUCKETS,
+  ValueType,
+  LegalBucket,
+  LedgerEntryResponse,
+} from "@/lib/ledger";
+
+const VALUE_TYPE_LABELS: Record<ValueType, string> = {
+  IST: "IST",
+  PLAN: "PLAN",
+};
+
+const LEGAL_BUCKET_LABELS: Record<LegalBucket, string> = {
+  MASSE: "Masse",
+  ABSONDERUNG: "Absonderung",
+  NEUTRAL: "Neutral",
+  UNKNOWN: "Unbekannt",
+};
+
+interface CaseData {
+  id: string;
+  caseNumber: string;
+  debtorName: string;
+}
+
+export default function LedgerEntryEditPage({
+  params,
+}: {
+  params: Promise<{ id: string; entryId: string }>;
+}) {
+  const { id, entryId } = use(params);
+  const router = useRouter();
+  const [caseData, setCaseData] = useState<CaseData | null>(null);
+  const [entry, setEntry] = useState<LedgerEntryResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Form state
+  const [formLegalBucket, setFormLegalBucket] = useState<LegalBucket>("UNKNOWN");
+  const [formNote, setFormNote] = useState<string>("");
+  const [formDescription, setFormDescription] = useState<string>("");
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [caseRes, entryRes] = await Promise.all([
+          fetch(`/api/cases/${id}`),
+          fetch(`/api/cases/${id}/ledger/${entryId}`),
+        ]);
+
+        if (caseRes.ok) {
+          const data = await caseRes.json();
+          setCaseData(data);
+        } else {
+          setError("Fall nicht gefunden");
+          return;
+        }
+
+        if (entryRes.ok) {
+          const data = await entryRes.json();
+          setEntry(data);
+          setFormLegalBucket(data.legalBucket);
+          setFormNote(data.note || "");
+          setFormDescription(data.description || "");
+        } else {
+          setError("Eintrag nicht gefunden");
+        }
+      } catch (err) {
+        console.error("Error fetching data:", err);
+        setError("Fehler beim Laden der Daten");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [id, entryId]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/${entryId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          legalBucket: formLegalBucket,
+          note: formNote || null,
+          description: formDescription,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Speichern fehlgeschlagen");
+      }
+
+      const updated = await res.json();
+      setEntry(updated);
+      setSuccessMessage("Änderungen gespeichert");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Speichern fehlgeschlagen");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Möchten Sie diesen Eintrag wirklich löschen?")) {
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/${entryId}`, {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Löschen fehlgeschlagen");
+      }
+
+      router.push(`/admin/cases/${id}/ledger`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+      setSaving(false);
+    }
+  };
+
+  const formatCurrency = (cents: string | number): string => {
+    const amount = typeof cents === "string" ? parseInt(cents) : cents;
+    return (amount / 100).toLocaleString("de-DE", {
+      style: "currency",
+      currency: "EUR",
+    });
+  };
+
+  const formatDate = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString("de-DE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
+
+  const formatDateTime = (dateString: string): string => {
+    return new Date(dateString).toLocaleString("de-DE", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
+      </div>
+    );
+  }
+
+  if (!caseData || !entry) {
+    return (
+      <div className="space-y-6">
+        <div className="admin-card p-8 text-center">
+          <p className="text-[var(--danger)]">{error || "Nicht gefunden"}</p>
+          <Link href={`/admin/cases/${id}/ledger`} className="btn-secondary mt-4 inline-block">
+            Zurück zum Zahlungsregister
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const amount = parseInt(entry.amountCents);
+  const isInflow = amount >= 0;
+
+  return (
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center text-sm text-[var(--muted)]">
+        <Link href="/admin/cases" className="hover:text-[var(--primary)]">
+          Fälle
+        </Link>
+        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+        <Link href={`/admin/cases/${id}`} className="hover:text-[var(--primary)]">
+          {caseData.debtorName}
+        </Link>
+        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+        <Link href={`/admin/cases/${id}/ledger`} className="hover:text-[var(--primary)]">
+          Zahlungsregister
+        </Link>
+        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+        <span className="text-[var(--foreground)]">Bearbeiten</span>
+      </div>
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">Ledger-Eintrag bearbeiten</h1>
+          <p className="text-[var(--secondary)] mt-1">
+            {caseData.caseNumber} - {caseData.debtorName}
+          </p>
+        </div>
+        <Link href={`/admin/cases/${id}/ledger`} className="btn-secondary">
+          Zurück zum Zahlungsregister
+        </Link>
+      </div>
+
+      {/* Messages */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+          {successMessage}
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Info (Read-only) */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="admin-card p-6">
+            <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Transaktionsdetails</h2>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-[var(--muted)]">Transaktionsdatum</p>
+                <p className="font-medium text-[var(--foreground)]">
+                  {formatDate(entry.transactionDate)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-[var(--muted)]">Betrag</p>
+                <p className={`text-xl font-bold ${isInflow ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
+                  {formatCurrency(entry.amountCents)}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-[var(--muted)]">Werttyp</p>
+                <p className="font-medium text-[var(--foreground)]">
+                  {VALUE_TYPE_LABELS[entry.valueType]}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-[var(--muted)]">Buchungsquelle</p>
+                <p className="font-medium text-[var(--foreground)]">
+                  {entry.bookingSource || "-"}
+                </p>
+              </div>
+            </div>
+
+            {/* Import Info */}
+            {entry.importSource && (
+              <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                <h3 className="text-sm font-medium text-[var(--foreground)] mb-2">Import-Herkunft</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-[var(--muted)]">Quelle</p>
+                    <p className="text-[var(--secondary)]">{entry.importSource}</p>
+                  </div>
+                  {entry.importFileHash && (
+                    <div>
+                      <p className="text-[var(--muted)]">Datei-Hash</p>
+                      <p className="font-mono text-xs text-[var(--secondary)]">
+                        {entry.importFileHash.substring(0, 16)}...
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Editable Fields */}
+          <div className="admin-card p-6">
+            <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Bearbeitbare Felder</h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                  Beschreibung
+                </label>
+                <input
+                  type="text"
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  className="input-field w-full"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                  Rechtsstatus
+                </label>
+                <select
+                  value={formLegalBucket}
+                  onChange={(e) => setFormLegalBucket(e.target.value as LegalBucket)}
+                  className="input-field w-full"
+                >
+                  {Object.entries(LEGAL_BUCKET_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-[var(--muted)] mt-1">
+                  Klassifizierung für die Insolvenzmasse
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                  Notiz
+                </label>
+                <textarea
+                  value={formNote}
+                  onChange={(e) => setFormNote(e.target.value)}
+                  rows={3}
+                  className="input-field w-full"
+                  placeholder="Optionale Anmerkung zum Eintrag..."
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-between">
+              <button
+                onClick={handleDelete}
+                disabled={saving}
+                className="text-[var(--danger)] hover:underline text-sm disabled:opacity-50"
+              >
+                Eintrag löschen
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="btn-primary disabled:opacity-50"
+              >
+                {saving ? "Speichern..." : "Änderungen speichern"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar: Audit Info */}
+        <div className="lg:col-span-1">
+          <div className="admin-card p-6">
+            <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Audit-Trail</h2>
+
+            <div className="space-y-3 text-sm">
+              <div>
+                <p className="text-[var(--muted)]">Erstellt am</p>
+                <p className="text-[var(--foreground)]">{formatDateTime(entry.createdAt)}</p>
+              </div>
+              <div>
+                <p className="text-[var(--muted)]">Erstellt von</p>
+                <p className="text-[var(--foreground)]">{entry.createdBy}</p>
+              </div>
+              <div className="pt-3 border-t border-[var(--border)]">
+                <p className="text-[var(--muted)]">Zuletzt geändert</p>
+                <p className="text-[var(--foreground)]">{formatDateTime(entry.updatedAt)}</p>
+              </div>
+              <div>
+                <p className="text-[var(--muted)]">Geändert von</p>
+                <p className="text-[var(--foreground)]">{entry.updatedBy}</p>
+              </div>
+              <div className="pt-3 border-t border-[var(--border)]">
+                <p className="text-[var(--muted)]">Eintrag-ID</p>
+                <p className="font-mono text-xs text-[var(--secondary)] break-all">{entry.id}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

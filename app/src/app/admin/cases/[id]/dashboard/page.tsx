@@ -9,6 +9,7 @@ import {
 import { ConfigurableDashboard } from "@/components/dashboard";
 import EditableCategoryTable from "@/components/admin/EditableCategoryTable";
 import PlanStructureManager from "@/components/admin/PlanStructureManager";
+import LedgerDrillDownModal from "@/components/admin/LedgerDrillDownModal";
 
 interface ConfigResponse {
   success: boolean;
@@ -89,6 +90,7 @@ export default function CaseDashboardPage({
   const [editMode, setEditMode] = useState(false);
   const [showStructureManager, setShowStructureManager] = useState(false);
   const [metadata, setMetadata] = useState<ConfigResponse["metadata"] | null>(null);
+  const [drillDownPeriod, setDrillDownPeriod] = useState<number | null>(null);
 
   // Load config and calculate
   const loadData = useCallback(async () => {
@@ -522,6 +524,47 @@ export default function CaseDashboardPage({
           }}
           onClose={() => setShowStructureManager(false)}
         />
+      )}
+
+      {/* Ledger Drill-Down Modal */}
+      {drillDownPeriod !== null && (
+        <LedgerDrillDownModal
+          caseId={id}
+          periodIndex={drillDownPeriod}
+          onClose={() => setDrillDownPeriod(null)}
+        />
+      )}
+
+      {/* Drill-Down Bar (visible in non-edit mode) */}
+      {!editMode && calculationData.weeks.length > 0 && (
+        <div className="admin-card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-[var(--foreground)]">
+              Drill-Down: Ledger-Einträge pro Periode
+            </h3>
+            <Link
+              href={`/admin/cases/${id}/ledger`}
+              className="text-sm text-[var(--primary)] hover:underline"
+            >
+              Vollständiges Zahlungsregister öffnen
+            </Link>
+          </div>
+          <div className="flex gap-1 overflow-x-auto pb-2">
+            {calculationData.weeks.map((week) => (
+              <button
+                key={week.weekOffset}
+                onClick={() => setDrillDownPeriod(week.weekOffset)}
+                className="flex-shrink-0 px-3 py-2 text-xs rounded border border-[var(--border)] hover:bg-gray-50 hover:border-[var(--primary)] transition-colors"
+                title={`${week.weekLabel}: Einträge anzeigen`}
+              >
+                <div className="font-medium">{week.weekLabel}</div>
+                <div className="text-[var(--muted)] mt-0.5">
+                  {((Number(week.netCashflowCents) / 100) / 1000).toFixed(0)}k
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

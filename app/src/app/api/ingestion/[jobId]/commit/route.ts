@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { v4 as uuidv4 } from "uuid";
+import { calculatePeriodStartDate } from "@/lib/ledger";
 
 // POST /api/ingestion/[jobId]/commit - Commit staged data to core schema
+// Now creates LedgerEntry (Single Source of Truth) + PeriodValue (derived cache)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ jobId: string }> }
@@ -79,6 +81,7 @@ export async function POST(
       let createdLines = 0;
       let createdValues = 0;
       let updatedValues = 0;
+      let createdLedgerEntries = 0;
 
       for (const entry of stagedEntries) {
         // Find or create category
@@ -130,7 +133,41 @@ export async function POST(
           createdLines++;
         }
 
-        // Create or update period value
+        // === NEW: Create LedgerEntry (Single Source of Truth) ===
+        // Calculate transaction date from periodIndex or use originalDate
+        const transactionDate = entry.originalDate ||
+          calculatePeriodStartDate(
+            plan.planStartDate,
+            entry.periodIndex,
+            plan.periodType as 'WEEKLY' | 'MONTHLY'
+          );
+
+        // Determine amount with sign (positive = inflow, negative = outflow)
+        const amountWithSign = entry.targetCategoryFlowType === 'OUTFLOW'
+          ? -BigInt(entry.amountCents)
+          : BigInt(entry.amountCents);
+
+        await tx.ledgerEntry.create({
+          data: {
+            caseId: job.caseId,
+            transactionDate,
+            amountCents: amountWithSign,
+            description: entry.lineName,
+            note: entry.note,
+            valueType: entry.valueType,
+            legalBucket: 'UNKNOWN',
+            importSource: `${job.fileName} (Zeile ${entry.sourceRecordId})`,
+            importJobId: job.id,
+            importFileHash: job.fileHashSha256,
+            importRowNumber: null, // Could be extracted from sourceRecordId
+            bookingSource: 'BANK_ACCOUNT',
+            createdBy: session.username,
+            updatedBy: session.username,
+          },
+        });
+        createdLedgerEntries++;
+
+        // === Create or update period value (derived cache) ===
         const existingValue = await tx.periodValue.findUnique({
           where: {
             lineId_periodIndex_valueType: {
@@ -179,6 +216,7 @@ export async function POST(
         createdLines,
         createdValues,
         updatedValues,
+        createdLedgerEntries,
       };
     });
 

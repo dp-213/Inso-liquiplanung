@@ -39,6 +39,7 @@ model Case {
   aiPreprocessingJobs  AiPreprocessingJob[]
   customerAccess       CustomerCaseAccess[] // Additional access for other customers
   bankAccounts         BankAccount[]
+  ledgerEntries        LedgerEntry[]        // Transaction-level cash truth
 
   @@index([ownerId])
   @@map("cases")
@@ -219,6 +220,7 @@ model StagedCashflowEntry {
   valueType                String
   amountCents              BigInt
   originalAmountRaw        String?   // Original string value before conversion
+  originalDate             DateTime? // Original transaction date from import
   note                     String?
   confidenceScore          Float?
   requiresReview           Boolean   @default(false)
@@ -630,4 +632,53 @@ model BankAccount {
 
   @@index([caseId])
   @@map("bank_accounts")
+}
+
+// =============================================================================
+// LEDGER ENTRY - Transaction-level Cash Truth
+// =============================================================================
+
+// LedgerEntry - Single Source of Truth for all cash transactions
+// Case-bound (not plan-bound) - cash truth persists across plan changes
+model LedgerEntry {
+  id                String   @id @default(uuid())
+  caseId            String   // Case-bound, NOT plan-bound
+
+  // === CORE ===
+  transactionDate   DateTime  // Original payment date
+  amountCents       BigInt    // Positive = inflow, Negative = outflow
+  description       String
+  note              String?
+
+  // === VALUE TYPE ===
+  valueType         String    // IST, PLAN
+
+  // === LEGAL STATUS (lean) ===
+  legalBucket       String    @default("UNKNOWN")  // MASSE, ABSONDERUNG, NEUTRAL, UNKNOWN
+
+  // === SOURCE: IMPORT ORIGIN (audit) ===
+  importSource      String?   // e.g., "OP-Liste vom 05.01.2026"
+  importJobId       String?   // Reference to IngestionJob
+  importFileHash    String?   // SHA-256 of source file
+  importRowNumber   Int?      // Row number in source file
+
+  // === SOURCE: BOOKING SOURCE (business) ===
+  bookingSource     String?   // BANK_ACCOUNT, CASH_REGISTER, ERP, MANUAL
+  bookingSourceId   String?   // e.g., IBAN
+  bookingReference  String?   // Invoice number, document reference
+
+  // === AUDIT ===
+  createdAt         DateTime  @default(now())
+  createdBy         String
+  updatedAt         DateTime  @updatedAt
+  updatedBy         String
+
+  // === RELATIONS ===
+  case              Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([caseId, transactionDate])
+  @@index([caseId, valueType])
+  @@index([importJobId])
+  @@map("ledger_entries")
 }
