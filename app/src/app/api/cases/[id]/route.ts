@@ -55,7 +55,14 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(caseData);
+    // Convert BigInt values to strings for JSON serialization
+    const serializedData = JSON.parse(
+      JSON.stringify(caseData, (_, value) =>
+        typeof value === "bigint" ? value.toString() : value
+      )
+    );
+
+    return NextResponse.json(serializedData);
   } catch (error) {
     console.error("Error fetching case:", error);
     return NextResponse.json(
