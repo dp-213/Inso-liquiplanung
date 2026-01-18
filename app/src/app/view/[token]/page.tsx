@@ -174,41 +174,12 @@ export default function ExternalCaseView() {
     }
   }, [token]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-[var(--secondary)]">Liquiditätsplan wird geladen...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <div className="admin-card p-8 max-w-md text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h1 className="text-xl font-bold text-[var(--foreground)] mb-2">Zugang nicht moeglich</h1>
-          <p className="text-[var(--secondary)]">{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  // Memoized calculations - only recompute when data changes, not on tab switch
-  const weeks = data.calculation.weeks;
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
+  // Memoized calculations - handle null data gracefully
+  const weeks = data?.calculation?.weeks || [];
 
   const { currentCash, minCash, runwayWeek } = useMemo(() => {
+    if (weeks.length === 0) return { currentCash: BigInt(0), minCash: BigInt(0), runwayWeek: -1 };
     const current = BigInt(weeks[0]?.openingBalanceCents || "0");
     const min = weeks.reduce((m, week) => {
       const balance = BigInt(week.closingBalanceCents);
@@ -235,10 +206,11 @@ export default function ExternalCaseView() {
   }, [weeks]);
 
   const planTitle = useMemo(() => {
+    if (!data) return "";
     const periodType = data.calculation.periodType || data.plan.periodType || "WEEKLY";
     const periodCount = data.calculation.periodCount || data.plan.periodCount || 13;
     return periodType === "MONTHLY" ? `${periodCount}-Monats-Planung` : `${periodCount}-Wochen-Planung`;
-  }, [data.calculation.periodType, data.calculation.periodCount, data.plan.periodType, data.plan.periodCount]);
+  }, [data]);
 
   const getStatusLabel = useCallback((status: string): string => {
     switch (status) {
@@ -250,6 +222,7 @@ export default function ExternalCaseView() {
   }, []);
 
   const paymentMarkers = useMemo((): ChartMarker[] => {
+    if (!data || weeks.length === 0) return [];
     const markers: ChartMarker[] = [];
     const periodType = data.calculation.periodType || data.plan.periodType || "WEEKLY";
     if (periodType === "MONTHLY") {
@@ -266,19 +239,27 @@ export default function ExternalCaseView() {
       });
     }
     return markers;
-  }, [weeks, data.calculation.periodType, data.plan.periodType]);
+  }, [weeks, data]);
 
   // Memoized category calculations
-  const { inflowCategories, outflowCategories } = useMemo(() => ({
-    inflowCategories: data.calculation.categories.filter((c) => c.flowType === "INFLOW" && BigInt(c.totalCents) > BigInt(0)),
-    outflowCategories: data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && BigInt(c.totalCents) > BigInt(0)),
-  }), [data.calculation.categories]);
+  const { inflowCategories, outflowCategories } = useMemo(() => {
+    if (!data) return { inflowCategories: [], outflowCategories: [] };
+    return {
+      inflowCategories: data.calculation.categories.filter((c) => c.flowType === "INFLOW" && BigInt(c.totalCents) > BigInt(0)),
+      outflowCategories: data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && BigInt(c.totalCents) > BigInt(0)),
+    };
+  }, [data]);
 
   // Memoized estate calculations
   const {
     altmasseInflows, altmasseOutflows, neumasseInflows, neumasseOutflows,
     altmasseInflowTotal, altmasseOutflowTotal, neumasseInflowTotal, neumasseOutflowTotal
   } = useMemo(() => {
+    if (!data) return {
+      altmasseInflows: [], altmasseOutflows: [], neumasseInflows: [], neumasseOutflows: [],
+      altmasseInflowTotal: BigInt(0), altmasseOutflowTotal: BigInt(0),
+      neumasseInflowTotal: BigInt(0), neumasseOutflowTotal: BigInt(0),
+    };
     const altIn = data.calculation.categories.filter((c) => c.flowType === "INFLOW" && c.estateType === "ALTMASSE");
     const altOut = data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && c.estateType === "ALTMASSE");
     const neuIn = data.calculation.categories.filter((c) => c.flowType === "INFLOW" && c.estateType === "NEUMASSE");
@@ -293,7 +274,7 @@ export default function ExternalCaseView() {
       neumasseInflowTotal: neuIn.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0)),
       neumasseOutflowTotal: neuOut.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0)),
     };
-  }, [data.calculation.categories]);
+  }, [data]);
 
   // Memoized revenue totals
   const { grandTotal, sourceTotals } = useMemo(() => ({
@@ -307,19 +288,51 @@ export default function ExternalCaseView() {
 
   // Memoized bank account totals
   const { bankAccounts, totalBankBalance, totalAvailableBalance } = useMemo(() => {
-    const accounts = data.bankAccounts?.accounts || [];
+    const accounts = data?.bankAccounts?.accounts || [];
     return {
       bankAccounts: accounts,
       totalBankBalance: accounts.reduce((sum, acc) => sum + BigInt(acc.balanceCents), BigInt(0)),
       totalAvailableBalance: accounts.reduce((sum, acc) => sum + BigInt(acc.availableCents), BigInt(0)),
     };
-  }, [data.bankAccounts]);
+  }, [data?.bankAccounts]);
 
   // Security totals (demo data - memoized)
   const { totalSecurityValue, settledAmount } = useMemo(() => ({
     totalSecurityValue: DEMO_SECURITY_RIGHTS.reduce((sum, sr) => sum + sr.estimatedValue, BigInt(0)),
     settledAmount: DEMO_SECURITY_RIGHTS.filter((sr) => sr.settlementAmount).reduce((sum, sr) => sum + (sr.settlementAmount || BigInt(0)), BigInt(0)),
   }), []);
+
+  // NOW the conditional returns (after all hooks)
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="mt-4 text-[var(--secondary)]">Liquiditätsplan wird geladen...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <div className="admin-card p-8 max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold text-[var(--foreground)] mb-2">Zugang nicht möglich</h1>
+          <p className="text-[var(--secondary)]">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return null;
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {

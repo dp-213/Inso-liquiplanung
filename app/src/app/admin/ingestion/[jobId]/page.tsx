@@ -599,7 +599,12 @@ export default function IngestionJobDetailPage({
                         <div className="text-sm max-w-md truncate">
                           {Object.entries(record.rawData)
                             .slice(0, 3)
-                            .map(([k, v]) => `${k}: ${v}`)
+                            .map(([k, v]) => {
+                              const displayValue = typeof v === 'object' && v !== null
+                                ? JSON.stringify(v)
+                                : String(v || '');
+                              return `${k}: ${displayValue}`;
+                            })
                             .join(" | ")}
                           {Object.keys(record.rawData).length > 3 && " ..."}
                         </div>

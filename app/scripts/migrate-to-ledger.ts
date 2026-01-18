@@ -179,7 +179,6 @@ async function migrate() {
           importSource: 'MIGRATION_FROM_PERIOD_VALUES',
           bookingSource: 'MANUAL',
           createdBy: 'migration-script',
-          updatedBy: 'migration-script',
         },
       });
       count++;

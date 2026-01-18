@@ -26,45 +26,45 @@ Inso-Liquiplanung ist ein spezialisiertes System zur Erstellung und Verwaltung v
 2. Melden Sie sich mit Ihren Admin-Zugangsdaten an
 3. Nach erfolgreicher Anmeldung sehen Sie das Admin-Dashboard
 
-### Taeglich Arbeiten
+### Täglich Arbeiten
 
 **Neues Projekt anlegen:**
-1. Klicken Sie auf "Neues Projekt erstellen" auf der Uebersichtsseite
+1. Klicken Sie auf "Neues Projekt erstellen" auf der Übersichtsseite
 2. Geben Sie den Namen des Insolvenzverwalters/Mandanten ein
-3. Optional: Beschreibung hinzufuegen
+3. Optional: Beschreibung hinzufügen
 4. Speichern
 
 **Neuen Fall anlegen:**
-1. Gehen Sie zu "Faelle" im Seitenmenue
+1. Gehen Sie zu "Fälle" im Seitenmenü
 2. Klicken Sie auf "Neuen Fall anlegen"
-3. Waehlen Sie das zugehoerige Projekt aus
+3. Wählen Sie das zugehörige Projekt aus
 4. Tragen Sie ein:
    - Aktenzeichen (z.B. "123 IN 456/26")
    - Schuldnername
    - Amtsgericht
    - Antragsdatum
-   - Optional: Eroeffnungsdatum
+   - Optional: Eröffnungsdatum
 5. Speichern
 
 **Daten importieren:**
-1. Oeffnen Sie die Fall-Detailseite
+1. Öffnen Sie die Fall-Detailseite
 2. Klicken Sie auf "Daten importieren"
-3. Waehlen Sie den Fall und den Dateityp aus
-4. Ziehen Sie die Datei in den Upload-Bereich oder waehlen Sie sie aus
-5. Die Datei wird automatisch geprueft und normalisiert
-6. Bei Warnungen: Pruefen Sie die markierten Zeilen im Review-Bereich
-7. Nach erfolgreicher Pruefung: Klicken Sie auf "Uebernehmen"
+3. Wählen Sie den Fall und den Dateityp aus
+4. Ziehen Sie die Datei in den Upload-Bereich oder wählen Sie sie aus
+5. Die Datei wird automatisch geprüft und normalisiert
+6. Bei Warnungen: Prüfen Sie die markierten Zeilen im Review-Bereich
+7. Nach erfolgreicher Prüfung: Klicken Sie auf "Übernehmen"
 
-**Liquiditaetsplan einsehen:**
-1. Oeffnen Sie den gewuenschten Fall
-2. Klicken Sie auf "Liquiditaetsplan anzeigen"
+**Liquiditätsplan einsehen:**
+1. Öffnen Sie den gewünschten Fall
+2. Klicken Sie auf "Liquiditätsplan anzeigen"
 3. Die 13-Wochen-Tabelle zeigt alle Ein- und Auszahlungen
-4. Der Saldo wird automatisch woechentlich berechnet
+4. Der Saldo wird automatisch wöchentlich berechnet
 
 **Externen Zugang erstellen:**
 1. Auf der Fall-Detailseite: Bereich "Externe Freigaben"
 2. Klicken Sie auf "Neuen Link erstellen"
-3. Vergeben Sie eine Bezeichnung (z.B. "RA Dr. Mueller")
+3. Vergeben Sie eine Bezeichnung (z.B. "RA Dr. Müller")
 4. Optional: Ablaufdatum setzen
 5. Kopieren Sie den generierten Link und senden Sie ihn dem Insolvenzverwalter
 
@@ -72,11 +72,11 @@ Inso-Liquiplanung ist ein spezialisiertes System zur Erstellung und Verwaltung v
 
 | Bereich | Beschreibung |
 |---------|--------------|
-| Uebersicht | Dashboard mit Schnellzugriff auf Projekte, Faelle, offene Imports |
+| Übersicht | Dashboard mit Schnellzugriff auf Projekte, Fälle, offene Imports |
 | Projekte | Verwaltung von Mandanten/Insolvenzverwaltern |
-| Faelle | Alle Insolvenzverfahren mit Status und Aktionen |
+| Fälle | Alle Insolvenzverfahren mit Status und Aktionen |
 | Daten-Import | Zentraler Upload- und Mapping-Bereich |
-| Pruefung | Review-Warteschlange fuer Datensaetze mit Warnungen |
+| Prüfung | Review-Warteschlange für Datensätze mit Warnungen |
 
 ---
 

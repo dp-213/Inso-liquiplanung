@@ -196,20 +196,46 @@ export interface CanonicalImportRecord {
  * Each canonical field can be represented by multiple column name variations.
  */
 export const COLUMN_NAME_MAPPINGS: Record<string, string[]> = {
-  // Required: Date
-  datum: ['datum', 'date', 'buchungsdatum', 'valuta', 'wertstellung', 'faellig', 'faelligkeit', 'termin'],
+  // Required: Date - viele Varianten für Bankauszüge
+  datum: [
+    'datum', 'date', 'buchungsdatum', 'valuta', 'wertstellung',
+    'faellig', 'fällig', 'faelligkeit', 'fälligkeit', 'termin',
+    'buchungstag', 'wertstellungsdatum', 'valutadatum',
+    'transaktionsdatum', 'umsatzdatum', 'tag',
+  ],
 
-  // Required: Amount (single)
-  betrag: ['betrag', 'amount', 'summe', 'wert', 'euro', 'eur', 'value'],
+  // Required: Amount (single) - viele Varianten
+  betrag: [
+    'betrag', 'amount', 'summe', 'wert', 'euro', 'eur', 'value',
+    'umsatz', 'transaktion', 'buchung', 'zahlung',
+    'betrag eur', 'betrag in eur', 'betrag (eur)', 'betrag €',
+  ],
 
   // Required: Amount (split - inflow)
-  einzahlung: ['einzahlung', 'einnahme', 'einnahmen', 'zufluss', 'haben', 'credit', 'inflow', 'eingang'],
+  einzahlung: [
+    'einzahlung', 'einnahme', 'einnahmen', 'zufluss', 'haben', 'credit', 'inflow', 'eingang',
+    'gutschrift', 'eingang eur', 'haben eur',
+  ],
 
   // Required: Amount (split - outflow)
-  auszahlung: ['auszahlung', 'ausgabe', 'ausgaben', 'abfluss', 'soll', 'debit', 'outflow', 'ausgang'],
+  auszahlung: [
+    'auszahlung', 'ausgabe', 'ausgaben', 'abfluss', 'soll', 'debit', 'outflow', 'ausgang',
+    'belastung', 'lastschrift', 'ausgang eur', 'soll eur',
+  ],
 
-  // Required: Description
-  bezeichnung: ['bezeichnung', 'beschreibung', 'name', 'position', 'text', 'verwendungszweck', 'buchungstext', 'description', 'label'],
+  // Required: Description - viele Varianten für Bankauszüge
+  bezeichnung: [
+    'bezeichnung', 'beschreibung', 'name', 'position', 'text',
+    'verwendungszweck', 'buchungstext', 'description', 'label',
+    'info', 'details', 'zahlungsgrund', 'grund', 'zweck',
+    'empfaenger', 'empfänger', 'auftraggeber', 'partner',
+    'zahlungsempfaenger', 'zahlungsempfänger', 'beguenstigter', 'begünstigter',
+    'empfänger/auftraggeber', 'name/verwendungszweck',
+    'buchungsinformation', 'transaktionstext', 'umsatztext',
+    // HVPlus / Banksoftware-Exporte
+    'transaktionsinformation', 'transaktion', 'information',
+    'creditor name', 'debtor name', 'kreditor', 'debitor',
+  ],
 
   // Optional: Category
   kategorie: ['kategorie', 'category', 'gruppe', 'group', 'art', 'type', 'klasse'],

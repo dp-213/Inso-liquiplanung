@@ -79,6 +79,11 @@ export default function CaseLedgerPage({
   const [filterFrom, setFilterFrom] = useState<string>("");
   const [filterTo, setFilterTo] = useState<string>("");
 
+  // Sort state
+  type SortField = "transactionDate" | "description" | "amountCents" | "valueType" | "legalBucket" | "reviewStatus";
+  const [sortBy, setSortBy] = useState<SortField>("transactionDate");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -292,6 +297,61 @@ export default function CaseLedgerPage({
     }
   };
 
+  // Sort handler
+  const handleSort = (field: SortField) => {
+    if (sortBy === field) {
+      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    } else {
+      setSortBy(field);
+      setSortOrder("asc");
+    }
+  };
+
+  // Sort entries
+  const sortedEntries = [...entries].sort((a, b) => {
+    let comparison = 0;
+    switch (sortBy) {
+      case "transactionDate":
+        comparison = new Date(a.transactionDate).getTime() - new Date(b.transactionDate).getTime();
+        break;
+      case "description":
+        comparison = a.description.localeCompare(b.description, "de");
+        break;
+      case "amountCents":
+        comparison = parseInt(a.amountCents) - parseInt(b.amountCents);
+        break;
+      case "valueType":
+        comparison = a.valueType.localeCompare(b.valueType);
+        break;
+      case "legalBucket":
+        comparison = a.legalBucket.localeCompare(b.legalBucket);
+        break;
+      case "reviewStatus":
+        comparison = a.reviewStatus.localeCompare(b.reviewStatus);
+        break;
+    }
+    return sortOrder === "asc" ? comparison : -comparison;
+  });
+
+  // Sort header component
+  const SortHeader = ({ field, label, className = "" }: { field: SortField; label: string; className?: string }) => (
+    <th
+      className={`cursor-pointer hover:bg-gray-100 select-none ${className}`}
+      onClick={() => handleSort(field)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        <span className="text-[var(--muted)]">
+          {sortBy === field ? (
+            sortOrder === "asc" ? "↑" : "↓"
+          ) : (
+            <span className="opacity-30">↕</span>
+          )}
+        </span>
+      </div>
+    </th>
+  );
+
   const getReviewStatusBadgeClass = (status: ReviewStatus): string => {
     switch (status) {
       case "CONFIRMED":
@@ -387,6 +447,12 @@ export default function CaseLedgerPage({
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <Link href={`/admin/cases/${id}/rules`} className="btn-secondary flex items-center">
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            Rules
+          </Link>
           <button
             onClick={handleSync}
             disabled={syncing}
@@ -676,18 +742,18 @@ export default function CaseLedgerPage({
                       className="rounded border-gray-300"
                     />
                   </th>
-                  <th>Datum</th>
-                  <th>Beschreibung</th>
-                  <th className="text-right">Betrag</th>
-                  <th>Typ</th>
-                  <th>Rechtsstatus</th>
-                  <th>Review</th>
+                  <SortHeader field="transactionDate" label="Datum" />
+                  <SortHeader field="description" label="Beschreibung" />
+                  <SortHeader field="amountCents" label="Betrag" className="text-right" />
+                  <SortHeader field="valueType" label="Typ" />
+                  <SortHeader field="legalBucket" label="Rechtsstatus" />
+                  <SortHeader field="reviewStatus" label="Review" />
                   <th>Vorschlag</th>
                   <th>Aktionen</th>
                 </tr>
               </thead>
               <tbody>
-                {entries.map((entry) => {
+                {sortedEntries.map((entry) => {
                   const amount = parseInt(entry.amountCents);
                   const isInflow = amount >= 0;
                   const entryWithExtras = entry as LedgerEntryResponse & {

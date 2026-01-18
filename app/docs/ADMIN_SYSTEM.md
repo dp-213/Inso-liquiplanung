@@ -20,7 +20,9 @@
    - [4.6 Insolvenzeffekte](#46-insolvenzeffekte)
    - [4.7 Bankenspiegel](#47-bankenspiegel)
    - [4.8 Zahlungsregister (Ledger)](#48-zahlungsregister-ledger)
-   - [4.9 Externe Ansicht](#49-externe-ansicht)
+   - [4.9 Steuerungsdimensionen](#49-steuerungsdimensionen-ledgerentry)
+   - [4.10 Planungsart (Horizont)](#410-planungsart-horizont)
+   - [4.11 Externe Ansicht](#411-externe-ansicht)
 5. [Datenmodell-Diagramm](#5-datenmodell-diagramm)
 6. [Datenfluss: Import bis Anzeige](#6-datenfluss-import-bis-anzeige)
 
@@ -640,7 +642,103 @@ model LedgerEntry {
 
 ---
 
-### 4.9 Externe Ansicht
+### 4.9 Steuerungsdimensionen (LedgerEntry)
+
+**Erweiterte Kategorisierung von Buchungen**
+
+#### Was sind Steuerungsdimensionen?
+
+Steuerungsdimensionen ermöglichen es, jeden LedgerEntry zusätzlich zu seiner Kategorie nach weiteren Kriterien zu klassifizieren. Dies erlaubt detaillierte Auswertungen nach:
+
+| Dimension | Modell | Beispiel | Nutzen |
+|-----------|--------|----------|--------|
+| **Bankkonto** | `BankAccount` | "Sparkasse Geschäftskonto DE89..." | Liquidität pro Konto verfolgen |
+| **Gegenpartei** | `Counterparty` | "HAEVG Rechenzentrum" | Top-Zahler identifizieren |
+| **Standort** | `Location` | "Praxis Uckerath" | Kosten pro Betriebsstätte |
+| **Freitext-Tag** | `steeringTag` | "Projekt-A" | Flexible Zusatzkategorisierung |
+
+#### Felder am LedgerEntry
+
+```prisma
+model LedgerEntry {
+  // ... Kernfelder ...
+
+  // Steuerungsdimensionen (alle optional)
+  bankAccountId   String?       // FK zu BankAccount
+  counterpartyId  String?       // FK zu Counterparty
+  locationId      String?       // FK zu Location
+  steeringTag     String?       // Freies Textfeld für flexible Tags
+
+  // Relationen
+  bankAccount     BankAccount?  @relation(...)
+  counterparty    Counterparty? @relation(...)
+  location        Location?     @relation(...)
+}
+```
+
+#### Wann werden Steuerungsdimensionen gesetzt?
+
+1. **Beim Import:** Bankkonto optional vorauswählbar
+2. **Im Review:** Manuell pro Eintrag zuweisbar
+3. **Per Klassifikationsregel:** Automatisch basierend auf Mustern
+
+#### Beispiel: Auswertung nach Gegenpartei
+
+```
+Gegenpartei         | Einzahlungen (IST) | % Anteil
+--------------------|--------------------|---------
+HAEVG Rechenzentrum | 125.000 EUR        | 42%
+KV Nordrhein        |  85.000 EUR        | 28%
+PVS rhein-ruhr      |  45.000 EUR        | 15%
+Andere              |  45.000 EUR        | 15%
+```
+
+#### Stammdatenpflege
+
+- **Bankkonten:** `/admin/cases/[id]/bank-accounts`
+- **Gegenparteien:** `/admin/cases/[id]/counterparties`
+- **Standorte:** `/admin/cases/[id]/locations`
+
+---
+
+### 4.10 Planungsart (Horizont)
+
+**Pfad:** `/admin/cases/[id]/edit` → Abschnitt "Planeinstellungen"
+
+#### Was ist die Planungsart?
+
+Die Planungsart definiert den **zeitlichen Horizont** und die **Granularität** des Liquiditätsplans:
+
+| Einstellung | Optionen | Standard | Auswirkung |
+|-------------|----------|----------|------------|
+| **periodType** | WEEKLY, MONTHLY | WEEKLY | Periodenlänge |
+| **periodCount** | 1-52 | 13 | Anzahl Perioden |
+| **planStartDate** | Datum | Antragsdatum | Beginn des Plans |
+
+#### Industriestandard: 13-Wochen-Plan
+
+Der **13-Wochen-Liquiditätsplan** ist der Industriestandard in der deutschen Insolvenzpraxis:
+
+- **Wöchentliche Granularität:** Jede Woche separat ausgewiesen
+- **3-Monats-Horizont:** ~13 Wochen = 1 Quartal
+- **Rollierend:** Wird wöchentlich fortgeschrieben
+
+#### Alternative: Monatsplanung
+
+Für längerfristige Szenarien (z.B. Sanierungspläne):
+
+- periodType = MONTHLY
+- periodCount = 12 (1 Jahr) oder 24 (2 Jahre)
+
+#### Wo wird die Planungsart angezeigt?
+
+- **Case-Übersicht:** Zeigt "13 Wochen" oder "12 Monate"
+- **Dashboard:** Spaltenanzahl entspricht periodCount
+- **PDF-Export:** Überschrift enthält Planungshorizont
+
+---
+
+### 4.11 Externe Ansicht
 
 **Pfad:** `/view/[token]`
 

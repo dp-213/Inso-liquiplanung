@@ -61,6 +61,26 @@ interface CaseData {
   debtorName: string;
 }
 
+interface BankAccount {
+  id: string;
+  bankName: string;
+  iban: string;
+  accountType: string;
+}
+
+interface Counterparty {
+  id: string;
+  name: string;
+  shortName: string | null;
+  type: string | null;
+}
+
+interface Location {
+  id: string;
+  name: string;
+  shortName: string | null;
+}
+
 export default function LedgerEntryEditPage({
   params,
 }: {
@@ -80,6 +100,17 @@ export default function LedgerEntryEditPage({
   const [formNote, setFormNote] = useState<string>("");
   const [formDescription, setFormDescription] = useState<string>("");
 
+  // Steuerungsdimensionen
+  const [formBankAccountId, setFormBankAccountId] = useState<string>("");
+  const [formCounterpartyId, setFormCounterpartyId] = useState<string>("");
+  const [formLocationId, setFormLocationId] = useState<string>("");
+  const [formSteeringTag, setFormSteeringTag] = useState<string>("");
+
+  // Dropdown-Listen
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+
   // Review state
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewReason, setReviewReason] = useState<string>("");
@@ -88,9 +119,12 @@ export default function LedgerEntryEditPage({
   useEffect(() => {
     async function fetchData() {
       try {
-        const [caseRes, entryRes] = await Promise.all([
+        const [caseRes, entryRes, bankRes, counterpartyRes, locationRes] = await Promise.all([
           fetch(`/api/cases/${id}`),
           fetch(`/api/cases/${id}/ledger/${entryId}`),
+          fetch(`/api/cases/${id}/bank-accounts`),
+          fetch(`/api/cases/${id}/counterparties`),
+          fetch(`/api/cases/${id}/locations`),
         ]);
 
         if (caseRes.ok) {
@@ -101,12 +135,31 @@ export default function LedgerEntryEditPage({
           return;
         }
 
+        // Dropdown-Listen laden
+        if (bankRes.ok) {
+          const data = await bankRes.json();
+          setBankAccounts(data.accounts || []);
+        }
+        if (counterpartyRes.ok) {
+          const data = await counterpartyRes.json();
+          setCounterparties(data.counterparties || []);
+        }
+        if (locationRes.ok) {
+          const data = await locationRes.json();
+          setLocations(data.locations || []);
+        }
+
         if (entryRes.ok) {
           const data = await entryRes.json();
           setEntry(data);
           setFormLegalBucket(data.legalBucket);
           setFormNote(data.note || "");
           setFormDescription(data.description || "");
+          // Steuerungsdimensionen initialisieren
+          setFormBankAccountId(data.bankAccountId || "");
+          setFormCounterpartyId(data.counterpartyId || "");
+          setFormLocationId(data.locationId || "");
+          setFormSteeringTag(data.steeringTag || "");
         } else {
           setError("Eintrag nicht gefunden");
         }
@@ -134,6 +187,10 @@ export default function LedgerEntryEditPage({
           legalBucket: formLegalBucket,
           note: formNote || null,
           description: formDescription,
+          bankAccountId: formBankAccountId || null,
+          counterpartyId: formCounterpartyId || null,
+          locationId: formLocationId || null,
+          steeringTag: formSteeringTag || null,
         }),
       });
 
@@ -450,6 +507,79 @@ export default function LedgerEntryEditPage({
                 </p>
               </div>
 
+              {/* Steuerungsdimensionen */}
+              <div className="pt-4 border-t border-[var(--border)]">
+                <h3 className="text-sm font-medium text-[var(--foreground)] mb-3">Steuerungsdimensionen</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm text-[var(--muted)] mb-1">
+                      Bankkonto
+                    </label>
+                    <select
+                      value={formBankAccountId}
+                      onChange={(e) => setFormBankAccountId(e.target.value)}
+                      className="input-field w-full"
+                    >
+                      <option value="">-- Nicht zugeordnet --</option>
+                      {bankAccounts.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.bankName} ({acc.iban.slice(-8)})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-[var(--muted)] mb-1">
+                      Gegenpartei
+                    </label>
+                    <select
+                      value={formCounterpartyId}
+                      onChange={(e) => setFormCounterpartyId(e.target.value)}
+                      className="input-field w-full"
+                    >
+                      <option value="">-- Nicht zugeordnet --</option>
+                      {counterparties.map((cp) => (
+                        <option key={cp.id} value={cp.id}>
+                          {cp.shortName || cp.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-[var(--muted)] mb-1">
+                      Standort
+                    </label>
+                    <select
+                      value={formLocationId}
+                      onChange={(e) => setFormLocationId(e.target.value)}
+                      className="input-field w-full"
+                    >
+                      <option value="">-- Nicht zugeordnet --</option>
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.shortName ? `${loc.shortName} - ${loc.name}` : loc.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-[var(--muted)] mb-1">
+                      Tag
+                    </label>
+                    <input
+                      type="text"
+                      value={formSteeringTag}
+                      onChange={(e) => setFormSteeringTag(e.target.value)}
+                      className="input-field w-full"
+                      placeholder="z.B. TOP_PAYER"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
                   Notiz
@@ -571,6 +701,75 @@ export default function LedgerEntryEditPage({
             </div>
           </div>
 
+          {/* Classification Suggestion (if available) */}
+          {(entry as LedgerEntryResponse & { suggestedLegalBucket?: string; suggestedConfidence?: number; suggestedReason?: string }).suggestedLegalBucket && (
+            <div className="admin-card p-6 bg-purple-50 border-purple-200">
+              <h2 className="text-lg font-semibold text-purple-800 mb-4">Klassifikations-Vorschlag</h2>
+              <div className="space-y-3 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-purple-600">Vorgeschlagen:</span>
+                  <span className="font-semibold text-purple-800">
+                    {(entry as LedgerEntryResponse & { suggestedLegalBucket?: string }).suggestedLegalBucket}
+                  </span>
+                </div>
+                {(entry as LedgerEntryResponse & { suggestedConfidence?: number }).suggestedConfidence && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-purple-600">Konfidenz:</span>
+                    <div className="flex-1 bg-purple-100 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-purple-600 h-full"
+                        style={{ width: `${Math.round((entry as LedgerEntryResponse & { suggestedConfidence?: number }).suggestedConfidence! * 100)}%` }}
+                      />
+                    </div>
+                    <span className="font-mono text-purple-800">
+                      {Math.round((entry as LedgerEntryResponse & { suggestedConfidence?: number }).suggestedConfidence! * 100)}%
+                    </span>
+                  </div>
+                )}
+                {(entry as LedgerEntryResponse & { suggestedReason?: string }).suggestedReason && (
+                  <div>
+                    <span className="text-purple-600">Begründung:</span>
+                    <p className="text-purple-800 mt-1 text-xs italic">
+                      {(entry as LedgerEntryResponse & { suggestedReason?: string }).suggestedReason}
+                    </p>
+                  </div>
+                )}
+                {entry.reviewStatus === REVIEW_STATUS.UNREVIEWED && (
+                  <div className="pt-3 border-t border-purple-200">
+                    <button
+                      onClick={() => {
+                        setFormLegalBucket((entry as LedgerEntryResponse & { suggestedLegalBucket?: string }).suggestedLegalBucket as LegalBucket);
+                      }}
+                      className="text-sm text-purple-700 hover:text-purple-900 underline"
+                    >
+                      Vorschlag übernehmen
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Rule erstellen */}
+          <div className="admin-card p-6 bg-blue-50 border-blue-200">
+            <h2 className="text-lg font-semibold text-blue-800 mb-3">Regel erstellen</h2>
+            <p className="text-sm text-blue-700 mb-4">
+              Erstelle eine Klassifikationsregel basierend auf diesem Eintrag.
+            </p>
+            <Link
+              href={`/admin/cases/${id}/rules?createFrom=${encodeURIComponent(entry.description)}&suggestBucket=${formLegalBucket}`}
+              className="w-full btn-secondary bg-blue-100 hover:bg-blue-200 text-blue-800 border-blue-300 flex items-center justify-center"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Regel aus Beschreibung erstellen
+            </Link>
+            <p className="text-xs text-blue-600 mt-2">
+              Pattern: &ldquo;{entry.description.substring(0, 30)}{entry.description.length > 30 ? "..." : ""}&rdquo;
+            </p>
+          </div>
+
           {/* Audit Info */}
           <div className="admin-card p-6">
             <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Audit-Trail</h2>
@@ -588,10 +787,12 @@ export default function LedgerEntryEditPage({
                 <p className="text-[var(--muted)]">Zuletzt geändert</p>
                 <p className="text-[var(--foreground)]">{formatDateTime(entry.updatedAt)}</p>
               </div>
-              <div>
-                <p className="text-[var(--muted)]">Geändert von</p>
-                <p className="text-[var(--foreground)]">{entry.updatedBy}</p>
-              </div>
+              {entry.reviewedBy && (
+                <div>
+                  <p className="text-[var(--muted)]">Geprüft von</p>
+                  <p className="text-[var(--foreground)]">{entry.reviewedBy}</p>
+                </div>
+              )}
               <div className="pt-3 border-t border-[var(--border)]">
                 <p className="text-[var(--muted)]">Eintrag-ID</p>
                 <p className="font-mono text-xs text-[var(--secondary)] break-all">{entry.id}</p>

@@ -271,7 +271,7 @@ export async function POST(
             categoryName: isInflow
               ? defaultCategory.flowType === "INFLOW"
                 ? defaultCategory.categoryName
-                : "Umsatzerloese"
+                : "Umsatzerlöse"
               : defaultCategory.flowType === "OUTFLOW"
               ? defaultCategory.categoryName
               : "Sonstige Auszahlungen Neu",
@@ -283,7 +283,7 @@ export async function POST(
           // Auto-assign based on sign
           const isInflow = amountCents >= 0;
           targetCategory = {
-            categoryName: isInflow ? "Umsatzerloese" : "Sonstige Auszahlungen Neu",
+            categoryName: isInflow ? "Umsatzerlöse" : "Sonstige Auszahlungen Neu",
             flowType: isInflow ? "INFLOW" : "OUTFLOW",
             estateType: "NEUMASSE",
           };

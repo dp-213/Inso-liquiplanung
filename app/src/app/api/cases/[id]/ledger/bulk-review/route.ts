@@ -202,7 +202,6 @@ async function bulkAdjustEntries(
         reviewNote: options.reason,
         changeReason: options.reason,
         updatedAt: now,
-        updatedBy: userId,
       };
 
       const fieldChanges: Record<string, { old: string | null; new: string | null }> = {

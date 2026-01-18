@@ -46,7 +46,6 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
     createdAt: entry.createdAt.toISOString(),
     createdBy: entry.createdBy,
     updatedAt: entry.updatedAt.toISOString(),
-    updatedBy: entry.updatedBy,
     // Derived
     flowType: deriveFlowType(BigInt(entry.amountCents)),
   };
@@ -113,9 +112,7 @@ export async function PUT(
     }
 
     // Build update data
-    const updateData: Record<string, unknown> = {
-      updatedBy: session.username,
-    };
+    const updateData: Record<string, unknown> = {};
 
     if (body.transactionDate !== undefined) {
       updateData.transactionDate = new Date(body.transactionDate);
@@ -163,6 +160,23 @@ export async function PUT(
 
     if (body.bookingReference !== undefined) {
       updateData.bookingReference = body.bookingReference;
+    }
+
+    // Steuerungsdimensionen
+    if (body.bankAccountId !== undefined) {
+      updateData.bankAccountId = body.bankAccountId || null;
+    }
+
+    if (body.counterpartyId !== undefined) {
+      updateData.counterpartyId = body.counterpartyId || null;
+    }
+
+    if (body.locationId !== undefined) {
+      updateData.locationId = body.locationId || null;
+    }
+
+    if (body.steeringTag !== undefined) {
+      updateData.steeringTag = body.steeringTag || null;
     }
 
     // Build field changes for audit log

@@ -161,8 +161,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             reviewStatus: 'UNREVIEWED',
             createdAt: now,
             createdBy: userId,
-            updatedAt: now,
-            updatedBy: userId,
           },
         });
 

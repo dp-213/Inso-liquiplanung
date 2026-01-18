@@ -162,7 +162,6 @@ export async function POST(
             importRowNumber: null, // Could be extracted from sourceRecordId
             bookingSource: 'BANK_ACCOUNT',
             createdBy: session.username,
-            updatedBy: session.username,
           },
         });
         createdLedgerEntries++;

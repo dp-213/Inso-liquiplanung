@@ -169,7 +169,6 @@ export async function confirmEntry(
       reviewedAt: new Date(),
       reviewNote: note || null,
       updatedAt: new Date(),
-      updatedBy: userId,
     },
   });
 
@@ -239,7 +238,6 @@ export async function adjustEntry(
     reviewNote: input.reason,
     changeReason: input.reason,
     updatedAt: new Date(),
-    updatedBy: userId,
   };
 
   // Track amount change

@@ -43,6 +43,8 @@ model Case {
   aiPreprocessingJobs  AiPreprocessingJob[]
   customerAccess       CustomerCaseAccess[] // Additional access for other customers
   bankAccounts         BankAccount[]
+  counterparties       Counterparty[]       // Wichtige Gegenparteien (HAEVG, KV, etc.)
+  locations            Location[]           // Standorte / Praxen
   ledgerEntries        LedgerEntry[]        // Transaction-level cash truth
   classificationRules  ClassificationRule[] // Rule Engine für Klassifikations-Vorschläge
 
@@ -636,9 +638,55 @@ model BankAccount {
   updatedBy       String
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  ledgerEntries LedgerEntry[]
 
   @@index([caseId])
   @@map("bank_accounts")
+}
+
+// Counterparty - Wichtige Gegenparteien (z.B. HAEVG, KV, große Zahler)
+// Case-spezifische Stammdaten für Steuerung und Auswertung
+model Counterparty {
+  id            String   @id @default(uuid())
+  caseId        String
+  name          String   // z.B. "HAEVG", "KV Nordrhein", "PVS rhein-ruhr"
+  shortName     String?  // Kurzname für Anzeige
+  type          String?  // PAYER, SUPPLIER, AUTHORITY, OTHER
+  matchPattern  String?  // Regex/Pattern für Auto-Matching in Beschreibungen
+  isTopPayer    Boolean  @default(false)  // Separat in Auswertung ausweisen?
+  notes         String?
+  displayOrder  Int      @default(0)
+  createdAt     DateTime @default(now())
+  createdBy     String
+  updatedAt     DateTime @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  ledgerEntries LedgerEntry[]
+
+  @@index([caseId])
+  @@map("counterparties")
+}
+
+// Location - Standorte / Praxen / Einheiten
+// Case-spezifische Stammdaten für Standort-basierte Auswertung
+model Location {
+  id            String   @id @default(uuid())
+  caseId        String
+  name          String   // z.B. "Praxis Uckerath", "Standort Köln"
+  shortName     String?  // Kurzname für Anzeige
+  address       String?  // Optionale Adresse
+  costCenter    String?  // Kostenstelle (falls relevant)
+  notes         String?
+  displayOrder  Int      @default(0)
+  createdAt     DateTime @default(now())
+  createdBy     String
+  updatedAt     DateTime @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  ledgerEntries LedgerEntry[]
+
+  @@index([caseId])
+  @@map("locations")
 }
 
 // =============================================================================
@@ -671,8 +719,14 @@ model LedgerEntry {
 
   // === SOURCE: BOOKING SOURCE (business) ===
   bookingSource     String?   // BANK_ACCOUNT, CASH_REGISTER, ERP, MANUAL
-  bookingSourceId   String?   // e.g., IBAN
+  bookingSourceId   String?   // e.g., IBAN (legacy, use bankAccountId instead)
   bookingReference  String?   // Invoice number, document reference
+
+  // === STEUERUNGSDIMENSIONEN (optional, für Dashboard/Auswertung) ===
+  bankAccountId     String?   // Referenz auf Bankenspiegel
+  counterpartyId    String?   // Referenz auf Gegenpartei (z.B. HAEVG, KV)
+  locationId        String?   // Referenz auf Standort/Praxis
+  steeringTag       String?   // Freies Tag (z.B. TOP_PAYER, SYSTEMRELEVANT)
 
   // === GOVERNANCE (Review-Status) ===
   reviewStatus      String    @default("UNREVIEWED")  // UNREVIEWED, CONFIRMED, ADJUSTED
@@ -695,10 +749,12 @@ model LedgerEntry {
   createdAt         DateTime  @default(now())
   createdBy         String
   updatedAt         DateTime  @updatedAt
-  updatedBy         String
 
   // === RELATIONS ===
   case              Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  bankAccount       BankAccount? @relation(fields: [bankAccountId], references: [id])
+  counterparty      Counterparty? @relation(fields: [counterpartyId], references: [id])
+  location          Location? @relation(fields: [locationId], references: [id])
   auditLogs         LedgerAuditLog[]
 
   @@index([caseId])
@@ -706,6 +762,9 @@ model LedgerEntry {
   @@index([caseId, valueType])
   @@index([caseId, reviewStatus])
   @@index([caseId, reviewStatus, suggestedLegalBucket])
+  @@index([caseId, bankAccountId])
+  @@index([caseId, counterpartyId])
+  @@index([caseId, locationId])
   @@index([importJobId])
   @@map("ledger_entries")
 }

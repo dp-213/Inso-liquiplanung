@@ -242,7 +242,6 @@ export interface LedgerEntryResponse {
   createdAt: string;
   createdBy: string;
   updatedAt: string;
-  updatedBy: string;
 
   // Derived (calculated at runtime)
   flowType: FlowType;

@@ -62,7 +62,6 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse & {
     createdAt: entry.createdAt.toISOString(),
     createdBy: entry.createdBy,
     updatedAt: entry.updatedAt.toISOString(),
-    updatedBy: entry.updatedBy,
     // Derived
     flowType: deriveFlowType(BigInt(entry.amountCents)),
   };
@@ -248,7 +247,6 @@ export async function POST(
         bookingReference: body.bookingReference || null,
         reviewStatus: REVIEW_STATUS.UNREVIEWED,
         createdBy: session.username,
-        updatedBy: session.username,
       },
     });
 

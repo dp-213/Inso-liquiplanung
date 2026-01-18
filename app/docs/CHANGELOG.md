@@ -112,15 +112,15 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 ### Neue Funktionen
 
 #### Dashboard-Tabs (Externe Ansicht)
-- **5 neue Ansichten:** Uebersicht, Einnahmen, Sicherungsrechte, Masseuebersicht, Vergleich
-- **Tab-Navigation:** ExternalDashboardNav Komponente fuer /view/ Seite
-- **Chart-Marker:** KV-Restzahlung und HZV-Schlusszahlung Ereignisse im Liquiditaetschart
-- **Phasen-Visualisierung:** Fortfuehrung/Nachlauf Bereiche im Chart
+- **5 neue Ansichten:** Übersicht, Einnahmen, Sicherungsrechte, Masseübersicht, Vergleich
+- **Tab-Navigation:** ExternalDashboardNav Komponente für /view/ Seite
+- **Chart-Marker:** KV-Restzahlung und HZV-Schlusszahlung Ereignisse im Liquiditätschart
+- **Phasen-Visualisierung:** Fortführung/Nachlauf Bereiche im Chart
 
 #### Admin-Bereich Umbau
-- **Neue Sidebar-Struktur:** Uebersicht, VERWALTUNG (Kunden, Faelle)
-- **Kundenverwaltung:** Komplette CRUD-Funktionalitaet unter /admin/customers
-- **Passwort-Reset:** Admins koennen Kundenpasswoerter zuruecksetzen
+- **Neue Sidebar-Struktur:** Übersicht, VERWALTUNG (Kunden, Fälle)
+- **Kundenverwaltung:** Komplette CRUD-Funktionalität unter /admin/customers
+- **Passwort-Reset:** Admins können Kundenpasswörter zurücksetzen
 - **Externe Ansicht Button:** Schnellzugriff auf Share-Link von Fall-Detail-Seite
 - **Planungstyp-Anzeige:** Fallliste zeigt "10 Monate" oder "13 Wochen"
 

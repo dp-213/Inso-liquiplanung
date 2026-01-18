@@ -45,8 +45,8 @@ export default function CasesError({ error, reset }: ErrorProps) {
             Fälle konnten nicht geladen werden
           </h2>
           <p className="text-[var(--secondary)] mb-6">
-            Die Daten konnten nicht abgerufen werden. Dies kann an einer Verbindungsstorung
-            oder einem temporaren Problem liegen.
+            Die Daten konnten nicht abgerufen werden. Dies kann an einer Verbindungsstörung
+            oder einem temporären Problem liegen.
           </p>
           {error.digest && (
             <p className="text-xs text-[var(--muted)] mb-4 font-mono bg-gray-50 p-2 rounded">
@@ -58,7 +58,7 @@ export default function CasesError({ error, reset }: ErrorProps) {
               Erneut laden
             </button>
             <Link href="/admin" className="btn-secondary">
-              Zur Ubersicht
+              Zur Übersicht
             </Link>
           </div>
         </div>

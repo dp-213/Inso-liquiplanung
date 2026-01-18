@@ -43,7 +43,6 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
     createdAt: entry.createdAt.toISOString(),
     createdBy: entry.createdBy,
     updatedAt: entry.updatedAt.toISOString(),
-    updatedBy: entry.updatedBy,
     flowType: deriveFlowType(BigInt(entry.amountCents)),
   };
 }

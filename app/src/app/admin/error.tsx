@@ -47,7 +47,7 @@ export default function AdminError({ error, reset }: ErrorProps) {
             Erneut versuchen
           </button>
           <a href="/admin" className="btn-secondary">
-            Zur Ubersicht
+            Zur Übersicht
           </a>
         </div>
       </div>

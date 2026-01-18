@@ -40,14 +40,14 @@ Deine Rolle (Admin)
 
 ### 1. Admin-Bereich (`/admin`)
 
-**Fuer dich** - hier verwaltest du alles.
+**Für dich** - hier verwaltest du alles.
 
 | Seite | Was du dort machst |
 |-------|-------------------|
-| Uebersicht | Dashboard mit Statistiken |
-| Faelle | Alle Insolvenzfaelle verwalten |
+| Übersicht | Dashboard mit Statistiken |
+| Fälle | Alle Insolvenzfälle verwalten |
 | Kunden | Insolvenzverwalter anlegen/bearbeiten |
-| Daten-Import | Liquiditaetsdaten hochladen |
+| Daten-Import | Liquiditätsdaten hochladen |
 | KI-Aufbereitung | Daten automatisch kategorisieren |
 
 ### 2. Kundenportal (`/portal`)
