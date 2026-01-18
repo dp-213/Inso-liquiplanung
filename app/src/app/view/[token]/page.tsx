@@ -49,6 +49,17 @@ interface BankAccountData {
   notes: string | null;
 }
 
+interface LedgerStats {
+  dataSource: "LEDGER" | "LEGACY";
+  entryCount: number;
+  istCount: number;
+  planCount: number;
+  confirmedCount: number;
+  unreviewedCount: number;
+  masseCount: number;
+  absonderungCount: number;
+}
+
 interface ShareData {
   case: {
     caseNumber: string;
@@ -89,6 +100,7 @@ interface ShareData {
       accountCount: number;
     };
   };
+  ledgerStats?: LedgerStats;
   calculation: {
     openingBalanceCents: string;
     totalInflowsCents: string;
@@ -386,7 +398,7 @@ export default function ExternalCaseView() {
               />
 
               {/* Data Source Legend */}
-              <DataSourceLegend />
+              <DataSourceLegend ledgerStats={data.ledgerStats} />
 
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Liquiditaetsverlauf</h2>
@@ -814,18 +826,70 @@ export default function ExternalCaseView() {
           {/* TAB: Compare */}
           <div className={activeTab === "compare" ? "" : "hidden"}>
             <div className="space-y-6">
-              <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">IST vs PLAN Vergleich</h2>
-                <p className="text-sm text-[var(--secondary)] mb-4">
-                  Der Vergleich zwischen geplanten und tatsächlichen Werten wird verfügbar sein, sobald IST-Daten erfasst werden.
-                </p>
-                <div className="p-8 bg-gray-50 rounded-lg text-center">
-                  <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  <p className="text-[var(--muted)]">Noch keine IST-Daten vorhanden</p>
+              {data.ledgerStats && data.ledgerStats.istCount > 0 ? (
+                <div className="admin-card p-6">
+                  <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">IST vs PLAN Vergleich</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                          <span className="text-green-700 font-bold text-xs">IST</span>
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-green-800">Reale Zahlungen</h3>
+                          <p className="text-xs text-green-600">Aus dem Zahlungsregister</p>
+                        </div>
+                      </div>
+                      <div className="text-3xl font-bold text-green-700">{data.ledgerStats.istCount}</div>
+                      <p className="text-sm text-green-600 mt-1">Buchungen erfasst</p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-purple-50 border border-purple-200">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                          <span className="text-purple-700 font-bold text-xs">PLAN</span>
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-purple-800">Geplante Werte</h3>
+                          <p className="text-xs text-purple-600">Prognose und Planung</p>
+                        </div>
+                      </div>
+                      <div className="text-3xl font-bold text-purple-700">{data.ledgerStats.planCount}</div>
+                      <p className="text-sm text-purple-600 mt-1">Planwerte eingetragen</p>
+                    </div>
+                  </div>
+                  <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <h4 className="font-medium text-blue-800 mb-2">Status der Datenerfassung</h4>
+                    <div className="flex items-center gap-4 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                        <span className="text-blue-700">Bestätigt: {data.ledgerStats.confirmedCount}</span>
+                      </div>
+                      {data.ledgerStats.unreviewedCount > 0 && (
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+                          <span className="text-blue-700">Zu prüfen: {data.ledgerStats.unreviewedCount}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="admin-card p-6">
+                  <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">IST vs PLAN Vergleich</h2>
+                  <p className="text-sm text-[var(--secondary)] mb-4">
+                    Der Vergleich zwischen geplanten und tatsächlichen Werten wird verfügbar sein, sobald IST-Daten erfasst werden.
+                  </p>
+                  <div className="p-8 bg-gray-50 rounded-lg text-center">
+                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                    <p className="text-[var(--muted)]">Noch keine IST-Daten vorhanden</p>
+                    <p className="text-xs text-[var(--secondary)] mt-2">
+                      IST-Daten werden im Admin-Bereich unter Zahlungsregister erfasst.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Aktuelle Version</h2>
@@ -853,11 +917,19 @@ export default function ExternalCaseView() {
 
           {/* Footer Info */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-sm text-[var(--muted)] px-1">
-            <div>
-              Version {data.plan.versionNumber} | Stand: {new Date(data.calculation.calculatedAt).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>Version {data.plan.versionNumber}</span>
+              <span>|</span>
+              <span>Stand: {new Date(data.calculation.calculatedAt).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+              {data.ledgerStats?.dataSource === "LEDGER" && (
+                <>
+                  <span>|</span>
+                  <span className="text-green-600 font-medium">Zahlungsregister</span>
+                </>
+              )}
             </div>
             <div className="mt-2 sm:mt-0">
-              Datenintegritaet: {data.calculation.dataHash.substring(0, 8)}...
+              Datenintegrität: {data.calculation.dataHash.substring(0, 8)}...
             </div>
           </div>
         </div>
