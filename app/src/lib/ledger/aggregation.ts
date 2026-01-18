@@ -16,7 +16,11 @@ import {
   deriveFlowType,
   ValueType,
   FlowType,
+  AGGREGATION_STATUS,
+  AggregationStatus,
+  AggregationStatusResponse,
 } from './types';
+import { createHash } from 'crypto';
 
 // =============================================================================
 // PERIOD INDEX CALCULATION (runtime, not persisted)
@@ -306,4 +310,278 @@ export async function rebuildPeriodValues(
   // For MVP, delegate to syncPeriodValues
   // Full implementation would clear and rebuild
   return syncPeriodValues(prisma, caseId, planId, userId);
+}
+
+// =============================================================================
+// AGGREGATION CACHE (Stale Detection)
+// =============================================================================
+
+/**
+ * Calculate a hash of all LedgerEntries for a case
+ * Used for stale detection - if hash changes, data has changed
+ */
+export async function calculateLedgerHash(
+  prisma: PrismaClient,
+  caseId: string
+): Promise<string> {
+  const entries = await prisma.ledgerEntry.findMany({
+    where: { caseId },
+    select: {
+      id: true,
+      amountCents: true,
+      transactionDate: true,
+      valueType: true,
+      legalBucket: true,
+      updatedAt: true,
+    },
+    orderBy: { id: 'asc' },
+  });
+
+  // Create a deterministic string representation
+  const dataString = entries
+    .map(
+      (e) =>
+        `${e.id}|${e.amountCents}|${e.transactionDate.toISOString()}|${e.valueType}|${e.legalBucket}|${e.updatedAt.toISOString()}`
+    )
+    .join('\n');
+
+  // Calculate SHA-256 hash
+  const hash = createHash('sha256').update(dataString).digest('hex');
+  return hash;
+}
+
+/**
+ * Check the aggregation status for a case
+ * Returns CURRENT if no changes since last aggregation, STALE otherwise
+ */
+export async function checkAggregationStatus(
+  prisma: PrismaClient,
+  caseId: string
+): Promise<AggregationStatusResponse> {
+  const cache = await prisma.aggregationCache.findUnique({
+    where: { caseId },
+  });
+
+  if (!cache) {
+    return {
+      status: AGGREGATION_STATUS.STALE,
+      reason: 'Noch nie aggregiert',
+      pendingChanges: 0,
+      lastAggregatedAt: null,
+    };
+  }
+
+  // If status is REBUILDING, return that
+  if (cache.status === AGGREGATION_STATUS.REBUILDING) {
+    return {
+      status: AGGREGATION_STATUS.REBUILDING,
+      reason: 'Wird gerade neu berechnet',
+      pendingChanges: cache.pendingChanges,
+      lastAggregatedAt: cache.lastAggregatedAt.toISOString(),
+      planId: cache.planId,
+    };
+  }
+
+  // Calculate current hash and compare
+  const currentHash = await calculateLedgerHash(prisma, caseId);
+
+  if (currentHash !== cache.dataHashAtAggregation) {
+    return {
+      status: AGGREGATION_STATUS.STALE,
+      reason: 'Daten seit letzter Aggregation geändert',
+      pendingChanges: cache.pendingChanges,
+      lastAggregatedAt: cache.lastAggregatedAt.toISOString(),
+      planId: cache.planId,
+    };
+  }
+
+  return {
+    status: AGGREGATION_STATUS.CURRENT,
+    pendingChanges: 0,
+    lastAggregatedAt: cache.lastAggregatedAt.toISOString(),
+    planId: cache.planId,
+  };
+}
+
+/**
+ * Mark aggregation as stale (call after LedgerEntry changes)
+ * This is a lightweight operation - just increments pending changes counter
+ */
+export async function markAggregationStale(
+  prisma: PrismaClient,
+  caseId: string
+): Promise<void> {
+  await prisma.aggregationCache.upsert({
+    where: { caseId },
+    update: {
+      status: AGGREGATION_STATUS.STALE,
+      pendingChanges: { increment: 1 },
+      lastChangeAt: new Date(),
+    },
+    create: {
+      caseId,
+      planId: '', // Will be set on first rebuild
+      status: AGGREGATION_STATUS.STALE,
+      lastAggregatedAt: new Date(0), // Epoch
+      dataHashAtAggregation: '',
+      pendingChanges: 1,
+      lastChangeAt: new Date(),
+    },
+  });
+}
+
+/**
+ * Full aggregation rebuild with cache update
+ * This recalculates all PeriodValues from LedgerEntries
+ */
+export async function rebuildAggregation(
+  prisma: PrismaClient,
+  caseId: string,
+  planId: string,
+  userId: string
+): Promise<{
+  success: boolean;
+  periodValuesCreated: number;
+  entriesProcessed: number;
+  error?: string;
+}> {
+  try {
+    // 1. Set status to REBUILDING
+    await prisma.aggregationCache.upsert({
+      where: { caseId },
+      update: { status: AGGREGATION_STATUS.REBUILDING },
+      create: {
+        caseId,
+        planId,
+        status: AGGREGATION_STATUS.REBUILDING,
+        lastAggregatedAt: new Date(),
+        dataHashAtAggregation: '',
+      },
+    });
+
+    // 2. Get the plan
+    const plan = await prisma.liquidityPlan.findUnique({
+      where: { id: planId },
+      include: {
+        categories: {
+          include: {
+            lines: true,
+          },
+        },
+      },
+    });
+
+    if (!plan) {
+      throw new Error(`Plan ${planId} nicht gefunden`);
+    }
+
+    // 3. Get all LedgerEntries
+    const entries = await prisma.ledgerEntry.findMany({
+      where: { caseId },
+    });
+
+    // 4. Aggregate entries
+    const aggregation = await aggregateLedgerEntries(prisma, caseId, planId);
+
+    // 5. Sync to PeriodValues (this is where the actual update happens)
+    const syncResult = await syncPeriodValues(prisma, caseId, planId, userId);
+
+    // 6. Calculate new hash
+    const newHash = await calculateLedgerHash(prisma, caseId);
+
+    // 7. Update cache to CURRENT
+    await prisma.aggregationCache.update({
+      where: { caseId },
+      data: {
+        status: AGGREGATION_STATUS.CURRENT,
+        planId,
+        lastAggregatedAt: new Date(),
+        dataHashAtAggregation: newHash,
+        pendingChanges: 0,
+      },
+    });
+
+    return {
+      success: true,
+      periodValuesCreated: syncResult.created + syncResult.updated,
+      entriesProcessed: entries.length,
+    };
+  } catch (error) {
+    // Revert to STALE on error
+    await prisma.aggregationCache
+      .update({
+        where: { caseId },
+        data: { status: AGGREGATION_STATUS.STALE },
+      })
+      .catch(() => {
+        /* ignore if cache doesn't exist */
+      });
+
+    return {
+      success: false,
+      periodValuesCreated: 0,
+      entriesProcessed: 0,
+      error: error instanceof Error ? error.message : 'Unbekannter Fehler',
+    };
+  }
+}
+
+/**
+ * Get aggregation statistics for a case
+ */
+export async function getAggregationStats(
+  prisma: PrismaClient,
+  caseId: string,
+  planId: string
+): Promise<{
+  ledgerEntriesTotal: number;
+  ledgerEntriesIst: number;
+  ledgerEntriesPlan: number;
+  periodValuesTotal: number;
+  status: AggregationStatus;
+}> {
+  const [
+    ledgerEntriesTotal,
+    ledgerEntriesIst,
+    ledgerEntriesPlan,
+    plan,
+    statusResponse,
+  ] = await Promise.all([
+    prisma.ledgerEntry.count({ where: { caseId } }),
+    prisma.ledgerEntry.count({ where: { caseId, valueType: 'IST' } }),
+    prisma.ledgerEntry.count({ where: { caseId, valueType: 'PLAN' } }),
+    prisma.liquidityPlan.findUnique({
+      where: { id: planId },
+      include: {
+        categories: {
+          include: {
+            lines: {
+              include: {
+                _count: { select: { periodValues: true } },
+              },
+            },
+          },
+        },
+      },
+    }),
+    checkAggregationStatus(prisma, caseId),
+  ]);
+
+  // Count PeriodValues across all lines
+  let periodValuesTotal = 0;
+  if (plan) {
+    for (const category of plan.categories) {
+      for (const line of category.lines) {
+        periodValuesTotal += (line as unknown as { _count: { periodValues: number } })._count.periodValues;
+      }
+    }
+  }
+
+  return {
+    ledgerEntriesTotal,
+    ledgerEntriesIst,
+    ledgerEntriesPlan,
+    periodValuesTotal,
+    status: statusResponse.status,
+  };
 }

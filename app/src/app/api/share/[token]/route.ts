@@ -199,7 +199,7 @@ export async function GET(
         versionNumber: latestVersion?.versionNumber ?? 0,
         versionDate: latestVersion?.snapshotDate ?? null,
       },
-      // W&P Best Practices data
+      // Planungsprämissen und Dokumentation
       assumptions: plan.assumptions.map((a) => ({
         id: a.id,
         categoryName: a.categoryName,

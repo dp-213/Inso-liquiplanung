@@ -8,10 +8,53 @@ import {
   LEGAL_BUCKETS,
   BOOKING_SOURCES,
   VALUE_TYPES,
+  REVIEW_STATUS,
   LegalBucket,
   ValueType,
   BookingSource,
+  ReviewStatus,
+  markAggregationStale,
+  createAuditLog,
+  AUDIT_ACTIONS,
 } from '@/lib/ledger';
+import { LedgerEntry } from '@prisma/client';
+
+/**
+ * Serialize a LedgerEntry to LedgerEntryResponse (including governance fields)
+ */
+function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
+  return {
+    id: entry.id,
+    caseId: entry.caseId,
+    transactionDate: entry.transactionDate.toISOString(),
+    amountCents: entry.amountCents.toString(),
+    description: entry.description,
+    note: entry.note,
+    valueType: entry.valueType as ValueType,
+    legalBucket: entry.legalBucket as LegalBucket,
+    importSource: entry.importSource,
+    importJobId: entry.importJobId,
+    importFileHash: entry.importFileHash,
+    importRowNumber: entry.importRowNumber,
+    bookingSource: entry.bookingSource,
+    bookingSourceId: entry.bookingSourceId,
+    bookingReference: entry.bookingReference,
+    // Governance fields
+    reviewStatus: entry.reviewStatus as ReviewStatus,
+    reviewedBy: entry.reviewedBy,
+    reviewedAt: entry.reviewedAt?.toISOString() || null,
+    reviewNote: entry.reviewNote,
+    changeReason: entry.changeReason,
+    previousAmountCents: entry.previousAmountCents?.toString() || null,
+    // Audit
+    createdAt: entry.createdAt.toISOString(),
+    createdBy: entry.createdBy,
+    updatedAt: entry.updatedAt.toISOString(),
+    updatedBy: entry.updatedBy,
+    // Derived
+    flowType: deriveFlowType(BigInt(entry.amountCents)),
+  };
+}
 
 // =============================================================================
 // GET /api/cases/[id]/ledger - List all LedgerEntries for a case
@@ -97,28 +140,7 @@ export async function GET(
     const netAmount = totalInflows + totalOutflows;
 
     // Transform to response format
-    const response: LedgerEntryResponse[] = entries.map((entry) => ({
-      id: entry.id,
-      caseId: entry.caseId,
-      transactionDate: entry.transactionDate.toISOString(),
-      amountCents: entry.amountCents.toString(),
-      description: entry.description,
-      note: entry.note,
-      valueType: entry.valueType as ValueType,
-      legalBucket: entry.legalBucket as LegalBucket,
-      importSource: entry.importSource,
-      importJobId: entry.importJobId,
-      importFileHash: entry.importFileHash,
-      importRowNumber: entry.importRowNumber,
-      bookingSource: entry.bookingSource,
-      bookingSourceId: entry.bookingSourceId,
-      bookingReference: entry.bookingReference,
-      createdAt: entry.createdAt.toISOString(),
-      createdBy: entry.createdBy,
-      updatedAt: entry.updatedAt.toISOString(),
-      updatedBy: entry.updatedBy,
-      flowType: deriveFlowType(BigInt(entry.amountCents)),
-    }));
+    const response: LedgerEntryResponse[] = entries.map(serializeLedgerEntry);
 
     return NextResponse.json({
       entries: response,
@@ -198,35 +220,25 @@ export async function POST(
         bookingSource: body.bookingSource || 'MANUAL',
         bookingSourceId: body.bookingSourceId || null,
         bookingReference: body.bookingReference || null,
+        reviewStatus: REVIEW_STATUS.UNREVIEWED,
         createdBy: session.username,
         updatedBy: session.username,
       },
     });
 
-    const response: LedgerEntryResponse = {
-      id: entry.id,
-      caseId: entry.caseId,
-      transactionDate: entry.transactionDate.toISOString(),
-      amountCents: entry.amountCents.toString(),
-      description: entry.description,
-      note: entry.note,
-      valueType: entry.valueType as ValueType,
-      legalBucket: entry.legalBucket as LegalBucket,
-      importSource: entry.importSource,
-      importJobId: entry.importJobId,
-      importFileHash: entry.importFileHash,
-      importRowNumber: entry.importRowNumber,
-      bookingSource: entry.bookingSource,
-      bookingSourceId: entry.bookingSourceId,
-      bookingReference: entry.bookingReference,
-      createdAt: entry.createdAt.toISOString(),
-      createdBy: entry.createdBy,
-      updatedAt: entry.updatedAt.toISOString(),
-      updatedBy: entry.updatedBy,
-      flowType: deriveFlowType(BigInt(entry.amountCents)),
-    };
+    // Create audit log for creation
+    await createAuditLog(prisma, {
+      ledgerEntryId: entry.id,
+      caseId,
+      action: AUDIT_ACTIONS.CREATED,
+      fieldChanges: {},
+      userId: session.username,
+    });
 
-    return NextResponse.json(response, { status: 201 });
+    // Mark aggregation as stale
+    await markAggregationStale(prisma, caseId);
+
+    return NextResponse.json(serializeLedgerEntry(entry), { status: 201 });
   } catch (error) {
     console.error('Error creating ledger entry:', error);
     return NextResponse.json(

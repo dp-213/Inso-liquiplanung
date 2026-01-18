@@ -8,7 +8,49 @@ import {
   LEGAL_BUCKETS,
   LegalBucket,
   ValueType,
+  ReviewStatus,
+  markAggregationStale,
+  createAuditLog,
+  AUDIT_ACTIONS,
 } from '@/lib/ledger';
+import { LedgerEntry } from '@prisma/client';
+
+/**
+ * Serialize a LedgerEntry to LedgerEntryResponse (including governance fields)
+ */
+function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
+  return {
+    id: entry.id,
+    caseId: entry.caseId,
+    transactionDate: entry.transactionDate.toISOString(),
+    amountCents: entry.amountCents.toString(),
+    description: entry.description,
+    note: entry.note,
+    valueType: entry.valueType as ValueType,
+    legalBucket: entry.legalBucket as LegalBucket,
+    importSource: entry.importSource,
+    importJobId: entry.importJobId,
+    importFileHash: entry.importFileHash,
+    importRowNumber: entry.importRowNumber,
+    bookingSource: entry.bookingSource,
+    bookingSourceId: entry.bookingSourceId,
+    bookingReference: entry.bookingReference,
+    // Governance fields
+    reviewStatus: entry.reviewStatus as ReviewStatus,
+    reviewedBy: entry.reviewedBy,
+    reviewedAt: entry.reviewedAt?.toISOString() || null,
+    reviewNote: entry.reviewNote,
+    changeReason: entry.changeReason,
+    previousAmountCents: entry.previousAmountCents?.toString() || null,
+    // Audit
+    createdAt: entry.createdAt.toISOString(),
+    createdBy: entry.createdBy,
+    updatedAt: entry.updatedAt.toISOString(),
+    updatedBy: entry.updatedBy,
+    // Derived
+    flowType: deriveFlowType(BigInt(entry.amountCents)),
+  };
+}
 
 // =============================================================================
 // GET /api/cases/[id]/ledger/[entryId] - Get a single LedgerEntry
@@ -34,30 +76,7 @@ export async function GET(
       return NextResponse.json({ error: 'Eintrag nicht gefunden' }, { status: 404 });
     }
 
-    const response: LedgerEntryResponse = {
-      id: entry.id,
-      caseId: entry.caseId,
-      transactionDate: entry.transactionDate.toISOString(),
-      amountCents: entry.amountCents.toString(),
-      description: entry.description,
-      note: entry.note,
-      valueType: entry.valueType as ValueType,
-      legalBucket: entry.legalBucket as LegalBucket,
-      importSource: entry.importSource,
-      importJobId: entry.importJobId,
-      importFileHash: entry.importFileHash,
-      importRowNumber: entry.importRowNumber,
-      bookingSource: entry.bookingSource,
-      bookingSourceId: entry.bookingSourceId,
-      bookingReference: entry.bookingReference,
-      createdAt: entry.createdAt.toISOString(),
-      createdBy: entry.createdBy,
-      updatedAt: entry.updatedAt.toISOString(),
-      updatedBy: entry.updatedBy,
-      flowType: deriveFlowType(BigInt(entry.amountCents)),
-    };
-
-    return NextResponse.json(response);
+    return NextResponse.json(serializeLedgerEntry(entry));
   } catch (error) {
     console.error('Error fetching ledger entry:', error);
     return NextResponse.json(
@@ -146,36 +165,46 @@ export async function PUT(
       updateData.bookingReference = body.bookingReference;
     }
 
+    // Build field changes for audit log
+    const fieldChanges: Record<string, { old: string | number | null; new: string | number | null }> = {};
+
+    if (body.amountCents !== undefined && existing.amountCents.toString() !== body.amountCents.toString()) {
+      fieldChanges.amountCents = { old: existing.amountCents.toString(), new: body.amountCents.toString() };
+    }
+    if (body.description !== undefined && existing.description !== body.description) {
+      fieldChanges.description = { old: existing.description, new: body.description };
+    }
+    if (body.legalBucket !== undefined && existing.legalBucket !== body.legalBucket) {
+      fieldChanges.legalBucket = { old: existing.legalBucket, new: body.legalBucket };
+    }
+    if (body.transactionDate !== undefined) {
+      const newDate = new Date(body.transactionDate).toISOString();
+      if (existing.transactionDate.toISOString() !== newDate) {
+        fieldChanges.transactionDate = { old: existing.transactionDate.toISOString(), new: newDate };
+      }
+    }
+
     // Update entry
     const entry = await prisma.ledgerEntry.update({
       where: { id: entryId },
       data: updateData,
     });
 
-    const response: LedgerEntryResponse = {
-      id: entry.id,
-      caseId: entry.caseId,
-      transactionDate: entry.transactionDate.toISOString(),
-      amountCents: entry.amountCents.toString(),
-      description: entry.description,
-      note: entry.note,
-      valueType: entry.valueType as ValueType,
-      legalBucket: entry.legalBucket as LegalBucket,
-      importSource: entry.importSource,
-      importJobId: entry.importJobId,
-      importFileHash: entry.importFileHash,
-      importRowNumber: entry.importRowNumber,
-      bookingSource: entry.bookingSource,
-      bookingSourceId: entry.bookingSourceId,
-      bookingReference: entry.bookingReference,
-      createdAt: entry.createdAt.toISOString(),
-      createdBy: entry.createdBy,
-      updatedAt: entry.updatedAt.toISOString(),
-      updatedBy: entry.updatedBy,
-      flowType: deriveFlowType(BigInt(entry.amountCents)),
-    };
+    // Create audit log if there were changes
+    if (Object.keys(fieldChanges).length > 0) {
+      await createAuditLog(prisma, {
+        ledgerEntryId: entryId,
+        caseId,
+        action: AUDIT_ACTIONS.UPDATED,
+        fieldChanges,
+        userId: session.username,
+      });
 
-    return NextResponse.json(response);
+      // Mark aggregation as stale
+      await markAggregationStale(prisma, caseId);
+    }
+
+    return NextResponse.json(serializeLedgerEntry(entry));
   } catch (error) {
     console.error('Error updating ledger entry:', error);
     return NextResponse.json(

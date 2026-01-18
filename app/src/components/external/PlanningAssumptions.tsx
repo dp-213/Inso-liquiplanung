@@ -14,7 +14,7 @@ interface PlanningAssumptionsProps {
   assumptions: Assumption[];
 }
 
-// Risk level configuration based on W&P standard
+// Risk level configuration
 const RISK_CONFIG: Record<string, { label: string; symbol: string; color: string; bgColor: string }> = {
   conservative: {
     label: "Konservativ",

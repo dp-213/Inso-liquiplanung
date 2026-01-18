@@ -9,6 +9,10 @@ import {
   ValueType,
   LegalBucket,
   LedgerEntryResponse,
+  ReviewStatus,
+  REVIEW_STATUS,
+  REVIEW_STATUS_LABELS,
+  REVIEW_STATUS_COLORS,
 } from "@/lib/ledger";
 
 const VALUE_TYPE_LABELS: Record<ValueType, string> = {
@@ -22,6 +26,34 @@ const LEGAL_BUCKET_LABELS: Record<LegalBucket, string> = {
   NEUTRAL: "Neutral",
   UNKNOWN: "Unbekannt",
 };
+
+// Review Status Badge Component
+function ReviewStatusBadge({ status }: { status: ReviewStatus }) {
+  const label = REVIEW_STATUS_LABELS[status];
+  const color = REVIEW_STATUS_COLORS[status];
+
+  const colorClasses: Record<string, string> = {
+    gray: "bg-gray-100 text-gray-700 border-gray-200",
+    green: "bg-green-100 text-green-700 border-green-200",
+    amber: "bg-amber-100 text-amber-700 border-amber-200",
+  };
+
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${colorClasses[color] || colorClasses.gray}`}>
+      {status === REVIEW_STATUS.CONFIRMED && (
+        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+        </svg>
+      )}
+      {status === REVIEW_STATUS.ADJUSTED && (
+        <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+        </svg>
+      )}
+      {label}
+    </span>
+  );
+}
 
 interface CaseData {
   id: string;
@@ -47,6 +79,11 @@ export default function LedgerEntryEditPage({
   const [formLegalBucket, setFormLegalBucket] = useState<LegalBucket>("UNKNOWN");
   const [formNote, setFormNote] = useState<string>("");
   const [formDescription, setFormDescription] = useState<string>("");
+
+  // Review state
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewReason, setReviewReason] = useState<string>("");
+  const [reviewingEntry, setReviewingEntry] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -140,6 +177,86 @@ export default function LedgerEntryEditPage({
     }
   };
 
+  const handleConfirmReview = async () => {
+    setReviewingEntry(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/${entryId}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "CONFIRM" }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Bestätigung fehlgeschlagen");
+      }
+
+      const updated = await res.json();
+      setEntry(updated);
+      setSuccessMessage("Eintrag als geprüft markiert");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Bestätigung fehlgeschlagen");
+    } finally {
+      setReviewingEntry(false);
+    }
+  };
+
+  const handleAdjustReview = async () => {
+    if (!reviewReason.trim()) {
+      setError("Bitte geben Sie eine Begründung für die Korrektur an");
+      return;
+    }
+
+    setReviewingEntry(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    // Build changes object (only include changed fields)
+    const changes: Record<string, unknown> = {};
+    if (entry && formDescription !== entry.description) {
+      changes.description = formDescription;
+    }
+    if (entry && formLegalBucket !== entry.legalBucket) {
+      changes.legalBucket = formLegalBucket;
+    }
+
+    if (Object.keys(changes).length === 0) {
+      setError("Keine Änderungen zum Speichern. Nutzen Sie 'Bestätigen' wenn keine Korrektur nötig ist.");
+      setReviewingEntry(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/${entryId}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ADJUST",
+          reason: reviewReason,
+          ...changes,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Korrektur fehlgeschlagen");
+      }
+
+      const updated = await res.json();
+      setEntry(updated);
+      setSuccessMessage("Eintrag korrigiert und als geprüft markiert");
+      setShowReviewModal(false);
+      setReviewReason("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Korrektur fehlgeschlagen");
+    } finally {
+      setReviewingEntry(false);
+    }
+  };
+
   const formatCurrency = (cents: string | number): string => {
     const amount = typeof cents === "string" ? parseInt(cents) : cents;
     return (amount / 100).toLocaleString("de-DE", {
@@ -218,7 +335,10 @@ export default function LedgerEntryEditPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">Ledger-Eintrag bearbeiten</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-[var(--foreground)]">Ledger-Eintrag bearbeiten</h1>
+            <ReviewStatusBadge status={entry.reviewStatus} />
+          </div>
           <p className="text-[var(--secondary)] mt-1">
             {caseData.caseNumber} - {caseData.debtorName}
           </p>
@@ -363,8 +483,95 @@ export default function LedgerEntryEditPage({
           </div>
         </div>
 
-        {/* Sidebar: Audit Info */}
-        <div className="lg:col-span-1">
+        {/* Sidebar: Review + Audit Info */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Review Section */}
+          <div className="admin-card p-6">
+            <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Prüfung</h2>
+
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-[var(--muted)]">Status:</span>
+                <ReviewStatusBadge status={entry.reviewStatus} />
+              </div>
+
+              {entry.reviewedAt && (
+                <div className="text-sm">
+                  <p className="text-[var(--muted)]">Geprüft am</p>
+                  <p className="text-[var(--foreground)]">{formatDateTime(entry.reviewedAt)}</p>
+                  <p className="text-[var(--secondary)]">von {entry.reviewedBy}</p>
+                </div>
+              )}
+
+              {entry.changeReason && (
+                <div className="text-sm">
+                  <p className="text-[var(--muted)]">Korrektur-Begründung</p>
+                  <p className="text-[var(--foreground)] italic">&ldquo;{entry.changeReason}&rdquo;</p>
+                </div>
+              )}
+
+              {entry.previousAmountCents && (
+                <div className="text-sm">
+                  <p className="text-[var(--muted)]">Ursprünglicher Betrag</p>
+                  <p className="text-[var(--secondary)] line-through">
+                    {formatCurrency(entry.previousAmountCents)}
+                  </p>
+                </div>
+              )}
+
+              {/* Review Actions */}
+              {entry.reviewStatus === REVIEW_STATUS.UNREVIEWED && (
+                <div className="pt-3 border-t border-[var(--border)] space-y-2">
+                  <button
+                    onClick={handleConfirmReview}
+                    disabled={reviewingEntry}
+                    className="w-full btn-primary bg-green-600 hover:bg-green-700 disabled:opacity-50"
+                  >
+                    {reviewingEntry ? "..." : "✓ Als geprüft bestätigen"}
+                  </button>
+                  <button
+                    onClick={() => setShowReviewModal(true)}
+                    disabled={reviewingEntry}
+                    className="w-full btn-secondary disabled:opacity-50"
+                  >
+                    Korrigieren & Prüfen
+                  </button>
+                </div>
+              )}
+
+              {entry.reviewStatus === REVIEW_STATUS.CONFIRMED && (
+                <div className="pt-3 border-t border-[var(--border)]">
+                  <p className="text-xs text-[var(--muted)] mb-2">
+                    Bereits bestätigt. Bei Änderungen wird der Status auf &ldquo;Korrigiert&rdquo; gesetzt.
+                  </p>
+                  <button
+                    onClick={() => setShowReviewModal(true)}
+                    disabled={reviewingEntry}
+                    className="w-full btn-secondary disabled:opacity-50"
+                  >
+                    Nochmals korrigieren
+                  </button>
+                </div>
+              )}
+
+              {entry.reviewStatus === REVIEW_STATUS.ADJUSTED && (
+                <div className="pt-3 border-t border-[var(--border)]">
+                  <p className="text-xs text-[var(--muted)] mb-2">
+                    Wurde bereits korrigiert.
+                  </p>
+                  <button
+                    onClick={() => setShowReviewModal(true)}
+                    disabled={reviewingEntry}
+                    className="w-full btn-secondary disabled:opacity-50"
+                  >
+                    Weitere Korrektur
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Audit Info */}
           <div className="admin-card p-6">
             <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Audit-Trail</h2>
 
@@ -393,6 +600,66 @@ export default function LedgerEntryEditPage({
           </div>
         </div>
       </div>
+
+      {/* Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-[var(--foreground)] mb-4">
+                Eintrag korrigieren
+              </h3>
+              <p className="text-sm text-[var(--muted)] mb-4">
+                Bitte nehmen Sie die gewünschten Änderungen vor und geben Sie eine Begründung an.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                    Begründung für Korrektur *
+                  </label>
+                  <textarea
+                    value={reviewReason}
+                    onChange={(e) => setReviewReason(e.target.value)}
+                    rows={3}
+                    className="input-field w-full"
+                    placeholder="z.B. Betrag war falsch erfasst, Rechtsstatus korrigiert..."
+                    required
+                  />
+                </div>
+
+                <div className="bg-gray-50 p-3 rounded-md">
+                  <p className="text-xs text-[var(--muted)]">
+                    Die Änderungen aus den Formularfeldern (Beschreibung, Rechtsstatus) werden übernommen.
+                    Ändern Sie diese vor dem Speichern.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowReviewModal(false);
+                    setReviewReason("");
+                    setError(null);
+                  }}
+                  className="btn-secondary"
+                  disabled={reviewingEntry}
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={handleAdjustReview}
+                  className="btn-primary bg-amber-600 hover:bg-amber-700"
+                  disabled={reviewingEntry || !reviewReason.trim()}
+                >
+                  {reviewingEntry ? "Speichern..." : "Korrigieren & Prüfen"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

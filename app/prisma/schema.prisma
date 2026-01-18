@@ -31,6 +31,10 @@ model Case {
   updatedAt   DateTime  @updatedAt
   updatedBy   String
 
+  // === DEFAULT PERIOD CONFIGURATION (optional, überschreibt Plan-Defaults) ===
+  defaultPeriodType    String?   // WEEKLY, MONTHLY - wenn gesetzt, wird bei neuen Plänen verwendet
+  defaultPeriodCount   Int?      // Anzahl Perioden - wenn gesetzt, wird bei neuen Plänen verwendet
+
   owner                CustomerUser         @relation("OwnedCases", fields: [ownerId], references: [id])
   plans                LiquidityPlan[]
   ingestionJobs        IngestionJob[]
@@ -40,6 +44,7 @@ model Case {
   customerAccess       CustomerCaseAccess[] // Additional access for other customers
   bankAccounts         BankAccount[]
   ledgerEntries        LedgerEntry[]        // Transaction-level cash truth
+  classificationRules  ClassificationRule[] // Rule Engine für Klassifikations-Vorschläge
 
   @@index([ownerId])
   @@map("cases")
@@ -561,11 +566,12 @@ model AiPreprocessingLog {
 }
 
 // =============================================================================
-// DASHBOARD BEST PRACTICES (W&P Standard)
+// PLANNING DOCUMENTATION (no cashflows, only metadata)
 // =============================================================================
 
 // PlanningAssumption - Documentation of planning assumptions with risk assessment
-// Based on W&P report standard: each position has source, description, and risk indicator
+// IMPORTANT: This is ONLY metadata/documentation - it does NOT create any cashflows
+// Links to categories but does NOT contain amountCents
 model PlanningAssumption {
   id            String   @id @default(uuid())
   planId        String
@@ -585,8 +591,9 @@ model PlanningAssumption {
   @@map("planning_assumptions")
 }
 
-// InsolvencyEffect - Insolvency-specific effects separate from operative cashflow
-// Enables "vor/nach Insolvenzeffekten" view as per W&P standard
+// InsolvencyEffect - PLAN component for insolvency-specific effects
+// IMPORTANT: These are PLAN values (not IST) - clearly separated from operative cashflows
+// Enables "vor/nach Insolvenzeffekten" comparison view
 model InsolvencyEffect {
   id            String   @id @default(uuid())
   planId        String
@@ -609,8 +616,8 @@ model InsolvencyEffect {
   @@map("insolvency_effects")
 }
 
-// BankAccount - Bankenspiegel (bank account overview) as per W&P standard
-// Shows IBAN, balances, security holders, and status
+// BankAccount - Bankenspiegel (bank account overview)
+// Shows IBAN, balances, security holders, and status - NO cashflows, only account snapshots
 model BankAccount {
   id              String   @id @default(uuid())
   caseId          String
@@ -667,6 +674,16 @@ model LedgerEntry {
   bookingSourceId   String?   // e.g., IBAN
   bookingReference  String?   // Invoice number, document reference
 
+  // === GOVERNANCE (Review-Status) ===
+  reviewStatus      String    @default("UNREVIEWED")  // UNREVIEWED, CONFIRMED, ADJUSTED
+  reviewedBy        String?
+  reviewedAt        DateTime?
+  reviewNote        String?
+
+  // === GOVERNANCE (Änderungs-Tracking bei ADJUSTED) ===
+  changeReason      String?   // Pflicht bei ADJUSTED
+  previousAmountCents BigInt? // Ursprünglicher Betrag vor Korrektur
+
   // === AUDIT ===
   createdAt         DateTime  @default(now())
   createdBy         String
@@ -675,10 +692,84 @@ model LedgerEntry {
 
   // === RELATIONS ===
   case              Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  auditLogs         LedgerAuditLog[]
 
   @@index([caseId])
   @@index([caseId, transactionDate])
   @@index([caseId, valueType])
+  @@index([caseId, reviewStatus])
   @@index([importJobId])
   @@map("ledger_entries")
+}
+
+// =============================================================================
+// LEDGER AUDIT LOG - Vollständiges Audit-Trail für alle Ledger-Änderungen
+// =============================================================================
+
+model LedgerAuditLog {
+  id            String   @id @default(uuid())
+  ledgerEntryId String
+  caseId        String
+  action        String   // CREATED, UPDATED, CONFIRMED, ADJUSTED, DELETED
+  fieldChanges  String   // JSON: {field: {old, new}}
+  reason        String?
+  userId        String
+  timestamp     DateTime @default(now())
+
+  ledgerEntry   LedgerEntry @relation(fields: [ledgerEntryId], references: [id], onDelete: Cascade)
+
+  @@index([ledgerEntryId])
+  @@index([caseId, timestamp])
+  @@map("ledger_audit_logs")
+}
+
+// =============================================================================
+// AGGREGATION CACHE - Tracking für PeriodValue-Aggregation
+// =============================================================================
+
+model AggregationCache {
+  id                      String    @id @default(uuid())
+  caseId                  String    @unique
+  planId                  String
+  status                  String    @default("CURRENT") // CURRENT, STALE, REBUILDING
+  lastAggregatedAt        DateTime
+  dataHashAtAggregation   String    // Hash der Ledger-Daten zum Zeitpunkt der Aggregation
+  pendingChanges          Int       @default(0)
+  lastChangeAt            DateTime?
+
+  @@index([caseId])
+  @@map("aggregation_cache")
+}
+
+// =============================================================================
+// CLASSIFICATION RULES - Rule Engine Light für Vorschläge
+// =============================================================================
+
+model ClassificationRule {
+  id              String   @id @default(uuid())
+  caseId          String
+  name            String
+  isActive        Boolean  @default(true)
+  priority        Int      @default(100)  // Niedrigere Zahl = höhere Priorität
+
+  // Match-Kriterien
+  matchField      String   // description, bookingReference, bookingSource, etc.
+  matchType       String   // CONTAINS, STARTS_WITH, ENDS_WITH, REGEX, EQUALS, AMOUNT_RANGE
+  matchValue      String   // Der Suchwert oder Regex-Pattern
+
+  // Ziel-Vorschlag (eines oder mehrere)
+  suggestedCategory     String?   // Vorgeschlagene CashflowCategory
+  suggestedFlowType     String?   // INFLOW, OUTFLOW
+  suggestedLegalBucket  String?   // MASSE, ABSONDERUNG, NEUTRAL
+  confidenceBonus       Float     @default(0.0)  // Zusätzlicher Confidence-Score
+
+  createdAt       DateTime @default(now())
+  createdBy       String
+  updatedAt       DateTime @updatedAt
+  updatedBy       String
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, isActive])
+  @@map("classification_rules")
 }

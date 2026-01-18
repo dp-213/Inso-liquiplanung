@@ -202,7 +202,7 @@ export default function BankAccountsPage() {
           <div>
             <h1 className="text-2xl font-bold text-[var(--foreground)]">Bankenspiegel</h1>
             <p className="mt-1 text-sm text-[var(--secondary)]">
-              Übersicht aller Bankkonten mit IBAN, Saldo und Status (W&P-Standard)
+              Übersicht aller Bankkonten mit IBAN, Saldo und Status
             </p>
           </div>
           <Link href={`/admin/cases/${caseId}`} className="btn-secondary">

@@ -132,18 +132,19 @@ export default function InsolvencyEffectsTable({
   return (
     <div className="space-y-4">
       {/* Info Box */}
-      <div className="admin-card p-4 bg-blue-50 border-blue-200">
+      <div className="admin-card p-4 bg-purple-50 border-purple-200">
         <div className="flex items-start gap-3">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <span className="text-xs font-bold text-purple-600">PLAN</span>
           </div>
           <div>
-            <h4 className="text-sm font-medium text-blue-800">Insolvenzspezifische Effekte</h4>
-            <p className="text-xs text-blue-700 mt-1">
-              Diese Tabelle zeigt alle insolvenzspezifischen Zahlungsströme, die vom operativen Geschäft
-              getrennt betrachtet werden. Dies ermöglicht den Vergleich &quot;vor&quot; und &quot;nach&quot; Insolvenzeffekten.
+            <h4 className="text-sm font-medium text-purple-800">
+              Insolvenzspezifische Effekte
+              <span className="ml-2 px-2 py-0.5 bg-purple-200 text-purple-700 text-xs rounded-full">Plan-Werte</span>
+            </h4>
+            <p className="text-xs text-purple-700 mt-1">
+              Diese Tabelle zeigt <strong>geplante</strong> insolvenzspezifische Zahlungsströme.
+              Diese sind keine realen Transaktionen (IST), sondern Planungsannahmen für zukünftige Effekte.
             </p>
           </div>
         </div>

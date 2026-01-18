@@ -264,7 +264,7 @@ export default function InsolvencyEffectsPage() {
 
       {/* Standard Effects Quick Add */}
       <div className="admin-card p-4">
-        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">Standard-Positionen (W&P-Katalog)</h3>
+        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">Standard-Positionen</h3>
         <div className="flex flex-wrap gap-2">
           {STANDARD_EFFECTS.map((effect) => (
             <button

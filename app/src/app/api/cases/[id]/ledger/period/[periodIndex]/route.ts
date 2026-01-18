@@ -11,7 +11,46 @@ import {
   VALUE_TYPES,
   ValueType,
   LegalBucket,
+  ReviewStatus,
 } from '@/lib/ledger';
+import { LedgerEntry } from '@prisma/client';
+
+/**
+ * Serialize a LedgerEntry to LedgerEntryResponse (including governance fields)
+ */
+function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
+  return {
+    id: entry.id,
+    caseId: entry.caseId,
+    transactionDate: entry.transactionDate.toISOString(),
+    amountCents: entry.amountCents.toString(),
+    description: entry.description,
+    note: entry.note,
+    valueType: entry.valueType as ValueType,
+    legalBucket: entry.legalBucket as LegalBucket,
+    importSource: entry.importSource,
+    importJobId: entry.importJobId,
+    importFileHash: entry.importFileHash,
+    importRowNumber: entry.importRowNumber,
+    bookingSource: entry.bookingSource,
+    bookingSourceId: entry.bookingSourceId,
+    bookingReference: entry.bookingReference,
+    // Governance fields
+    reviewStatus: entry.reviewStatus as ReviewStatus,
+    reviewedBy: entry.reviewedBy,
+    reviewedAt: entry.reviewedAt?.toISOString() || null,
+    reviewNote: entry.reviewNote,
+    changeReason: entry.changeReason,
+    previousAmountCents: entry.previousAmountCents?.toString() || null,
+    // Audit
+    createdAt: entry.createdAt.toISOString(),
+    createdBy: entry.createdBy,
+    updatedAt: entry.updatedAt.toISOString(),
+    updatedBy: entry.updatedBy,
+    // Derived
+    flowType: deriveFlowType(BigInt(entry.amountCents)),
+  };
+}
 
 // =============================================================================
 // GET /api/cases/[id]/ledger/period/[periodIndex] - Get LedgerEntries for a period
@@ -110,28 +149,7 @@ export async function GET(
         totalOutflows += amount;
       }
 
-      return {
-        id: entry.id,
-        caseId: entry.caseId,
-        transactionDate: entry.transactionDate.toISOString(),
-        amountCents: entry.amountCents.toString(),
-        description: entry.description,
-        note: entry.note,
-        valueType: entry.valueType as ValueType,
-        legalBucket: entry.legalBucket as LegalBucket,
-        importSource: entry.importSource,
-        importJobId: entry.importJobId,
-        importFileHash: entry.importFileHash,
-        importRowNumber: entry.importRowNumber,
-        bookingSource: entry.bookingSource,
-        bookingSourceId: entry.bookingSourceId,
-        bookingReference: entry.bookingReference,
-        createdAt: entry.createdAt.toISOString(),
-        createdBy: entry.createdBy,
-        updatedAt: entry.updatedAt.toISOString(),
-        updatedBy: entry.updatedBy,
-        flowType: deriveFlowType(amount),
-      };
+      return serializeLedgerEntry(entry);
     });
 
     const periodLabel = plan.periodType === 'WEEKLY'

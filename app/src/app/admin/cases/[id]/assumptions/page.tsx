@@ -180,7 +180,7 @@ export default function AssumptionsManagementPage() {
           <div>
             <h1 className="text-2xl font-bold text-[var(--foreground)]">Planungsprämissen</h1>
             <p className="mt-1 text-sm text-[var(--secondary)]">
-              Dokumentation der Annahmen hinter jeder Planungsposition (W&P-Standard)
+              Dokumentation der Annahmen hinter jeder Planungsposition
             </p>
           </div>
           <Link href={`/admin/cases/${caseId}`} className="btn-secondary">

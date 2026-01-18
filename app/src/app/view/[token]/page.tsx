@@ -13,6 +13,7 @@ import EstateComparisonChart from "@/components/external/EstateComparisonChart";
 import PlanningAssumptions from "@/components/external/PlanningAssumptions";
 import InsolvencyEffectsTable from "@/components/external/InsolvencyEffectsTable";
 import WaterfallChart from "@/components/external/WaterfallChart";
+import DataSourceLegend from "@/components/external/DataSourceLegend";
 
 interface Assumption {
   id: string;
@@ -371,6 +372,9 @@ export default function ExternalCaseView() {
                 periodCount={data.calculation.periodCount || data.plan.periodCount}
               />
 
+              {/* Data Source Legend */}
+              <DataSourceLegend />
+
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Liquiditaetsverlauf</h2>
                 <BalanceChart weeks={weeks} markers={paymentMarkers} showPhases={(data.calculation.periodType || data.plan.periodType) === "MONTHLY"} />
@@ -679,7 +683,7 @@ export default function ExternalCaseView() {
                   <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Insolvenzspezifische Effekte</h2>
                   <p className="text-sm text-[var(--secondary)] mb-4">
                     Diese Ansicht trennt insolvenzspezifische Zahlungsströme vom operativen Geschäft.
-                    Die Struktur folgt dem W&P-Industriestandard für professionelle Liquiditätsberichte.
+                    Diese Ansicht ist klar von den operativen Zahlen getrennt.
                   </p>
                   <div className="p-8 bg-blue-50 rounded-lg border border-blue-200">
                     <div className="flex items-center gap-3 mb-4">
@@ -746,7 +750,7 @@ export default function ExternalCaseView() {
                   <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Planungsprämissen</h2>
                   <p className="text-sm text-[var(--secondary)] mb-4">
                     Die Planungsprämissen dokumentieren die Annahmen hinter jeder Planungsposition.
-                    Jede Position hat eine Informationsquelle, Beschreibung und Risikobewertung nach dem W&P-Standard.
+                    Jede Position hat eine Informationsquelle, Beschreibung und Risikobewertung.
                   </p>
                   <div className="p-8 bg-amber-50 rounded-lg border border-amber-200">
                     <div className="flex items-center gap-3 mb-4">
@@ -764,7 +768,7 @@ export default function ExternalCaseView() {
                       </div>
                     </div>
                     <div className="bg-white p-4 rounded-lg">
-                      <h4 className="font-medium text-amber-800 mb-3">Risiko-Bewertungsskala (W&P-Standard)</h4>
+                      <h4 className="font-medium text-amber-800 mb-3">Risiko-Bewertungsskala</h4>
                       <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm">
                         <div className="flex items-center gap-2">
                           <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-700 text-xs font-bold">○</span>
