@@ -118,10 +118,10 @@ export default function CaseResultsPage({
 
   const runCalculation = async () => {
     setCalculating(true);
+    setError(null);
     try {
-      const res = await fetch(`/api/cases/${id}/calculate`, {
-        method: "POST",
-      });
+      // GET für Berechnung (POST ist für Versions-Erstellung)
+      const res = await fetch(`/api/cases/${id}/calculate`);
       if (res.ok) {
         const result = await res.json();
         setCalculation(result);
