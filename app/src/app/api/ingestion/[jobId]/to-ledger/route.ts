@@ -372,7 +372,6 @@ export async function POST(
           legalBucket: "UNKNOWN", // Wird im Review zugewiesen
           reviewStatus: "UNREVIEWED",
           createdBy: session.username || "Import",
-          updatedBy: session.username || "Import",
 
           // Import-Herkunft
           importSource: job.fileName,
