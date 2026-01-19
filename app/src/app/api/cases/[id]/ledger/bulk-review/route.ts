@@ -35,6 +35,7 @@ interface BulkReviewRequest {
   // Für ADJUST
   reason?: string;
   applyClassificationSuggestions?: boolean; // Übernimmt suggestedLegalBucket
+  applyDimensionSuggestions?: boolean; // Übernimmt suggestedBankAccountId, suggestedCounterpartyId, suggestedLocationId
 }
 
 // =============================================================================
@@ -65,9 +66,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Entweder filter oder entryIds ist erforderlich' }, { status: 400 });
     }
 
-    if (body.action === 'ADJUST' && !body.reason && !body.applyClassificationSuggestions) {
+    if (body.action === 'ADJUST' && !body.reason && !body.applyClassificationSuggestions && !body.applyDimensionSuggestions) {
       return NextResponse.json(
-        { error: 'Bei ADJUST ist entweder reason oder applyClassificationSuggestions erforderlich' },
+        { error: 'Bei ADJUST ist entweder reason, applyClassificationSuggestions oder applyDimensionSuggestions erforderlich' },
         { status: 400 }
       );
     }
@@ -138,8 +139,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     } else {
       // ADJUST
       result = await bulkAdjustEntries(prisma, caseId, entryIds, userId, {
-        reason: body.reason || 'Klassifikation übernommen',
+        reason: body.reason || 'Vorschläge übernommen',
         applyClassificationSuggestions: body.applyClassificationSuggestions || false,
+        applyDimensionSuggestions: body.applyDimensionSuggestions || false,
       });
     }
 
@@ -176,6 +178,7 @@ async function bulkAdjustEntries(
   options: {
     reason: string;
     applyClassificationSuggestions: boolean;
+    applyDimensionSuggestions: boolean;
   }
 ): Promise<{ processed: number; errors: string[] }> {
   const errors: string[] = [];
@@ -218,6 +221,31 @@ async function bulkAdjustEntries(
           old: entry.legalBucket,
           new: entry.suggestedLegalBucket,
         };
+      }
+
+      // Übernehme Dimensions-Vorschläge wenn gewünscht
+      if (options.applyDimensionSuggestions) {
+        if (entry.suggestedBankAccountId) {
+          updateData.bankAccountId = entry.suggestedBankAccountId;
+          fieldChanges.bankAccountId = {
+            old: entry.bankAccountId,
+            new: entry.suggestedBankAccountId,
+          };
+        }
+        if (entry.suggestedCounterpartyId) {
+          updateData.counterpartyId = entry.suggestedCounterpartyId;
+          fieldChanges.counterpartyId = {
+            old: entry.counterpartyId,
+            new: entry.suggestedCounterpartyId,
+          };
+        }
+        if (entry.suggestedLocationId) {
+          updateData.locationId = entry.suggestedLocationId;
+          fieldChanges.locationId = {
+            old: entry.locationId,
+            new: entry.suggestedLocationId,
+          };
+        }
       }
 
       // Update Entry

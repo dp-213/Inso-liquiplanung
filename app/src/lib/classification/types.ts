@@ -75,6 +75,11 @@ export interface ClassificationRuleInput {
   suggestedFlowType?: FlowType;
   suggestedLegalBucket?: LegalBucket;
   confidenceBonus?: number;
+
+  // Dimensions-Zuweisung (optional)
+  assignBankAccountId?: string;
+  assignCounterpartyId?: string;
+  assignLocationId?: string;
 }
 
 /**
@@ -95,6 +100,11 @@ export interface ClassificationRuleResponse {
   suggestedFlowType: FlowType | null;
   suggestedLegalBucket: LegalBucket | null;
   confidenceBonus: number;
+
+  // Dimensions-Zuweisung
+  assignBankAccountId: string | null;
+  assignCounterpartyId: string | null;
+  assignLocationId: string | null;
 
   createdAt: string;
   createdBy: string;
@@ -121,6 +131,11 @@ export interface ClassificationSuggestion {
   suggestedCategory?: string;
   suggestedFlowType?: FlowType;
   suggestedLegalBucket?: LegalBucket;
+
+  // Dimensions-Zuweisung
+  assignBankAccountId?: string;
+  assignCounterpartyId?: string;
+  assignLocationId?: string;
 
   confidence: number; // 0.0 - 1.0
   matchDetails: string; // z.B. "Beschreibung enthält 'Miete'"

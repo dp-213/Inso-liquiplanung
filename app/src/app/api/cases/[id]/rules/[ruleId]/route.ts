@@ -28,6 +28,10 @@ function serializeRule(rule: ClassificationRule): ClassificationRuleResponse {
     suggestedFlowType: rule.suggestedFlowType as 'INFLOW' | 'OUTFLOW' | null,
     suggestedLegalBucket: rule.suggestedLegalBucket as 'MASSE' | 'ABSONDERUNG' | 'NEUTRAL' | 'UNKNOWN' | null,
     confidenceBonus: rule.confidenceBonus,
+    // Dimensions-Zuweisung
+    assignBankAccountId: rule.assignBankAccountId,
+    assignCounterpartyId: rule.assignCounterpartyId,
+    assignLocationId: rule.assignLocationId,
     createdAt: rule.createdAt.toISOString(),
     createdBy: rule.createdBy,
     updatedAt: rule.updatedAt.toISOString(),
@@ -181,6 +185,19 @@ export async function PUT(
 
     if (body.confidenceBonus !== undefined) {
       updateData.confidenceBonus = body.confidenceBonus;
+    }
+
+    // Dimensions-Zuweisung
+    if (body.assignBankAccountId !== undefined) {
+      updateData.assignBankAccountId = body.assignBankAccountId || null;
+    }
+
+    if (body.assignCounterpartyId !== undefined) {
+      updateData.assignCounterpartyId = body.assignCounterpartyId || null;
+    }
+
+    if (body.assignLocationId !== undefined) {
+      updateData.assignLocationId = body.assignLocationId || null;
     }
 
     // Update rule

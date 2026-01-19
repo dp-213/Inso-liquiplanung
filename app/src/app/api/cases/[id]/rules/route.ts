@@ -28,6 +28,10 @@ function serializeRule(rule: ClassificationRule): ClassificationRuleResponse {
     suggestedFlowType: rule.suggestedFlowType as 'INFLOW' | 'OUTFLOW' | null,
     suggestedLegalBucket: rule.suggestedLegalBucket as 'MASSE' | 'ABSONDERUNG' | 'NEUTRAL' | 'UNKNOWN' | null,
     confidenceBonus: rule.confidenceBonus,
+    // Dimensions-Zuweisung
+    assignBankAccountId: rule.assignBankAccountId,
+    assignCounterpartyId: rule.assignCounterpartyId,
+    assignLocationId: rule.assignLocationId,
     createdAt: rule.createdAt.toISOString(),
     createdBy: rule.createdBy,
     updatedAt: rule.updatedAt.toISOString(),
@@ -169,16 +173,21 @@ export async function POST(
       );
     }
 
-    // At least one suggestion should be provided
-    if (
-      !body.suggestedCategory &&
-      !body.suggestedFlowType &&
-      !body.suggestedLegalBucket
-    ) {
+    // At least one suggestion OR dimension assignment should be provided
+    const hasClassificationSuggestion =
+      body.suggestedCategory ||
+      body.suggestedFlowType ||
+      body.suggestedLegalBucket;
+    const hasDimensionAssignment =
+      body.assignBankAccountId ||
+      body.assignCounterpartyId ||
+      body.assignLocationId;
+
+    if (!hasClassificationSuggestion && !hasDimensionAssignment) {
       return NextResponse.json(
         {
           error:
-            'Mindestens ein Vorschlagsfeld erforderlich: suggestedCategory, suggestedFlowType oder suggestedLegalBucket',
+            'Mindestens ein Zielfeld erforderlich: suggestedCategory, suggestedFlowType, suggestedLegalBucket, assignBankAccountId, assignCounterpartyId oder assignLocationId',
         },
         { status: 400 }
       );
@@ -198,6 +207,10 @@ export async function POST(
         suggestedFlowType: body.suggestedFlowType || null,
         suggestedLegalBucket: body.suggestedLegalBucket || null,
         confidenceBonus: body.confidenceBonus || 0,
+        // Dimensions-Zuweisung
+        assignBankAccountId: body.assignBankAccountId || null,
+        assignCounterpartyId: body.assignCounterpartyId || null,
+        assignLocationId: body.assignLocationId || null,
         createdBy: session.username,
         updatedBy: session.username,
       },

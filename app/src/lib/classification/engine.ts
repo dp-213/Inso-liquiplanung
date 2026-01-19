@@ -157,6 +157,10 @@ export async function classifyEntry(
         suggestedCategory: rule.suggestedCategory || undefined,
         suggestedFlowType: rule.suggestedFlowType as 'INFLOW' | 'OUTFLOW' | undefined,
         suggestedLegalBucket: rule.suggestedLegalBucket as 'MASSE' | 'ABSONDERUNG' | 'NEUTRAL' | 'UNKNOWN' | undefined,
+        // Dimensions-Zuweisung
+        assignBankAccountId: rule.assignBankAccountId || undefined,
+        assignCounterpartyId: rule.assignCounterpartyId || undefined,
+        assignLocationId: rule.assignLocationId || undefined,
         confidence,
         matchDetails: buildMatchDetails(rule, entry),
       };
@@ -251,6 +255,10 @@ export async function classifyBatch(
             suggestedCategory: rule.suggestedCategory || undefined,
             suggestedFlowType: rule.suggestedFlowType as 'INFLOW' | 'OUTFLOW' | undefined,
             suggestedLegalBucket: rule.suggestedLegalBucket as 'MASSE' | 'ABSONDERUNG' | 'NEUTRAL' | 'UNKNOWN' | undefined,
+            // Dimensions-Zuweisung
+            assignBankAccountId: rule.assignBankAccountId || undefined,
+            assignCounterpartyId: rule.assignCounterpartyId || undefined,
+            assignLocationId: rule.assignLocationId || undefined,
             confidence,
             matchDetails: buildMatchDetails(rule, entry),
           };
@@ -259,7 +267,7 @@ export async function classifyBatch(
       }
 
       if (suggestion) {
-        // Schreibe Vorschlag an LedgerEntry
+        // Schreibe Vorschlag an LedgerEntry (inkl. Dimensions-Vorschläge)
         await prisma.ledgerEntry.update({
           where: { id: entry.id },
           data: {
@@ -268,6 +276,10 @@ export async function classifyBatch(
             suggestedConfidence: suggestion.confidence,
             suggestedRuleId: suggestion.ruleId,
             suggestedReason: suggestion.matchDetails,
+            // Dimensions-Vorschläge
+            suggestedBankAccountId: suggestion.assignBankAccountId || null,
+            suggestedCounterpartyId: suggestion.assignCounterpartyId || null,
+            suggestedLocationId: suggestion.assignLocationId || null,
           },
         });
         classified++;
@@ -295,7 +307,7 @@ export async function reclassifyUnreviewed(
   prisma: PrismaClient,
   caseId: string
 ): Promise<{ classified: number; unchanged: number; errors: number }> {
-  // Setze alle Vorschläge für UNREVIEWED Entries zurück
+  // Setze alle Vorschläge für UNREVIEWED Entries zurück (inkl. Dimensions)
   await prisma.ledgerEntry.updateMany({
     where: {
       caseId,
@@ -307,6 +319,9 @@ export async function reclassifyUnreviewed(
       suggestedConfidence: null,
       suggestedRuleId: null,
       suggestedReason: null,
+      suggestedBankAccountId: null,
+      suggestedCounterpartyId: null,
+      suggestedLocationId: null,
     },
   });
 

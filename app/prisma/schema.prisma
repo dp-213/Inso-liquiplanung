@@ -745,6 +745,11 @@ model LedgerEntry {
   suggestedRuleId         String?   // Welche ClassificationRule hat gematcht
   suggestedReason         String?   // Erklärungstext für den Vorschlag
 
+  // === DIMENSIONS-VORSCHLÄGE (von Rule Engine) ===
+  suggestedBankAccountId  String?   // Vorgeschlagenes Bankkonto
+  suggestedCounterpartyId String?   // Vorgeschlagene Gegenpartei
+  suggestedLocationId     String?   // Vorgeschlagener Standort
+
   // === AUDIT ===
   createdAt         DateTime  @default(now())
   createdBy         String
@@ -829,6 +834,11 @@ model ClassificationRule {
   suggestedFlowType     String?   // INFLOW, OUTFLOW
   suggestedLegalBucket  String?   // MASSE, ABSONDERUNG, NEUTRAL
   confidenceBonus       Float     @default(0.0)  // Zusätzlicher Confidence-Score
+
+  // Dimensions-Zuweisung (NEU)
+  assignBankAccountId   String?   // Direkte Zuweisung Bankkonto
+  assignCounterpartyId  String?   // Direkte Zuweisung Gegenpartei
+  assignLocationId      String?   // Direkte Zuweisung Standort
 
   createdAt       DateTime @default(now())
   createdBy       String
