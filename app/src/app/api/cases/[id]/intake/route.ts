@@ -9,7 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { classifyBatch } from '@/lib/classification';
+import { classifyBatch, matchCounterpartyPatterns } from '@/lib/classification';
 import { markAggregationStale } from '@/lib/ledger/aggregation';
 
 // =============================================================================
@@ -171,16 +171,28 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Klassifiziere die neuen Entries
     const classificationResult = await classifyBatch(prisma, caseId, createdIds);
 
+    // Counterparty Pattern Matching (schreibt nur Vorschläge!)
+    const counterpartyResult = await matchCounterpartyPatterns(prisma, caseId, createdIds);
+
     // Markiere Aggregation als veraltet
     await markAggregationStale(prisma, caseId);
+
+    // Message bauen
+    const extras: string[] = [];
+    if (classificationResult.classified > 0) extras.push(`${classificationResult.classified} klassifiziert`);
+    if (counterpartyResult.matched > 0) extras.push(`${counterpartyResult.matched} Gegenparteien erkannt`);
+    const message = extras.length > 0
+      ? `${createdIds.length} Einträge importiert (${extras.join(", ")})`
+      : `${createdIds.length} Einträge importiert`;
 
     return NextResponse.json({
       success: true,
       created: createdIds.length,
       classified: classificationResult.classified,
+      counterpartyMatched: counterpartyResult.matched,
       unchanged: classificationResult.unchanged,
       errors: classificationResult.errors,
-      message: `${createdIds.length} Einträge importiert, ${classificationResult.classified} mit Klassifikations-Vorschlägen`,
+      message,
       entryIds: createdIds,
     });
   } catch (error) {

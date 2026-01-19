@@ -17,8 +17,31 @@ interface ClassificationRule {
   suggestedFlowType: string | null;
   suggestedLegalBucket: string | null;
   confidenceBonus: number;
+  // Dimensions-Zuweisung
+  assignBankAccountId: string | null;
+  assignCounterpartyId: string | null;
+  assignLocationId: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface BankAccount {
+  id: string;
+  bankName: string;
+  accountName: string;
+  iban: string | null;
+}
+
+interface Counterparty {
+  id: string;
+  name: string;
+  shortName: string | null;
+}
+
+interface Location {
+  id: string;
+  name: string;
+  shortName: string | null;
 }
 
 interface CaseData {
@@ -72,6 +95,11 @@ export default function CaseRulesPage({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [deletingRuleId, setDeletingRuleId] = useState<string | null>(null);
 
+  // Dimensions State
+  const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
+  const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+
   // Form State für neue Rule
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
@@ -80,6 +108,10 @@ export default function CaseRulesPage({
     matchType: "CONTAINS",
     matchValue: "",
     suggestedLegalBucket: "MASSE",
+    // Dimensions-Zuweisung
+    assignBankAccountId: "",
+    assignCounterpartyId: "",
+    assignLocationId: "",
   });
   const [saving, setSaving] = useState(false);
   const [editingRule, setEditingRule] = useState<ClassificationRule | null>(null);
@@ -89,9 +121,12 @@ export default function CaseRulesPage({
       setLoading(true);
       setError(null);
 
-      const [caseRes, rulesRes] = await Promise.all([
+      const [caseRes, rulesRes, bankRes, counterpartyRes, locationRes] = await Promise.all([
         fetch(`/api/cases/${id}`, { credentials: "include" }),
         fetch(`/api/cases/${id}/rules`, { credentials: "include" }),
+        fetch(`/api/cases/${id}/bank-accounts`, { credentials: "include" }),
+        fetch(`/api/cases/${id}/counterparties`, { credentials: "include" }),
+        fetch(`/api/cases/${id}/locations`, { credentials: "include" }),
       ]);
 
       if (caseRes.ok) {
@@ -112,6 +147,20 @@ export default function CaseRulesPage({
         setRules(data.rules || []);
       } else {
         setError("Fehler beim Laden der Rules");
+      }
+
+      // Lade Dimensionen (nicht kritisch, daher keine Fehler werfen)
+      if (bankRes.ok) {
+        const data = await bankRes.json();
+        setBankAccounts(data.accounts || []);
+      }
+      if (counterpartyRes.ok) {
+        const data = await counterpartyRes.json();
+        setCounterparties(data.counterparties || []);
+      }
+      if (locationRes.ok) {
+        const data = await locationRes.json();
+        setLocations(data.locations || []);
       }
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -142,6 +191,9 @@ export default function CaseRulesPage({
         matchType: "CONTAINS",
         matchValue: createFrom,
         suggestedLegalBucket: suggestBucket || "MASSE",
+        assignBankAccountId: "",
+        assignCounterpartyId: "",
+        assignLocationId: "",
       });
       setShowForm(true);
 
@@ -162,9 +214,17 @@ export default function CaseRulesPage({
 
       // Automatische Defaults für vereinfachte UI
       const dataToSend = {
-        ...formData,
+        name: formData.name,
+        matchField: formData.matchField,
+        matchType: formData.matchType,
+        matchValue: formData.matchValue,
+        suggestedLegalBucket: formData.suggestedLegalBucket,
         confidenceBonus: 0.15, // Ergibt ~85% Konfidenz für CONTAINS
         priority: editingRule?.priority || (rules.length + 1) * 10, // Auto-Priorität
+        // Dimensions-Zuweisung (leere Strings → null)
+        assignBankAccountId: formData.assignBankAccountId || null,
+        assignCounterpartyId: formData.assignCounterpartyId || null,
+        assignLocationId: formData.assignLocationId || null,
       };
 
       const res = await fetch(url, {
@@ -249,6 +309,10 @@ export default function CaseRulesPage({
       matchType: rule.matchType,
       matchValue: rule.matchValue,
       suggestedLegalBucket: rule.suggestedLegalBucket || "MASSE",
+      // Dimensions-Zuweisung
+      assignBankAccountId: rule.assignBankAccountId || "",
+      assignCounterpartyId: rule.assignCounterpartyId || "",
+      assignLocationId: rule.assignLocationId || "",
     });
     setShowForm(true);
   };
@@ -260,6 +324,9 @@ export default function CaseRulesPage({
       matchType: "CONTAINS",
       matchValue: "",
       suggestedLegalBucket: "MASSE",
+      assignBankAccountId: "",
+      assignCounterpartyId: "",
+      assignLocationId: "",
     });
   };
 
@@ -459,6 +526,79 @@ export default function CaseRulesPage({
               </select>
             </div>
 
+            {/* Dimensions-Zuweisung */}
+            {(bankAccounts.length > 0 || counterparties.length > 0 || locations.length > 0) && (
+              <div className="pt-4 border-t border-[var(--border)]">
+                <h3 className="text-sm font-medium text-[var(--foreground)] mb-3">
+                  Dimensions-Zuweisung (optional)
+                </h3>
+                <p className="text-xs text-[var(--muted)] mb-3">
+                  Wenn die Regel matched, werden diese Dimensionen automatisch vorgeschlagen.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Bankkonto */}
+                  {bankAccounts.length > 0 && (
+                    <div>
+                      <label className="block text-sm text-[var(--muted)] mb-1">Bankkonto</label>
+                      <select
+                        value={formData.assignBankAccountId}
+                        onChange={(e) => setFormData({ ...formData, assignBankAccountId: e.target.value })}
+                        className="input-field w-full"
+                      >
+                        <option value="">-- Keine Zuweisung --</option>
+                        {bankAccounts.map((acc) => (
+                          <option key={acc.id} value={acc.id}>
+                            {acc.bankName} - {acc.accountName}
+                            {acc.iban && ` (${acc.iban.slice(-4)})`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Gegenpartei */}
+                  {counterparties.length > 0 && (
+                    <div>
+                      <label className="block text-sm text-[var(--muted)] mb-1">Gegenpartei</label>
+                      <select
+                        value={formData.assignCounterpartyId}
+                        onChange={(e) => setFormData({ ...formData, assignCounterpartyId: e.target.value })}
+                        className="input-field w-full"
+                      >
+                        <option value="">-- Keine Zuweisung --</option>
+                        {counterparties.map((cp) => (
+                          <option key={cp.id} value={cp.id}>
+                            {cp.name}
+                            {cp.shortName && ` (${cp.shortName})`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Standort */}
+                  {locations.length > 0 && (
+                    <div>
+                      <label className="block text-sm text-[var(--muted)] mb-1">Standort</label>
+                      <select
+                        value={formData.assignLocationId}
+                        onChange={(e) => setFormData({ ...formData, assignLocationId: e.target.value })}
+                        className="input-field w-full"
+                      >
+                        <option value="">-- Keine Zuweisung --</option>
+                        {locations.map((loc) => (
+                          <option key={loc.id} value={loc.id}>
+                            {loc.name}
+                            {loc.shortName && ` (${loc.shortName})`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Preview */}
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm font-medium text-blue-800">So wird die Regel angewendet:</p>
@@ -537,13 +677,30 @@ export default function CaseRulesPage({
                       „<span className="text-green-600 font-medium">{rule.matchValue}</span>"
                     </td>
                     <td>
-                      <span className={`badge ${
-                        rule.suggestedLegalBucket === "MASSE" ? "badge-success" :
-                        rule.suggestedLegalBucket === "ABSONDERUNG" ? "badge-warning" :
-                        rule.suggestedLegalBucket === "NEUTRAL" ? "badge-info" : "badge-neutral"
-                      }`}>
-                        {LEGAL_BUCKET_LABELS[rule.suggestedLegalBucket || "UNKNOWN"]}
-                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        <span className={`badge ${
+                          rule.suggestedLegalBucket === "MASSE" ? "badge-success" :
+                          rule.suggestedLegalBucket === "ABSONDERUNG" ? "badge-warning" :
+                          rule.suggestedLegalBucket === "NEUTRAL" ? "badge-info" : "badge-neutral"
+                        }`}>
+                          {LEGAL_BUCKET_LABELS[rule.suggestedLegalBucket || "UNKNOWN"]}
+                        </span>
+                        {rule.assignBankAccountId && (
+                          <span className="badge badge-info text-xs" title="Bankkonto">
+                            🏦 {bankAccounts.find(a => a.id === rule.assignBankAccountId)?.bankName || "..."}
+                          </span>
+                        )}
+                        {rule.assignCounterpartyId && (
+                          <span className="badge badge-info text-xs" title="Gegenpartei">
+                            👤 {counterparties.find(c => c.id === rule.assignCounterpartyId)?.name || "..."}
+                          </span>
+                        )}
+                        {rule.assignLocationId && (
+                          <span className="badge badge-info text-xs" title="Standort">
+                            📍 {locations.find(l => l.id === rule.assignLocationId)?.name || "..."}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <div className="flex items-center gap-2">

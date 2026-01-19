@@ -56,6 +56,22 @@ interface ClassificationStats {
   };
 }
 
+interface BankAccount {
+  id: string;
+  bankName: string;
+  accountName: string;
+}
+
+interface Counterparty {
+  id: string;
+  name: string;
+}
+
+interface Location {
+  id: string;
+  name: string;
+}
+
 export default function CaseLedgerPage({
   params,
 }: {
@@ -79,6 +95,14 @@ export default function CaseLedgerPage({
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "grouped">("table");
 
+  // Dimensions für Name-Lookup
+  const [bankAccountsMap, setBankAccountsMap] = useState<Map<string, string>>(new Map());
+  const [counterpartiesMap, setCounterpartiesMap] = useState<Map<string, string>>(new Map());
+  const [locationsMap, setLocationsMap] = useState<Map<string, string>>(new Map());
+  const [bankAccountsList, setBankAccountsList] = useState<BankAccount[]>([]);
+  const [counterpartiesList, setCounterpartiesList] = useState<Counterparty[]>([]);
+  const [locationsList, setLocationsList] = useState<Location[]>([]);
+
   // Tab switching
   const setActiveTab = (tab: TabType) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -97,6 +121,10 @@ export default function CaseLedgerPage({
   const [filterSuggestedBucket, setFilterSuggestedBucket] = useState<string>("");
   const [filterFrom, setFilterFrom] = useState<string>("");
   const [filterTo, setFilterTo] = useState<string>("");
+  // Dimensions-Filter
+  const [filterBankAccountId, setFilterBankAccountId] = useState<string>("");
+  const [filterCounterpartyId, setFilterCounterpartyId] = useState<string>("");
+  const [filterLocationId, setFilterLocationId] = useState<string>("");
 
   // Auto-set review filter when tab changes
   useEffect(() => {
@@ -125,14 +153,21 @@ export default function CaseLedgerPage({
       if (filterSuggestedBucket) queryParams.set("suggestedLegalBucket", filterSuggestedBucket);
       if (filterFrom) queryParams.set("from", filterFrom);
       if (filterTo) queryParams.set("to", filterTo);
+      // Dimensions-Filter
+      if (filterBankAccountId) queryParams.set("bankAccountId", filterBankAccountId);
+      if (filterCounterpartyId) queryParams.set("counterpartyId", filterCounterpartyId);
+      if (filterLocationId) queryParams.set("locationId", filterLocationId);
 
       const queryString = queryParams.toString();
       const url = `/api/cases/${id}/ledger${queryString ? `?${queryString}` : ""}`;
 
-      const [caseRes, ledgerRes, intakeRes] = await Promise.all([
+      const [caseRes, ledgerRes, intakeRes, bankRes, counterpartyRes, locationRes] = await Promise.all([
         fetch(`/api/cases/${id}`, { credentials: 'include' }),
         fetch(url, { credentials: 'include' }),
         fetch(`/api/cases/${id}/intake`, { credentials: 'include' }),
+        fetch(`/api/cases/${id}/bank-accounts`, { credentials: 'include' }),
+        fetch(`/api/cases/${id}/counterparties`, { credentials: 'include' }),
+        fetch(`/api/cases/${id}/locations`, { credentials: 'include' }),
       ]);
 
       if (caseRes.ok) {
@@ -168,13 +203,39 @@ export default function CaseLedgerPage({
         const intakeData = await intakeRes.json();
         setClassificationStats(intakeData);
       }
+
+      // Lade Dimensionen für Name-Lookup
+      if (bankRes.ok) {
+        const data = await bankRes.json();
+        const accounts = data.accounts || [];
+        setBankAccountsList(accounts);
+        const map = new Map<string, string>();
+        accounts.forEach((acc: BankAccount) => map.set(acc.id, `${acc.bankName} - ${acc.accountName}`));
+        setBankAccountsMap(map);
+      }
+      if (counterpartyRes.ok) {
+        const data = await counterpartyRes.json();
+        const cps = data.counterparties || [];
+        setCounterpartiesList(cps);
+        const map = new Map<string, string>();
+        cps.forEach((cp: Counterparty) => map.set(cp.id, cp.name));
+        setCounterpartiesMap(map);
+      }
+      if (locationRes.ok) {
+        const data = await locationRes.json();
+        const locs = data.locations || [];
+        setLocationsList(locs);
+        const map = new Map<string, string>();
+        locs.forEach((loc: Location) => map.set(loc.id, loc.name));
+        setLocationsMap(map);
+      }
     } catch (err) {
       console.error("Error fetching data:", err);
       setError("Fehler beim Laden der Daten");
     } finally {
       setLoading(false);
     }
-  }, [id, filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterFrom, filterTo]);
+  }, [id, filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountId, filterCounterpartyId, filterLocationId]);
 
   useEffect(() => {
     fetchData();
@@ -221,9 +282,12 @@ export default function CaseLedgerPage({
     setFilterSuggestedBucket("");
     setFilterFrom("");
     setFilterTo("");
+    setFilterBankAccountId("");
+    setFilterCounterpartyId("");
+    setFilterLocationId("");
   };
 
-  const hasActiveFilters = filterValueType || filterLegalBucket || filterReviewStatus || filterSuggestedBucket || filterFrom || filterTo;
+  const hasActiveFilters = filterValueType || filterLegalBucket || filterReviewStatus || filterSuggestedBucket || filterFrom || filterTo || filterBankAccountId || filterCounterpartyId || filterLocationId;
 
   // Bulk Actions
   const handleBulkConfirm = async (filter?: { suggestedLegalBucket?: string; minConfidence?: number }) => {
@@ -303,6 +367,41 @@ export default function CaseLedgerPage({
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Klassifikations-Übernahme fehlgeschlagen");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const handleApplyDimensionSuggestions = async () => {
+    setBulkProcessing(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/bulk-review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "ADJUST",
+          filter: {
+            reviewStatus: "UNREVIEWED",
+          },
+          reason: "Dimensions-Vorschläge übernommen",
+          applyDimensionSuggestions: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Dimensions-Übernahme fehlgeschlagen");
+      }
+
+      setSuccessMessage(data.message || `${data.processed} Einträge mit Dimensionen aktualisiert`);
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Dimensions-Übernahme fehlgeschlagen");
     } finally {
       setBulkProcessing(false);
     }
@@ -699,6 +798,25 @@ export default function CaseLedgerPage({
                 Ausgewählte bestätigen ({selectedEntries.size})
               </button>
             )}
+
+            {/* Dimensions-Vorschläge übernehmen */}
+            {entries.some((e) => {
+              const ext = e as LedgerEntryResponse & {
+                suggestedBankAccountId?: string | null;
+                suggestedCounterpartyId?: string | null;
+                suggestedLocationId?: string | null;
+              };
+              return ext.suggestedBankAccountId || ext.suggestedCounterpartyId || ext.suggestedLocationId;
+            }) && (
+              <button
+                onClick={handleApplyDimensionSuggestions}
+                disabled={bulkProcessing}
+                className="btn-secondary text-sm bg-white disabled:opacity-50"
+                title="Übernimmt vorgeschlagene Bankkonten, Gegenparteien und Standorte"
+              >
+                Dimensionen übernehmen
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -795,6 +913,70 @@ export default function CaseLedgerPage({
             />
           </div>
 
+          {/* Dimensions-Filter */}
+          {bankAccountsList.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                Bankkonto
+              </label>
+              <select
+                value={filterBankAccountId}
+                onChange={(e) => setFilterBankAccountId(e.target.value)}
+                className="input-field min-w-[150px]"
+              >
+                <option value="">Alle</option>
+                <option value="null">Ohne Bankkonto</option>
+                {bankAccountsList.map((acc) => (
+                  <option key={acc.id} value={acc.id}>
+                    {acc.bankName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {counterpartiesList.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                Gegenpartei
+              </label>
+              <select
+                value={filterCounterpartyId}
+                onChange={(e) => setFilterCounterpartyId(e.target.value)}
+                className="input-field min-w-[150px]"
+              >
+                <option value="">Alle</option>
+                <option value="null">Ohne Gegenpartei</option>
+                {counterpartiesList.map((cp) => (
+                  <option key={cp.id} value={cp.id}>
+                    {cp.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {locationsList.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                Standort
+              </label>
+              <select
+                value={filterLocationId}
+                onChange={(e) => setFilterLocationId(e.target.value)}
+                className="input-field min-w-[150px]"
+              >
+                <option value="">Alle</option>
+                <option value="null">Ohne Standort</option>
+                {locationsList.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
@@ -856,6 +1038,7 @@ export default function CaseLedgerPage({
                   <SortHeader field="legalBucket" label="Rechtsstatus" />
                   <SortHeader field="reviewStatus" label="Review" />
                   <th>Vorschlag</th>
+                  <th>Dim.-Vorschlag</th>
                   <th>Aktionen</th>
                 </tr>
               </thead>
@@ -867,6 +1050,9 @@ export default function CaseLedgerPage({
                     suggestedLegalBucket?: string | null;
                     suggestedConfidence?: number | null;
                     suggestedReason?: string | null;
+                    suggestedBankAccountId?: string | null;
+                    suggestedCounterpartyId?: string | null;
+                    suggestedLocationId?: string | null;
                   };
 
                   return (
@@ -928,6 +1114,29 @@ export default function CaseLedgerPage({
                           </div>
                         ) : (
                           <span className="text-xs text-[var(--muted)]">-</span>
+                        )}
+                      </td>
+                      <td className="text-xs">
+                        {(entryWithExtras.suggestedBankAccountId || entryWithExtras.suggestedCounterpartyId || entryWithExtras.suggestedLocationId) ? (
+                          <div className="flex flex-wrap gap-1">
+                            {entryWithExtras.suggestedBankAccountId && (
+                              <span className="badge badge-info text-xs" title={`Bankkonto: ${bankAccountsMap.get(entryWithExtras.suggestedBankAccountId) || '...'}`}>
+                                🏦
+                              </span>
+                            )}
+                            {entryWithExtras.suggestedCounterpartyId && (
+                              <span className="badge badge-info text-xs" title={`Gegenpartei: ${counterpartiesMap.get(entryWithExtras.suggestedCounterpartyId) || '...'}`}>
+                                👤
+                              </span>
+                            )}
+                            {entryWithExtras.suggestedLocationId && (
+                              <span className="badge badge-info text-xs" title={`Standort: ${locationsMap.get(entryWithExtras.suggestedLocationId) || '...'}`}>
+                                📍
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-[var(--muted)]">-</span>
                         )}
                       </td>
                       <td>

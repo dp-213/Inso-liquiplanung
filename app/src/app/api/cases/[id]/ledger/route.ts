@@ -28,6 +28,14 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse & {
   suggestedConfidence: number | null;
   suggestedRuleId: string | null;
   suggestedReason: string | null;
+  // Dimensions (final)
+  bankAccountId: string | null;
+  counterpartyId: string | null;
+  locationId: string | null;
+  // Dimensions-Vorschläge (von Rule Engine)
+  suggestedBankAccountId: string | null;
+  suggestedCounterpartyId: string | null;
+  suggestedLocationId: string | null;
 } {
   return {
     id: entry.id,
@@ -58,6 +66,14 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse & {
     suggestedConfidence: entry.suggestedConfidence,
     suggestedRuleId: entry.suggestedRuleId,
     suggestedReason: entry.suggestedReason,
+    // Dimensions (final)
+    bankAccountId: entry.bankAccountId,
+    counterpartyId: entry.counterpartyId,
+    locationId: entry.locationId,
+    // Dimensions-Vorschläge (von Rule Engine)
+    suggestedBankAccountId: entry.suggestedBankAccountId,
+    suggestedCounterpartyId: entry.suggestedCounterpartyId,
+    suggestedLocationId: entry.suggestedLocationId,
     // Audit
     createdAt: entry.createdAt.toISOString(),
     createdBy: entry.createdBy,
@@ -90,6 +106,11 @@ export async function GET(
     const bookingSource = searchParams.get('bookingSource') as BookingSource | null;
     const reviewStatus = searchParams.get('reviewStatus') as ReviewStatus | null;
     const suggestedLegalBucket = searchParams.get('suggestedLegalBucket');
+    // Dimensions-Filter
+    const bankAccountId = searchParams.get('bankAccountId');
+    const counterpartyId = searchParams.get('counterpartyId');
+    const locationId = searchParams.get('locationId');
+    const hasDimensionSuggestions = searchParams.get('hasDimensionSuggestions');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 100;
@@ -129,6 +150,40 @@ export async function GET(
       } else if (suggestedLegalBucket) {
         where.suggestedLegalBucket = suggestedLegalBucket;
       }
+    }
+
+    // Dimensions-Filter (finale Werte)
+    if (bankAccountId) {
+      if (bankAccountId === 'null') {
+        where.bankAccountId = null;
+      } else {
+        where.bankAccountId = bankAccountId;
+      }
+    }
+
+    if (counterpartyId) {
+      if (counterpartyId === 'null') {
+        where.counterpartyId = null;
+      } else {
+        where.counterpartyId = counterpartyId;
+      }
+    }
+
+    if (locationId) {
+      if (locationId === 'null') {
+        where.locationId = null;
+      } else {
+        where.locationId = locationId;
+      }
+    }
+
+    // Filter: Nur Einträge mit Dimensions-Vorschlägen
+    if (hasDimensionSuggestions === 'true') {
+      where.OR = [
+        { suggestedBankAccountId: { not: null } },
+        { suggestedCounterpartyId: { not: null } },
+        { suggestedLocationId: { not: null } },
+      ];
     }
 
     if (from || to) {

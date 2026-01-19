@@ -393,3 +393,91 @@ export async function getClassificationStats(
 
   return stats;
 }
+
+// =============================================================================
+// COUNTERPARTY PATTERN MATCHING
+// =============================================================================
+
+/**
+ * Matcht Counterparty-Patterns gegen LedgerEntry-Beschreibungen.
+ * Schreibt NUR suggestedCounterpartyId - User muss bestätigen!
+ */
+export async function matchCounterpartyPatterns(
+  prisma: PrismaClient,
+  caseId: string,
+  entryIds?: string[]
+): Promise<{ matched: number; skipped: number; errors: number }> {
+  // Lade Counterparties mit Pattern
+  const counterparties = await prisma.counterparty.findMany({
+    where: {
+      caseId,
+      matchPattern: { not: null },
+    },
+    orderBy: { displayOrder: 'asc' },
+  });
+
+  if (counterparties.length === 0) {
+    return { matched: 0, skipped: 0, errors: 0 };
+  }
+
+  // Lade Entries ohne Counterparty-Vorschlag
+  const where = entryIds
+    ? { id: { in: entryIds }, caseId }
+    : {
+        caseId,
+        suggestedCounterpartyId: null,
+        reviewStatus: 'UNREVIEWED',
+      };
+
+  const entries = await prisma.ledgerEntry.findMany({
+    where,
+    select: { id: true, description: true, suggestedReason: true },
+  });
+
+  if (entries.length === 0) {
+    return { matched: 0, skipped: 0, errors: 0 };
+  }
+
+  let matched = 0;
+  let skipped = 0;
+  let errors = 0;
+
+  for (const entry of entries) {
+    let foundMatch = false;
+
+    for (const cp of counterparties) {
+      if (!cp.matchPattern) continue;
+
+      try {
+        const regex = new RegExp(cp.matchPattern, 'i');
+        if (regex.test(entry.description)) {
+          // Nur Vorschlag setzen - User muss bestätigen!
+          const reason = entry.suggestedReason
+            ? `${entry.suggestedReason} | Gegenpartei "${cp.name}" erkannt`
+            : `Gegenpartei "${cp.name}" erkannt (Pattern: ${cp.matchPattern})`;
+
+          await prisma.ledgerEntry.update({
+            where: { id: entry.id },
+            data: {
+              suggestedCounterpartyId: cp.id,
+              suggestedReason: reason,
+            },
+          });
+
+          matched++;
+          foundMatch = true;
+          break; // Erste Übereinstimmung gewinnt
+        }
+      } catch (err) {
+        console.warn(`Invalid regex pattern for counterparty ${cp.id}: ${cp.matchPattern}`, err);
+        errors++;
+      }
+    }
+
+    if (!foundMatch) {
+      skipped++;
+    }
+  }
+
+  return { matched, skipped, errors };
+}

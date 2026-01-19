@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 import { parseDate } from "@/lib/ingestion/transformations";
 import { parseGermanEuroToCents } from "@/lib/calculation-engine";
 import { markAggregationStale } from "@/lib/ledger/aggregation";
-import { classifyBatch } from "@/lib/classification/engine";
+import { classifyBatch, matchCounterpartyPatterns } from "@/lib/classification/engine";
 
 interface Mappings {
   transactionDate: string;
@@ -379,31 +379,45 @@ export async function POST(
 
     // Klassifikation für neue Einträge durchführen
     let classified = 0;
+    let counterpartyMatched = 0;
     if (created > 0) {
       try {
         const classificationResult = await classifyBatch(prisma, job.caseId);
         classified = classificationResult.classified;
         console.log(`[to-ledger] Classification: classified=${classified}, unchanged=${classificationResult.unchanged}`);
+
+        // Counterparty Pattern Matching (schreibt nur Vorschläge!)
+        const counterpartyResult = await matchCounterpartyPatterns(prisma, job.caseId);
+        counterpartyMatched = counterpartyResult.matched;
+        if (counterpartyMatched > 0) {
+          console.log(`[to-ledger] Counterparty matching: matched=${counterpartyMatched}`);
+        }
       } catch (classErr) {
         console.error("[to-ledger] Classification error (non-fatal):", classErr);
       }
     }
 
-    console.log(`[to-ledger] Finished: created=${created}, classified=${classified}, skipped=${skipped}, errors=${errors.length}`);
+    console.log(`[to-ledger] Finished: created=${created}, classified=${classified}, counterpartyMatched=${counterpartyMatched}, skipped=${skipped}, errors=${errors.length}`);
     if (errors.length > 0) {
       console.log(`[to-ledger] First errors:`, errors.slice(0, 5));
     }
+
+    // Message bauen
+    let message = `${created} Zahlungen ins Ledger importiert`;
+    const extras: string[] = [];
+    if (classified > 0) extras.push(`${classified} klassifiziert`);
+    if (counterpartyMatched > 0) extras.push(`${counterpartyMatched} Gegenparteien erkannt`);
+    if (extras.length > 0) message += ` (${extras.join(", ")})`;
 
     return NextResponse.json({
       success: true,
       created,
       classified,
+      counterpartyMatched,
       skipped,
       errors: errors.slice(0, 10), // Max 10 Fehler zurückgeben
       totalErrors: errors.length,
-      message: classified > 0
-        ? `${created} Zahlungen importiert, ${classified} mit Klassifikations-Vorschlag`
-        : `${created} Zahlungen ins Ledger importiert`,
+      message,
     });
   } catch (error) {
     console.error("Error importing to ledger:", error);
