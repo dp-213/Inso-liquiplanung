@@ -8,7 +8,9 @@ import { CaseDashboardData } from "@/types/dashboard";
 
 export default function AdminDashboardPage() {
   const params = useParams();
-  const caseId = params.id as string;
+  // Sicherstellen dass caseId ein String ist (nicht Array)
+  const rawId = params.id;
+  const caseId = Array.isArray(rawId) ? rawId[0] : rawId;
   const [data, setData] = useState<CaseDashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -96,11 +98,18 @@ export default function AdminDashboardPage() {
         <span className="text-[var(--foreground)]">Liquiditätsplan</span>
       </div>
 
+      {/* DEBUG: caseId check */}
+      {!caseId && (
+        <div className="p-4 bg-red-100 border border-red-300 rounded text-red-800 text-sm">
+          DEBUG: caseId ist leer! params.id = {JSON.stringify(params.id)}
+        </div>
+      )}
+
       {/* Unified Dashboard with Admin capabilities */}
       <UnifiedCaseDashboard
         data={data}
         accessMode="admin"
-        caseId={caseId}
+        caseId={caseId || ""}
       />
     </div>
   );
