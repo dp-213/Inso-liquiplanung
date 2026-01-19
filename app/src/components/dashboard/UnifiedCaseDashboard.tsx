@@ -286,33 +286,22 @@ export default function UnifiedCaseDashboard({
             />
 
             {/* Rolling Forecast Chart - IST (Vergangenheit) + PLAN (Zukunft) */}
-            <div className="admin-card p-6">
-              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
-                Rolling Forecast
-                <span className="ml-2 text-xs font-normal text-[var(--muted)]">
-                  (caseId: {caseId || "FEHLT!"})
-                </span>
-              </h2>
-              {caseId ? (
+            {caseId && (
+              <div className="admin-card p-6">
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Rolling Forecast</h2>
                 <RollingForecastChart caseId={caseId} />
-              ) : (
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">
-                  Fehler: caseId nicht verfügbar. Kann Rolling Forecast nicht laden.
-                </div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Rolling Forecast Tabelle */}
-            <div className="admin-card">
-              <div className="px-6 py-4 border-b border-[var(--border)]">
-                <h2 className="text-lg font-semibold text-[var(--foreground)]">Liquiditätsübersicht (IST/PLAN)</h2>
-              </div>
-              {caseId ? (
+            {caseId && (
+              <div className="admin-card">
+                <div className="px-6 py-4 border-b border-[var(--border)]">
+                  <h2 className="text-lg font-semibold text-[var(--foreground)]">Liquiditätsübersicht (IST/PLAN)</h2>
+                </div>
                 <RollingForecastTable caseId={caseId} />
-              ) : (
-                <div className="p-4 text-[var(--muted)]">caseId fehlt</div>
-              )}
-            </div>
+              </div>
+            )}
 
             {/* Detaillierte Kategorien-Tabelle */}
             <div className="admin-card">

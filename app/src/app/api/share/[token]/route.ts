@@ -290,6 +290,7 @@ export async function GET(
     // Prepare response (limited external view)
     const response = {
       case: {
+        id: caseData.id,
         caseNumber: caseData.caseNumber,
         debtorName: caseData.debtorName,
         courtName: caseData.courtName,

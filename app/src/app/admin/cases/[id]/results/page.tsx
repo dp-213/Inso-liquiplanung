@@ -98,18 +98,11 @@ export default function AdminDashboardPage() {
         <span className="text-[var(--foreground)]">Liquiditätsplan</span>
       </div>
 
-      {/* DEBUG: caseId check */}
-      {!caseId && (
-        <div className="p-4 bg-red-100 border border-red-300 rounded text-red-800 text-sm">
-          DEBUG: caseId ist leer! params.id = {JSON.stringify(params.id)}
-        </div>
-      )}
-
       {/* Unified Dashboard with Admin capabilities */}
       <UnifiedCaseDashboard
         data={data}
         accessMode="admin"
-        caseId={caseId || ""}
+        caseId={caseId}
       />
     </div>
   );

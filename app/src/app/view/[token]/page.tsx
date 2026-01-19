@@ -75,6 +75,7 @@ export default function ExternalCaseView() {
         <UnifiedCaseDashboard
           data={data}
           accessMode="external"
+          caseId={data.case?.id}
         />
       </main>
     </div>
