@@ -302,6 +302,19 @@ export default function UnifiedCaseDashboard({
                 <RollingForecastTable caseId={caseId} />
               </div>
             )}
+
+            {/* 10-Monatsplanung Kategorien-Tabelle */}
+            <div className="admin-card">
+              <div className="px-6 py-4 border-b border-[var(--border)]">
+                <h2 className="text-lg font-semibold text-[var(--foreground)]">{getPlanTitle(data)}</h2>
+              </div>
+              <LiquidityTable
+                weeks={weeksData}
+                categories={data.calculation.categories}
+                openingBalance={BigInt(data.calculation.openingBalanceCents)}
+                compact={true}
+              />
+            </div>
           </div>
         );
 

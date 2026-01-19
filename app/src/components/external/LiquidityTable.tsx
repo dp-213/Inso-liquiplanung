@@ -31,6 +31,8 @@ interface LiquidityTableProps {
   categories: Category[];
   openingBalance: bigint;
   showLineItems?: boolean;
+  compact?: boolean;
+  periodSources?: ("IST" | "PLAN" | "MIXED")[];
 }
 
 export default function LiquidityTable({
@@ -38,10 +40,20 @@ export default function LiquidityTable({
   categories,
   openingBalance,
   showLineItems = false,
+  compact = false,
+  periodSources,
 }: LiquidityTableProps) {
+  // Kompakte Währungsformatierung für enge Spalten
   const formatCurrency = (cents: bigint | string): string => {
     const value = typeof cents === "string" ? BigInt(cents) : cents;
     const euros = Number(value) / 100;
+    if (compact) {
+      // Kompakt: 1.234.567 → 1,2M / 123.456 → 123K
+      const abs = Math.abs(euros);
+      if (abs >= 1000000) return `${(euros / 1000000).toFixed(1)}M`;
+      if (abs >= 10000) return `${Math.round(euros / 1000)}K`;
+      return Math.round(euros).toLocaleString("de-DE");
+    }
     return euros.toLocaleString("de-DE", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
@@ -74,18 +86,32 @@ export default function LiquidityTable({
   const sumOutflows = totalOutflows.reduce((a, b) => a + b, BigInt(0));
   const sumNet = netCashflows.reduce((a, b) => a + b, BigInt(0));
 
+  // Spaltenbreite basierend auf compact-Modus
+  const colWidth = compact ? "min-w-[60px]" : "min-w-[90px]";
+  const posWidth = compact ? "min-w-[140px]" : "min-w-[200px]";
+  const sumWidth = compact ? "min-w-[70px]" : "min-w-[100px]";
+  const fontSize = compact ? "text-xs" : "text-sm";
+
   return (
-    <div className="table-scroll-container custom-scrollbar">
-    <table className="liquidity-table">
+    <div className={compact ? "" : "table-scroll-container custom-scrollbar"}>
+    <table className={`liquidity-table ${fontSize}`}>
       <thead>
         <tr>
-          <th className="min-w-[200px]">Position</th>
-          {weeks.map((week) => (
-            <th key={week.weekOffset} className="min-w-[90px]">
-              {week.weekLabel}
+          <th className={posWidth}>Position</th>
+          {weeks.map((week, idx) => (
+            <th key={week.weekOffset} className={`${colWidth} ${compact ? "px-1" : ""}`}>
+              <div className="flex flex-col items-center gap-0.5">
+                <span className={compact ? "text-[10px]" : ""}>{week.weekLabel}</span>
+                {periodSources && periodSources[idx] && (
+                  <span className={`inline-block w-2 h-2 rounded-full ${
+                    periodSources[idx] === "IST" ? "bg-green-500" :
+                    periodSources[idx] === "PLAN" ? "bg-purple-500" : "bg-amber-500"
+                  }`} title={periodSources[idx]} />
+                )}
+              </div>
             </th>
           ))}
-          <th className="min-w-[100px]">Summe</th>
+          <th className={sumWidth}>Summe</th>
         </tr>
       </thead>
       <tbody>
