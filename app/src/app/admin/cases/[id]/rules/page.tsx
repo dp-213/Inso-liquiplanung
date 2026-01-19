@@ -740,6 +740,9 @@ export default function CaseRulesPage({
                   matchType: "CONTAINS",
                   matchValue: "Miete",
                   suggestedLegalBucket: "NEUTRAL",
+                  assignBankAccountId: "",
+                  assignCounterpartyId: "",
+                  assignLocationId: "",
                 });
                 setShowForm(true);
               }}
@@ -756,6 +759,9 @@ export default function CaseRulesPage({
                   matchType: "CONTAINS",
                   matchValue: "Gehalt",
                   suggestedLegalBucket: "MASSE",
+                  assignBankAccountId: "",
+                  assignCounterpartyId: "",
+                  assignLocationId: "",
                 });
                 setShowForm(true);
               }}
@@ -772,6 +778,9 @@ export default function CaseRulesPage({
                   matchType: "STARTS_WITH",
                   matchValue: "Bank",
                   suggestedLegalBucket: "ABSONDERUNG",
+                  assignBankAccountId: "",
+                  assignCounterpartyId: "",
+                  assignLocationId: "",
                 });
                 setShowForm(true);
               }}
