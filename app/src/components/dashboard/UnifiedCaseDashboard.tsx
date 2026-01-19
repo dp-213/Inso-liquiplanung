@@ -26,7 +26,9 @@ import EstateComparisonChart from "@/components/external/EstateComparisonChart";
 import PlanningAssumptions from "@/components/external/PlanningAssumptions";
 import InsolvencyEffectsTable from "@/components/external/InsolvencyEffectsTable";
 import WaterfallChart from "@/components/external/WaterfallChart";
-import DataSourceLegend from "@/components/external/DataSourceLegend";
+import RevenueTable from "@/components/dashboard/RevenueTable";
+import SecurityRightsChart from "@/components/dashboard/SecurityRightsChart";
+// DataSourceLegend entfernt - nicht operativ relevant für Insolvenzverwalter
 
 // =============================================================================
 // Tab Navigation Icons
@@ -276,8 +278,6 @@ export default function UnifiedCaseDashboard({
               periodCount={data.calculation.periodCount || data.plan.periodCount}
             />
 
-            {data.ledgerStats && <DataSourceLegend ledgerStats={data.ledgerStats} />}
-
             <div className="admin-card p-6">
               <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Liquiditätsverlauf</h2>
               <BalanceChart weeks={weeksData} markers={paymentMarkers} showPhases={(data.calculation.periodType || data.plan.periodType) === "MONTHLY"} />
@@ -303,57 +303,39 @@ export default function UnifiedCaseDashboard({
       case "revenue":
         return (
           <div className="space-y-6">
-            <div className="admin-card p-6">
-              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen-Taktung nach Quelle</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--border)]">
-                      <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Quelle</th>
-                      <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Beschreibung</th>
-                      <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Rhythmus</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {PAYMENT_SOURCES.map((source) => (
-                      <tr key={source.id} className="border-b border-[var(--border)] hover:bg-gray-50">
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: source.color }} />
-                            <span className="font-medium">{source.name}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-[var(--secondary)]">{source.description}</td>
-                        <td className="py-3 px-4 text-[var(--secondary)]">{source.rhythm}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            {/* Datengetriebene Einnahmen-Übersicht aus Zahlungsregister */}
+            {data.case.id && (
+              <div className="admin-card p-6">
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen nach Quelle</h2>
+                <RevenueTable caseId={data.case.id} months={6} showSummary={true} />
               </div>
-            </div>
+            )}
 
-            <div className="admin-card p-6">
-              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen nach Kategorie</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                {sourceTotals.map((source, idx) => (
-                  <div key={source.name} className="p-4 rounded-lg border border-[var(--border)] bg-gray-50">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-[var(--secondary)]">{source.name}</span>
-                      <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: `${PAYMENT_SOURCES[idx % PAYMENT_SOURCES.length].color}20`, color: PAYMENT_SOURCES[idx % PAYMENT_SOURCES.length].color }}>
-                        {grandTotal > BigInt(0) ? `${((Number(source.total) / Number(grandTotal)) * 100).toFixed(0)}%` : "0%"}
-                      </span>
+            {/* Zusätzlich: Einnahmen aus Plankategorien (falls vorhanden) */}
+            {sourceTotals.length > 0 && (
+              <div className="admin-card p-6">
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen nach Plankategorie</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                  {sourceTotals.map((source, idx) => (
+                    <div key={source.name} className="p-4 rounded-lg border border-[var(--border)] bg-gray-50">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-[var(--secondary)]">{source.name}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: `${PAYMENT_SOURCES[idx % PAYMENT_SOURCES.length].color}20`, color: PAYMENT_SOURCES[idx % PAYMENT_SOURCES.length].color }}>
+                          {grandTotal > BigInt(0) ? `${((Number(source.total) / Number(grandTotal)) * 100).toFixed(0)}%` : "0%"}
+                        </span>
+                      </div>
+                      <div className="text-2xl font-bold text-[var(--foreground)]">{formatCurrencyFn(source.total)}</div>
                     </div>
-                    <div className="text-2xl font-bold text-[var(--foreground)]">{formatCurrencyFn(source.total)}</div>
+                  ))}
+                </div>
+                <div className="p-4 rounded-lg bg-[var(--primary)] text-white">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Gesamteinnahmen (Plan)</span>
+                    <span className="text-2xl font-bold">{formatCurrencyFn(grandTotal)}</span>
                   </div>
-                ))}
-              </div>
-              <div className="p-4 rounded-lg bg-[var(--primary)] text-white">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Gesamteinnahmen (Plan)</span>
-                  <span className="text-2xl font-bold">{formatCurrencyFn(grandTotal)}</span>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="admin-card p-6">
               <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen-Verlauf</h2>
@@ -365,6 +347,15 @@ export default function UnifiedCaseDashboard({
       case "security":
         return (
           <div className="space-y-6">
+            {/* Verfügbar vs. Gebunden Chart */}
+            {data.case.id && (
+              <div className="admin-card p-6">
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Verfügbarkeit über Zeit</h2>
+                <SecurityRightsChart caseId={data.case.id} periods={10} />
+              </div>
+            )}
+
+            {/* Bank Account Summary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="admin-card p-4">
                 <div className="text-sm text-[var(--secondary)]">Bankguthaben Gesamt</div>
@@ -713,11 +704,11 @@ export default function UnifiedCaseDashboard({
                   <span>Gericht: {data.case.courtName}</span>
                 </div>
               </div>
-              <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end gap-2">
-                <span className={`badge ${data.case.status === "OPENED" ? "badge-success" : data.case.status === "PRELIMINARY" ? "badge-warning" : "badge-neutral"}`}>
-                  {getStatusLabel(data.case.status)}
-                </span>
+              <div className="mt-4 md:mt-0 flex flex-col items-start md:items-end gap-1">
                 <span className="text-sm text-[var(--muted)]">Planungszeitraum: {getPeriodLabelRange(data)}</span>
+                <span className="text-xs text-[var(--muted)]">
+                  Status: {getStatusLabel(data.case.status)}
+                </span>
               </div>
             </div>
             {headerContent}

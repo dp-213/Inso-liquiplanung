@@ -526,6 +526,265 @@ export async function rebuildAggregation(
   }
 }
 
+// =============================================================================
+// AVAILABILITY AGGREGATION (Verfügbar vs. Gebunden)
+// =============================================================================
+
+/**
+ * Liquidity breakdown by availability
+ */
+export interface LiquidityByAvailability {
+  periodIndex: number;
+  periodLabel: string;
+  periodStart: Date;
+  available: bigint;    // legalBucket = 'MASSE' oder 'NEUTRAL' oder 'UNKNOWN'
+  encumbered: bigint;   // legalBucket = 'ABSONDERUNG'
+  total: bigint;
+}
+
+/**
+ * Aggregate LedgerEntries by availability (legalBucket)
+ * Separates funds that are freely available (MASSE) from encumbered funds (ABSONDERUNG)
+ */
+export async function aggregateByAvailability(
+  prisma: PrismaClient,
+  caseId: string,
+  planId: string,
+  periodCount?: number
+): Promise<LiquidityByAvailability[]> {
+  // Get the plan
+  const plan = await prisma.liquidityPlan.findUnique({
+    where: { id: planId },
+  });
+
+  if (!plan) {
+    return [];
+  }
+
+  const actualPeriodCount = periodCount || plan.periodCount;
+
+  // Get all LedgerEntries for the case
+  const entries = await prisma.ledgerEntry.findMany({
+    where: { caseId },
+    orderBy: { transactionDate: 'asc' },
+  });
+
+  // Initialize periods
+  const periods: LiquidityByAvailability[] = [];
+  for (let i = 0; i < actualPeriodCount; i++) {
+    const periodStart = calculatePeriodStartDate(
+      plan.planStartDate,
+      i,
+      plan.periodType as 'WEEKLY' | 'MONTHLY'
+    );
+
+    const periodLabel = formatPeriodLabel(periodStart, plan.periodType as 'WEEKLY' | 'MONTHLY');
+
+    periods.push({
+      periodIndex: i,
+      periodLabel,
+      periodStart,
+      available: BigInt(0),
+      encumbered: BigInt(0),
+      total: BigInt(0),
+    });
+  }
+
+  // Aggregate entries by period and availability
+  for (const entry of entries) {
+    const periodIndex = calculatePeriodIndex({
+      transactionDate: entry.transactionDate,
+      planStartDate: plan.planStartDate,
+      periodType: plan.periodType as 'WEEKLY' | 'MONTHLY',
+      periodCount: actualPeriodCount,
+    });
+
+    if (periodIndex >= 0 && periodIndex < actualPeriodCount) {
+      const period = periods[periodIndex];
+      const amount = BigInt(entry.amountCents);
+
+      // Classify by legalBucket
+      if (entry.legalBucket === 'ABSONDERUNG') {
+        period.encumbered += amount;
+      } else {
+        // MASSE, NEUTRAL, UNKNOWN, null -> all count as available
+        period.available += amount;
+      }
+      period.total += amount;
+    }
+  }
+
+  return periods;
+}
+
+/**
+ * Format a period label based on start date and period type
+ */
+function formatPeriodLabel(periodStart: Date, periodType: 'WEEKLY' | 'MONTHLY'): string {
+  const months = ['Jan', 'Feb', 'Mrz', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+
+  if (periodType === 'MONTHLY') {
+    return `${months[periodStart.getMonth()]} ${periodStart.getFullYear()}`;
+  } else {
+    // Weekly: KW XX
+    const startOfYear = new Date(periodStart.getFullYear(), 0, 1);
+    const days = Math.floor((periodStart.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
+    const weekNumber = Math.ceil((days + startOfYear.getDay() + 1) / 7);
+    return `KW ${weekNumber.toString().padStart(2, '0')}`;
+  }
+}
+
+// =============================================================================
+// REVENUE AGGREGATION BY COUNTERPARTY
+// =============================================================================
+
+/**
+ * Revenue entry with counterparty information
+ */
+export interface RevenueBySource {
+  counterpartyId: string | null;
+  counterpartyName: string;
+  locationId: string | null;
+  locationName: string;
+  periodIndex: number;
+  periodLabel: string;
+  amountCents: bigint;
+  transactionDate: Date;
+  description: string;
+}
+
+/**
+ * Aggregate revenue (inflows) by counterparty and location
+ */
+export async function aggregateByCounterparty(
+  prisma: PrismaClient,
+  caseId: string,
+  planId: string,
+  options?: {
+    startDate?: Date;
+    endDate?: Date;
+    flowType?: 'INFLOW' | 'OUTFLOW' | 'ALL';
+  }
+): Promise<RevenueBySource[]> {
+  const plan = await prisma.liquidityPlan.findUnique({
+    where: { id: planId },
+  });
+
+  if (!plan) {
+    return [];
+  }
+
+  const flowType = options?.flowType || 'INFLOW';
+
+  // Build date filter
+  const dateFilter: { gte?: Date; lte?: Date } = {};
+  if (options?.startDate) {
+    dateFilter.gte = options.startDate;
+  }
+  if (options?.endDate) {
+    dateFilter.lte = options.endDate;
+  }
+
+  // Get entries with counterparty and location
+  const entries = await prisma.ledgerEntry.findMany({
+    where: {
+      caseId,
+      ...(Object.keys(dateFilter).length > 0 ? { transactionDate: dateFilter } : {}),
+      ...(flowType === 'INFLOW' ? { amountCents: { gt: 0 } } : {}),
+      ...(flowType === 'OUTFLOW' ? { amountCents: { lt: 0 } } : {}),
+    },
+    include: {
+      counterparty: true,
+      location: true,
+    },
+    orderBy: { transactionDate: 'asc' },
+  });
+
+  return entries.map((entry) => {
+    const periodIndex = calculatePeriodIndex({
+      transactionDate: entry.transactionDate,
+      planStartDate: plan.planStartDate,
+      periodType: plan.periodType as 'WEEKLY' | 'MONTHLY',
+      periodCount: plan.periodCount,
+    });
+
+    const periodStart = calculatePeriodStartDate(
+      plan.planStartDate,
+      periodIndex,
+      plan.periodType as 'WEEKLY' | 'MONTHLY'
+    );
+
+    const periodLabel = formatPeriodLabel(periodStart, plan.periodType as 'WEEKLY' | 'MONTHLY');
+
+    return {
+      counterpartyId: entry.counterpartyId,
+      counterpartyName: entry.counterparty?.name || 'Unbekannt',
+      locationId: entry.locationId,
+      locationName: entry.location?.name || 'Ohne Standort',
+      periodIndex,
+      periodLabel,
+      amountCents: BigInt(entry.amountCents),
+      transactionDate: entry.transactionDate,
+      description: entry.description,
+    };
+  });
+}
+
+/**
+ * Aggregate revenue summarized by counterparty (total per counterparty)
+ */
+export async function summarizeByCounterparty(
+  prisma: PrismaClient,
+  caseId: string,
+  planId: string,
+  options?: {
+    startDate?: Date;
+    endDate?: Date;
+  }
+): Promise<Array<{
+  counterpartyId: string | null;
+  counterpartyName: string;
+  totalCents: bigint;
+  entryCount: number;
+}>> {
+  const entries = await aggregateByCounterparty(prisma, caseId, planId, {
+    ...options,
+    flowType: 'INFLOW',
+  });
+
+  const byCounterparty = new Map<string, {
+    counterpartyId: string | null;
+    counterpartyName: string;
+    totalCents: bigint;
+    entryCount: number;
+  }>();
+
+  for (const entry of entries) {
+    const key = entry.counterpartyId || '__unknown__';
+
+    if (!byCounterparty.has(key)) {
+      byCounterparty.set(key, {
+        counterpartyId: entry.counterpartyId,
+        counterpartyName: entry.counterpartyName,
+        totalCents: BigInt(0),
+        entryCount: 0,
+      });
+    }
+
+    const summary = byCounterparty.get(key)!;
+    summary.totalCents += entry.amountCents;
+    summary.entryCount++;
+  }
+
+  return Array.from(byCounterparty.values()).sort((a, b) =>
+    Number(b.totalCents - a.totalCents)
+  );
+}
+
+// =============================================================================
+// AGGREGATION STATISTICS
+// =============================================================================
+
 /**
  * Get aggregation statistics for a case
  */
