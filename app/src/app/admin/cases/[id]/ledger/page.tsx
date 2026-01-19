@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   VALUE_TYPES,
   LEGAL_BUCKETS,
@@ -11,6 +12,8 @@ import {
   ReviewStatus,
   REVIEW_STATUS,
 } from "@/lib/ledger";
+
+type TabType = "all" | "review" | "rules";
 
 const VALUE_TYPE_LABELS: Record<ValueType, string> = {
   IST: "IST",
@@ -59,6 +62,11 @@ export default function CaseLedgerPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = use(params);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab") as TabType | null;
+  const activeTab: TabType = tabParam === "review" || tabParam === "rules" ? tabParam : "all";
+
   const [caseData, setCaseData] = useState<CaseData | null>(null);
   const [entries, setEntries] = useState<LedgerEntryResponse[]>([]);
   const [stats, setStats] = useState<LedgerStats | null>(null);
@@ -71,13 +79,34 @@ export default function CaseLedgerPage({
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "grouped">("table");
 
-  // Filter state
+  // Tab switching
+  const setActiveTab = (tab: TabType) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (tab === "all") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+    router.push(`/admin/cases/${id}/ledger${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
+  };
+
+  // Filter state - review tab auto-sets reviewStatus filter
   const [filterValueType, setFilterValueType] = useState<ValueType | "">("");
   const [filterLegalBucket, setFilterLegalBucket] = useState<LegalBucket | "">("");
   const [filterReviewStatus, setFilterReviewStatus] = useState<ReviewStatus | "">("");
   const [filterSuggestedBucket, setFilterSuggestedBucket] = useState<string>("");
   const [filterFrom, setFilterFrom] = useState<string>("");
   const [filterTo, setFilterTo] = useState<string>("");
+
+  // Auto-set review filter when tab changes
+  useEffect(() => {
+    if (activeTab === "review") {
+      setFilterReviewStatus("UNREVIEWED");
+    } else if (filterReviewStatus === "UNREVIEWED" && activeTab === "all") {
+      // Clear the auto-set filter when switching back to "all"
+      setFilterReviewStatus("");
+    }
+  }, [activeTab]);
 
   // Sort state
   type SortField = "transactionDate" | "description" | "amountCents" | "valueType" | "legalBucket" | "reviewStatus";
@@ -441,18 +470,12 @@ export default function CaseLedgerPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">Zahlungsregister (Ledger)</h1>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">Zahlungsregister</h1>
           <p className="text-[var(--secondary)] mt-1">
             {caseData.caseNumber} - {caseData.debtorName}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href={`/admin/cases/${id}/rules`} className="btn-secondary flex items-center">
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            Rules
-          </Link>
           <button
             onClick={handleSync}
             disabled={syncing}
@@ -476,8 +499,92 @@ export default function CaseLedgerPage({
         </div>
       </div>
 
-      {/* Stats Cards */}
-      {stats && (
+      {/* Tab Navigation */}
+      <div className="admin-card p-1">
+        <nav className="flex gap-1">
+          <button
+            onClick={() => setActiveTab("all")}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "all"
+                ? "bg-[var(--primary)] text-white"
+                : "text-[var(--secondary)] hover:bg-gray-100"
+            }`}
+          >
+            <span className="flex items-center">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+              Alle Einträge
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab("review")}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "review"
+                ? "bg-[var(--primary)] text-white"
+                : "text-[var(--secondary)] hover:bg-gray-100"
+            }`}
+          >
+            <span className="flex items-center">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Zur Prüfung
+              {classificationStats?.byReviewStatus?.UNREVIEWED ? (
+                <span className="ml-2 px-1.5 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">
+                  {classificationStats.byReviewStatus.UNREVIEWED}
+                </span>
+              ) : null}
+            </span>
+          </button>
+          <button
+            onClick={() => setActiveTab("rules")}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "rules"
+                ? "bg-[var(--primary)] text-white"
+                : "text-[var(--secondary)] hover:bg-gray-100"
+            }`}
+          >
+            <span className="flex items-center">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+              Regeln
+            </span>
+          </button>
+        </nav>
+      </div>
+
+      {/* Rules Tab Content */}
+      {activeTab === "rules" && (
+        <div className="admin-card p-4 bg-blue-50 border-blue-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="text-sm text-blue-800">
+                <p className="font-medium">Klassifikationsregeln</p>
+                <p className="mt-1">
+                  Regeln werden automatisch auf neue Ledger-Einträge angewendet und erzeugen Klassifikations-Vorschläge.
+                </p>
+              </div>
+            </div>
+            <Link
+              href={`/admin/cases/${id}/rules`}
+              className="btn-primary flex items-center text-sm"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Regeln verwalten
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Stats Cards - only show for non-rules tabs */}
+      {activeTab !== "rules" && stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="admin-card p-4">
             <p className="text-sm text-[var(--muted)]">Anzahl Einträge</p>

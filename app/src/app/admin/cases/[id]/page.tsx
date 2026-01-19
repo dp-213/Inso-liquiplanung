@@ -166,12 +166,12 @@ export default async function CaseDetailPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Navigation nach Bereichen */}
+      {/* Navigation nach Bereichen (MECE) */}
       <div className="admin-card p-4">
-        <div className="flex flex-wrap gap-6">
-          {/* Ledger & Import */}
+        <div className="flex flex-wrap gap-4 lg:gap-6">
+          {/* TRANSAKTIONEN */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-[var(--muted)] uppercase tracking-wide">Ledger</span>
+            <span className="text-xs font-medium text-[var(--muted)] uppercase tracking-wide">Transaktionen</span>
             <div className="flex gap-1">
               <Link
                 href={`/admin/cases/${id}/ledger`}
@@ -192,22 +192,22 @@ export default async function CaseDetailPage({ params }: PageProps) {
                 Import
               </Link>
               <Link
-                href={`/admin/cases/${id}/rules`}
+                href={`/admin/cases/${id}/ledger?tab=review`}
                 className="btn-secondary text-sm py-1.5 px-3 flex items-center"
               >
                 <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                Klassifikation
+                Review
               </Link>
             </div>
           </div>
 
           <div className="border-l border-[var(--border)]" />
 
-          {/* Stammdaten */}
+          {/* DIMENSIONEN */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-[var(--muted)] uppercase tracking-wide">Stammdaten</span>
+            <span className="text-xs font-medium text-[var(--muted)] uppercase tracking-wide">Dimensionen</span>
             <div className="flex gap-1">
               <Link
                 href={`/admin/cases/${id}/bank-accounts`}
@@ -242,9 +242,36 @@ export default async function CaseDetailPage({ params }: PageProps) {
 
           <div className="border-l border-[var(--border)]" />
 
-          {/* Recht/Interpretation */}
+          {/* VERFAHREN & RECHTE */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-[var(--muted)] uppercase tracking-wide">Recht</span>
+            <span className="text-xs font-medium text-[var(--muted)] uppercase tracking-wide">Verfahren</span>
+            <div className="flex gap-1">
+              <Link
+                href={`/admin/cases/${id}/insolvency-effects`}
+                className="btn-secondary text-sm py-1.5 px-3 flex items-center"
+              >
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                </svg>
+                Insolvenzeffekte
+              </Link>
+              <Link
+                href={`/admin/cases/${id}/security-rights`}
+                className="btn-secondary text-sm py-1.5 px-3 flex items-center"
+              >
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                Sicherungsrechte
+              </Link>
+            </div>
+          </div>
+
+          <div className="border-l border-[var(--border)]" />
+
+          {/* PLANUNG & ANNAHMEN */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-[var(--muted)] uppercase tracking-wide">Planung</span>
             <div className="flex gap-1">
               <Link
                 href={`/admin/cases/${id}/assumptions`}
@@ -256,13 +283,13 @@ export default async function CaseDetailPage({ params }: PageProps) {
                 Prämissen
               </Link>
               <Link
-                href={`/admin/cases/${id}/insolvency-effects`}
+                href={`/admin/cases/${id}/results`}
                 className="btn-secondary text-sm py-1.5 px-3 flex items-center"
               >
                 <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                Insolvenzeffekte
+                Liquiditätsplan
               </Link>
             </div>
           </div>
