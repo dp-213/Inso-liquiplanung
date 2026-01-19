@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -13,6 +13,7 @@ interface InsolvencyEffect {
   periodIndex: number;
   amountCents: string;
   isActive: boolean;
+  isAvailabilityOnly?: boolean;
 }
 
 interface PlanInfo {
@@ -50,8 +51,13 @@ export default function InsolvencyEffectsPage() {
   const [planInfo, setPlanInfo] = useState<PlanInfo>({ periodType: "WEEKLY", periodCount: 13 });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [transferring, setTransferring] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+
+  // Neue States für Transfer-Funktionalität
+  const [selectedEffectIds, setSelectedEffectIds] = useState<Set<string>>(new Set());
+  const [transferredEffectIds, setTransferredEffectIds] = useState<Set<string>>(new Set());
 
   const [formData, setFormData] = useState({
     name: "",
@@ -63,27 +69,44 @@ export default function InsolvencyEffectsPage() {
     effectId: null as string | null,
   });
 
-  useEffect(() => {
-    fetchData();
+  const fetchTransferStatus = useCallback(async (effectIds: string[]) => {
+    if (effectIds.length === 0) return;
+    try {
+      const res = await fetch(`/api/cases/${caseId}/effects/transfer?effectIds=${effectIds.join(",")}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTransferredEffectIds(new Set(data.transferredIds || []));
+      }
+    } catch {
+      // Ignore errors
+    }
   }, [caseId]);
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     try {
       const res = await fetch(`/api/cases/${caseId}/plan/insolvency-effects`);
       if (res.ok) {
         const data = await res.json();
-        setEffects(data.rawEffects || []);
+        const rawEffects = data.rawEffects || [];
+        setEffects(rawEffects);
         setPlanInfo({
           periodType: data.periodType || "WEEKLY",
           periodCount: data.periodCount || 13,
         });
+        // Transfer-Status laden
+        const effectIds = rawEffects.map((e: InsolvencyEffect) => e.id);
+        fetchTransferStatus(effectIds);
       }
-    } catch (err) {
+    } catch {
       setError("Fehler beim Laden der Daten");
     } finally {
       setLoading(false);
     }
-  }
+  }, [caseId, fetchTransferStatus]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   function generatePeriodLabels(): string[] {
     const labels: string[] = [];
@@ -151,9 +174,54 @@ export default function InsolvencyEffectsPage() {
       }
 
       setSuccess("Insolvenzeffekt gelöscht");
+      setSelectedEffectIds((prev) => {
+        const next = new Set(prev);
+        next.delete(effectId);
+        return next;
+      });
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler beim Löschen");
+    }
+  }
+
+  async function handleTransfer() {
+    if (selectedEffectIds.size === 0) return;
+
+    setTransferring(true);
+    setError(null);
+    setSuccess(null);
+
+    try {
+      const res = await fetch(`/api/cases/${caseId}/effects/transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          effectIds: Array.from(selectedEffectIds),
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Fehler beim Transfer");
+      }
+
+      const messages: string[] = [];
+      if (data.created > 0) messages.push(`${data.created} PLAN-Einträge erstellt`);
+      if (data.deleted > 0) messages.push(`${data.deleted} alte Einträge ersetzt`);
+      if (data.skipped > 0) messages.push(`${data.skipped} übersprungen`);
+
+      setSuccess(messages.join(", ") || "Transfer abgeschlossen");
+      setSelectedEffectIds(new Set());
+
+      // Transfer-Status aktualisieren
+      const effectIds = effects.map((e) => e.id);
+      fetchTransferStatus(effectIds);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Transfer");
+    } finally {
+      setTransferring(false);
     }
   }
 
@@ -198,19 +266,26 @@ export default function InsolvencyEffectsPage() {
     });
   }
 
-  // Group effects by name for display
-  const effectsByName = effects.reduce((acc, effect) => {
-    if (!acc[effect.name]) {
-      acc[effect.name] = {
-        name: effect.name,
-        effectType: effect.effectType,
-        effectGroup: effect.effectGroup,
-        entries: [],
-      };
+  function toggleEffectSelection(effectId: string) {
+    setSelectedEffectIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(effectId)) {
+        next.delete(effectId);
+      } else {
+        next.add(effectId);
+      }
+      return next;
+    });
+  }
+
+  function toggleAllEffects() {
+    const transferableEffects = effects.filter((e) => !e.isAvailabilityOnly);
+    if (selectedEffectIds.size === transferableEffects.length) {
+      setSelectedEffectIds(new Set());
+    } else {
+      setSelectedEffectIds(new Set(transferableEffects.map((e) => e.id)));
     }
-    acc[effect.name].entries.push(effect);
-    return acc;
-  }, {} as Record<string, { name: string; effectType: string; effectGroup: string; entries: InsolvencyEffect[] }>);
+  }
 
   if (loading) {
     return (
@@ -219,6 +294,8 @@ export default function InsolvencyEffectsPage() {
       </div>
     );
   }
+
+  const transferableEffects = effects.filter((e) => !e.isAvailabilityOnly);
 
   return (
     <div className="space-y-6">
@@ -241,12 +318,34 @@ export default function InsolvencyEffectsPage() {
           <div>
             <h1 className="text-2xl font-bold text-[var(--foreground)]">Insolvenzspezifische Effekte</h1>
             <p className="mt-1 text-sm text-[var(--secondary)]">
-              Erfassen Sie insolvenzspezifische Zahlungsströme getrennt vom operativen Geschäft
+              Erfassen Sie insolvenzspezifische Zahlungsströme und überführen Sie diese in die operative Planung
             </p>
           </div>
           <Link href={`/admin/cases/${caseId}`} className="btn-secondary">
             Zurück zum Fall
           </Link>
+        </div>
+      </div>
+
+      {/* Info-Box: Was sind Insolvenzeffekte? */}
+      <div className="admin-card p-4 bg-amber-50 border-amber-200">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <h4 className="text-sm font-medium text-amber-800">
+              Insolvenzeffekte = Echte zahlungswirksame Ereignisse
+            </h4>
+            <p className="text-xs text-amber-700 mt-1">
+              Insolvenzeffekte sind keine Szenarien, sondern <strong>rechtlich wirksame Zahlungswirkungen</strong>:
+              Verfahrenskosten, Masseverbindlichkeiten, Halteprämien, Anfechtungsrückflüsse, etc.
+              Mit <em>&quot;In Planung überführen&quot;</em> werden sie als PLAN-Einträge im Zahlungsregister angelegt
+              und fließen in die Liquiditätsberechnung ein.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -389,6 +488,43 @@ export default function InsolvencyEffectsPage() {
         </form>
       </div>
 
+      {/* Transfer-Aktionen */}
+      {effects.length > 0 && (
+        <div className="admin-card p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-[var(--secondary)]">
+                {selectedEffectIds.size} von {transferableEffects.length} Effekten ausgewählt
+              </span>
+              {transferredEffectIds.size > 0 && (
+                <span className="text-xs text-green-600">
+                  ({transferredEffectIds.size} bereits im Ledger)
+                </span>
+              )}
+            </div>
+            <button
+              onClick={handleTransfer}
+              disabled={selectedEffectIds.size === 0 || transferring}
+              className="btn-primary flex items-center gap-2"
+            >
+              {transferring ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Überführe...
+                </>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                  In Planung überführen ({selectedEffectIds.size})
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Existing Effects Table */}
       <div className="admin-card">
         <div className="px-6 py-4 border-b border-[var(--border)]">
@@ -405,62 +541,103 @@ export default function InsolvencyEffectsPage() {
             <table className="min-w-full divide-y divide-[var(--border)]">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={selectedEffectIds.size === transferableEffects.length && transferableEffects.length > 0}
+                      onChange={toggleAllEffects}
+                      className="rounded border-gray-300"
+                      title="Alle auswählen"
+                    />
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Position</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Typ</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Gruppe</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Periode</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--secondary)] uppercase">Betrag</th>
+                  <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Status</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Aktionen</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {effects.map((effect) => (
-                  <tr key={effect.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-[var(--foreground)]">{effect.name}</td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        effect.effectType === "INFLOW"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700"
+                {effects.map((effect) => {
+                  const isTransferred = transferredEffectIds.has(effect.id);
+                  const isAvailabilityOnly = effect.isAvailabilityOnly;
+                  return (
+                    <tr key={effect.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        {!isAvailabilityOnly ? (
+                          <input
+                            type="checkbox"
+                            checked={selectedEffectIds.has(effect.id)}
+                            onChange={() => toggleEffectSelection(effect.id)}
+                            className="rounded border-gray-300"
+                          />
+                        ) : (
+                          <span className="text-xs text-gray-400" title="Nur Verfügbarkeitsanzeige">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-[var(--foreground)]">{effect.name}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          effect.effectType === "INFLOW"
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}>
+                          {effect.effectType === "INFLOW" ? "Einzahlung" : "Auszahlung"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[var(--secondary)]">
+                        {EFFECT_GROUPS.find((g) => g.value === effect.effectGroup)?.label || effect.effectGroup}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[var(--secondary)]">
+                        {periodLabels[effect.periodIndex] || `Periode ${effect.periodIndex + 1}`}
+                      </td>
+                      <td className={`px-4 py-3 text-sm text-right font-medium ${
+                        effect.effectType === "INFLOW" ? "text-green-600" : "text-red-600"
                       }`}>
-                        {effect.effectType === "INFLOW" ? "Einzahlung" : "Auszahlung"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[var(--secondary)]">
-                      {EFFECT_GROUPS.find((g) => g.value === effect.effectGroup)?.label || effect.effectGroup}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[var(--secondary)]">
-                      {periodLabels[effect.periodIndex] || `Periode ${effect.periodIndex + 1}`}
-                    </td>
-                    <td className={`px-4 py-3 text-sm text-right font-medium ${
-                      effect.effectType === "INFLOW" ? "text-green-600" : "text-red-600"
-                    }`}>
-                      {effect.effectType === "INFLOW" ? "+" : "-"}{formatCurrency(effect.amountCents)} €
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex justify-center gap-1">
-                        <button
-                          onClick={() => startEdit(effect)}
-                          className="p-1.5 text-[var(--secondary)] hover:text-[var(--primary)] hover:bg-gray-100 rounded"
-                          title="Bearbeiten"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                          </svg>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(effect.id)}
-                          className="p-1.5 text-[var(--secondary)] hover:text-red-600 hover:bg-red-50 rounded"
-                          title="Löschen"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        {effect.effectType === "INFLOW" ? "+" : "-"}{formatCurrency(effect.amountCents)} €
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {isAvailabilityOnly ? (
+                          <span className="badge badge-info text-xs" title="Nur zur Verfügbarkeitsanzeige, nicht transferierbar">
+                            Verfügbarkeit
+                          </span>
+                        ) : isTransferred ? (
+                          <span className="badge badge-success text-xs" title="Bereits als PLAN-Entry im Ledger">
+                            ✓ Im Ledger
+                          </span>
+                        ) : (
+                          <span className="badge badge-neutral text-xs">
+                            Nicht überführt
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex justify-center gap-1">
+                          <button
+                            onClick={() => startEdit(effect)}
+                            className="p-1.5 text-[var(--secondary)] hover:text-[var(--primary)] hover:bg-gray-100 rounded"
+                            title="Bearbeiten"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(effect.id)}
+                            className="p-1.5 text-[var(--secondary)] hover:text-red-600 hover:bg-red-50 rounded"
+                            title="Löschen"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

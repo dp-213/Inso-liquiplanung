@@ -189,6 +189,28 @@ export default function AssumptionsManagementPage() {
         </div>
       </div>
 
+      {/* Info-Box: Was sind Planungsprämissen? */}
+      <div className="admin-card p-4 bg-blue-50 border-blue-200">
+        <div className="flex items-start gap-3">
+          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <h4 className="text-sm font-medium text-blue-800">
+              Planungsprämissen = Dokumentation
+            </h4>
+            <p className="text-xs text-blue-700 mt-1">
+              Prämissen dokumentieren die Annahmen hinter Ihrer Planung.
+              Sie erzeugen <strong>keine</strong> Zahlungsströme, sondern dienen
+              der Nachvollziehbarkeit für Gericht und Gläubiger.
+              Änderungen an Prämissen haben keinen Einfluss auf die Liquiditätsberechnung.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Messages */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">

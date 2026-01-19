@@ -200,6 +200,62 @@ Keine KI, ML oder Heuristiken in der Berechnungs- oder Klassifikationslogik. Rul
 
 ---
 
+## ADR-008: InsolvencyEffects → LedgerEntry Transfer
+
+**Datum:** 19. Januar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+InsolvencyEffects waren ursprünglich als separate PLAN-Werte konzipiert, die nur zur Anzeige dienten ("vor/nach Insolvenzeffekten"). In der Praxis sind Insolvenzeffekte jedoch **echte zahlungswirksame Ereignisse**:
+
+- Verfahrenskosten
+- Masseverbindlichkeiten
+- Halteprämien
+- Anfechtungsrückflüsse
+- Kündigungen/Mietreduktionen
+
+Diese MÜSSEN in die operative Liquiditätsplanung einfließen können.
+
+### Entscheidung
+
+InsolvencyEffects können idempotent in PLAN-LedgerEntries überführt werden:
+
+1. **Lineage via `sourceEffectId`**: Jeder abgeleitete LedgerEntry referenziert seinen Ursprungs-Effekt
+2. **Idempotente Überführung**: Bei erneuter Ausführung werden bestehende Entries gelöscht und neu erstellt (DELETE + CREATE)
+3. **Kein Duplikat-Risiko**: Harte Ersetzung statt weicher Update-Logik
+
+```
+InsolvencyEffect (Erfassung)
+        │
+        └── [In Planung überführen] → Erzeugt PLAN-LedgerEntries
+                                      mit sourceEffectId (Lineage)
+
+Effekt-Änderung → Deterministisches Update der abgeleiteten Entries
+```
+
+### Sonderfall: Unechte Massekredite
+
+`isAvailabilityOnly = true` markiert Effekte, die **nicht automatisch transferiert** werden:
+- Primär: Verfügbarkeits-Overlay (zeigt potenzielle Mittel)
+- Nur bei tatsächlicher Auszahlung/Valutierung → manueller PLAN-Entry
+
+### Begründung
+
+- **Operative Integration**: Insolvenzeffekte sind echte Zahlungswirkungen, keine Szenarien
+- **Auditierbarkeit**: Lineage über `sourceEffectId` macht Herkunft nachvollziehbar
+- **Determinismus**: Idempotente Überführung verhindert Duplikate
+- **Flexibilität**: User entscheidet, welche Effekte in die Planung fließen
+
+### Konsequenzen
+
+- Neue Felder: `LedgerEntry.sourceEffectId`, `InsolvencyEffect.isAvailabilityOnly`
+- Neue Transfer-Engine: `src/lib/effects/transfer-engine.ts`
+- Neue API: `POST /api/cases/[id]/effects/transfer`
+- UI: Checkboxes + "In Planung überführen"-Button
+
+---
+
 ## Template für neue Entscheidungen
 
 ```markdown

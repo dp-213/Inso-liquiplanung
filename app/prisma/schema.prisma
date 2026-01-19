@@ -596,6 +596,7 @@ model PlanningAssumption {
 // InsolvencyEffect - PLAN component for insolvency-specific effects
 // IMPORTANT: These are PLAN values (not IST) - clearly separated from operative cashflows
 // Enables "vor/nach Insolvenzeffekten" comparison view
+// Can be transferred to LedgerEntry for operative planning (idempotent via sourceEffectId)
 model InsolvencyEffect {
   id            String   @id @default(uuid())
   planId        String
@@ -606,12 +607,20 @@ model InsolvencyEffect {
   periodIndex   Int      // 0-based period index
   amountCents   BigInt
   isActive      Boolean  @default(true)
+
+  // NEU: Verfügbarkeits-Overlay (z.B. unechte Massekredite)
+  // Bei true: Nur zur Anzeige, NICHT automatisch in Ledger überführbar
+  isAvailabilityOnly  Boolean  @default(false)
+
   createdAt     DateTime @default(now())
   createdBy     String
   updatedAt     DateTime @updatedAt
   updatedBy     String
 
   plan LiquidityPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  // NEU: Abgeleitete LedgerEntries (für idempotente Überführung)
+  derivedEntries LedgerEntry[]
 
   @@index([planId])
   @@index([planId, periodIndex])
@@ -750,6 +759,11 @@ model LedgerEntry {
   suggestedCounterpartyId String?   // Vorgeschlagene Gegenpartei
   suggestedLocationId     String?   // Vorgeschlagener Standort
 
+  // === LINEAGE: InsolvencyEffect-Herkunft ===
+  // Wenn dieser Entry aus einem InsolvencyEffect abgeleitet wurde
+  // Ermöglicht idempotente Überführung (Effekt-Änderung → DELETE + CREATE)
+  sourceEffectId    String?
+
   // === AUDIT ===
   createdAt         DateTime  @default(now())
   createdBy         String
@@ -760,6 +774,7 @@ model LedgerEntry {
   bankAccount       BankAccount? @relation(fields: [bankAccountId], references: [id])
   counterparty      Counterparty? @relation(fields: [counterpartyId], references: [id])
   location          Location? @relation(fields: [locationId], references: [id])
+  sourceEffect      InsolvencyEffect? @relation(fields: [sourceEffectId], references: [id], onDelete: SetNull)
   auditLogs         LedgerAuditLog[]
 
   @@index([caseId])
@@ -771,6 +786,7 @@ model LedgerEntry {
   @@index([caseId, counterpartyId])
   @@index([caseId, locationId])
   @@index([importJobId])
+  @@index([sourceEffectId])
   @@map("ledger_entries")
 }
 
