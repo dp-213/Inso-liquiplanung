@@ -259,8 +259,8 @@ export default function RollingForecastChart({
       </div>
 
       {/* Chart */}
-      <div className="h-80">
-        <ResponsiveContainer width="100%" height="100%">
+      <div style={{ width: '100%', height: 320 }}>
+        <ResponsiveContainer width="100%" height={320} minWidth={300}>
           <ComposedChart
             data={chartData}
             margin={{ top: 20, right: 30, left: 20, bottom: 10 }}
