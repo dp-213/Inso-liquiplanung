@@ -285,25 +285,34 @@ export default function UnifiedCaseDashboard({
               periodCount={data.calculation.periodCount || data.plan.periodCount}
             />
 
-            {/* Rolling Forecast Chart */}
+            {/* Rolling Forecast Chart - IST (Vergangenheit) + PLAN (Zukunft) */}
             <div className="admin-card p-6">
-              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Liquiditätsverlauf</h2>
+              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
+                Rolling Forecast
+                <span className="ml-2 text-xs font-normal text-[var(--muted)]">
+                  (caseId: {caseId || "FEHLT!"})
+                </span>
+              </h2>
               {caseId ? (
                 <RollingForecastChart caseId={caseId} />
               ) : (
-                <BalanceChart weeks={weeksData} markers={paymentMarkers} showPhases={(data.calculation.periodType || data.plan.periodType) === "MONTHLY"} />
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">
+                  Fehler: caseId nicht verfügbar. Kann Rolling Forecast nicht laden.
+                </div>
               )}
             </div>
 
             {/* Rolling Forecast Tabelle */}
-            {caseId && (
-              <div className="admin-card">
-                <div className="px-6 py-4 border-b border-[var(--border)]">
-                  <h2 className="text-lg font-semibold text-[var(--foreground)]">Liquiditätsübersicht (IST/PLAN)</h2>
-                </div>
-                <RollingForecastTable caseId={caseId} />
+            <div className="admin-card">
+              <div className="px-6 py-4 border-b border-[var(--border)]">
+                <h2 className="text-lg font-semibold text-[var(--foreground)]">Liquiditätsübersicht (IST/PLAN)</h2>
               </div>
-            )}
+              {caseId ? (
+                <RollingForecastTable caseId={caseId} />
+              ) : (
+                <div className="p-4 text-[var(--muted)]">caseId fehlt</div>
+              )}
+            </div>
 
             {/* Detaillierte Kategorien-Tabelle */}
             <div className="admin-card">

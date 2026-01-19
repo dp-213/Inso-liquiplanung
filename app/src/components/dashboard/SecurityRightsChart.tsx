@@ -169,12 +169,11 @@ export default function SecurityRightsChart({
       </div>
 
       {/* Chart */}
-      <div style={{ width: '100%', height: 320 }}>
-        <ResponsiveContainer width="100%" height={320} minWidth={300}>
-          <BarChart
-            data={chartData}
-            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-          >
+      <ResponsiveContainer width="100%" aspect={2.5} minHeight={200}>
+        <BarChart
+          data={chartData}
+          margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+        >
             <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
             <XAxis
               dataKey="name"
@@ -229,7 +228,6 @@ export default function SecurityRightsChart({
             />
           </BarChart>
         </ResponsiveContainer>
-      </div>
 
       {/* Legend Explanation */}
       <div className="flex flex-wrap gap-6 text-sm text-[var(--secondary)]">
