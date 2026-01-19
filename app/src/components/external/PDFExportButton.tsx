@@ -3,105 +3,7 @@
 import { useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-
-interface Assumption {
-  id: string;
-  categoryName: string;
-  source: string;
-  description: string;
-  riskLevel: string;
-}
-
-interface InsolvencyEffect {
-  name: string;
-  description: string | null;
-  effectType: "INFLOW" | "OUTFLOW";
-  effectGroup: string;
-  periods: {
-    id: string;
-    periodIndex: number;
-    amountCents: string;
-  }[];
-}
-
-interface BankAccountData {
-  id: string;
-  bankName: string;
-  accountName: string;
-  iban: string | null;
-  balanceCents: string;
-  availableCents: string;
-  securityHolder: string | null;
-  status: string;
-  notes: string | null;
-}
-
-interface ShareData {
-  case: {
-    caseNumber: string;
-    debtorName: string;
-    courtName: string;
-    status: string;
-    filingDate: string;
-    openingDate: string | null;
-  };
-  administrator: string;
-  plan: {
-    name: string;
-    planStartDate: string;
-    periodType?: "WEEKLY" | "MONTHLY";
-    periodCount?: number;
-    versionNumber: number;
-    versionDate: string | null;
-  };
-  assumptions?: Assumption[];
-  insolvencyEffects?: {
-    effects: InsolvencyEffect[];
-  };
-  bankAccounts?: {
-    accounts: BankAccountData[];
-    summary: {
-      totalBalanceCents: string;
-      totalAvailableCents: string;
-      accountCount: number;
-    };
-  };
-  calculation: {
-    periodType?: "WEEKLY" | "MONTHLY";
-    periodCount?: number;
-    openingBalanceCents: string;
-    totalInflowsCents: string;
-    totalOutflowsCents: string;
-    totalNetCashflowCents: string;
-    finalClosingBalanceCents: string;
-    dataHash: string;
-    calculatedAt: string;
-    weeks: {
-      weekOffset: number;
-      weekLabel: string;
-      openingBalanceCents: string;
-      totalInflowsCents: string;
-      totalOutflowsCents: string;
-      netCashflowCents: string;
-      closingBalanceCents: string;
-    }[];
-    categories: {
-      categoryName: string;
-      flowType: string;
-      estateType: string;
-      totalCents: string;
-      weeklyTotals: string[];
-      lines: {
-        lineName: string;
-        totalCents: string;
-        weeklyValues: {
-          weekOffset: number;
-          effectiveCents: string;
-        }[];
-      }[];
-    }[];
-  };
-}
+import { CaseDashboardData, getPeriods } from "@/types/dashboard";
 
 interface PDFTextConfig {
   legalDisclaimers?: string[];
@@ -113,7 +15,7 @@ interface PDFTextConfig {
 }
 
 interface PDFExportButtonProps {
-  data: ShareData;
+  data: CaseDashboardData;
   formatCurrency: (cents: bigint) => string;
   pdfTexts?: PDFTextConfig;
 }
@@ -334,12 +236,12 @@ export default function PDFExportButton({ data, pdfTexts }: PDFExportButtonProps
 
       // Find minimum balance
       let minBalance = openingBalance;
-      let minBalanceWeek = weeks[0]?.weekLabel || "";
+      let minBalanceWeek = weeks[0]?.periodLabel || weeks[0]?.weekLabel || "";
       weeks.forEach((w) => {
         const bal = BigInt(w.closingBalanceCents);
         if (bal < minBalance) {
           minBalance = bal;
-          minBalanceWeek = w.weekLabel;
+          minBalanceWeek = w.periodLabel || w.weekLabel || "";
         }
       });
 
@@ -409,7 +311,7 @@ export default function PDFExportButton({ data, pdfTexts }: PDFExportButtonProps
       doc.text(getStatusLabel(data.case.status), valueX, detailsY + 18);
       doc.text(data.administrator, valueX, detailsY + 27);
       doc.text(
-        weeks.length > 0 ? `${weeks[0].weekLabel} - ${weeks[weeks.length - 1].weekLabel}` : "-",
+        weeks.length > 0 ? `${weeks[0].periodLabel || weeks[0].weekLabel || ""} - ${weeks[weeks.length - 1].periodLabel || weeks[weeks.length - 1].weekLabel || ""}` : "-",
         valueX, detailsY + 36
       );
       doc.text(periodType === "WEEKLY" ? "Wöchentlich (13 Wochen)" : "Monatlich", valueX, detailsY + 45);
@@ -583,7 +485,7 @@ export default function PDFExportButton({ data, pdfTexts }: PDFExportButtonProps
       );
       yPos += 5;
       doc.text(
-        `den Zeitraum von ${weeks[0]?.weekLabel || "-"} bis ${weeks[weeks.length - 1]?.weekLabel || "-"} ab.`,
+        `den Zeitraum von ${weeks[0]?.periodLabel || weeks[0]?.weekLabel || "-"} bis ${weeks[weeks.length - 1]?.periodLabel || weeks[weeks.length - 1]?.weekLabel || "-"} ab.`,
         margin, yPos
       );
       yPos += 10;
@@ -671,7 +573,7 @@ export default function PDFExportButton({ data, pdfTexts }: PDFExportButtonProps
       weeks.forEach((week, idx) => {
         if (idx % 2 === 0) {
           const x = margin + 10 + idx * barWidth + barWidth / 2;
-          doc.text(week.weekLabel, x, yPos + chartHeight + 8, { align: "center" });
+          doc.text(week.periodLabel || week.weekLabel || "", x, yPos + chartHeight + 8, { align: "center" });
         }
       });
 
@@ -826,7 +728,7 @@ export default function PDFExportButton({ data, pdfTexts }: PDFExportButtonProps
 
       // Build table data
       const tableData: (string | number)[][] = [];
-      const headers = ["Position", ...weeks.map((w) => w.weekLabel), "Summe"];
+      const headers = ["Position", ...weeks.map((w) => w.periodLabel || w.weekLabel || ""), "Summe"];
 
       // Opening balance
       const openingRow = ["ANFANGSBESTAND"];

@@ -11,6 +11,10 @@ import {
   PeriodValueInput,
   PeriodType,
 } from "@/lib/calculation-engine";
+import {
+  aggregateLedgerEntries,
+  convertToLegacyFormat,
+} from "@/lib/ledger-aggregation";
 
 // GET /api/customer/cases/[id] - Get case details and calculation
 export async function GET(
@@ -36,7 +40,7 @@ export async function GET(
       );
     }
 
-    // Fetch case data
+    // Fetch case data with all related entities
     const caseData = await prisma.case.findUnique({
       where: { id: caseId },
       include: {
@@ -59,7 +63,21 @@ export async function GET(
               },
               orderBy: { displayOrder: "asc" },
             },
+            assumptions: {
+              orderBy: { categoryName: "asc" },
+            },
+            insolvencyEffects: {
+              where: { isActive: true },
+              orderBy: [
+                { effectGroup: "asc" },
+                { name: "asc" },
+                { periodIndex: "asc" },
+              ],
+            },
           },
+        },
+        bankAccounts: {
+          orderBy: { displayOrder: "asc" },
         },
       },
     });
@@ -86,49 +104,178 @@ export async function GET(
       ? BigInt(latestVersion.openingBalanceCents)
       : BigInt(0);
 
-    // Prepare calculation inputs
-    const categories: CategoryInput[] = plan.categories.map((cat) => ({
-      id: cat.id,
-      name: cat.name,
-      flowType: cat.flowType as "INFLOW" | "OUTFLOW",
-      estateType: cat.estateType as "ALTMASSE" | "NEUMASSE",
-      displayOrder: cat.displayOrder,
-    }));
-
-    const lines: LineInput[] = plan.categories.flatMap((cat) =>
-      cat.lines.map((line) => ({
-        id: line.id,
-        categoryId: cat.id,
-        name: line.name,
-        displayOrder: line.displayOrder,
-      }))
-    );
-
-    const periodValues: PeriodValueInput[] = plan.categories.flatMap((cat) =>
-      cat.lines.flatMap((line) =>
-        line.periodValues.map((pv) => ({
-          lineId: line.id,
-          periodIndex: pv.periodIndex,
-          valueType: pv.valueType as "IST" | "PLAN",
-          amountCents: BigInt(pv.amountCents),
-        }))
-      )
-    );
-
     // Get period type and count from plan
     const periodType = (plan.periodType as PeriodType) || "WEEKLY";
     const periodCount = plan.periodCount || 13;
 
-    // Run calculation
-    const result = calculateLiquidityPlan(
-      openingBalanceCents,
-      categories,
-      lines,
-      periodValues,
-      new Date(plan.planStartDate),
-      periodType,
-      periodCount
-    );
+    // Check if we have LedgerEntries for this case (new data model)
+    const ledgerEntryCount = await prisma.ledgerEntry.count({
+      where: {
+        caseId: caseData.id,
+        reviewStatus: { in: ["CONFIRMED", "ADJUSTED"] },
+      },
+    });
+
+    let result;
+    let useLedgerAggregation = false;
+
+    if (ledgerEntryCount > 0) {
+      // NEW: Use LedgerEntry aggregation
+      useLedgerAggregation = true;
+      const aggregation = await aggregateLedgerEntries(
+        caseData.id,
+        new Date(plan.planStartDate),
+        periodType,
+        periodCount,
+        openingBalanceCents
+      );
+      const legacyFormat = convertToLegacyFormat(aggregation);
+
+      // Convert to calculation result format
+      result = {
+        openingBalanceCents: aggregation.openingBalanceCents,
+        periodType: aggregation.periodType,
+        periodCount: aggregation.periodCount,
+        periods: aggregation.periods.map((p) => ({
+          periodIndex: p.periodIndex,
+          periodLabel: p.periodLabel,
+          periodStartDate: p.periodStartDate,
+          periodEndDate: p.periodEndDate,
+          openingBalanceCents: p.openingBalanceCents,
+          totalInflowsCents: p.totalInflowsCents,
+          totalOutflowsCents: p.totalOutflowsCents,
+          netCashflowCents: p.netCashflowCents,
+          closingBalanceCents: p.closingBalanceCents,
+        })),
+        categories: legacyFormat.categories.map((c) => ({
+          categoryName: c.categoryName,
+          flowType: c.flowType,
+          estateType: c.estateType,
+          totalCents: BigInt(c.totalCents),
+          periodTotals: c.weeklyTotals.map((t) => BigInt(t)),
+          lines: c.lines.map((l) => ({
+            lineName: l.lineName,
+            totalCents: BigInt(l.totalCents),
+            periodValues: l.weeklyValues.map((w) => ({
+              periodIndex: w.weekOffset,
+              effectiveCents: BigInt(w.effectiveCents),
+            })),
+          })),
+        })),
+        totalInflowsCents: aggregation.totalInflowsCents,
+        totalOutflowsCents: aggregation.totalOutflowsCents,
+        totalNetCashflowCents: aggregation.totalNetCashflowCents,
+        finalClosingBalanceCents: aggregation.finalClosingBalanceCents,
+        dataHash: aggregation.dataHash,
+        calculatedAt: aggregation.calculatedAt,
+      };
+    } else {
+      // LEGACY: Use old CashflowCategory/Line/PeriodValue structure
+      const categories: CategoryInput[] = plan.categories.map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        flowType: cat.flowType as "INFLOW" | "OUTFLOW",
+        estateType: cat.estateType as "ALTMASSE" | "NEUMASSE",
+        displayOrder: cat.displayOrder,
+      }));
+
+      const lines: LineInput[] = plan.categories.flatMap((cat) =>
+        cat.lines.map((line) => ({
+          id: line.id,
+          categoryId: cat.id,
+          name: line.name,
+          displayOrder: line.displayOrder,
+        }))
+      );
+
+      const periodValues: PeriodValueInput[] = plan.categories.flatMap((cat) =>
+        cat.lines.flatMap((line) =>
+          line.periodValues.map((pv) => ({
+            lineId: line.id,
+            periodIndex: pv.periodIndex,
+            valueType: pv.valueType as "IST" | "PLAN",
+            amountCents: BigInt(pv.amountCents),
+          }))
+        )
+      );
+
+      // Run calculation
+      result = calculateLiquidityPlan(
+        openingBalanceCents,
+        categories,
+        lines,
+        periodValues,
+        new Date(plan.planStartDate),
+        periodType,
+        periodCount
+      );
+    }
+
+    // Group insolvency effects by name for easier display
+    const insolvencyEffectsByName = plan.insolvencyEffects.reduce((acc, effect) => {
+      const key = effect.name;
+      if (!acc[key]) {
+        acc[key] = {
+          name: effect.name,
+          description: effect.description,
+          effectType: effect.effectType,
+          effectGroup: effect.effectGroup,
+          periods: [],
+        };
+      }
+      acc[key].periods.push({
+        id: effect.id,
+        periodIndex: effect.periodIndex,
+        amountCents: effect.amountCents.toString(),
+      });
+      return acc;
+    }, {} as Record<string, {
+      name: string;
+      description: string | null;
+      effectType: string;
+      effectGroup: string;
+      periods: { id: string; periodIndex: number; amountCents: string }[];
+    }>);
+
+    // Get LedgerEntry statistics for dashboard display
+    let ledgerStats = null;
+    if (useLedgerAggregation) {
+      const stats = await prisma.ledgerEntry.groupBy({
+        by: ["valueType", "reviewStatus", "legalBucket"],
+        where: { caseId: caseData.id },
+        _count: { id: true },
+        _sum: { amountCents: true },
+      });
+
+      const istCount = stats.filter((s) => s.valueType === "IST").reduce((sum, s) => sum + s._count.id, 0);
+      const planCount = stats.filter((s) => s.valueType === "PLAN").reduce((sum, s) => sum + s._count.id, 0);
+      const confirmedCount = stats.filter((s) => s.reviewStatus === "CONFIRMED" || s.reviewStatus === "ADJUSTED").reduce((sum, s) => sum + s._count.id, 0);
+      const unreviewedCount = stats.filter((s) => s.reviewStatus === "UNREVIEWED").reduce((sum, s) => sum + s._count.id, 0);
+      const masseCount = stats.filter((s) => s.legalBucket === "MASSE").reduce((sum, s) => sum + s._count.id, 0);
+      const absonderungCount = stats.filter((s) => s.legalBucket === "ABSONDERUNG").reduce((sum, s) => sum + s._count.id, 0);
+
+      ledgerStats = {
+        dataSource: "LEDGER" as const,
+        entryCount: istCount + planCount,
+        istCount,
+        planCount,
+        confirmedCount,
+        unreviewedCount,
+        masseCount,
+        absonderungCount,
+      };
+    } else {
+      ledgerStats = {
+        dataSource: "LEGACY" as const,
+        entryCount: 0,
+        istCount: 0,
+        planCount: 0,
+        confirmedCount: 0,
+        unreviewedCount: 0,
+        masseCount: 0,
+        absonderungCount: 0,
+      };
+    }
 
     // Log access
     await prisma.customerAuditLog.create({
@@ -140,7 +287,7 @@ export async function GET(
       },
     });
 
-    // Prepare response (clean external view)
+    // Prepare response (same format as /api/share/[token])
     const response = {
       case: {
         id: caseData.id,
@@ -160,6 +307,48 @@ export async function GET(
         versionNumber: latestVersion?.versionNumber ?? 0,
         versionDate: latestVersion?.snapshotDate ?? null,
       },
+      // Planungsprämissen und Dokumentation
+      assumptions: plan.assumptions.map((a) => ({
+        id: a.id,
+        categoryName: a.categoryName,
+        source: a.source,
+        description: a.description,
+        riskLevel: a.riskLevel,
+        createdAt: a.createdAt.toISOString(),
+        updatedAt: a.updatedAt.toISOString(),
+      })),
+      insolvencyEffects: {
+        effects: Object.values(insolvencyEffectsByName),
+        rawEffects: plan.insolvencyEffects.map((e) => ({
+          id: e.id,
+          name: e.name,
+          description: e.description,
+          effectType: e.effectType,
+          effectGroup: e.effectGroup,
+          periodIndex: e.periodIndex,
+          amountCents: e.amountCents.toString(),
+          isActive: e.isActive,
+        })),
+      },
+      bankAccounts: {
+        accounts: caseData.bankAccounts.map((acc) => ({
+          id: acc.id,
+          bankName: acc.bankName,
+          accountName: acc.accountName,
+          iban: acc.iban,
+          balanceCents: acc.balanceCents.toString(),
+          availableCents: acc.availableCents.toString(),
+          securityHolder: acc.securityHolder,
+          status: acc.status,
+          notes: acc.notes,
+        })),
+        summary: {
+          totalBalanceCents: caseData.bankAccounts.reduce((sum, acc) => sum + acc.balanceCents, BigInt(0)).toString(),
+          totalAvailableCents: caseData.bankAccounts.reduce((sum, acc) => sum + acc.availableCents, BigInt(0)).toString(),
+          accountCount: caseData.bankAccounts.length,
+        },
+      },
+      ledgerStats,
       calculation: {
         openingBalanceCents: result.openingBalanceCents.toString(),
         totalInflowsCents: result.totalInflowsCents.toString(),
