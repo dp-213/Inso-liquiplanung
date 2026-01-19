@@ -460,9 +460,18 @@ export async function POST(
       message,
     });
   } catch (error) {
-    console.error("Error importing to ledger:", error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("Error importing to ledger:", {
+      message: errorMessage,
+      stack: errorStack,
+      error,
+    });
     return NextResponse.json(
-      { error: "Fehler beim Import ins Ledger" },
+      {
+        error: `Fehler beim Import ins Ledger: ${errorMessage}`,
+        details: process.env.NODE_ENV === "development" ? errorStack : undefined,
+      },
       { status: 500 }
     );
   }
