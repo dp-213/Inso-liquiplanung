@@ -4,6 +4,80 @@ import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+// =============================================================================
+// HELPERS FOR DISPLAYING CANONICAL DATA IN USER-FRIENDLY FORMAT
+// =============================================================================
+
+/**
+ * Converts the canonical record structure back to a flat key-value format for display.
+ */
+function flattenRawData(rawData: Record<string, unknown>): Record<string, string> {
+  if (rawData.core || rawData._schemaVersion) {
+    const flat: Record<string, string> = {};
+
+    const core = rawData.core as Record<string, unknown> | undefined;
+    if (core) {
+      if (core.datum) flat["Datum"] = String(core.datum);
+      if (core.betrag) flat["Betrag"] = String(core.betrag);
+      if (core.bezeichnung) flat["Bezeichnung"] = String(core.bezeichnung);
+    }
+
+    const splitAmount = rawData.splitAmount as Record<string, unknown> | undefined;
+    if (splitAmount) {
+      if (splitAmount.einzahlung) flat["Einzahlung"] = String(splitAmount.einzahlung);
+      if (splitAmount.auszahlung) flat["Auszahlung"] = String(splitAmount.auszahlung);
+    }
+
+    const standard = rawData.standard as Record<string, unknown> | undefined;
+    if (standard) {
+      const fieldLabels: Record<string, string> = {
+        kategorie: "Kategorie",
+        zahlungsart: "Zahlungsart",
+        typ: "Typ",
+        alt_neu_forderung: "Alt/Neu",
+        massetyp: "Massetyp",
+        konto: "Konto",
+        gegenpartei: "Gegenpartei",
+        referenz: "Referenz",
+        kommentar: "Kommentar",
+        notiz: "Notiz",
+        unsicherheit: "Unsicherheit",
+        quelle: "Quelle",
+        werttyp: "Werttyp",
+      };
+
+      for (const [key, value] of Object.entries(standard)) {
+        if (value) {
+          const label = fieldLabels[key] || key;
+          flat[label] = String(value);
+        }
+      }
+    }
+
+    const additional = rawData.additional as Record<string, unknown> | undefined;
+    if (additional) {
+      for (const [key, value] of Object.entries(additional)) {
+        if (value) {
+          // Capitalize first letter for display
+          const label = key.charAt(0).toUpperCase() + key.slice(1);
+          flat[label] = String(value);
+        }
+      }
+    }
+
+    return flat;
+  }
+
+  // Legacy format - already flat
+  const flat: Record<string, string> = {};
+  for (const [key, value] of Object.entries(rawData)) {
+    if (key !== '_schemaVersion' && key !== '_validationErrors') {
+      flat[key] = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
+    }
+  }
+  return flat;
+}
+
 // Minimale Zielfelder für Ledger-Import
 const TARGET_FIELDS = {
   transactionDate: {
@@ -108,9 +182,13 @@ export default function MappingPage({
         }
 
         if (data.records.length > 0) {
-          const cols = Object.keys(data.records[0].rawData);
+          // Flatten the canonical structure for display
+          const flattenedRecords = data.records.slice(0, 5).map((r: { rawData: Record<string, unknown> }) =>
+            flattenRawData(r.rawData)
+          );
+          const cols = Object.keys(flattenedRecords[0] || {});
           setSourceColumns(cols);
-          setSampleData(data.records.slice(0, 5).map((r: { rawData: Record<string, string> }) => r.rawData));
+          setSampleData(flattenedRecords);
 
           // Auto-Erkennung
           const autoMappings = { ...mappings };
