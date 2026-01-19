@@ -65,13 +65,29 @@ npx prisma db push   # Sync database schema
 
 ## Architecture
 
+### Verzeichnisstruktur
+
 - `/app` – Next.js application root
 - `/app/src/app/admin/*` – Internal admin dashboard
-- `/app/src/app/view/*` – External read-only view for insolvency administrators
+- `/app/src/app/portal/*` – Customer portal for insolvency administrators
+- `/app/src/app/view/*` – External read-only view (share links)
 - `/app/src/app/api/*` – API routes
 - `/app/src/components/*` – React components
 - `/app/src/lib/*` – Business logic, calculations, utilities
 - `/app/docs/*` – Documentation (German)
+
+### Kern-Architektur
+
+**LedgerEntry ist Single Source of Truth** – Alle Buchungen sind LedgerEntries mit:
+- Steuerungsdimensionen: `valueType` (IST/PLAN), `legalBucket` (MASSE/ABSONDERUNG/NEUTRAL)
+- Dimensionen: `bankAccountId`, `counterpartyId`, `locationId`
+- Klassifikations-Vorschläge: `suggestedLegalBucket`, `suggestedCounterpartyId`, etc.
+- Governance: `reviewStatus` (UNREVIEWED/CONFIRMED/ADJUSTED)
+
+**Classification Engine** – Rule-basierte Klassifikation:
+- `ClassificationRule` matcht auf Beschreibung/Betrag
+- Erstellt nur Vorschläge (`suggested*`), nie Auto-Commit
+- `matchCounterpartyPatterns()` für automatische Gegenpartei-Erkennung
 
 ## Key Patterns & Conventions
 
@@ -140,9 +156,27 @@ Dies gilt für:
 ### Für Custom Domain
 In Vercel Dashboard: Settings → Domains → eigene Domain hinzufügen
 
-## Documentation Requirements
+## Dokumentation
 
-When making changes, always update the relevant documentation files:
-- Functional changes → CHANGELOG.md
-- Design decisions → DECISIONS.md
-- New limitations → LIMITATIONS.md
+Alle Dokumentation liegt in `/app/docs/`:
+
+| Datei | Inhalt | Wann aktualisieren |
+|-------|--------|-------------------|
+| `CHANGELOG.md` | Versionshistorie | Bei jeder funktionalen Änderung |
+| `ARCHITECTURE.md` | System-Architektur | Bei strukturellen Änderungen |
+| `DECISIONS.md` | Architektur-Entscheidungen | Bei wichtigen Design-Entscheidungen |
+| `LIMITATIONS.md` | Bekannte Einschränkungen | Bei neuen Einschränkungen |
+
+### Claude-spezifische Dateien
+
+| Datei | Zweck |
+|-------|-------|
+| `CLAUDE.md` (root) | Diese Datei – Projekt-Kontext für Claude |
+| `.claude/agents/insolvency-liquidity-engineer.md` | Agent für Berechnungslogik |
+| `.claude/agents/insolvency-admin-architect.md` | Agent für Admin/Ingestion |
+| `.claude/commands/doku.md` | `/doku` Command für Doku-Updates |
+| `.claude/commands/liqui.md` | `/liqui` Command für Projekt-Kontext |
+
+### Dokumentation aktualisieren
+
+Nach größeren Änderungen `/doku` ausführen, um alle relevanten Dokumentationsdateien zu aktualisieren.

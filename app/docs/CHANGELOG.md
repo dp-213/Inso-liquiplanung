@@ -399,6 +399,71 @@ model LedgerEntry {
 
 ---
 
+## Version 2.1.0 – Dimensions & Counterparty Auto-Detection
+
+**Datum:** 19. Januar 2026
+
+### Neue Funktionen
+
+#### Steuerungsdimensionen im Ledger
+- **Dimensionen an LedgerEntry:** Jeder Eintrag kann jetzt mit Bankkonto, Gegenpartei und Standort verknüpft werden
+- **Finale vs. Vorgeschlagene Werte:** Klare Trennung zwischen bestätigten Werten (`bankAccountId`, `counterpartyId`, `locationId`) und Vorschlägen (`suggestedBankAccountId`, etc.)
+- **Bulk-Übernahme:** Button "Dimensionen übernehmen" übernimmt alle Vorschläge in finale Werte
+
+#### Regelbasierte Dimensions-Zuweisung
+- **Rules-Seite erweitert:** Dimensionen können direkt pro Klassifikationsregel zugewiesen werden
+- **Dropdown-Felder:** Bankkonto, Gegenpartei, Standort auswählbar bei Regel-Erstellung
+- **Automatische Vorschläge:** Beim Import werden Dimensions-Vorschläge basierend auf Regeln erstellt
+
+#### Counterparty Auto-Detection
+- **Pattern-Matching:** `matchPattern` (Regex) aus Counterparty wird auf Beschreibungen angewendet
+- **Automatische Erkennung:** Nach jedem Import werden Counterparty-Patterns gematcht
+- **Nur Vorschläge:** Ergebnisse werden als `suggestedCounterpartyId` gespeichert – User muss bestätigen!
+
+#### Ledger-UI Erweiterungen
+- **Dim.-Vorschlag Spalte:** Zeigt Badges (🏦 👤 📍) für vorgeschlagene Dimensionen
+- **Dimensions-Filter:** Dropdown-Filter für Bankkonto, Gegenpartei, Standort
+- **Hover-Details:** Tooltip zeigt Dimensions-Vorschläge im Detail
+
+### Schema-Änderungen
+
+#### LedgerEntry Erweiterungen
+```prisma
+model LedgerEntry {
+  // Finale Dimensionen (nach User-Bestätigung)
+  bankAccountId      String?
+  counterpartyId     String?
+  locationId         String?
+
+  // Vorgeschlagene Dimensionen (von Rule Engine)
+  suggestedBankAccountId    String?
+  suggestedCounterpartyId   String?
+  suggestedLocationId       String?
+}
+```
+
+#### ClassificationRule Erweiterungen
+```prisma
+model ClassificationRule {
+  // Dimensions-Zuweisung bei Match
+  assignBankAccountId    String?
+  assignCounterpartyId   String?
+  assignLocationId       String?
+}
+```
+
+### API-Erweiterungen
+- **GET /api/cases/[id]/ledger:** Neue Filter `bankAccountId`, `counterpartyId`, `locationId`, `hasDimensionSuggestions`
+- **POST /api/cases/[id]/ledger/bulk-review:** Option `applyDimensionSuggestions` übernimmt Vorschläge
+- **matchCounterpartyPatterns():** Neue Funktion in Classification Engine
+
+### Technische Änderungen
+- `classifyBatch()` setzt jetzt auch Dimensions-Vorschläge
+- `matchCounterpartyPatterns()` läuft nach jedem Import
+- Turso-Schema manuell erweitert (ALTER TABLE)
+
+---
+
 ## Geplante Änderungen
 
 Keine ausstehenden Änderungen
