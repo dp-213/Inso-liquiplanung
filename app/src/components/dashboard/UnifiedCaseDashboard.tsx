@@ -293,25 +293,15 @@ export default function UnifiedCaseDashboard({
               </div>
             )}
 
-            {/* Rolling Forecast Tabelle */}
+            {/* Rolling Forecast Tabelle - zeigt IST/PLAN pro Periode */}
             {caseId && (
               <div className="admin-card">
                 <div className="px-6 py-4 border-b border-[var(--border)]">
-                  <h2 className="text-lg font-semibold text-[var(--foreground)]">Liquiditätsübersicht (IST/PLAN)</h2>
+                  <h2 className="text-lg font-semibold text-[var(--foreground)]">Liquiditätsübersicht</h2>
                 </div>
                 <RollingForecastTable caseId={caseId} />
               </div>
             )}
-
-            {/* Detaillierte Kategorien-Tabelle */}
-            <div className="admin-card">
-              <div className="px-6 py-4 border-b border-[var(--border)]">
-                <h2 className="text-lg font-semibold text-[var(--foreground)]">{getPlanTitle(data)} – Kategorien</h2>
-              </div>
-              <div className="overflow-x-auto custom-scrollbar">
-                <LiquidityTable weeks={weeksData} categories={data.calculation.categories} openingBalance={BigInt(data.calculation.openingBalanceCents)} />
-              </div>
-            </div>
           </div>
         );
 
