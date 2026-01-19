@@ -86,6 +86,7 @@ export default function CustomerCaseDashboard() {
       <UnifiedCaseDashboard
         data={data}
         accessMode="customer"
+        caseId={caseId}
       />
     </div>
   );

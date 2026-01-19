@@ -100,6 +100,7 @@ export default function AdminDashboardPage() {
       <UnifiedCaseDashboard
         data={data}
         accessMode="admin"
+        caseId={caseId}
       />
     </div>
   );

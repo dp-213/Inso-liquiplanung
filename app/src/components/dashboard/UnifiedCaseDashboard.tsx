@@ -131,6 +131,7 @@ const PAYMENT_SOURCES = [
 interface UnifiedCaseDashboardProps {
   data: CaseDashboardData;
   accessMode: AccessMode;
+  caseId?: string; // Explicit caseId for Rolling Forecast (fallback if data.case.id missing)
   capabilities?: DashboardCapabilities;
   config?: DashboardConfig;
   showHeader?: boolean;
@@ -144,6 +145,7 @@ interface UnifiedCaseDashboardProps {
 export default function UnifiedCaseDashboard({
   data,
   accessMode,
+  caseId: propCaseId,
   capabilities: propCapabilities,
   config = DEFAULT_DASHBOARD_CONFIG,
   showHeader = true,
@@ -154,6 +156,9 @@ export default function UnifiedCaseDashboard({
 
   // Get capabilities
   const capabilities = propCapabilities || getCapabilitiesForAccessMode(accessMode);
+
+  // Effective caseId (prop takes priority, fallback to data.case.id)
+  const caseId = propCaseId || data.case?.id;
 
   // Memoized calculations
   const periods = useMemo(() => getPeriods(data), [data]);
@@ -280,31 +285,23 @@ export default function UnifiedCaseDashboard({
               periodCount={data.calculation.periodCount || data.plan.periodCount}
             />
 
-            {/* Liquiditätsverlauf - Rolling Forecast wenn caseId verfügbar, sonst Fallback */}
+            {/* Rolling Forecast Chart */}
             <div className="admin-card p-6">
               <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Liquiditätsverlauf</h2>
-              {data.case?.id ? (
-                <RollingForecastChart caseId={data.case.id} />
+              {caseId ? (
+                <RollingForecastChart caseId={caseId} />
               ) : (
-                <>
-                  <BalanceChart weeks={weeksData} markers={paymentMarkers} showPhases={(data.calculation.periodType || data.plan.periodType) === "MONTHLY"} />
-                  {(data.calculation.periodType || data.plan.periodType) === "MONTHLY" && (
-                    <div className="mt-4 flex flex-wrap gap-4 text-xs text-[var(--secondary)]">
-                      <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-[#10b981]"></div><span>KV-Restzahlung</span></div>
-                      <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-[#8b5cf6]"></div><span>HZV-Schlusszahlung</span></div>
-                    </div>
-                  )}
-                </>
+                <BalanceChart weeks={weeksData} markers={paymentMarkers} showPhases={(data.calculation.periodType || data.plan.periodType) === "MONTHLY"} />
               )}
             </div>
 
             {/* Rolling Forecast Tabelle */}
-            {data.case?.id && (
+            {caseId && (
               <div className="admin-card">
                 <div className="px-6 py-4 border-b border-[var(--border)]">
                   <h2 className="text-lg font-semibold text-[var(--foreground)]">Liquiditätsübersicht (IST/PLAN)</h2>
                 </div>
-                <RollingForecastTable caseId={data.case.id} />
+                <RollingForecastTable caseId={caseId} />
               </div>
             )}
 
@@ -324,10 +321,10 @@ export default function UnifiedCaseDashboard({
         return (
           <div className="space-y-6">
             {/* Datengetriebene Einnahmen-Übersicht aus Zahlungsregister */}
-            {data.case.id && (
+            {caseId && (
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen nach Quelle</h2>
-                <RevenueTable caseId={data.case.id} months={6} showSummary={true} />
+                <RevenueTable caseId={caseId} months={6} showSummary={true} />
               </div>
             )}
 
@@ -368,10 +365,10 @@ export default function UnifiedCaseDashboard({
         return (
           <div className="space-y-6">
             {/* Verfügbar vs. Gebunden Chart */}
-            {data.case.id && (
+            {caseId && (
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Verfügbarkeit über Zeit</h2>
-                <SecurityRightsChart caseId={data.case.id} periods={10} />
+                <SecurityRightsChart caseId={caseId} periods={10} />
               </div>
             )}
 
