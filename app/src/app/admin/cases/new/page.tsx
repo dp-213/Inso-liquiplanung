@@ -76,7 +76,9 @@ function NewCaseContent() {
         router.push(`/admin/cases/${newCase.id}`);
       } else {
         const data = await res.json();
-        setError(data.error || "Fehler beim Erstellen des Falls");
+        const errorMsg = data.error || "Fehler beim Erstellen des Falls";
+        const details = data.details ? `\n\nDetails: ${data.details}` : "";
+        setError(errorMsg + details);
       }
     } catch {
       setError("Netzwerkfehler. Bitte versuchen Sie es erneut.");

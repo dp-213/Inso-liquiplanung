@@ -56,6 +56,36 @@ export default function CaseIngestionPage({
     useState<SourceType>("CSV_GENERIC");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
+
+  const handleDeleteJob = async (jobId: string, jobStatus: string) => {
+    const isCommitted = jobStatus === "COMMITTED";
+    const confirmMessage = isCommitted
+      ? "Dieser Import wurde bereits übernommen. Beim Löschen werden auch alle importierten Buchungen entfernt. Fortfahren?"
+      : "Diesen Import wirklich löschen?";
+
+    if (!confirm(confirmMessage)) return;
+
+    setDeletingJobId(jobId);
+    try {
+      const res = await fetch(`/api/ingestion/${jobId}`, { method: "DELETE" });
+      if (res.ok) {
+        setSuccessMessage(
+          isCommitted
+            ? "Import und zugehörige Buchungen wurden gelöscht"
+            : "Import wurde gelöscht"
+        );
+        fetchData();
+      } else {
+        const data = await res.json();
+        setError(data.error || "Fehler beim Löschen");
+      }
+    } catch {
+      setError("Fehler beim Löschen des Imports");
+    } finally {
+      setDeletingJobId(null);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     try {
@@ -597,6 +627,13 @@ export default function CaseIngestionPage({
                             Übernehmen
                           </Link>
                         )}
+                        <button
+                          onClick={() => handleDeleteJob(job.id, job.status)}
+                          disabled={deletingJobId === job.id}
+                          className="text-[var(--danger)] hover:underline text-sm disabled:opacity-50"
+                        >
+                          {deletingJobId === job.id ? "..." : "Löschen"}
+                        </button>
                       </div>
                     </td>
                   </tr>

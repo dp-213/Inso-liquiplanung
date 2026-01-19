@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     // Create case with default plan and categories in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Create the case
-      const newCase = await tx.case.create({
+      const createdCase = await tx.case.create({
         data: {
           ownerId,
           caseNumber: caseNumber.trim(),
@@ -120,11 +120,15 @@ export async function POST(request: NextRequest) {
         },
       });
 
+      if (!createdCase) {
+        throw new Error("Fall wurde erstellt, konnte aber nicht gefunden werden");
+      }
+
       // Create default liquidity plan
       const planStartDate = getCurrentMonday();
       const plan = await tx.liquidityPlan.create({
         data: {
-          caseId: newCase.id,
+          caseId: createdCase.id,
           name: "Hauptplan",
           description: "Automatisch erstellter Liquiditätsplan",
           planStartDate,
@@ -158,7 +162,7 @@ export async function POST(request: NextRequest) {
             await tx.customerCaseAccess.create({
               data: {
                 customerId,
-                caseId: newCase.id,
+                caseId: createdCase.id,
                 accessLevel: "VIEW",
                 grantedBy: session.username,
               },
@@ -167,14 +171,22 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return newCase;
+      return createdCase;
     });
 
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     console.error("Error creating case:", error);
+
+    // Mehr Details für Debugging
+    const errorMessage = error instanceof Error ? error.message : "Unbekannter Fehler";
+    const errorDetails = error instanceof Error && error.stack ? error.stack.split("\n").slice(0, 3).join(" | ") : "";
+
     return NextResponse.json(
-      { error: "Fehler beim Erstellen des Falls" },
+      {
+        error: `Fehler beim Erstellen des Falls: ${errorMessage}`,
+        details: errorDetails
+      },
       { status: 500 }
     );
   }

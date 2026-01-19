@@ -97,11 +97,13 @@ export async function DELETE(
       );
     }
 
+    // If committed, also delete associated LedgerEntries
     if (job.status === "COMMITTED") {
-      return NextResponse.json(
-        { error: "Ein abgeschlossener Import kann nicht gelöscht werden" },
-        { status: 400 }
-      );
+      // Delete all LedgerEntries that came from this import
+      const deletedEntries = await prisma.ledgerEntry.deleteMany({
+        where: { importJobId: jobId },
+      });
+      console.log(`Deleted ${deletedEntries.count} LedgerEntries from import ${jobId}`);
     }
 
     // Delete the job and all related records (cascade)

@@ -234,11 +234,11 @@ export const COLUMN_NAME_MAPPINGS: Record<string, string[]> = {
     'buchungsinformation', 'transaktionstext', 'umsatztext',
     // HVPlus / Banksoftware-Exporte
     'transaktionsinformation', 'transaktion', 'information',
-    'creditor name', 'debtor name', 'kreditor', 'debitor',
+    // Note: 'creditor name', 'debtor name' moved to gegenpartei - they are counterparty info, not description
   ],
 
   // Optional: Category
-  kategorie: ['kategorie', 'category', 'gruppe', 'group', 'art', 'type', 'klasse'],
+  kategorie: ['kategorie', 'category', 'gruppe', 'group', 'art', 'type', 'klasse', 'cashflow kategorie', 'cashflow-kategorie', 'cashflowkategorie'],
 
   // Optional: Payment type
   zahlungsart: ['zahlungsart', 'typ', 'type', 'payment_type', 'transaction_type'],
@@ -250,7 +250,8 @@ export const COLUMN_NAME_MAPPINGS: Record<string, string[]> = {
   konto: ['konto', 'account', 'kontonummer', 'account_number', 'bank', 'iban'],
 
   // Optional: Counterparty
-  gegenpartei: ['gegenpartei', 'partner', 'counterparty', 'debitor', 'kreditor', 'kunde', 'lieferant', 'empfaenger', 'auftraggeber'],
+  gegenpartei: ['gegenpartei', 'partner', 'counterparty', 'debitor', 'kreditor', 'kunde', 'lieferant',
+    'creditor name', 'debtor name', 'kreditorname', 'debitorname'],
 
   // Optional: Reference
   referenz: ['referenz', 'reference', 'ref', 'rechnungsnummer', 'invoice', 'belegnummer', 'beleg'],

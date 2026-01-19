@@ -11,6 +11,99 @@ import {
   QualityTier,
 } from "@/lib/ingestion/types";
 
+// =============================================================================
+// HELPERS FOR DISPLAYING CANONICAL DATA IN USER-FRIENDLY FORMAT
+// =============================================================================
+
+/**
+ * Converts the canonical record structure back to a flat key-value format for display.
+ * The stored format is: { core, splitAmount, standard, additional, _meta, _schemaVersion }
+ * We want to show it as: { Datum: "13.11.2025", Betrag: "100,00", ... }
+ */
+function flattenRawData(rawData: Record<string, unknown>): Record<string, string> {
+  // Check if this is the canonical format (has 'core' or '_schemaVersion')
+  if (rawData.core || rawData._schemaVersion) {
+    const flat: Record<string, string> = {};
+
+    // Extract core fields
+    const core = rawData.core as Record<string, unknown> | undefined;
+    if (core) {
+      if (core.datum) flat["Datum"] = String(core.datum);
+      if (core.betrag) flat["Betrag"] = String(core.betrag);
+      if (core.bezeichnung) flat["Bezeichnung"] = String(core.bezeichnung);
+    }
+
+    // Extract split amount fields
+    const splitAmount = rawData.splitAmount as Record<string, unknown> | undefined;
+    if (splitAmount) {
+      if (splitAmount.einzahlung) flat["Einzahlung"] = String(splitAmount.einzahlung);
+      if (splitAmount.auszahlung) flat["Auszahlung"] = String(splitAmount.auszahlung);
+    }
+
+    // Extract standard optional fields
+    const standard = rawData.standard as Record<string, unknown> | undefined;
+    if (standard) {
+      const fieldLabels: Record<string, string> = {
+        kategorie: "Kategorie",
+        zahlungsart: "Zahlungsart",
+        typ: "Typ",
+        alt_neu_forderung: "Alt/Neu",
+        massetyp: "Massetyp",
+        konto: "Konto",
+        gegenpartei: "Gegenpartei",
+        referenz: "Referenz",
+        kommentar: "Kommentar",
+        notiz: "Notiz",
+        unsicherheit: "Unsicherheit",
+        quelle: "Quelle",
+        werttyp: "Werttyp",
+      };
+
+      for (const [key, value] of Object.entries(standard)) {
+        if (value) {
+          const label = fieldLabels[key] || key;
+          flat[label] = String(value);
+        }
+      }
+    }
+
+    // Extract additional (unknown/unmapped) fields - preserve original keys
+    const additional = rawData.additional as Record<string, unknown> | undefined;
+    if (additional) {
+      for (const [key, value] of Object.entries(additional)) {
+        if (value) {
+          flat[key] = String(value);
+        }
+      }
+    }
+
+    return flat;
+  }
+
+  // Legacy format - already flat, just stringify values
+  const flat: Record<string, string> = {};
+  for (const [key, value] of Object.entries(rawData)) {
+    if (key !== '_schemaVersion' && key !== '_validationErrors') {
+      flat[key] = typeof value === 'object' ? JSON.stringify(value) : String(value ?? '');
+    }
+  }
+  return flat;
+}
+
+/**
+ * Gets the original headers from the canonical record's _meta, or fallback to flat keys.
+ */
+function getDisplayHeaders(rawData: Record<string, unknown>): string[] {
+  // Try to get original headers from _meta
+  const meta = rawData._meta as Record<string, unknown> | undefined;
+  if (meta?.originalHeaders && Array.isArray(meta.originalHeaders)) {
+    return meta.originalHeaders as string[];
+  }
+
+  // Fallback: use the flattened keys
+  return Object.keys(flattenRawData(rawData));
+}
+
 interface JobDetail {
   id: string;
   caseId: string;
@@ -545,7 +638,7 @@ export default function IngestionJobDetailPage({
                   Erkannte Spalten
                 </h4>
                 <div className="flex flex-wrap gap-2">
-                  {Object.keys(job.records[0].rawData).map((col) => (
+                  {getDisplayHeaders(job.records[0].rawData).map((col) => (
                     <span
                       key={col}
                       className="px-3 py-1 bg-gray-100 rounded-full text-sm"
@@ -597,16 +690,14 @@ export default function IngestionJobDetailPage({
                       </td>
                       <td>
                         <div className="text-sm max-w-md truncate">
-                          {Object.entries(record.rawData)
-                            .slice(0, 3)
-                            .map(([k, v]) => {
-                              const displayValue = typeof v === 'object' && v !== null
-                                ? JSON.stringify(v)
-                                : String(v || '');
-                              return `${k}: ${displayValue}`;
-                            })
-                            .join(" | ")}
-                          {Object.keys(record.rawData).length > 3 && " ..."}
+                          {(() => {
+                            const flat = flattenRawData(record.rawData);
+                            const entries = Object.entries(flat);
+                            return entries
+                              .slice(0, 3)
+                              .map(([k, v]) => `${k}: ${v}`)
+                              .join(" | ") + (entries.length > 3 ? " ..." : "");
+                          })()}
                         </div>
                       </td>
                       <td>
@@ -654,11 +745,20 @@ export default function IngestionJobDetailPage({
                           <div className="grid grid-cols-2 gap-6">
                             <div>
                               <h5 className="font-medium text-sm mb-2">
-                                Rohdaten
+                                Importierte Daten
                               </h5>
-                              <pre className="text-xs bg-white p-3 rounded border overflow-x-auto">
-                                {JSON.stringify(record.rawData, null, 2)}
-                              </pre>
+                              <div className="bg-white p-3 rounded border">
+                                <table className="text-xs w-full">
+                                  <tbody>
+                                    {Object.entries(flattenRawData(record.rawData)).map(([key, value]) => (
+                                      <tr key={key} className="border-b border-gray-100 last:border-b-0">
+                                        <td className="py-1 pr-3 font-medium text-[var(--secondary)] whitespace-nowrap">{key}</td>
+                                        <td className="py-1 text-[var(--foreground)]">{value}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
                             <div>
                               <h5 className="font-medium text-sm mb-2">

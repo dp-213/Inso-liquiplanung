@@ -172,7 +172,8 @@ export async function POST(request: NextRequest) {
       // Stage 7: Parse Excel
       stage = "Verarbeiten der Excel-Datei";
       try {
-        const workbook = XLSX.read(arrayBuffer, { type: "array" });
+        // cellDates: true converts Excel date serials to JS Date objects
+        const workbook = XLSX.read(arrayBuffer, { type: "array", cellDates: true });
         sheetNames = workbook.SheetNames;
 
         if (sheetNames.length === 0) {
@@ -223,6 +224,19 @@ export async function POST(request: NextRequest) {
                   parseError = `Doppelte Spaltenüberschriften gefunden: ${duplicates.join(", ")}. Jede Spalte muss einen eindeutigen Namen haben.`;
                   parseErrorDetails = `Duplicate headers: ${duplicates.join(", ")}`;
                 } else {
+                  // Helper to format cell values (especially dates)
+                  const formatCellValue = (value: unknown): string => {
+                    if (value === null || value === undefined || value === "") return "";
+                    if (value instanceof Date) {
+                      // Format as DD.MM.YYYY (German format)
+                      const day = String(value.getDate()).padStart(2, "0");
+                      const month = String(value.getMonth() + 1).padStart(2, "0");
+                      const year = value.getFullYear();
+                      return `${day}.${month}.${year}`;
+                    }
+                    return String(value);
+                  };
+
                   // Convert to records using original header names
                   rawRecords = jsonData
                     .slice(1)
@@ -231,7 +245,7 @@ export async function POST(request: NextRequest) {
                       const rowArr = row as unknown[];
                       const record: Record<string, string> = {};
                       headers.forEach((header, idx) => {
-                        record[header] = String(rowArr[idx] ?? "");
+                        record[header] = formatCellValue(rowArr[idx]);
                       });
                       return record;
                     });
