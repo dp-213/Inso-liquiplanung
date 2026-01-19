@@ -782,6 +782,243 @@ export async function summarizeByCounterparty(
 }
 
 // =============================================================================
+// ROLLING FORECAST AGGREGATION
+// =============================================================================
+
+/**
+ * Data source for a period in the rolling forecast
+ */
+export type RollingForecastSource = 'IST' | 'PLAN' | 'MIXED';
+
+/**
+ * Rolling Forecast period data
+ */
+export interface RollingForecastPeriod {
+  periodIndex: number;
+  periodLabel: string;
+  periodStart: Date;
+  periodEnd: Date;
+
+  // Aggregated values (IST preferred, PLAN as fallback)
+  openingBalanceCents: bigint;
+  inflowsCents: bigint;
+  outflowsCents: bigint;
+  netCashflowCents: bigint;
+  closingBalanceCents: bigint;
+
+  // Data source indication
+  source: RollingForecastSource;
+  istCount: number;      // Number of IST entries
+  planCount: number;     // Number of PLAN entries
+
+  // For transparency: raw values
+  istInflowsCents: bigint;
+  istOutflowsCents: bigint;
+  planInflowsCents: bigint;
+  planOutflowsCents: bigint;
+
+  // Is this period in the past (before today)?
+  isPast: boolean;
+}
+
+/**
+ * Rolling Forecast result
+ */
+export interface RollingForecastResult {
+  caseId: string;
+  planId: string;
+  calculatedAt: string;
+  openingBalanceCents: bigint;
+  periods: RollingForecastPeriod[];
+
+  // Summary
+  totalIstPeriods: number;
+  totalPlanPeriods: number;
+  todayPeriodIndex: number;  // Which period contains "today"
+}
+
+/**
+ * Aggregate Rolling Forecast
+ *
+ * Logic:
+ * - For each period, prefer IST over PLAN
+ * - Past periods (before today): Should have IST
+ * - Future periods (after today): Will have PLAN
+ * - Mixed periods: Period contains today, may have both
+ *
+ * The forecast "rolls" automatically as new IST data comes in
+ */
+export async function aggregateRollingForecast(
+  prisma: PrismaClient,
+  caseId: string,
+  planId: string
+): Promise<RollingForecastResult> {
+  // 1. Load plan with latest version for opening balance
+  const plan = await prisma.liquidityPlan.findUnique({
+    where: { id: planId },
+    include: {
+      versions: {
+        orderBy: { versionNumber: 'desc' },
+        take: 1,
+      },
+    },
+  });
+
+  if (!plan) {
+    throw new Error(`Plan ${planId} nicht gefunden`);
+  }
+
+  // Get opening balance from latest version (or default to 0)
+  const latestVersion = plan.versions[0];
+  const openingBalanceCents = latestVersion?.openingBalanceCents ?? BigInt(0);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // 2. Load all LedgerEntries
+  const entries = await prisma.ledgerEntry.findMany({
+    where: { caseId },
+    orderBy: { transactionDate: 'asc' },
+  });
+
+  // 3. Initialize periods
+  const periods: RollingForecastPeriod[] = [];
+  let runningBalance = openingBalanceCents;
+
+  for (let i = 0; i < plan.periodCount; i++) {
+    const periodStart = calculatePeriodStartDate(
+      plan.planStartDate,
+      i,
+      plan.periodType as 'WEEKLY' | 'MONTHLY'
+    );
+
+    const periodEnd = calculatePeriodStartDate(
+      plan.planStartDate,
+      i + 1,
+      plan.periodType as 'WEEKLY' | 'MONTHLY'
+    );
+
+    const periodLabel = formatPeriodLabel(periodStart, plan.periodType as 'WEEKLY' | 'MONTHLY');
+
+    // Determine if period is in the past
+    const isPast = periodEnd <= today;
+
+    periods.push({
+      periodIndex: i,
+      periodLabel,
+      periodStart,
+      periodEnd,
+      openingBalanceCents: BigInt(0),
+      inflowsCents: BigInt(0),
+      outflowsCents: BigInt(0),
+      netCashflowCents: BigInt(0),
+      closingBalanceCents: BigInt(0),
+      source: 'PLAN',
+      istCount: 0,
+      planCount: 0,
+      istInflowsCents: BigInt(0),
+      istOutflowsCents: BigInt(0),
+      planInflowsCents: BigInt(0),
+      planOutflowsCents: BigInt(0),
+      isPast,
+    });
+  }
+
+  // 4. Aggregate entries into periods
+  for (const entry of entries) {
+    const periodIndex = calculatePeriodIndex({
+      transactionDate: entry.transactionDate,
+      planStartDate: plan.planStartDate,
+      periodType: plan.periodType as 'WEEKLY' | 'MONTHLY',
+      periodCount: plan.periodCount,
+    });
+
+    if (periodIndex >= 0 && periodIndex < plan.periodCount) {
+      const period = periods[periodIndex];
+      const amount = BigInt(entry.amountCents);
+      const isInflow = amount > BigInt(0);
+      const valueType = entry.valueType as 'IST' | 'PLAN';
+
+      if (valueType === 'IST') {
+        period.istCount++;
+        if (isInflow) {
+          period.istInflowsCents += amount;
+        } else {
+          period.istOutflowsCents += amount; // Already negative
+        }
+      } else {
+        period.planCount++;
+        if (isInflow) {
+          period.planInflowsCents += amount;
+        } else {
+          period.planOutflowsCents += amount; // Already negative
+        }
+      }
+    }
+  }
+
+  // 5. Determine final values per period (IST preferred over PLAN)
+  let todayPeriodIndex = -1;
+  let totalIstPeriods = 0;
+  let totalPlanPeriods = 0;
+
+  for (let i = 0; i < periods.length; i++) {
+    const period = periods[i];
+
+    // Find which period contains today
+    if (today >= period.periodStart && today < period.periodEnd) {
+      todayPeriodIndex = i;
+    }
+
+    // Opening balance from previous period
+    period.openingBalanceCents = runningBalance;
+
+    // Determine source and values
+    // Rule: If we have ANY IST data, use IST. Otherwise use PLAN.
+    if (period.istCount > 0) {
+      // Use IST values
+      period.inflowsCents = period.istInflowsCents;
+      period.outflowsCents = period.istOutflowsCents;
+      period.source = period.planCount > 0 ? 'MIXED' : 'IST';
+      totalIstPeriods++;
+    } else {
+      // Use PLAN values
+      period.inflowsCents = period.planInflowsCents;
+      period.outflowsCents = period.planOutflowsCents;
+      period.source = 'PLAN';
+      totalPlanPeriods++;
+    }
+
+    // Calculate net and closing
+    period.netCashflowCents = period.inflowsCents + period.outflowsCents;
+    period.closingBalanceCents = period.openingBalanceCents + period.netCashflowCents;
+
+    // Carry forward
+    runningBalance = period.closingBalanceCents;
+  }
+
+  // If today is after all periods, set to last
+  if (todayPeriodIndex === -1 && periods.length > 0) {
+    if (today < periods[0].periodStart) {
+      todayPeriodIndex = 0;
+    } else {
+      todayPeriodIndex = periods.length - 1;
+    }
+  }
+
+  return {
+    caseId,
+    planId,
+    calculatedAt: new Date().toISOString(),
+    openingBalanceCents,
+    periods,
+    totalIstPeriods,
+    totalPlanPeriods,
+    todayPeriodIndex,
+  };
+}
+
+// =============================================================================
 // AGGREGATION STATISTICS
 // =============================================================================
 

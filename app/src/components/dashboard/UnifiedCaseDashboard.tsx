@@ -28,6 +28,8 @@ import InsolvencyEffectsTable from "@/components/external/InsolvencyEffectsTable
 import WaterfallChart from "@/components/external/WaterfallChart";
 import RevenueTable from "@/components/dashboard/RevenueTable";
 import SecurityRightsChart from "@/components/dashboard/SecurityRightsChart";
+import RollingForecastChart from "@/components/dashboard/RollingForecastChart";
+import RollingForecastTable from "@/components/dashboard/RollingForecastTable";
 // DataSourceLegend entfernt - nicht operativ relevant für Insolvenzverwalter
 
 // =============================================================================
@@ -278,20 +280,28 @@ export default function UnifiedCaseDashboard({
               periodCount={data.calculation.periodCount || data.plan.periodCount}
             />
 
-            <div className="admin-card p-6">
-              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Liquiditätsverlauf</h2>
-              <BalanceChart weeks={weeksData} markers={paymentMarkers} showPhases={(data.calculation.periodType || data.plan.periodType) === "MONTHLY"} />
-              {(data.calculation.periodType || data.plan.periodType) === "MONTHLY" && (
-                <div className="mt-4 flex flex-wrap gap-4 text-xs text-[var(--secondary)]">
-                  <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-[#10b981]"></div><span>KV-Restzahlung</span></div>
-                  <div className="flex items-center gap-1"><div className="w-3 h-0.5 bg-[#8b5cf6]"></div><span>HZV-Schlusszahlung</span></div>
-                </div>
-              )}
-            </div>
+            {/* Rolling Forecast: IST (Vergangenheit) + PLAN (Zukunft) */}
+            {data.case.id && (
+              <div className="admin-card p-6">
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Rolling Forecast</h2>
+                <RollingForecastChart caseId={data.case.id} />
+              </div>
+            )}
 
+            {/* Rolling Forecast Tabelle */}
+            {data.case.id && (
+              <div className="admin-card">
+                <div className="px-6 py-4 border-b border-[var(--border)]">
+                  <h2 className="text-lg font-semibold text-[var(--foreground)]">Liquiditätsübersicht (IST/PLAN)</h2>
+                </div>
+                <RollingForecastTable caseId={data.case.id} />
+              </div>
+            )}
+
+            {/* Detaillierte Kategorien-Tabelle */}
             <div className="admin-card">
               <div className="px-6 py-4 border-b border-[var(--border)]">
-                <h2 className="text-lg font-semibold text-[var(--foreground)]">{getPlanTitle(data)}</h2>
+                <h2 className="text-lg font-semibold text-[var(--foreground)]">{getPlanTitle(data)} – Kategorien</h2>
               </div>
               <div className="overflow-x-auto custom-scrollbar">
                 <LiquidityTable weeks={weeksData} categories={data.calculation.categories} openingBalance={BigInt(data.calculation.openingBalanceCents)} />
