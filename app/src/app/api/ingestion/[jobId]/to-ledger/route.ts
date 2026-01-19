@@ -73,15 +73,40 @@ export async function POST(
     for (const record of job.records) {
       const rawData = JSON.parse(record.rawData) as Record<string, string | unknown>;
 
-      // Hilfsfunktion um Werte sicher als String zu extrahieren
-      // Unterstützt direkte Keys und verschachtelte Strukturen (core.datum, additional.datum)
-      const getValue = (key: string): string => {
-        // Direkt versuchen
-        let val = rawData[key];
+      // Mapping von Display-Namen zu kanonischen Pfaden
+      const displayToCanonical: Record<string, string> = {
+        "Datum": "datum",
+        "Betrag": "betrag",
+        "Bezeichnung": "bezeichnung",
+        "Einzahlung": "einzahlung",
+        "Auszahlung": "auszahlung",
+        "Kategorie": "kategorie",
+        "Zahlungsart": "zahlungsart",
+        "Typ": "typ",
+        "Alt/Neu": "alt_neu_forderung",
+        "Massetyp": "massetyp",
+        "Konto": "konto",
+        "Gegenpartei": "gegenpartei",
+        "Referenz": "referenz",
+        "Kommentar": "kommentar",
+        "Notiz": "notiz",
+        "Unsicherheit": "unsicherheit",
+        "Quelle": "quelle",
+        "Werttyp": "werttyp",
+      };
 
-        // Fallback: Case-insensitive suchen
+      // Hilfsfunktion um Werte sicher als String zu extrahieren
+      // Unterstützt Display-Namen, direkte Keys und verschachtelte Strukturen
+      const getValue = (key: string): string => {
+        // Zuerst: Display-Name zu kanonischem Key auflösen
+        const canonicalKey = displayToCanonical[key] || key;
+        const lowerKey = canonicalKey.toLowerCase();
+
+        // Direkt versuchen
+        let val = rawData[key] ?? rawData[canonicalKey] ?? rawData[lowerKey];
+
+        // Fallback: Case-insensitive in Top-Level suchen
         if (val === null || val === undefined) {
-          const lowerKey = key.toLowerCase();
           for (const k of Object.keys(rawData)) {
             if (k.toLowerCase() === lowerKey) {
               val = rawData[k];
@@ -90,28 +115,43 @@ export async function POST(
           }
         }
 
-        // Fallback: In verschachtelten Strukturen suchen (core, additional, standard)
+        // Fallback: In verschachtelten Strukturen suchen (core, splitAmount, additional, standard)
         if (val === null || val === undefined) {
-          const lowerKey = key.toLowerCase();
-          for (const section of ["core", "additional", "standard"]) {
-            const nested = rawData[section];
-            if (nested && typeof nested === "object") {
-              const nestedObj = nested as Record<string, unknown>;
-              // Direkt oder case-insensitive
-              if (nestedObj[key] !== undefined) {
-                val = nestedObj[key];
-                break;
-              }
-              if (nestedObj[lowerKey] !== undefined) {
-                val = nestedObj[lowerKey];
-                break;
-              }
-              // Auch andere Varianten probieren
-              for (const k of Object.keys(nestedObj)) {
-                if (k.toLowerCase() === lowerKey) {
-                  val = nestedObj[k];
+          // Spezielle Behandlung für splitAmount
+          if (lowerKey === "einzahlung" || lowerKey === "auszahlung") {
+            const splitAmount = rawData.splitAmount as Record<string, unknown> | null;
+            if (splitAmount && splitAmount[lowerKey] !== undefined) {
+              val = splitAmount[lowerKey];
+            }
+          }
+
+          // core, additional, standard durchsuchen
+          if (val === null || val === undefined) {
+            for (const section of ["core", "additional", "standard"]) {
+              const nested = rawData[section];
+              if (nested && typeof nested === "object") {
+                const nestedObj = nested as Record<string, unknown>;
+                // Direkt, kanonisch, oder case-insensitive
+                if (nestedObj[key] !== undefined) {
+                  val = nestedObj[key];
                   break;
                 }
+                if (nestedObj[canonicalKey] !== undefined) {
+                  val = nestedObj[canonicalKey];
+                  break;
+                }
+                if (nestedObj[lowerKey] !== undefined) {
+                  val = nestedObj[lowerKey];
+                  break;
+                }
+                // Auch andere Varianten probieren
+                for (const k of Object.keys(nestedObj)) {
+                  if (k.toLowerCase() === lowerKey) {
+                    val = nestedObj[k];
+                    break;
+                  }
+                }
+                if (val !== null && val !== undefined) break;
               }
             }
           }
