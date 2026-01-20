@@ -426,19 +426,22 @@ export async function POST(
       }
 
       // === ESTATE ALLOCATION: Alt-/Neumasse-Zuordnung ===
+      // WICHTIG: Buchungsdatum (transactionDate) ist KEINE gültige Entscheidungsgrundlage!
+      // Maßgeblich ist ausschließlich die Forderungsentstehung (serviceDate, servicePeriod, Vertragslogik).
+      // Ohne Leistungsinformationen → UNKLAR (manuelle Zuordnung erforderlich)
       let estateAllocationResult: AllocationResult | null = null;
       if (job.case.cutoffDate) {
         // Split-Engine aufrufen
-        // Hinweis: Ohne SettlerConfig nur binäre Zuordnung möglich (transactionDate vs cutoffDate)
-        // Für case-spezifische Regeln (z.B. HZV Vormonat-Logik) wäre SettlerConfig nötig
+        // Da beim Import typischerweise keine Leistungs-Informationen vorliegen,
+        // wird die Zuordnung meist UNKLAR sein → manuelle Prüfung nötig
         estateAllocationResult = determineEstateAllocation(
           {
             transactionDate,
-            serviceDate: null, // Wird beim Import typischerweise nicht mitgeliefert
-            servicePeriodStart: null,
+            serviceDate: null, // Leistungsdatum - beim Import meist nicht vorhanden
+            servicePeriodStart: null, // Leistungszeitraum - beim Import meist nicht vorhanden
             servicePeriodEnd: null,
           },
-          null, // SettlerConfig - für jetzt ohne case-spezifische Config
+          null, // SettlerConfig - für case-spezifische Regeln (z.B. HZV Vormonat-Logik)
           job.case.cutoffDate
         );
 

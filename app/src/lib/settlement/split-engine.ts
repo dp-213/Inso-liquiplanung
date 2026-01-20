@@ -1,12 +1,21 @@
 /**
  * Split-Engine für Alt/Neu-Masse-Zuordnung
  *
+ * WICHTIG (Fachliche Regel):
+ * Maßgeblich für die Alt/Neu-Zuordnung ist AUSSCHLIESSLICH die FORDERUNGSENTSTEHUNG,
+ * NICHT das Buchungsdatum (transactionDate)!
+ *
+ * - Altmasse: Forderung entstand VOR Stichtag (Insolvenzantrag)
+ * - Neumasse: Forderung entstand NACH Stichtag
+ *
  * Fallback-Kette für Estate-Allokation:
  * 1. Explizite Vertragsregel (z.B. KV Q4: 1/3-2/3) → VERTRAGSREGEL
  * 2. serviceDate vorhanden → Binär vor/nach Stichtag → SERVICE_DATE_RULE
  * 3. servicePeriod (Start+End) → Zeitanteilige Aufteilung → PERIOD_PRORATA
  * 4. HZV: Monatslogik (Zahlung = Vormonat) → VORMONAT_LOGIK
- * 5. PVS ohne serviceDate → UNKLAR (manuelles Mapping erforderlich)
+ * 5. Keine Leistungs-Info → UNKLAR (manuelle Zuordnung erforderlich)
+ *
+ * Das Buchungsdatum darf NIEMALS als automatischer Fallback verwendet werden!
  */
 
 import { Decimal } from '@prisma/client/runtime/library';

@@ -44,12 +44,13 @@ const ESTATE_ALLOCATION_BADGE_CLASSES: Record<string, string> = {
   UNKLAR: "bg-red-100 text-red-800 border-red-200",
 };
 
+// WICHTIG: Keine TRANSACTION_DATE_RULE - Buchungsdatum ist KEINE gültige Entscheidungsgrundlage
+// für Alt/Neu-Zuordnung. Maßgeblich ist ausschließlich Forderungsentstehung (serviceDate, servicePeriod).
 const ALLOCATION_SOURCE_LABELS: Record<string, string> = {
   VERTRAGSREGEL: "Vertragsregel",
   SERVICE_DATE_RULE: "Leistungsdatum",
   PERIOD_PRORATA: "Zeitanteilig",
-  VORMONAT_LOGIK: "Vormonat-Logik",
-  TRANSACTION_DATE_RULE: "Buchungsdatum",
+  VORMONAT_LOGIK: "Vormonat-Logik (HZV)",
   MANUELL: "Manuell zugeordnet",
   UNKLAR: "Automatische Zuordnung nicht möglich",
 };

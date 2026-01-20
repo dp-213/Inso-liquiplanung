@@ -39,12 +39,15 @@ export type EstateAllocationType = (typeof EstateAllocation)[keyof typeof Estate
  *
  * Wichtig für Revision: Jede Zuordnung muss nachvollziehbar begründet sein.
  *
+ * FACHLICHE REGEL: Maßgeblich ist AUSSCHLIESSLICH die Forderungsentstehung,
+ * NICHT das Buchungsdatum! Es gibt keine TRANSACTION_DATE_RULE.
+ *
  * - VERTRAGSREGEL: Explizite Vertragsregel (z.B. KV Q4: 1/3-2/3)
- * - SERVICE_DATE_RULE: Binär vor/nach Stichtag basierend auf serviceDate
- * - PERIOD_PRORATA: Zeitanteilige Aufteilung basierend auf servicePeriod
+ * - SERVICE_DATE_RULE: Binär vor/nach Stichtag basierend auf serviceDate (Leistungsdatum)
+ * - PERIOD_PRORATA: Zeitanteilige Aufteilung basierend auf servicePeriod (Leistungszeitraum)
  * - VORMONAT_LOGIK: HZV-spezifisch: Zahlung bezieht sich auf Vormonat
  * - MANUELL: Manuelle Zuordnung durch Benutzer
- * - UNKLAR: Keine Regel anwendbar - Review erforderlich
+ * - UNKLAR: Keine Leistungs-Info vorhanden - manuelle Prüfung erforderlich
  */
 export const AllocationSource = {
   VERTRAGSREGEL: 'VERTRAGSREGEL',
