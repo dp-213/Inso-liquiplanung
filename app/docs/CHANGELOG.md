@@ -464,6 +464,106 @@ model ClassificationRule {
 
 ---
 
+## Version 2.2.0 – Alt/Neu-Splitting & Massekredit
+
+**Datum:** 20. Januar 2026
+
+### Neue Funktionen
+
+#### Alt/Neu-Masse-Zuordnung
+- **Estate Allocation:** Jeder LedgerEntry kann als ALTMASSE, NEUMASSE, MIXED oder UNKLAR klassifiziert werden
+- **Allocation Source (Revisionssprache):** Nachvollziehbare Herkunft der Zuordnung:
+  - `VERTRAGSREGEL`: Explizite Vertragsregel (z.B. KV Q4: 1/3-2/3)
+  - `SERVICE_DATE_RULE`: Binär vor/nach Stichtag
+  - `PERIOD_PRORATA`: Zeitanteilige Aufteilung
+  - `VORMONAT_LOGIK`: HZV-spezifisch (Zahlung bezieht sich auf Vormonat)
+  - `MANUELL`: Manuelle Zuordnung durch Benutzer
+  - `UNKLAR`: Keine Regel anwendbar - Review erforderlich
+- **Split-Engine:** Automatische Fallback-Kette für Zuordnung
+
+#### Case-spezifische Konfiguration (HAEVG PLUS eG)
+- **Neues Muster:** `/lib/cases/[case-name]/config.ts` für case-spezifische Regeln
+- **HAEVG PLUS:** Erste Implementierung mit:
+  - Stichtag: 29.10.2025
+  - Abrechnungsstellen: KV Nordrhein, HZV-Vertrag, PVS rhein-ruhr
+  - Banken: Sparkasse Velbert, apobank
+  - Standorte: Velbert, Uckerath, Eitorf
+
+#### Massekredit-Dashboard
+- **Neuer Tab:** "Banken/Massekredit" im Dashboard (nach Übersicht)
+- **KPI-Karten:** Altforderungen brutto, Fortführungsbeitrag, USt, Massekredit Altforderungen
+- **Bank-Tabelle:** Status, Beträge, Cap, Headroom pro Bank
+- **Annahmen-Box:** Transparente Darstellung aller Berechnungsgrundlagen
+- **Warnungen:** Gelb für offene Vereinbarungen, Rot für UNKLAR-Buchungen
+
+#### BankAgreement-Modell
+- **Vereinbarungsstatus:** OFFEN, VERHANDLUNG, VEREINBART
+- **Globalzession:** Flag für Sicherungsrecht
+- **Fortführungsbeitrag:** Rate + USt (nur wenn vereinbart)
+- **Massekredit-Cap:** Optional, nur wenn vertraglich festgelegt
+- **Unsicherheit explizit:** `isUncertain` Flag + Erklärung
+
+### Datenmodell-Erweiterungen
+
+#### LedgerEntry
+```prisma
+// Service Date / Period (für Alt/Neu-Splitting)
+serviceDate         DateTime?
+servicePeriodStart  DateTime?
+servicePeriodEnd    DateTime?
+
+// Estate Allocation
+estateAllocation    String?    // ALTMASSE, NEUMASSE, MIXED, UNKLAR
+estateRatio         Decimal?   // Bei MIXED: Anteil Neumasse (0.0-1.0)
+
+// Allocation Source (Revisionssprache)
+allocationSource    String?    // VERTRAGSREGEL, SERVICE_DATE_RULE, etc.
+allocationNote      String?    // Audit-Trail
+
+// Split Reference
+parentEntryId       String?    // Bei Split: Referenz auf Original
+splitReason         String?
+```
+
+#### Case
+```prisma
+cutoffDate  DateTime?  // Stichtag Insolvenzantrag
+```
+
+#### BankAgreement (NEU)
+```prisma
+model BankAgreement {
+  agreementStatus     String    // OFFEN, VERHANDLUNG, VEREINBART
+  hasGlobalAssignment Boolean
+  contributionRate    Decimal?  // z.B. 0.10 für 10%
+  contributionVatRate Decimal?  // z.B. 0.19
+  creditCapCents      BigInt?
+  isUncertain         Boolean
+  uncertaintyNote     String?
+}
+```
+
+### Neue Module
+
+| Pfad | Beschreibung |
+|------|--------------|
+| `/lib/types/allocation.ts` | Type-Definitionen für Estate Allocation |
+| `/lib/cases/haevg-plus/config.ts` | HAEVG PLUS Konfiguration |
+| `/lib/settlement/split-engine.ts` | Alt/Neu-Split-Engine |
+| `/lib/credit/calculate-massekredit.ts` | Massekredit-Berechnung |
+| `/components/dashboard/MasseCreditTab.tsx` | Dashboard-Komponente |
+| `/api/cases/[id]/massekredit/route.ts` | API-Endpunkt |
+
+### API-Erweiterungen
+- **GET /api/cases/[id]/massekredit** – Berechnet Massekredit-Status für alle Banken
+
+### Technische Entscheidungen
+- **Decimal statt Float** für `estateRatio` – keine Rundungsartefakte
+- **Keine createdBy/updatedBy** auf BankAgreement – wird nur von Gradify gepflegt
+- **Revisionssprache** – alle Zuordnungen sind audit-sicher begründet
+
+---
+
 ## Geplante Änderungen
 
 Keine ausstehenden Änderungen

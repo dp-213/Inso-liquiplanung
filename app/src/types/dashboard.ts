@@ -233,7 +233,9 @@ export type PanelType =
   | "insolvency-effects"
   | "assumptions"
   | "ist-plan-compare"
-  | "version-info";
+  | "version-info"
+  | "massekredit-overview"
+  | "massekredit-per-bank";
 
 export interface PanelConfig {
   type: PanelType;
@@ -264,6 +266,15 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
         { type: "data-source", visible: true, order: 2 },
         { type: "balance-chart", visible: true, order: 3 },
         { type: "liquidity-table", visible: true, order: 4 },
+      ],
+    },
+    {
+      id: "banks",
+      label: "Banken/Massekredit",
+      icon: "bank",
+      panels: [
+        { type: "massekredit-overview", visible: true, order: 1 },
+        { type: "massekredit-per-bank", visible: true, order: 2 },
       ],
     },
     {

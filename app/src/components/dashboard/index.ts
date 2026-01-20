@@ -12,3 +12,4 @@ export { default as DashboardCard } from "./DashboardCard";
 export { default as KPIDisplay } from "./KPIDisplay";
 export { default as CategoryTable } from "./CategoryTable";
 export { default as ChartDisplay } from "./ChartDisplay";
+export { default as MasseCreditTab } from "./MasseCreditTab";

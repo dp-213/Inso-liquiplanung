@@ -256,6 +256,105 @@ Effekt-Änderung → Deterministisches Update der abgeleiteten Entries
 
 ---
 
+## ADR-009: Case-spezifische Konfiguration
+
+**Datum:** 20. Januar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Verschiedene Insolvenzfälle haben unterschiedliche Abrechnungsstellen (KV, HZV, PVS), Banken und Vertragsregeln für Alt/Neu-Splitting. Diese Regeln sind case-spezifisch und können nicht generisch abgebildet werden.
+
+### Entscheidung
+
+Case-spezifische Konfigurationen werden in `/lib/cases/[case-name]/config.ts` abgelegt:
+
+```
+/lib/cases/
+├── haevg-plus/
+│   ├── config.ts    # Abrechnungsstellen, Banken, Split-Regeln
+│   └── index.ts     # Exports
+└── [weitere-cases]/
+```
+
+### Begründung
+
+- **Modellgetrieben:** Jeder Case hat seine eigene "Wahrheit"
+- **Typsicherheit:** TypeScript-Konfiguration statt JSON/YAML
+- **Versionierbar:** Änderungen sind im Git-History nachvollziehbar
+- **Testbar:** Sanity-Checks pro Case möglich
+
+### Konsequenzen
+
+- Für jeden neuen Case wird ein Verzeichnis angelegt
+- Änderungen an Vertragsregeln erfordern Code-Deployment
+- Keine Runtime-Konfiguration durch User (bewusst)
+
+---
+
+## ADR-010: Alt/Neu-Splitting mit Fallback-Kette
+
+**Datum:** 20. Januar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Buchungen müssen für Revision nachvollziehbar der Alt- oder Neumasse zugeordnet werden. Die Herkunft der Zuordnung (Revisionssprache) muss dokumentiert sein.
+
+### Entscheidung
+
+Die Split-Engine verwendet eine deterministische Fallback-Kette:
+
+1. **VERTRAGSREGEL** – Explizite Vertragsregel (z.B. KV Q4: 1/3-2/3)
+2. **SERVICE_DATE_RULE** – serviceDate vorhanden → binär vor/nach Stichtag
+3. **PERIOD_PRORATA** – servicePeriod vorhanden → zeitanteilige Aufteilung
+4. **VORMONAT_LOGIK** – HZV-spezifisch: Zahlung bezieht sich auf Vormonat
+5. **UNKLAR** – Keine Regel anwendbar → manuelle Prüfung erforderlich
+
+Jede Zuordnung wird mit `allocationSource` und `allocationNote` dokumentiert.
+
+### Begründung
+
+- **Revisionssprache:** Jede Zuordnung ist begründet und nachvollziehbar
+- **Hierarchie:** Explizite Regeln haben Vorrang vor automatischer Berechnung
+- **Transparenz:** UNKLAR-Status macht offene Fragen sichtbar
+- **Keine stillen Annahmen:** Wenn keine Regel greift → UNKLAR (nicht stillschweigend Altmasse)
+
+### Konsequenzen
+
+- `estateAllocation`, `allocationSource`, `allocationNote` an LedgerEntry
+- `estateRatio` als Decimal (nicht Float) für Präzision
+- UNKLAR-Buchungen werden im Dashboard rot markiert
+
+---
+
+## ADR-011: Keine User-Attribution auf BankAgreement
+
+**Datum:** 20. Januar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+BankAgreements erfassen Vereinbarungen mit Banken (Globalzession, Fortführungsbeitrag, etc.). Die Frage war, ob `createdBy` und `updatedBy` Felder benötigt werden.
+
+### Entscheidung
+
+BankAgreement hat KEINE `createdBy`/`updatedBy` Felder. Nur `createdAt`/`updatedAt` für technisches Tracking.
+
+### Begründung
+
+- **Gradify-only:** BankAgreements werden ausschließlich von Gradify (uns) gepflegt, nicht kollaborativ
+- **Kein fachlicher Mehrwert:** Es gibt keine User-Zuordnung, die Revision benötigt
+- **Technische Einfachheit:** Seeds, Imports und API-Calls ohne User-Context funktionieren problemlos
+- **Audit erfolgt anders:** Über `allocationSource`/`allocationNote` auf LedgerEntry und `LedgerAuditLog`
+
+### Konsequenzen
+
+- BankAgreement kann ohne User-Context erstellt/aktualisiert werden
+- Keine Komplexität bei Seed-Skripten oder automatischen Importen
+
+---
+
 ## Template für neue Entscheidungen
 
 ```markdown

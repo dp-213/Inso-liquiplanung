@@ -1,7 +1,7 @@
 # System-Architektur
 
-**Version:** 2.1.0
-**Stand:** 19. Januar 2026
+**Version:** 2.2.0
+**Stand:** 20. Januar 2026
 
 ---
 
@@ -80,6 +80,23 @@ model LedgerEntry {
   valueType         String   // IST | PLAN
   legalBucket       String   // MASSE | ABSONDERUNG | NEUTRAL | UNKNOWN
 
+  // === SERVICE DATE / PERIOD (für Alt/Neu-Splitting) ===
+  serviceDate         DateTime?  // Leistungsdatum
+  servicePeriodStart  DateTime?  // Beginn Leistungszeitraum
+  servicePeriodEnd    DateTime?  // Ende Leistungszeitraum
+
+  // === ESTATE ALLOCATION (Alt/Neu-Masse) ===
+  estateAllocation    String?    // ALTMASSE | NEUMASSE | MIXED | UNKLAR
+  estateRatio         Decimal?   // Bei MIXED: Anteil Neumasse (0.0-1.0)
+
+  // === ALLOCATION SOURCE (Revisionssprache) ===
+  allocationSource    String?    // VERTRAGSREGEL | SERVICE_DATE_RULE | etc.
+  allocationNote      String?    // Audit-Trail
+
+  // === SPLIT REFERENCE ===
+  parentEntryId       String?    // Bei Split: Referenz auf Original
+  splitReason         String?
+
   // Dimensionen (finale Werte)
   bankAccountId     String?
   counterpartyId    String?
@@ -111,6 +128,35 @@ model LedgerEntry {
   createdAt         DateTime @default(now())
   createdBy         String
   updatedAt         DateTime @updatedAt
+}
+```
+
+### BankAgreement (Bankvereinbarungen)
+
+```prisma
+model BankAgreement {
+  id                  String    @id
+  caseId              String
+  bankAccountId       String
+
+  // Status
+  agreementStatus     String    // OFFEN | VERHANDLUNG | VEREINBART
+  agreementDate       DateTime?
+  agreementNote       String?
+
+  // Globalzession
+  hasGlobalAssignment Boolean   @default(false)
+
+  // Fortführungsbeitrag (nur wenn vereinbart!)
+  contributionRate    Decimal?  // z.B. 0.10 für 10%
+  contributionVatRate Decimal?  // z.B. 0.19
+
+  // Massekredit-Cap (nur wenn vertraglich festgelegt!)
+  creditCapCents      BigInt?
+
+  // Unsicherheit explizit markieren
+  isUncertain         Boolean   @default(true)
+  uncertaintyNote     String?
 }
 ```
 
@@ -288,9 +334,20 @@ LedgerEntry (UNREVIEWED)
 │       ├── classification/           # Rule Engine
 │       │   ├── engine.ts
 │       │   └── types.ts
+│       ├── types/                    # Zentrale Type-Definitionen
+│       │   └── allocation.ts         # Estate Allocation, AllocationSource
+│       ├── cases/                    # Case-spezifische Konfigurationen
+│       │   └── haevg-plus/           # HAEVG PLUS eG
+│       │       └── config.ts         # Abrechnungsstellen, Banken, Split-Regeln
+│       ├── settlement/               # Settlement-Logik
+│       │   └── split-engine.ts       # Alt/Neu-Splitting
+│       ├── credit/                   # Massekredit-Logik
+│       │   └── calculate-massekredit.ts
 │       └── calculation-engine.ts     # Berechnungen
 ├── prisma/
 │   └── schema.prisma                 # Datenbank-Schema
+├── scripts/                          # Utility-Skripte
+│   └── sanity-check-allocation.ts    # Alt/Neu-Allokation testen
 └── docs/                             # Dokumentation
     ├── CHANGELOG.md
     ├── ARCHITECTURE.md               # Diese Datei

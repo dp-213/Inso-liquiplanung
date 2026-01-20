@@ -81,6 +81,8 @@ npx prisma db push   # Sync database schema
 **LedgerEntry ist Single Source of Truth** – Alle Buchungen sind LedgerEntries mit:
 - Steuerungsdimensionen: `valueType` (IST/PLAN), `legalBucket` (MASSE/ABSONDERUNG/NEUTRAL)
 - Dimensionen: `bankAccountId`, `counterpartyId`, `locationId`
+- Estate Allocation: `estateAllocation` (ALTMASSE/NEUMASSE/MIXED/UNKLAR), `estateRatio`
+- Revisionssprache: `allocationSource`, `allocationNote` (Audit-Trail)
 - Klassifikations-Vorschläge: `suggestedLegalBucket`, `suggestedCounterpartyId`, etc.
 - Governance: `reviewStatus` (UNREVIEWED/CONFIRMED/ADJUSTED)
 
@@ -88,6 +90,15 @@ npx prisma db push   # Sync database schema
 - `ClassificationRule` matcht auf Beschreibung/Betrag
 - Erstellt nur Vorschläge (`suggested*`), nie Auto-Commit
 - `matchCounterpartyPatterns()` für automatische Gegenpartei-Erkennung
+
+**Split-Engine** – Alt/Neu-Masse-Zuordnung (`/lib/settlement/split-engine.ts`):
+- Fallback-Kette: VERTRAGSREGEL → SERVICE_DATE_RULE → PERIOD_PRORATA → VORMONAT_LOGIK → UNKLAR
+- Revisionssprache: Jede Zuordnung ist begründet und nachvollziehbar
+
+**Case-spezifische Konfiguration** – Jeder Fall hat eigene Regeln (`/lib/cases/[case-name]/config.ts`):
+- Abrechnungsstellen (KV, HZV, PVS) mit Split-Regeln
+- Banken mit Vereinbarungsstatus
+- Standorte mit Bank-Zuordnung
 
 ## Key Patterns & Conventions
 
