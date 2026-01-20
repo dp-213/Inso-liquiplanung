@@ -460,8 +460,14 @@ export async function GET(
     return NextResponse.json(response);
   } catch (error) {
     console.error("Error fetching admin dashboard:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unbekannter Fehler";
+    const errorStack = error instanceof Error ? error.stack : undefined;
     return NextResponse.json(
-      { error: "Fehler beim Laden der Dashboard-Daten" },
+      {
+        error: "Fehler beim Laden der Dashboard-Daten",
+        details: errorMessage,
+        stack: process.env.NODE_ENV === "development" ? errorStack : undefined,
+      },
       { status: 500 }
     );
   }
