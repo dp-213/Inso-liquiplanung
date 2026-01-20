@@ -21,7 +21,10 @@ export default function AdminDashboardPage() {
         const response = await fetch(`/api/cases/${caseId}/dashboard`);
         if (!response.ok) {
           const errorData = await response.json();
-          setError(errorData.error || "Fehler beim Laden der Daten");
+          const errorMsg = errorData.details
+            ? `${errorData.error}: ${errorData.details}`
+            : errorData.error || "Fehler beim Laden der Daten";
+          setError(errorMsg);
           return;
         }
         const dashboardData = await response.json();
