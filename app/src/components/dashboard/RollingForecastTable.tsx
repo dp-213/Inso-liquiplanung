@@ -20,6 +20,10 @@ interface ForecastData {
   openingBalanceCents: string;
   todayPeriodIndex: number;
   periods: ForecastPeriod[];
+  // Filter info
+  includeUnreviewed: boolean;
+  unreviewedCount: number;
+  totalEntryCount: number;
 }
 
 interface RollingForecastTableProps {
@@ -81,6 +85,7 @@ export default function RollingForecastTable({
   const [data, setData] = useState<ForecastData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [includeUnreviewed, setIncludeUnreviewed] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -88,7 +93,8 @@ export default function RollingForecastTable({
       setError(null);
 
       try {
-        const res = await fetch(`/api/cases/${caseId}/ledger/rolling-forecast`);
+        const url = `/api/cases/${caseId}/ledger/rolling-forecast?includeUnreviewed=${includeUnreviewed}`;
+        const res = await fetch(url);
         if (res.ok) {
           const result = await res.json();
           setData(result);
@@ -104,7 +110,7 @@ export default function RollingForecastTable({
     }
 
     fetchData();
-  }, [caseId]);
+  }, [caseId, includeUnreviewed]);
 
   if (loading) {
     return (
@@ -122,8 +128,67 @@ export default function RollingForecastTable({
     );
   }
 
+  const hasUnreviewedData = data.unreviewedCount > 0;
+  const showingUnreviewed = data.includeUnreviewed && hasUnreviewedData;
+
   return (
     <div className="overflow-x-auto">
+      {/* Filter Toggle */}
+      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={includeUnreviewed}
+              onChange={(e) => setIncludeUnreviewed(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-[var(--primary)] focus:ring-[var(--primary)]"
+            />
+            <span className="text-sm text-gray-700">
+              Ungeprüfte Buchungen einbeziehen
+            </span>
+          </label>
+          {hasUnreviewedData && (
+            <span className="text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+              {data.unreviewedCount} ungeprüft
+            </span>
+          )}
+        </div>
+        <div className="text-xs text-gray-500">
+          {data.totalEntryCount} Buchungen geladen
+        </div>
+      </div>
+
+      {/* Warning when showing unreviewed data */}
+      {showingUnreviewed && (
+        <div className="mx-4 mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2">
+          <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div>
+            <p className="text-sm font-medium text-amber-800">
+              Achtung: Ungeprüfte Daten enthalten
+            </p>
+            <p className="text-xs text-amber-700 mt-1">
+              Diese Ansicht enthält {data.unreviewedCount} Buchungen, die noch nicht geprüft wurden.
+              Die Zahlen können sich nach der Prüfung ändern.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Empty state when no data and not including unreviewed */}
+      {!includeUnreviewed && data.totalEntryCount === 0 && hasUnreviewedData && (
+        <div className="mx-4 mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+          <p className="text-sm text-blue-800">
+            Keine bestätigten Buchungen vorhanden.
+          </p>
+          <p className="text-xs text-blue-600 mt-1">
+            Es gibt {data.unreviewedCount} ungeprüfte Buchungen.
+            Aktiviere &quot;Ungeprüfte Buchungen einbeziehen&quot; um diese anzuzeigen.
+          </p>
+        </div>
+      )}
+
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b-2 border-gray-200">

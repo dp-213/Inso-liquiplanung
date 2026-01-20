@@ -835,6 +835,11 @@ export interface RollingForecastResult {
   totalIstPeriods: number;
   totalPlanPeriods: number;
   todayPeriodIndex: number;  // Which period contains "today"
+
+  // Filter info
+  includeUnreviewed: boolean;  // Whether unreviewed entries are included
+  unreviewedCount: number;      // Number of unreviewed entries (for warning)
+  totalEntryCount: number;      // Total entries used in calculation
 }
 
 /**
@@ -848,11 +853,19 @@ export interface RollingForecastResult {
  *
  * The forecast "rolls" automatically as new IST data comes in
  */
+export interface RollingForecastOptions {
+  /** Include UNREVIEWED entries (default: false = only CONFIRMED/ADJUSTED) */
+  includeUnreviewed?: boolean;
+}
+
 export async function aggregateRollingForecast(
   prisma: PrismaClient,
   caseId: string,
-  planId: string
+  planId: string,
+  options: RollingForecastOptions = {}
 ): Promise<RollingForecastResult> {
+  const { includeUnreviewed = false } = options;
+
   // 1. Load plan with latest version for opening balance
   const plan = await prisma.liquidityPlan.findUnique({
     where: { id: planId },
@@ -875,11 +888,24 @@ export async function aggregateRollingForecast(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // 2. Load all LedgerEntries
+  // 2. Load LedgerEntries based on filter setting
   const entries = await prisma.ledgerEntry.findMany({
-    where: { caseId },
+    where: {
+      caseId,
+      ...(includeUnreviewed
+        ? {} // All entries
+        : { reviewStatus: { in: ['CONFIRMED', 'ADJUSTED'] } } // Only reviewed
+      ),
+    },
     orderBy: { transactionDate: 'asc' },
   });
+
+  // Count unreviewed entries for statistics (even if not included)
+  const unreviewedCount = includeUnreviewed
+    ? entries.filter((e) => e.reviewStatus === 'UNREVIEWED').length
+    : await prisma.ledgerEntry.count({
+        where: { caseId, reviewStatus: 'UNREVIEWED' },
+      });
 
   // 3. Initialize periods
   const periods: RollingForecastPeriod[] = [];
@@ -1015,6 +1041,10 @@ export async function aggregateRollingForecast(
     totalIstPeriods,
     totalPlanPeriods,
     todayPeriodIndex,
+    // Filter info
+    includeUnreviewed,
+    unreviewedCount,
+    totalEntryCount: entries.length,
   };
 }
 

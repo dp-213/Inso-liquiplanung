@@ -47,6 +47,10 @@ export async function GET(
 
     const { id: caseId } = await params;
 
+    // Parse query parameters
+    const { searchParams } = new URL(request.url);
+    const includeUnreviewed = searchParams.get('includeUnreviewed') === 'true';
+
     // Get active plan for case
     const plan = await prisma.liquidityPlan.findFirst({
       where: { caseId, isActive: true },
@@ -60,8 +64,10 @@ export async function GET(
       );
     }
 
-    // Aggregate rolling forecast
-    const result = await aggregateRollingForecast(prisma, caseId, plan.id);
+    // Aggregate rolling forecast with filter option
+    const result = await aggregateRollingForecast(prisma, caseId, plan.id, {
+      includeUnreviewed,
+    });
 
     // Serialize BigInt values
     const serialized = {
@@ -74,6 +80,10 @@ export async function GET(
       totalPlanPeriods: result.totalPlanPeriods,
       periodType: plan.periodType,
       periodCount: plan.periodCount,
+      // Filter info for UI
+      includeUnreviewed: result.includeUnreviewed,
+      unreviewedCount: result.unreviewedCount,
+      totalEntryCount: result.totalEntryCount,
       periods: result.periods.map((p) => ({
         periodIndex: p.periodIndex,
         periodLabel: p.periodLabel,
