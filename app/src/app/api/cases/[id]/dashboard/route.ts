@@ -401,7 +401,9 @@ export async function GET(
           netCashflowCents: period.netCashflowCents.toString(),
           closingBalanceCents: period.closingBalanceCents.toString(),
           // Alt/Neu aus estateAllocation (nur bei LedgerEntry-Aggregation)
-          ...(period.inflowsAltmasseCents !== undefined ? {
+          // WICHTIG: Check auf inflowsUnklarCents, da das Feld NUR bei LedgerEntry-Aggregation existiert
+          // (Legacy calculateLiquidityPlan hat KEIN inflowsUnklarCents)
+          ...(period.inflowsUnklarCents !== undefined ? {
             inflowsAltmasseCents: period.inflowsAltmasseCents.toString(),
             inflowsNeumasseCents: period.inflowsNeumasseCents.toString(),
             outflowsAltmasseCents: period.outflowsAltmasseCents.toString(),
@@ -421,7 +423,8 @@ export async function GET(
           netCashflowCents: period.netCashflowCents.toString(),
           closingBalanceCents: period.closingBalanceCents.toString(),
           // Alt/Neu aus estateAllocation (nur bei LedgerEntry-Aggregation)
-          ...(period.inflowsAltmasseCents !== undefined ? {
+          // WICHTIG: Check auf inflowsUnklarCents, da das Feld NUR bei LedgerEntry-Aggregation existiert
+          ...(period.inflowsUnklarCents !== undefined ? {
             inflowsAltmasseCents: period.inflowsAltmasseCents.toString(),
             inflowsNeumasseCents: period.inflowsNeumasseCents.toString(),
             outflowsAltmasseCents: period.outflowsAltmasseCents.toString(),
