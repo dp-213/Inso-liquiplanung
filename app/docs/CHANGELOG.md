@@ -639,6 +639,61 @@ Neue stabile Struktur für Import-Daten:
 
 ---
 
+## Version 2.4.0 – Alt/Neu-Massezuordnung Integration
+
+**Datum:** 20. Januar 2026
+
+### Neue Funktionen
+
+#### Case-Konfiguration: Stichtag editierbar
+- **Stichtag-Feld:** Im Case-Bearbeitungsformular kann der Stichtag (cutoffDate) gesetzt werden
+- **Info-Box:** Erklärt die Bedeutung des Stichtags für Alt/Neu-Zuordnung
+- **Validierung:** Datumsfeld mit Standard-HTML5-Datepicker
+
+#### Import-Pipeline: Split-Engine Integration
+- **Automatische Zuordnung:** Beim Import (to-ledger API) wird die Split-Engine automatisch aufgerufen
+- **Estate Allocation:** Setzt `estateAllocation`, `estateRatio`, `allocationSource` auf LedgerEntry
+- **Response-Info:** `estateAllocated` Counter zeigt Anzahl zugeordneter Einträge
+- **Fallback:** `TRANSACTION_DATE_RULE` wenn kein cutoffDate oder keine Counterparty-Config
+
+#### Ledger-Liste: Alt/Neu-Spalte & Filter
+- **Neue Spalte:** "Alt/Neu" zeigt Massezuordnung mit farbigen Badges
+- **Badge-Farben:**
+  - Grün: Altmasse
+  - Blau: Neumasse
+  - Lila: Gemischt (mit Verhältnis)
+  - Gelb: Unklar (erfordert manuelle Prüfung)
+- **Filter-Dropdown:** Filtern nach Massezuordnung
+
+#### Ledger-Detail: Manuelle Zuordnung
+- **Anzeige:** Aktuelle Zuordnung mit Quelle und Begründung
+- **Override:** Manuelle Überschreibung setzt automatisch `MANUELL` als Quelle
+- **Transparenz:** Zeigt warum Zuordnung erfolgte (Regel, Datum, etc.)
+
+### API-Änderungen
+
+#### PUT /api/cases/[id]
+- Neues Feld: `cutoffDate` akzeptiert
+
+#### GET/PUT /api/cases/[id]/ledger/[entryId]
+- Gibt `estateAllocation`, `estateRatio`, `allocationSource`, `allocationNote` zurück
+- PUT akzeptiert manuelle Änderungen dieser Felder
+
+#### GET /api/cases/[id]/ledger
+- Neuer Filter: `estateAllocation` (ALTMASSE, NEUMASSE, MIXED, UNKLAR)
+- Gibt Estate Allocation Felder für alle Einträge zurück
+
+### Type-System
+- **LedgerEntryResponse:** Erweitert um Estate Allocation Felder
+- Alle `serializeLedgerEntry` Funktionen konsistent aktualisiert
+
+### Technische Details
+- Split-Engine aus `/lib/settlement/split-engine.ts` integriert
+- Types aus `/lib/types/allocation.ts` importiert
+- Keine neuen Schema-Änderungen (nutzt bestehende Felder aus 2.2.0)
+
+---
+
 ## Geplante Änderungen
 
 Keine ausstehenden Änderungen
