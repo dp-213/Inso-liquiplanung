@@ -267,8 +267,14 @@ export async function GET(
     });
   } catch (error) {
     console.error("Massekredit API Fehler:", error);
+    const errorMessage = error instanceof Error ? error.message : "Unbekannter Fehler";
+    const errorStack = error instanceof Error ? error.stack : undefined;
     return NextResponse.json(
-      { error: "Interner Serverfehler" },
+      {
+        error: "Interner Serverfehler",
+        details: errorMessage,
+        stack: process.env.NODE_ENV === "development" ? errorStack : undefined,
+      },
       { status: 500 }
     );
   }
