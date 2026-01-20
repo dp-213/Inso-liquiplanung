@@ -10,6 +10,7 @@ import { ConfigurableDashboard } from "@/components/dashboard";
 import EditableCategoryTable from "@/components/admin/EditableCategoryTable";
 import PlanStructureManager from "@/components/admin/PlanStructureManager";
 import LedgerDrillDownModal from "@/components/admin/LedgerDrillDownModal";
+import EstateAllocationSummary from "@/components/admin/EstateAllocationSummary";
 
 interface ConfigResponse {
   success: boolean;
@@ -91,6 +92,17 @@ export default function CaseDashboardPage({
   const [showStructureManager, setShowStructureManager] = useState(false);
   const [metadata, setMetadata] = useState<ConfigResponse["metadata"] | null>(null);
   const [drillDownPeriod, setDrillDownPeriod] = useState<number | null>(null);
+  // Estate Allocation (Alt/Neu aus Leistungsdatum)
+  const [estateAllocation, setEstateAllocation] = useState<{
+    totalAltmasseInflowsCents: string;
+    totalAltmasseOutflowsCents: string;
+    totalNeumasseInflowsCents: string;
+    totalNeumasseOutflowsCents: string;
+    totalUnklarInflowsCents: string;
+    totalUnklarOutflowsCents: string;
+    unklarCount: number;
+    warnings: { type: string; severity: string; message: string; count: number; totalCents: string }[];
+  } | null>(null);
 
   // Load config and calculate
   const loadData = useCallback(async () => {
@@ -114,6 +126,22 @@ export default function CaseDashboardPage({
         throw new Error(errData.error || "Calculation failed");
       }
       const calcData = await calcRes.json();
+
+      // Load estate allocation data from dashboard API (for Alt/Neu warnings)
+      try {
+        const dashboardRes = await fetch(`/api/cases/${id}/dashboard`, {
+          credentials: "include",
+        });
+        if (dashboardRes.ok) {
+          const dashboardData = await dashboardRes.json();
+          if (dashboardData.estateAllocation) {
+            setEstateAllocation(dashboardData.estateAllocation);
+          }
+        }
+      } catch {
+        // Estate allocation is optional, don't fail if it doesn't load
+        console.warn("Could not load estate allocation data");
+      }
 
       // Find minimum balance week
       let minBalanceWeek = 0;
@@ -469,6 +497,11 @@ export default function CaseDashboardPage({
             </span>
           </span>
         </div>
+      )}
+
+      {/* Estate Allocation Summary (Alt/Neu aus Leistungsdatum) */}
+      {estateAllocation && !editMode && (
+        <EstateAllocationSummary caseId={id} data={estateAllocation} />
       )}
 
       {/* Dashboard */}

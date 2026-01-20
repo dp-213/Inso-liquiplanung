@@ -6,7 +6,7 @@
  */
 
 import { PrismaClient, ClassificationRule, LedgerEntry } from '@prisma/client';
-import { ClassificationSuggestion, MatchType, MATCH_TYPES } from './types';
+import { ClassificationSuggestion, MatchType, MATCH_TYPES, ServiceDateRule, SERVICE_DATE_RULES } from './types';
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -70,6 +70,99 @@ function getBaseConfidence(matchType: string): number {
       return 0.6; // Betragsbereich = niedrigere Confidence
     default:
       return 0.5;
+  }
+}
+
+// =============================================================================
+// SERVICE DATE CALCULATION (Phase C)
+// =============================================================================
+
+interface ServiceDateResult {
+  serviceDate?: Date;
+  servicePeriodStart?: Date;
+  servicePeriodEnd?: Date;
+  explanation: string;
+}
+
+/**
+ * Berechnet das Leistungsdatum basierend auf der Regel und dem Transaktionsdatum.
+ *
+ * VORMONAT: Zahlung bezieht sich auf Vormonat
+ *   - Dezember-Zahlung → Leistungsdatum: 15. November (Monatsmitte)
+ *
+ * SAME_MONTH: Zahlung = Leistungsmonat
+ *   - Dezember-Zahlung → Leistungsdatum: 15. Dezember (Monatsmitte)
+ *
+ * PREVIOUS_QUARTER: Zahlung bezieht sich auf Vorquartal
+ *   - Januar-Zahlung → Leistungszeitraum: 1.10 - 31.12 (Q4)
+ *   - April-Zahlung → Leistungszeitraum: 1.1 - 31.3 (Q1)
+ */
+export function calculateServiceDate(
+  transactionDate: Date,
+  rule: ServiceDateRule
+): ServiceDateResult {
+  const year = transactionDate.getFullYear();
+  const month = transactionDate.getMonth(); // 0-indexed (0 = Januar)
+
+  switch (rule) {
+    case SERVICE_DATE_RULES.VORMONAT: {
+      // Vormonat: Monatsmitte des Vormonats
+      let targetMonth = month - 1;
+      let targetYear = year;
+      if (targetMonth < 0) {
+        targetMonth = 11; // Dezember
+        targetYear = year - 1;
+      }
+      const serviceDate = new Date(targetYear, targetMonth, 15);
+      const monthName = serviceDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+      return {
+        serviceDate,
+        explanation: `Vormonat-Regel: Leistungsdatum ${monthName}`,
+      };
+    }
+
+    case SERVICE_DATE_RULES.SAME_MONTH: {
+      // Gleicher Monat: Monatsmitte
+      const serviceDate = new Date(year, month, 15);
+      const monthName = serviceDate.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+      return {
+        serviceDate,
+        explanation: `Gleicher-Monat-Regel: Leistungsdatum ${monthName}`,
+      };
+    }
+
+    case SERVICE_DATE_RULES.PREVIOUS_QUARTER: {
+      // Vorquartal als Zeitraum
+      // Q1 (Jan-Mär) → Zahlung in Q2 (Apr-Jun)
+      // Q2 (Apr-Jun) → Zahlung in Q3 (Jul-Sep)
+      // Q3 (Jul-Sep) → Zahlung in Q4 (Okt-Dez)
+      // Q4 (Okt-Dez) → Zahlung in Q1 nächstes Jahr (Jan-Mär)
+      const currentQuarter = Math.floor(month / 3); // 0=Q1, 1=Q2, 2=Q3, 3=Q4
+      let prevQuarter = currentQuarter - 1;
+      let targetYear = year;
+      if (prevQuarter < 0) {
+        prevQuarter = 3; // Q4
+        targetYear = year - 1;
+      }
+
+      // Quartals-Start/Ende berechnen
+      const quarterStartMonth = prevQuarter * 3; // 0, 3, 6, 9
+      const quarterEndMonth = quarterStartMonth + 2; // 2, 5, 8, 11
+      const quarterEndDay = new Date(targetYear, quarterEndMonth + 1, 0).getDate(); // Letzter Tag des Monats
+
+      const servicePeriodStart = new Date(targetYear, quarterStartMonth, 1);
+      const servicePeriodEnd = new Date(targetYear, quarterEndMonth, quarterEndDay);
+
+      const quarterLabel = `Q${prevQuarter + 1}/${targetYear}`;
+      return {
+        servicePeriodStart,
+        servicePeriodEnd,
+        explanation: `Vorquartal-Regel: Leistungszeitraum ${quarterLabel} (${servicePeriodStart.toLocaleDateString('de-DE')} - ${servicePeriodEnd.toLocaleDateString('de-DE')})`,
+      };
+    }
+
+    default:
+      return { explanation: 'Unbekannte Service-Date-Regel' };
   }
 }
 
@@ -150,6 +243,15 @@ export async function classifyEntry(
       const baseConfidence = getBaseConfidence(rule.matchType);
       const confidence = Math.min(1.0, baseConfidence + rule.confidenceBonus);
 
+      // Service-Date berechnen wenn Regel vorhanden
+      let serviceDateResult: ServiceDateResult | undefined;
+      if (rule.assignServiceDateRule) {
+        serviceDateResult = calculateServiceDate(
+          entry.transactionDate,
+          rule.assignServiceDateRule as ServiceDateRule
+        );
+      }
+
       return {
         ruleId: rule.id,
         ruleName: rule.name,
@@ -161,8 +263,15 @@ export async function classifyEntry(
         assignBankAccountId: rule.assignBankAccountId || undefined,
         assignCounterpartyId: rule.assignCounterpartyId || undefined,
         assignLocationId: rule.assignLocationId || undefined,
+        // Service-Date-Vorschlag (Phase C)
+        assignServiceDateRule: rule.assignServiceDateRule as ServiceDateRule | undefined,
+        suggestedServiceDate: serviceDateResult?.serviceDate,
+        suggestedServicePeriodStart: serviceDateResult?.servicePeriodStart,
+        suggestedServicePeriodEnd: serviceDateResult?.servicePeriodEnd,
         confidence,
-        matchDetails: buildMatchDetails(rule, entry),
+        matchDetails: serviceDateResult
+          ? `${buildMatchDetails(rule, entry)} | ${serviceDateResult.explanation}`
+          : buildMatchDetails(rule, entry),
       };
     }
   }
@@ -248,6 +357,15 @@ export async function classifyBatch(
           const baseConfidence = getBaseConfidence(rule.matchType);
           const confidence = Math.min(1.0, baseConfidence + rule.confidenceBonus);
 
+          // Service-Date berechnen wenn Regel vorhanden
+          let serviceDateResult: ServiceDateResult | undefined;
+          if (rule.assignServiceDateRule) {
+            serviceDateResult = calculateServiceDate(
+              entry.transactionDate,
+              rule.assignServiceDateRule as ServiceDateRule
+            );
+          }
+
           suggestion = {
             ruleId: rule.id,
             ruleName: rule.name,
@@ -259,15 +377,22 @@ export async function classifyBatch(
             assignBankAccountId: rule.assignBankAccountId || undefined,
             assignCounterpartyId: rule.assignCounterpartyId || undefined,
             assignLocationId: rule.assignLocationId || undefined,
+            // Service-Date-Vorschlag (Phase C)
+            assignServiceDateRule: rule.assignServiceDateRule as ServiceDateRule | undefined,
+            suggestedServiceDate: serviceDateResult?.serviceDate,
+            suggestedServicePeriodStart: serviceDateResult?.servicePeriodStart,
+            suggestedServicePeriodEnd: serviceDateResult?.servicePeriodEnd,
             confidence,
-            matchDetails: buildMatchDetails(rule, entry),
+            matchDetails: serviceDateResult
+              ? `${buildMatchDetails(rule, entry)} | ${serviceDateResult.explanation}`
+              : buildMatchDetails(rule, entry),
           };
           break; // Erste Regel (höchste Priorität) gewinnt
         }
       }
 
       if (suggestion) {
-        // Schreibe Vorschlag an LedgerEntry (inkl. Dimensions-Vorschläge)
+        // Schreibe Vorschlag an LedgerEntry (inkl. Dimensions- und Service-Date-Vorschläge)
         await prisma.ledgerEntry.update({
           where: { id: entry.id },
           data: {
@@ -280,6 +405,11 @@ export async function classifyBatch(
             suggestedBankAccountId: suggestion.assignBankAccountId || null,
             suggestedCounterpartyId: suggestion.assignCounterpartyId || null,
             suggestedLocationId: suggestion.assignLocationId || null,
+            // Service-Date-Vorschläge (Phase C)
+            suggestedServiceDate: suggestion.suggestedServiceDate || null,
+            suggestedServicePeriodStart: suggestion.suggestedServicePeriodStart || null,
+            suggestedServicePeriodEnd: suggestion.suggestedServicePeriodEnd || null,
+            suggestedServiceDateRule: suggestion.assignServiceDateRule || null,
           },
         });
         classified++;
@@ -307,7 +437,7 @@ export async function reclassifyUnreviewed(
   prisma: PrismaClient,
   caseId: string
 ): Promise<{ classified: number; unchanged: number; errors: number }> {
-  // Setze alle Vorschläge für UNREVIEWED Entries zurück (inkl. Dimensions)
+  // Setze alle Vorschläge für UNREVIEWED Entries zurück (inkl. Dimensions und Service-Date)
   await prisma.ledgerEntry.updateMany({
     where: {
       caseId,
@@ -322,6 +452,11 @@ export async function reclassifyUnreviewed(
       suggestedBankAccountId: null,
       suggestedCounterpartyId: null,
       suggestedLocationId: null,
+      // Service-Date-Vorschläge (Phase C)
+      suggestedServiceDate: null,
+      suggestedServicePeriodStart: null,
+      suggestedServicePeriodEnd: null,
+      suggestedServiceDateRule: null,
     },
   });
 

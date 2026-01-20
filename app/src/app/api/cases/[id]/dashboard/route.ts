@@ -106,6 +106,18 @@ export async function GET(
     let result;
     let useLedgerAggregation = false;
 
+    // Variablen für Alt/Neu und Warnungen (nur bei LedgerEntry-Aggregation)
+    let estateAllocationData: {
+      totalAltmasseInflowsCents: bigint;
+      totalAltmasseOutflowsCents: bigint;
+      totalNeumasseInflowsCents: bigint;
+      totalNeumasseOutflowsCents: bigint;
+      totalUnklarInflowsCents: bigint;
+      totalUnklarOutflowsCents: bigint;
+      unklarCount: number;
+      warnings: { type: string; severity: string; message: string; count: number; totalCents: string }[];
+    } | null = null;
+
     if (ledgerEntryCount > 0) {
       // NEW: Use LedgerEntry aggregation
       useLedgerAggregation = true;
@@ -118,7 +130,20 @@ export async function GET(
       );
       const legacyFormat = convertToLegacyFormat(aggregation);
 
+      // Speichere Alt/Neu-Daten für Response
+      estateAllocationData = {
+        totalAltmasseInflowsCents: aggregation.totalAltmasseInflowsCents,
+        totalAltmasseOutflowsCents: aggregation.totalAltmasseOutflowsCents,
+        totalNeumasseInflowsCents: aggregation.totalNeumasseInflowsCents,
+        totalNeumasseOutflowsCents: aggregation.totalNeumasseOutflowsCents,
+        totalUnklarInflowsCents: aggregation.totalUnklarInflowsCents,
+        totalUnklarOutflowsCents: aggregation.totalUnklarOutflowsCents,
+        unklarCount: aggregation.unklarCount,
+        warnings: legacyFormat.warnings,
+      };
+
       // Convert to calculation result format
+      // WICHTIG: Alt/Neu kommt aus estateAllocation (Leistungsdatum), NICHT aus legalBucket!
       result = {
         openingBalanceCents: aggregation.openingBalanceCents,
         periodType: aggregation.periodType,
@@ -133,11 +158,19 @@ export async function GET(
           totalOutflowsCents: p.totalOutflowsCents,
           netCashflowCents: p.netCashflowCents,
           closingBalanceCents: p.closingBalanceCents,
+          // Alt/Neu aus estateAllocation (NICHT aus legalBucket!)
+          inflowsAltmasseCents: p.altmasseInflowsCents,
+          inflowsNeumasseCents: p.neumasseInflowsCents,
+          outflowsAltmasseCents: p.altmasseOutflowsCents,
+          outflowsNeumasseCents: p.neumasseOutflowsCents,
+          // UNKLAR - NICHT in Alt/Neu verteilt!
+          inflowsUnklarCents: p.unklarInflowsCents,
+          outflowsUnklarCents: p.unklarOutflowsCents,
         })),
         categories: legacyFormat.categories.map((c) => ({
           categoryName: c.categoryName,
           flowType: c.flowType,
-          estateType: c.estateType,
+          estateType: c.estateType,  // Deprecated - nur Abwärtskompatibilität
           totalCents: BigInt(c.totalCents),
           periodTotals: c.weeklyTotals.map((t) => BigInt(t)),
           lines: c.lines.map((l) => ({
@@ -153,6 +186,13 @@ export async function GET(
         totalOutflowsCents: aggregation.totalOutflowsCents,
         totalNetCashflowCents: aggregation.totalNetCashflowCents,
         finalClosingBalanceCents: aggregation.finalClosingBalanceCents,
+        // Alt/Neu Gesamtsummen
+        totalAltmasseInflowsCents: aggregation.totalAltmasseInflowsCents,
+        totalAltmasseOutflowsCents: aggregation.totalAltmasseOutflowsCents,
+        totalNeumasseInflowsCents: aggregation.totalNeumasseInflowsCents,
+        totalNeumasseOutflowsCents: aggregation.totalNeumasseOutflowsCents,
+        totalUnklarInflowsCents: aggregation.totalUnklarInflowsCents,
+        totalUnklarOutflowsCents: aggregation.totalUnklarOutflowsCents,
         dataHash: aggregation.dataHash,
         calculatedAt: aggregation.calculatedAt,
       };
@@ -325,6 +365,20 @@ export async function GET(
         },
       },
       ledgerStats,
+      // Alt/Neu-Massezuordnung (aus estateAllocation, NICHT aus legalBucket!)
+      estateAllocation: estateAllocationData ? {
+        // Gesamtsummen
+        totalAltmasseInflowsCents: estateAllocationData.totalAltmasseInflowsCents.toString(),
+        totalAltmasseOutflowsCents: estateAllocationData.totalAltmasseOutflowsCents.toString(),
+        totalNeumasseInflowsCents: estateAllocationData.totalNeumasseInflowsCents.toString(),
+        totalNeumasseOutflowsCents: estateAllocationData.totalNeumasseOutflowsCents.toString(),
+        // UNKLAR - NICHT in Alt/Neu verteilt!
+        totalUnklarInflowsCents: estateAllocationData.totalUnklarInflowsCents.toString(),
+        totalUnklarOutflowsCents: estateAllocationData.totalUnklarOutflowsCents.toString(),
+        unklarCount: estateAllocationData.unklarCount,
+        // Warnungen (z.B. UNKLAR-Buchungen)
+        warnings: estateAllocationData.warnings,
+      } : null,
       calculation: {
         openingBalanceCents: result.openingBalanceCents.toString(),
         totalInflowsCents: result.totalInflowsCents.toString(),
@@ -335,7 +389,8 @@ export async function GET(
         calculatedAt: result.calculatedAt,
         periodType: result.periodType,
         periodCount: result.periodCount,
-        periods: result.periods.map((period) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        periods: result.periods.map((period: any) => ({
           periodIndex: period.periodIndex,
           periodLabel: period.periodLabel,
           periodStartDate: period.periodStartDate.toISOString(),
@@ -345,9 +400,19 @@ export async function GET(
           totalOutflowsCents: period.totalOutflowsCents.toString(),
           netCashflowCents: period.netCashflowCents.toString(),
           closingBalanceCents: period.closingBalanceCents.toString(),
+          // Alt/Neu aus estateAllocation (nur bei LedgerEntry-Aggregation)
+          ...(period.inflowsAltmasseCents !== undefined ? {
+            inflowsAltmasseCents: period.inflowsAltmasseCents.toString(),
+            inflowsNeumasseCents: period.inflowsNeumasseCents.toString(),
+            outflowsAltmasseCents: period.outflowsAltmasseCents.toString(),
+            outflowsNeumasseCents: period.outflowsNeumasseCents.toString(),
+            inflowsUnklarCents: period.inflowsUnklarCents.toString(),
+            outflowsUnklarCents: period.outflowsUnklarCents.toString(),
+          } : {}),
         })),
         // Legacy alias for backwards compatibility
-        weeks: result.periods.map((period) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        weeks: result.periods.map((period: any) => ({
           weekOffset: period.periodIndex,
           weekLabel: period.periodLabel,
           openingBalanceCents: period.openingBalanceCents.toString(),
@@ -355,22 +420,35 @@ export async function GET(
           totalOutflowsCents: period.totalOutflowsCents.toString(),
           netCashflowCents: period.netCashflowCents.toString(),
           closingBalanceCents: period.closingBalanceCents.toString(),
+          // Alt/Neu aus estateAllocation (nur bei LedgerEntry-Aggregation)
+          ...(period.inflowsAltmasseCents !== undefined ? {
+            inflowsAltmasseCents: period.inflowsAltmasseCents.toString(),
+            inflowsNeumasseCents: period.inflowsNeumasseCents.toString(),
+            outflowsAltmasseCents: period.outflowsAltmasseCents.toString(),
+            outflowsNeumasseCents: period.outflowsNeumasseCents.toString(),
+            inflowsUnklarCents: period.inflowsUnklarCents.toString(),
+            outflowsUnklarCents: period.outflowsUnklarCents.toString(),
+          } : {}),
         })),
-        categories: result.categories.map((cat) => ({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        categories: result.categories.map((cat: any) => ({
           categoryName: cat.categoryName,
           flowType: cat.flowType,
-          estateType: cat.estateType,
+          estateType: cat.estateType,  // Deprecated - nur Abwärtskompatibilität
           totalCents: cat.totalCents.toString(),
-          periodTotals: cat.periodTotals.map((t) => t.toString()),
-          weeklyTotals: cat.periodTotals.map((t) => t.toString()),
-          lines: cat.lines.map((line) => ({
+          periodTotals: cat.periodTotals.map((t: bigint) => t.toString()),
+          weeklyTotals: cat.periodTotals.map((t: bigint) => t.toString()),
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          lines: cat.lines.map((line: any) => ({
             lineName: line.lineName,
             totalCents: line.totalCents.toString(),
-            periodValues: line.periodValues.map((pv) => ({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            periodValues: line.periodValues.map((pv: any) => ({
               periodIndex: pv.periodIndex,
               effectiveCents: pv.effectiveCents.toString(),
             })),
-            weeklyValues: line.periodValues.map((pv) => ({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            weeklyValues: line.periodValues.map((pv: any) => ({
               weekOffset: pv.periodIndex,
               effectiveCents: pv.effectiveCents.toString(),
             })),

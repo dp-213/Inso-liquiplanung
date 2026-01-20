@@ -820,6 +820,12 @@ model LedgerEntry {
   suggestedCounterpartyId String?   // Vorgeschlagene Gegenpartei
   suggestedLocationId     String?   // Vorgeschlagener Standort
 
+  // === SERVICE-DATE-VORSCHLÄGE (von Rule Engine, Phase C) ===
+  suggestedServiceDate      DateTime? // Vorgeschlagenes Leistungsdatum
+  suggestedServicePeriodStart DateTime? // Vorgeschlagener Leistungszeitraum Start
+  suggestedServicePeriodEnd   DateTime? // Vorgeschlagener Leistungszeitraum Ende
+  suggestedServiceDateRule    String?   // Welche Regel wurde angewandt (VORMONAT, etc.)
+
   // === LINEAGE: InsolvencyEffect-Herkunft ===
   // Wenn dieser Entry aus einem InsolvencyEffect abgeleitet wurde
   // Ermöglicht idempotente Überführung (Effekt-Änderung → DELETE + CREATE)
@@ -925,6 +931,12 @@ model ClassificationRule {
   assignBankAccountId   String?   // Direkte Zuweisung Bankkonto
   assignCounterpartyId  String?   // Direkte Zuweisung Gegenpartei
   assignLocationId      String?   // Direkte Zuweisung Standort
+
+  // Service-Date-Regel (für Alt/Neu-Zuordnung)
+  // VORMONAT: Zahlung bezieht sich auf Vormonat (HZV: Dezember-Zahlung → November)
+  // SAME_MONTH: Zahlung = Leistungsmonat (Direktzahler)
+  // PREVIOUS_QUARTER: KV-Quartalsabrechnung (Q4/25-Zahlung im Jan → Okt-Dez)
+  assignServiceDateRule String?   // VORMONAT, SAME_MONTH, PREVIOUS_QUARTER
 
   createdAt       DateTime @default(now())
   createdBy       String

@@ -7,6 +7,8 @@ import {
   MATCH_FIELDS,
   MatchType,
   MatchField,
+  SERVICE_DATE_RULES,
+  ServiceDateRule,
 } from '@/lib/classification';
 import { LEGAL_BUCKETS, FLOW_TYPES } from '@/lib/ledger';
 import { ClassificationRule } from '@prisma/client';
@@ -32,6 +34,8 @@ function serializeRule(rule: ClassificationRule): ClassificationRuleResponse {
     assignBankAccountId: rule.assignBankAccountId,
     assignCounterpartyId: rule.assignCounterpartyId,
     assignLocationId: rule.assignLocationId,
+    // Service-Date-Regel (Phase C)
+    assignServiceDateRule: rule.assignServiceDateRule as ServiceDateRule | null,
     createdAt: rule.createdAt.toISOString(),
     createdBy: rule.createdBy,
     updatedAt: rule.updatedAt.toISOString(),
@@ -173,7 +177,20 @@ export async function POST(
       );
     }
 
-    // At least one suggestion OR dimension assignment should be provided
+    // Validate assignServiceDateRule if provided
+    if (
+      body.assignServiceDateRule &&
+      !Object.values(SERVICE_DATE_RULES).includes(body.assignServiceDateRule)
+    ) {
+      return NextResponse.json(
+        {
+          error: `Ungültige Service-Date-Regel. Erlaubt: ${Object.values(SERVICE_DATE_RULES).join(', ')}`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // At least one suggestion, dimension assignment, or service date rule should be provided
     const hasClassificationSuggestion =
       body.suggestedCategory ||
       body.suggestedFlowType ||
@@ -182,12 +199,13 @@ export async function POST(
       body.assignBankAccountId ||
       body.assignCounterpartyId ||
       body.assignLocationId;
+    const hasServiceDateRule = body.assignServiceDateRule;
 
-    if (!hasClassificationSuggestion && !hasDimensionAssignment) {
+    if (!hasClassificationSuggestion && !hasDimensionAssignment && !hasServiceDateRule) {
       return NextResponse.json(
         {
           error:
-            'Mindestens ein Zielfeld erforderlich: suggestedCategory, suggestedFlowType, suggestedLegalBucket, assignBankAccountId, assignCounterpartyId oder assignLocationId',
+            'Mindestens ein Zielfeld erforderlich: suggestedCategory, suggestedFlowType, suggestedLegalBucket, assignBankAccountId, assignCounterpartyId, assignLocationId oder assignServiceDateRule',
         },
         { status: 400 }
       );
@@ -211,6 +229,8 @@ export async function POST(
         assignBankAccountId: body.assignBankAccountId || null,
         assignCounterpartyId: body.assignCounterpartyId || null,
         assignLocationId: body.assignLocationId || null,
+        // Service-Date-Regel (Phase C)
+        assignServiceDateRule: body.assignServiceDateRule || null,
         createdBy: session.username,
         updatedBy: session.username,
       },

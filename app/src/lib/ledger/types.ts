@@ -244,6 +244,17 @@ export interface LedgerEntryResponse {
   allocationSource: string | null;
   allocationNote: string | null;
 
+  // Service Date / Period (für Alt/Neu-Zuordnung)
+  serviceDate: string | null;
+  servicePeriodStart: string | null;
+  servicePeriodEnd: string | null;
+
+  // Service Date Vorschläge (Phase C - von Classification Rules)
+  suggestedServiceDate: string | null;
+  suggestedServicePeriodStart: string | null;
+  suggestedServicePeriodEnd: string | null;
+  suggestedServiceDateRule: string | null;
+
   // Audit
   createdAt: string;
   createdBy: string;

@@ -32,6 +32,30 @@ export const MATCH_TYPE_LABELS: Record<MatchType, string> = {
 };
 
 // =============================================================================
+// SERVICE DATE RULES (Phase C)
+// =============================================================================
+
+export const SERVICE_DATE_RULES = {
+  VORMONAT: 'VORMONAT',
+  SAME_MONTH: 'SAME_MONTH',
+  PREVIOUS_QUARTER: 'PREVIOUS_QUARTER',
+} as const;
+
+export type ServiceDateRule = (typeof SERVICE_DATE_RULES)[keyof typeof SERVICE_DATE_RULES];
+
+export const SERVICE_DATE_RULE_LABELS: Record<ServiceDateRule, string> = {
+  VORMONAT: 'Vormonat (HZV-Logik)',
+  SAME_MONTH: 'Gleicher Monat',
+  PREVIOUS_QUARTER: 'Vorquartal (KV-Abrechnung)',
+};
+
+export const SERVICE_DATE_RULE_DESCRIPTIONS: Record<ServiceDateRule, string> = {
+  VORMONAT: 'Zahlung im Dezember → Leistung November. Typisch für HZV-Abrechnungen.',
+  SAME_MONTH: 'Zahlung und Leistung im gleichen Monat. Typisch für Direktzahler.',
+  PREVIOUS_QUARTER: 'Zahlung im Januar → Leistungszeitraum Q4. Typisch für KV-Quartalsabrechnungen.',
+};
+
+// =============================================================================
 // MATCH FIELDS
 // =============================================================================
 
@@ -80,6 +104,9 @@ export interface ClassificationRuleInput {
   assignBankAccountId?: string;
   assignCounterpartyId?: string;
   assignLocationId?: string;
+
+  // Service-Date-Regel (optional)
+  assignServiceDateRule?: ServiceDateRule;
 }
 
 /**
@@ -105,6 +132,9 @@ export interface ClassificationRuleResponse {
   assignBankAccountId: string | null;
   assignCounterpartyId: string | null;
   assignLocationId: string | null;
+
+  // Service-Date-Regel
+  assignServiceDateRule: ServiceDateRule | null;
 
   createdAt: string;
   createdBy: string;
@@ -136,6 +166,12 @@ export interface ClassificationSuggestion {
   assignBankAccountId?: string;
   assignCounterpartyId?: string;
   assignLocationId?: string;
+
+  // Service-Date-Vorschlag (Phase C)
+  assignServiceDateRule?: ServiceDateRule;
+  suggestedServiceDate?: Date;
+  suggestedServicePeriodStart?: Date;
+  suggestedServicePeriodEnd?: Date;
 
   confidence: number; // 0.0 - 1.0
   matchDetails: string; // z.B. "Beschreibung enthält 'Miete'"

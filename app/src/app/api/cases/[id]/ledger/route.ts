@@ -88,6 +88,15 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse & {
     estateRatio: entry.estateRatio?.toString() || null,
     allocationSource: entry.allocationSource,
     allocationNote: entry.allocationNote,
+    // Service Date / Period (für Alt/Neu-Zuordnung)
+    serviceDate: entry.serviceDate?.toISOString() || null,
+    servicePeriodStart: entry.servicePeriodStart?.toISOString() || null,
+    servicePeriodEnd: entry.servicePeriodEnd?.toISOString() || null,
+    // Service Date Vorschläge (Phase C)
+    suggestedServiceDate: entry.suggestedServiceDate?.toISOString() || null,
+    suggestedServicePeriodStart: entry.suggestedServicePeriodStart?.toISOString() || null,
+    suggestedServicePeriodEnd: entry.suggestedServicePeriodEnd?.toISOString() || null,
+    suggestedServiceDateRule: entry.suggestedServiceDateRule,
     // Derived
     flowType: deriveFlowType(BigInt(entry.amountCents)),
   };

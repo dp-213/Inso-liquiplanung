@@ -22,6 +22,7 @@ export type FlowType = "INFLOW" | "OUTFLOW";
 export type ValueType = "IST" | "PLAN";
 export type PeriodType = "WEEKLY" | "MONTHLY";
 export type ReviewStatus = "UNREVIEWED" | "CONFIRMED" | "ADJUSTED";
+export type EstateAllocation = "ALTMASSE" | "NEUMASSE" | "MIXED" | "UNKLAR";
 
 export interface PeriodAggregation {
   periodIndex: number;
@@ -39,6 +40,14 @@ export interface PeriodAggregation {
   neutralOutflowsCents: bigint;
   unknownInflowsCents: bigint;
   unknownOutflowsCents: bigint;
+  // Nach estateAllocation getrennt (Alt/Neu-Masse)
+  // WICHTIG: Diese Werte kommen aus estateAllocation, NICHT aus legalBucket!
+  altmasseInflowsCents: bigint;
+  altmasseOutflowsCents: bigint;
+  neumasseInflowsCents: bigint;
+  neumasseOutflowsCents: bigint;
+  unklarInflowsCents: bigint;   // UNKLAR-Buchungen - NICHT in Alt/Neu verteilt!
+  unklarOutflowsCents: bigint;
   // Summen
   totalInflowsCents: bigint;
   totalOutflowsCents: bigint;
@@ -77,22 +86,41 @@ export interface AggregationResult {
   totalOutflowsCents: bigint;
   totalNetCashflowCents: bigint;
   finalClosingBalanceCents: bigint;
-  // Nach legalBucket
+  // Nach legalBucket (für rechtliche Klassifikation)
   totalMasseInflowsCents: bigint;
   totalMasseOutflowsCents: bigint;
   totalAbsonderungInflowsCents: bigint;
   totalAbsonderungOutflowsCents: bigint;
   totalNeutralInflowsCents: bigint;
   totalNeutralOutflowsCents: bigint;
+  // Nach estateAllocation (Alt/Neu-Masse aus Leistungsdatum!)
+  // WICHTIG: legalBucket hat KEINEN Einfluss auf diese Werte!
+  totalAltmasseInflowsCents: bigint;
+  totalAltmasseOutflowsCents: bigint;
+  totalNeumasseInflowsCents: bigint;
+  totalNeumasseOutflowsCents: bigint;
+  totalUnklarInflowsCents: bigint;   // UNKLAR - NICHT verteilt!
+  totalUnklarOutflowsCents: bigint;
   // Statistiken
   entryCount: number;
   confirmedCount: number;
   unreviewedCount: number;
   istCount: number;
   planCount: number;
+  unklarCount: number;  // Anzahl UNKLAR-Buchungen
+  // Warnungen
+  warnings: AggregationWarning[];
   // Metadata
   dataHash: string;
   calculatedAt: Date;
+}
+
+export interface AggregationWarning {
+  type: "UNKLAR_ENTRIES" | "MISSING_SERVICE_DATE";
+  severity: "info" | "warning" | "error";
+  message: string;
+  count: number;
+  totalCents: bigint;
 }
 
 export interface AggregationOptions {
@@ -254,6 +282,7 @@ export async function aggregateLedgerEntries(
       periodEndDate: end,
       openingBalanceCents: currentOpeningBalance,
       closingBalanceCents: BigInt(0), // Wird später berechnet
+      // legalBucket-basiert (rechtliche Klassifikation)
       masseInflowsCents: BigInt(0),
       masseOutflowsCents: BigInt(0),
       absonderungInflowsCents: BigInt(0),
@@ -262,6 +291,14 @@ export async function aggregateLedgerEntries(
       neutralOutflowsCents: BigInt(0),
       unknownInflowsCents: BigInt(0),
       unknownOutflowsCents: BigInt(0),
+      // estateAllocation-basiert (Alt/Neu aus Leistungsdatum!)
+      altmasseInflowsCents: BigInt(0),
+      altmasseOutflowsCents: BigInt(0),
+      neumasseInflowsCents: BigInt(0),
+      neumasseOutflowsCents: BigInt(0),
+      unklarInflowsCents: BigInt(0),
+      unklarOutflowsCents: BigInt(0),
+      // Summen
       totalInflowsCents: BigInt(0),
       totalOutflowsCents: BigInt(0),
       netCashflowCents: BigInt(0),
@@ -276,6 +313,8 @@ export async function aggregateLedgerEntries(
   let unreviewedCount = 0;
   let istCount = 0;
   let planCount = 0;
+  let unklarCount = 0;
+  let totalUnklarCents = BigInt(0);
 
   // Verarbeite jeden Eintrag
   for (const entry of entries) {
@@ -289,13 +328,13 @@ export async function aggregateLedgerEntries(
     const isInflow = amount > BigInt(0);
     const absAmount = amount < BigInt(0) ? -amount : amount;
 
-    // Bestimme legalBucket
+    // Bestimme legalBucket (für rechtliche Klassifikation)
     let bucket: LegalBucket = entry.legalBucket as LegalBucket;
     if (bucket === "UNKNOWN" && options.includeSuggested && entry.suggestedLegalBucket) {
       bucket = entry.suggestedLegalBucket as LegalBucket;
     }
 
-    // Aggregiere nach legalBucket
+    // Aggregiere nach legalBucket (rechtliche Klassifikation)
     if (isInflow) {
       period.totalInflowsCents += absAmount;
       switch (bucket) {
@@ -311,6 +350,50 @@ export async function aggregateLedgerEntries(
         case "ABSONDERUNG": period.absonderungOutflowsCents += absAmount; break;
         case "NEUTRAL": period.neutralOutflowsCents += absAmount; break;
         default: period.unknownOutflowsCents += absAmount;
+      }
+    }
+
+    // =========================================================================
+    // WICHTIG: Alt/Neu-Zuordnung aus estateAllocation (NICHT aus legalBucket!)
+    // =========================================================================
+    const allocation = entry.estateAllocation as EstateAllocation | null;
+    const estateRatio = entry.estateRatio ? Number(entry.estateRatio) : null;
+
+    if (allocation === "ALTMASSE") {
+      // 100% Altmasse
+      if (isInflow) {
+        period.altmasseInflowsCents += absAmount;
+      } else {
+        period.altmasseOutflowsCents += absAmount;
+      }
+    } else if (allocation === "NEUMASSE") {
+      // 100% Neumasse
+      if (isInflow) {
+        period.neumasseInflowsCents += absAmount;
+      } else {
+        period.neumasseOutflowsCents += absAmount;
+      }
+    } else if (allocation === "MIXED" && estateRatio !== null) {
+      // MIXED: Split nach estateRatio
+      // estateRatio = Anteil NEUMASSE (0.0 - 1.0)
+      const neumasseAmount = BigInt(Math.round(Number(absAmount) * estateRatio));
+      const altmasseAmount = absAmount - neumasseAmount;
+
+      if (isInflow) {
+        period.altmasseInflowsCents += altmasseAmount;
+        period.neumasseInflowsCents += neumasseAmount;
+      } else {
+        period.altmasseOutflowsCents += altmasseAmount;
+        period.neumasseOutflowsCents += neumasseAmount;
+      }
+    } else {
+      // UNKLAR oder null: NICHT verteilen, separat tracken!
+      unklarCount++;
+      totalUnklarCents += absAmount;
+      if (isInflow) {
+        period.unklarInflowsCents += absAmount;
+      } else {
+        period.unklarOutflowsCents += absAmount;
       }
     }
 
@@ -361,7 +444,7 @@ export async function aggregateLedgerEntries(
     }
   }
 
-  // Gesamtsummen
+  // Gesamtsummen (legalBucket)
   const totalInflowsCents = periods.reduce((sum, p) => sum + p.totalInflowsCents, BigInt(0));
   const totalOutflowsCents = periods.reduce((sum, p) => sum + p.totalOutflowsCents, BigInt(0));
   const totalMasseInflowsCents = periods.reduce((sum, p) => sum + p.masseInflowsCents, BigInt(0));
@@ -370,6 +453,27 @@ export async function aggregateLedgerEntries(
   const totalAbsonderungOutflowsCents = periods.reduce((sum, p) => sum + p.absonderungOutflowsCents, BigInt(0));
   const totalNeutralInflowsCents = periods.reduce((sum, p) => sum + p.neutralInflowsCents, BigInt(0));
   const totalNeutralOutflowsCents = periods.reduce((sum, p) => sum + p.neutralOutflowsCents, BigInt(0));
+
+  // Gesamtsummen (estateAllocation - Alt/Neu)
+  const totalAltmasseInflowsCents = periods.reduce((sum, p) => sum + p.altmasseInflowsCents, BigInt(0));
+  const totalAltmasseOutflowsCents = periods.reduce((sum, p) => sum + p.altmasseOutflowsCents, BigInt(0));
+  const totalNeumasseInflowsCents = periods.reduce((sum, p) => sum + p.neumasseInflowsCents, BigInt(0));
+  const totalNeumasseOutflowsCents = periods.reduce((sum, p) => sum + p.neumasseOutflowsCents, BigInt(0));
+  const totalUnklarInflowsCents = periods.reduce((sum, p) => sum + p.unklarInflowsCents, BigInt(0));
+  const totalUnklarOutflowsCents = periods.reduce((sum, p) => sum + p.unklarOutflowsCents, BigInt(0));
+
+  // Warnungen generieren
+  const warnings: AggregationWarning[] = [];
+
+  if (unklarCount > 0) {
+    warnings.push({
+      type: "UNKLAR_ENTRIES",
+      severity: "warning",
+      message: `${unklarCount} Buchung${unklarCount === 1 ? "" : "en"} ohne Alt/Neu-Zuordnung (${formatCentsForWarning(totalUnklarCents)}). Diese Beträge sind NICHT in den Alt/Neu-Summen enthalten.`,
+      count: unklarCount,
+      totalCents: totalUnklarCents,
+    });
+  }
 
   const dataHash = calculateDataHash(
     entries.map((e) => ({ id: e.id, amountCents: e.amountCents })),
@@ -395,20 +499,46 @@ export async function aggregateLedgerEntries(
     totalOutflowsCents,
     totalNetCashflowCents: totalInflowsCents - totalOutflowsCents,
     finalClosingBalanceCents: periods[periodCount - 1]?.closingBalanceCents ?? openingBalanceCents,
+    // legalBucket-Summen
     totalMasseInflowsCents,
     totalMasseOutflowsCents,
     totalAbsonderungInflowsCents,
     totalAbsonderungOutflowsCents,
     totalNeutralInflowsCents,
     totalNeutralOutflowsCents,
+    // estateAllocation-Summen (Alt/Neu)
+    totalAltmasseInflowsCents,
+    totalAltmasseOutflowsCents,
+    totalNeumasseInflowsCents,
+    totalNeumasseOutflowsCents,
+    totalUnklarInflowsCents,
+    totalUnklarOutflowsCents,
+    // Statistiken
     entryCount: entries.length,
     confirmedCount,
     unreviewedCount,
     istCount,
     planCount,
+    unklarCount,
+    // Warnungen
+    warnings,
+    // Metadata
     dataHash,
     calculatedAt,
   };
+}
+
+/**
+ * Hilfsfunktion: Formatiere Cents für Warnungen
+ */
+function formatCentsForWarning(cents: bigint): string {
+  const euros = Number(cents) / 100;
+  return new Intl.NumberFormat("de-DE", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(euros);
 }
 
 // =============================================================================
@@ -418,21 +548,34 @@ export async function aggregateLedgerEntries(
 /**
  * Konvertiert AggregationResult zum Legacy-Format für Abwärtskompatibilität
  * mit bestehenden Dashboard-Komponenten
+ *
+ * WICHTIG: Alt/Neu-Werte kommen aus estateAllocation (Leistungsdatum),
+ * NICHT aus legalBucket!
  */
 export function convertToLegacyFormat(result: AggregationResult): {
   weeks: {
     weekOffset: number;
     weekLabel: string;
+    weekStartDate: string;
+    weekEndDate: string;
     openingBalanceCents: string;
     totalInflowsCents: string;
     totalOutflowsCents: string;
     netCashflowCents: string;
     closingBalanceCents: string;
+    // Alt/Neu aus estateAllocation (NICHT aus legalBucket!)
+    inflowsAltmasseCents: string;
+    inflowsNeumasseCents: string;
+    outflowsAltmasseCents: string;
+    outflowsNeumasseCents: string;
+    // UNKLAR - NICHT in Alt/Neu verteilt!
+    inflowsUnklarCents: string;
+    outflowsUnklarCents: string;
   }[];
   categories: {
     categoryName: string;
     flowType: string;
-    estateType: string;
+    estateType: string;  // Deprecated - nur für Abwärtskompatibilität
     totalCents: string;
     weeklyTotals: string[];
     lines: {
@@ -441,20 +584,47 @@ export function convertToLegacyFormat(result: AggregationResult): {
       weeklyValues: { weekOffset: number; effectiveCents: string }[];
     }[];
   }[];
+  // Gesamtsummen Alt/Neu
+  totalAltmasseInflowsCents: string;
+  totalAltmasseOutflowsCents: string;
+  totalNeumasseInflowsCents: string;
+  totalNeumasseOutflowsCents: string;
+  totalUnklarInflowsCents: string;
+  totalUnklarOutflowsCents: string;
+  // Warnungen
+  warnings: {
+    type: string;
+    severity: string;
+    message: string;
+    count: number;
+    totalCents: string;
+  }[];
+  unklarCount: number;
 } {
   // Konvertiere Perioden zu "weeks" (Legacy-Name)
+  // WICHTIG: Alt/Neu kommt aus estateAllocation!
   const weeks = result.periods.map((p) => ({
     weekOffset: p.periodIndex,
     weekLabel: p.periodLabel,
+    weekStartDate: p.periodStartDate.toISOString(),
+    weekEndDate: p.periodEndDate.toISOString(),
     openingBalanceCents: p.openingBalanceCents.toString(),
     totalInflowsCents: p.totalInflowsCents.toString(),
     totalOutflowsCents: p.totalOutflowsCents.toString(),
     netCashflowCents: p.netCashflowCents.toString(),
     closingBalanceCents: p.closingBalanceCents.toString(),
+    // Alt/Neu aus estateAllocation
+    inflowsAltmasseCents: p.altmasseInflowsCents.toString(),
+    inflowsNeumasseCents: p.neumasseInflowsCents.toString(),
+    outflowsAltmasseCents: p.altmasseOutflowsCents.toString(),
+    outflowsNeumasseCents: p.neumasseOutflowsCents.toString(),
+    // UNKLAR
+    inflowsUnklarCents: p.unklarInflowsCents.toString(),
+    outflowsUnklarCents: p.unklarOutflowsCents.toString(),
   }));
 
-  // Konvertiere Kategorien - mappe legalBucket auf estateType für Kompatibilität
-  // MASSE → NEUMASSE (operativ), ABSONDERUNG → ALTMASSE (vorab), NEUTRAL → NEUMASSE
+  // Konvertiere Kategorien
+  // HINWEIS: estateType ist deprecated - Alt/Neu kommt jetzt aus period-level Daten
   const categories = result.categories.map((cat) => {
     // Gruppiere Einträge nach Beschreibung als "Zeilen"
     const lineMap = new Map<string, {
@@ -484,7 +654,10 @@ export function convertToLegacyFormat(result: AggregationResult): {
     return {
       categoryName: cat.legalBucket === "UNKNOWN" ? "Nicht klassifiziert" : `${cat.legalBucket} (${cat.flowType === "INFLOW" ? "Einzahlungen" : "Auszahlungen"})`,
       flowType: cat.flowType,
-      estateType: cat.legalBucket === "ABSONDERUNG" ? "ALTMASSE" : "NEUMASSE",
+      // DEPRECATED: estateType auf Kategorie-Ebene ist veraltet
+      // Alt/Neu kommt jetzt aus estateAllocation auf Entry-Ebene
+      // Wir setzen hier einen Platzhalter für Abwärtskompatibilität
+      estateType: "MIXED",  // Kategorien haben kein festes estateType mehr
       totalCents: cat.totalCents.toString(),
       weeklyTotals: cat.periodTotals.map((t) => t.toString()),
       lines: Array.from(lineMap.values()).map((line) => ({
@@ -498,5 +671,24 @@ export function convertToLegacyFormat(result: AggregationResult): {
     };
   });
 
-  return { weeks, categories };
+  return {
+    weeks,
+    categories,
+    // Alt/Neu Gesamtsummen
+    totalAltmasseInflowsCents: result.totalAltmasseInflowsCents.toString(),
+    totalAltmasseOutflowsCents: result.totalAltmasseOutflowsCents.toString(),
+    totalNeumasseInflowsCents: result.totalNeumasseInflowsCents.toString(),
+    totalNeumasseOutflowsCents: result.totalNeumasseOutflowsCents.toString(),
+    totalUnklarInflowsCents: result.totalUnklarInflowsCents.toString(),
+    totalUnklarOutflowsCents: result.totalUnklarOutflowsCents.toString(),
+    // Warnungen
+    warnings: result.warnings.map((w) => ({
+      type: w.type,
+      severity: w.severity,
+      message: w.message,
+      count: w.count,
+      totalCents: w.totalCents.toString(),
+    })),
+    unklarCount: result.unklarCount,
+  };
 }

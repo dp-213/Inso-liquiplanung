@@ -7,6 +7,8 @@ import {
   MATCH_FIELDS,
   MatchType,
   MatchField,
+  SERVICE_DATE_RULES,
+  ServiceDateRule,
 } from '@/lib/classification';
 import { LEGAL_BUCKETS, FLOW_TYPES } from '@/lib/ledger';
 import { ClassificationRule } from '@prisma/client';
@@ -32,6 +34,8 @@ function serializeRule(rule: ClassificationRule): ClassificationRuleResponse {
     assignBankAccountId: rule.assignBankAccountId,
     assignCounterpartyId: rule.assignCounterpartyId,
     assignLocationId: rule.assignLocationId,
+    // Service-Date-Regel (Phase C)
+    assignServiceDateRule: rule.assignServiceDateRule as ServiceDateRule | null,
     createdAt: rule.createdAt.toISOString(),
     createdBy: rule.createdBy,
     updatedAt: rule.updatedAt.toISOString(),
@@ -198,6 +202,22 @@ export async function PUT(
 
     if (body.assignLocationId !== undefined) {
       updateData.assignLocationId = body.assignLocationId || null;
+    }
+
+    // Service-Date-Regel (Phase C)
+    if (body.assignServiceDateRule !== undefined) {
+      if (
+        body.assignServiceDateRule &&
+        !Object.values(SERVICE_DATE_RULES).includes(body.assignServiceDateRule)
+      ) {
+        return NextResponse.json(
+          {
+            error: `Ungültige Service-Date-Regel. Erlaubt: ${Object.values(SERVICE_DATE_RULES).join(', ')}`,
+          },
+          { status: 400 }
+        );
+      }
+      updateData.assignServiceDateRule = body.assignServiceDateRule || null;
     }
 
     // Update rule

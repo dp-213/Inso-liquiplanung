@@ -21,6 +21,8 @@ interface ClassificationRule {
   assignBankAccountId: string | null;
   assignCounterpartyId: string | null;
   assignLocationId: string | null;
+  // Service-Date-Regel (Phase C)
+  assignServiceDateRule: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,6 +95,19 @@ const LEGAL_BUCKET_LABELS: Record<string, string> = {
   UNKNOWN: "Unbekannt",
 };
 
+// Service-Date-Regeln (Phase C) für Alt/Neu-Zuordnung
+const SERVICE_DATE_RULE_LABELS: Record<string, string> = {
+  VORMONAT: "Vormonat (HZV-Logik)",
+  SAME_MONTH: "Gleicher Monat",
+  PREVIOUS_QUARTER: "Vorquartal (KV-Abrechnung)",
+};
+
+const SERVICE_DATE_RULE_HINTS: Record<string, string> = {
+  VORMONAT: "Dezember-Zahlung → Leistung November. Für HZV und ähnliche Abrechnungen.",
+  SAME_MONTH: "Zahlung und Leistung im selben Monat. Für Direktzahler.",
+  PREVIOUS_QUARTER: "Januar-Zahlung → Q4-Leistung. Für KV-Quartalsabrechnungen.",
+};
+
 export default function CaseRulesPage({
   params,
 }: {
@@ -125,6 +140,8 @@ export default function CaseRulesPage({
     assignBankAccountId: "",
     assignCounterpartyId: "",
     assignLocationId: "",
+    // Service-Date-Regel (Phase C)
+    assignServiceDateRule: "",
   });
   const [saving, setSaving] = useState(false);
   const [editingRule, setEditingRule] = useState<ClassificationRule | null>(null);
@@ -208,6 +225,7 @@ export default function CaseRulesPage({
         assignBankAccountId: "",
         assignCounterpartyId: "",
         assignLocationId: "",
+        assignServiceDateRule: "",
       });
       setShowForm(true);
 
@@ -239,6 +257,8 @@ export default function CaseRulesPage({
         assignBankAccountId: formData.assignBankAccountId || null,
         assignCounterpartyId: formData.assignCounterpartyId || null,
         assignLocationId: formData.assignLocationId || null,
+        // Service-Date-Regel (Phase C)
+        assignServiceDateRule: formData.assignServiceDateRule || null,
       };
 
       const res = await fetch(url, {
@@ -327,6 +347,8 @@ export default function CaseRulesPage({
       assignBankAccountId: rule.assignBankAccountId || "",
       assignCounterpartyId: rule.assignCounterpartyId || "",
       assignLocationId: rule.assignLocationId || "",
+      // Service-Date-Regel (Phase C)
+      assignServiceDateRule: rule.assignServiceDateRule || "",
     });
     setShowForm(true);
   };
@@ -341,6 +363,7 @@ export default function CaseRulesPage({
       assignBankAccountId: "",
       assignCounterpartyId: "",
       assignLocationId: "",
+      assignServiceDateRule: "",
     });
   };
 
@@ -617,6 +640,33 @@ export default function CaseRulesPage({
               </div>
             )}
 
+            {/* Service-Date-Regel (Phase C) */}
+            <div className="pt-4 border-t border-[var(--border)]">
+              <h3 className="text-sm font-medium text-[var(--foreground)] mb-3">
+                Leistungsdatum-Regel (optional)
+              </h3>
+              <p className="text-xs text-[var(--muted)] mb-3">
+                Bestimmt automatisch das Leistungsdatum für die Alt/Neu-Masse-Zuordnung.
+              </p>
+              <div className="max-w-sm">
+                <select
+                  value={formData.assignServiceDateRule}
+                  onChange={(e) => setFormData({ ...formData, assignServiceDateRule: e.target.value })}
+                  className="input-field w-full"
+                >
+                  <option value="">-- Keine Regel --</option>
+                  {Object.entries(SERVICE_DATE_RULE_LABELS).map(([key, label]) => (
+                    <option key={key} value={key}>{label}</option>
+                  ))}
+                </select>
+                {formData.assignServiceDateRule && (
+                  <p className="text-xs text-[var(--muted)] mt-1">
+                    {SERVICE_DATE_RULE_HINTS[formData.assignServiceDateRule] || ""}
+                  </p>
+                )}
+              </div>
+            </div>
+
             {/* Preview */}
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm font-medium text-blue-800">So wird die Regel angewendet:</p>
@@ -627,6 +677,11 @@ export default function CaseRulesPage({
               </p>
               <p className="mt-1 text-blue-900">
                 → Vorschlag: <span className="inline-flex items-center px-2 py-0.5 rounded text-sm font-bold bg-orange-100 text-orange-800">{LEGAL_BUCKET_LABELS[formData.suggestedLegalBucket]}</span>
+                {formData.assignServiceDateRule && (
+                  <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-sm font-bold bg-purple-100 text-purple-800">
+                    📅 {SERVICE_DATE_RULE_LABELS[formData.assignServiceDateRule]}
+                  </span>
+                )}
               </p>
             </div>
 
@@ -718,6 +773,11 @@ export default function CaseRulesPage({
                             📍 {locations.find(l => l.id === rule.assignLocationId)?.name || "..."}
                           </span>
                         )}
+                        {rule.assignServiceDateRule && (
+                          <span className="badge text-xs bg-purple-100 text-purple-800" title="Leistungsdatum-Regel">
+                            📅 {SERVICE_DATE_RULE_LABELS[rule.assignServiceDateRule] || rule.assignServiceDateRule}
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td>
@@ -753,26 +813,27 @@ export default function CaseRulesPage({
             <button
               onClick={() => {
                 setFormData({
-                  name: "Standort Velbert → Sparkasse",
-                  matchField: "standort",
-                  matchType: "EQUALS",
-                  matchValue: "Velbert",
+                  name: "HZV-Zahlung → Vormonat",
+                  matchField: "counterpartyHint",
+                  matchType: "CONTAINS",
+                  matchValue: "HZV",
                   suggestedLegalBucket: "MASSE",
                   assignBankAccountId: "",
                   assignCounterpartyId: "",
                   assignLocationId: "",
+                  assignServiceDateRule: "VORMONAT",
                 });
                 setShowForm(true);
               }}
               className="p-4 border border-dashed border-[var(--border)] rounded-lg hover:border-[var(--primary)] hover:bg-blue-50 transition-colors text-left"
             >
-              <p className="font-medium">Standort → Bank</p>
-              <p className="text-sm text-[var(--muted)] mt-1">Standort-basierte Bankkonto-Zuordnung</p>
+              <p className="font-medium">HZV → Vormonat</p>
+              <p className="text-sm text-[var(--muted)] mt-1">HZV-Zahlungen mit Vormonat-Regel für Alt/Neu</p>
             </button>
             <button
               onClick={() => {
                 setFormData({
-                  name: "KV-Zahlung → Gegenpartei",
+                  name: "KV-Zahlung → Vorquartal",
                   matchField: "counterpartyHint",
                   matchType: "CONTAINS",
                   matchValue: "KV",
@@ -780,13 +841,14 @@ export default function CaseRulesPage({
                   assignBankAccountId: "",
                   assignCounterpartyId: "",
                   assignLocationId: "",
+                  assignServiceDateRule: "PREVIOUS_QUARTER",
                 });
                 setShowForm(true);
               }}
               className="p-4 border border-dashed border-[var(--border)] rounded-lg hover:border-[var(--primary)] hover:bg-blue-50 transition-colors text-left"
             >
-              <p className="font-medium">KV → Gegenpartei</p>
-              <p className="text-sm text-[var(--muted)] mt-1">KV-Zahlungen einer Gegenpartei zuordnen</p>
+              <p className="font-medium">KV → Vorquartal</p>
+              <p className="text-sm text-[var(--muted)] mt-1">KV-Zahlungen mit Vorquartal-Regel</p>
             </button>
             <button
               onClick={() => {
@@ -799,6 +861,7 @@ export default function CaseRulesPage({
                   assignBankAccountId: "",
                   assignCounterpartyId: "",
                   assignLocationId: "",
+                  assignServiceDateRule: "",
                 });
                 setShowForm(true);
               }}

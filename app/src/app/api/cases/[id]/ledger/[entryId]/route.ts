@@ -14,6 +14,8 @@ import {
   AUDIT_ACTIONS,
 } from '@/lib/ledger';
 import { LedgerEntry } from '@prisma/client';
+import { determineEstateAllocation } from '@/lib/settlement/split-engine';
+import { AllocationSource } from '@/lib/types/allocation';
 
 /**
  * Serialize a LedgerEntry to LedgerEntryResponse (including governance fields)
@@ -47,6 +49,15 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
     estateRatio: entry.estateRatio?.toString() || null,
     allocationSource: entry.allocationSource,
     allocationNote: entry.allocationNote,
+    // Service Date / Period (für Alt/Neu-Zuordnung)
+    serviceDate: entry.serviceDate?.toISOString() || null,
+    servicePeriodStart: entry.servicePeriodStart?.toISOString() || null,
+    servicePeriodEnd: entry.servicePeriodEnd?.toISOString() || null,
+    // Service Date Vorschläge (Phase C)
+    suggestedServiceDate: entry.suggestedServiceDate?.toISOString() || null,
+    suggestedServicePeriodStart: entry.suggestedServicePeriodStart?.toISOString() || null,
+    suggestedServicePeriodEnd: entry.suggestedServicePeriodEnd?.toISOString() || null,
+    suggestedServiceDateRule: entry.suggestedServiceDateRule,
     // Audit
     createdAt: entry.createdAt.toISOString(),
     createdBy: entry.createdBy,
@@ -150,6 +161,14 @@ export async function PUT(
       return NextResponse.json({ error: 'Eintrag nicht gefunden' }, { status: 404 });
     }
 
+    // Validierung: serviceDate und servicePeriod dürfen NICHT gleichzeitig gesetzt sein
+    if (body.serviceDate && (body.servicePeriodStart || body.servicePeriodEnd)) {
+      return NextResponse.json(
+        { error: 'Entweder Leistungsdatum ODER Leistungszeitraum, nicht beides' },
+        { status: 400 }
+      );
+    }
+
     // Build update data
     const updateData: Record<string, unknown> = {};
 
@@ -229,6 +248,27 @@ export async function PUT(
       updateData.allocationNote = body.allocationNote || null;
     }
 
+    // Service Date / Period (für Alt/Neu-Zuordnung)
+    // Beim Setzen von serviceDate: servicePeriod auf null setzen (und umgekehrt)
+    if (body.serviceDate !== undefined) {
+      updateData.serviceDate = body.serviceDate ? new Date(body.serviceDate) : null;
+      // Exklusivität: Period löschen wenn serviceDate gesetzt wird
+      if (body.serviceDate) {
+        updateData.servicePeriodStart = null;
+        updateData.servicePeriodEnd = null;
+      }
+    }
+    if (body.servicePeriodStart !== undefined) {
+      updateData.servicePeriodStart = body.servicePeriodStart ? new Date(body.servicePeriodStart) : null;
+    }
+    if (body.servicePeriodEnd !== undefined) {
+      updateData.servicePeriodEnd = body.servicePeriodEnd ? new Date(body.servicePeriodEnd) : null;
+      // Exklusivität: serviceDate löschen wenn Period vollständig gesetzt
+      if (body.servicePeriodStart && body.servicePeriodEnd) {
+        updateData.serviceDate = null;
+      }
+    }
+
     // Build field changes for audit log
     const fieldChanges: Record<string, { old: string | number | null; new: string | number | null }> = {};
 
@@ -249,10 +289,58 @@ export async function PUT(
     }
 
     // Update entry
-    const entry = await prisma.ledgerEntry.update({
+    let entry = await prisma.ledgerEntry.update({
       where: { id: entryId },
       data: updateData,
     });
+
+    // Prüfen ob Leistungsdatum geändert wurde → Split-Engine triggern
+    const serviceDateChanged =
+      body.serviceDate !== undefined ||
+      body.servicePeriodStart !== undefined ||
+      body.servicePeriodEnd !== undefined;
+
+    if (serviceDateChanged) {
+      // Case mit cutoffDate laden
+      const caseEntity = await prisma.case.findUnique({
+        where: { id: caseId },
+        select: { cutoffDate: true },
+      });
+
+      if (caseEntity?.cutoffDate) {
+        // Aktuellen Entry neu laden (stale data vermeiden)
+        const updatedEntry = await prisma.ledgerEntry.findUnique({
+          where: { id: entryId },
+        });
+
+        if (updatedEntry) {
+          // Split-Engine für Berechnung nutzen
+          // HINWEIS: Ohne CounterpartyConfig nur SERVICE_DATE_RULE / PERIOD_PRORATA / UNKLAR möglich
+          const allocationResult = determineEstateAllocation(
+            {
+              transactionDate: updatedEntry.transactionDate,
+              serviceDate: updatedEntry.serviceDate,
+              servicePeriodStart: updatedEntry.servicePeriodStart,
+              servicePeriodEnd: updatedEntry.servicePeriodEnd,
+            },
+            null, // CounterpartyConfig - Phase B
+            caseEntity.cutoffDate
+          );
+
+          // Estate Allocation aktualisieren
+          // WICHTIG: allocationSource = MANUELL, weil User das Datum manuell gesetzt hat!
+          entry = await prisma.ledgerEntry.update({
+            where: { id: entryId },
+            data: {
+              estateAllocation: allocationResult.estateAllocation,
+              estateRatio: allocationResult.estateRatio?.toNumber() || null,
+              allocationSource: AllocationSource.MANUELL,
+              allocationNote: `Manuell zugeordnet. ${allocationResult.allocationNote}`,
+            },
+          });
+        }
+      }
+    }
 
     // Create audit log if there were changes
     if (Object.keys(fieldChanges).length > 0) {

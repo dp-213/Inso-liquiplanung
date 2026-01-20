@@ -137,6 +137,12 @@ export default function LedgerEntryEditPage({
   // Estate Allocation (Alt-/Neumasse)
   const [formEstateAllocation, setFormEstateAllocation] = useState<EstateAllocationType>("");
 
+  // Service Date / Period (für Alt/Neu-Zuordnung)
+  const [serviceDate, setServiceDate] = useState<string>("");
+  const [servicePeriodStart, setServicePeriodStart] = useState<string>("");
+  const [servicePeriodEnd, setServicePeriodEnd] = useState<string>("");
+  const [serviceDateMode, setServiceDateMode] = useState<"single" | "period">("single");
+
   // Dropdown-Listen
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
@@ -200,6 +206,23 @@ export default function LedgerEntryEditPage({
           setFormSteeringTag(data.steeringTag || "");
           // Estate Allocation initialisieren
           setFormEstateAllocation(data.estateAllocation || "");
+          // Service Date / Period initialisieren
+          if (data.serviceDate) {
+            setServiceDateMode("single");
+            setServiceDate(data.serviceDate.split("T")[0]);
+            setServicePeriodStart("");
+            setServicePeriodEnd("");
+          } else if (data.servicePeriodStart && data.servicePeriodEnd) {
+            setServiceDateMode("period");
+            setServicePeriodStart(data.servicePeriodStart.split("T")[0]);
+            setServicePeriodEnd(data.servicePeriodEnd.split("T")[0]);
+            setServiceDate("");
+          } else {
+            setServiceDateMode("single");
+            setServiceDate("");
+            setServicePeriodStart("");
+            setServicePeriodEnd("");
+          }
           // Import-Rohdaten speichern
           if (data.importData) {
             setImportData(data.importData);
@@ -241,6 +264,10 @@ export default function LedgerEntryEditPage({
           allocationSource: formEstateAllocation && formEstateAllocation !== entry?.estateAllocation
             ? "MANUELL"
             : undefined,
+          // Service Date (je nach Modus)
+          serviceDate: serviceDateMode === "single" && serviceDate ? serviceDate : null,
+          servicePeriodStart: serviceDateMode === "period" && servicePeriodStart ? servicePeriodStart : null,
+          servicePeriodEnd: serviceDateMode === "period" && servicePeriodEnd ? servicePeriodEnd : null,
         }),
       });
 
@@ -680,6 +707,133 @@ export default function LedgerEntryEditPage({
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Leistungszuordnung (für Alt/Neu-Berechnung) */}
+              <div className="pt-4 border-t border-[var(--border)]">
+                <h3 className="text-sm font-medium text-[var(--foreground)] mb-2">
+                  Leistungszuordnung
+                </h3>
+                <p className="text-xs text-[var(--muted)] mb-4 bg-blue-50 p-2 rounded border border-blue-100">
+                  ℹ️ Das Leistungsdatum bestimmt die Alt-/Neumasse-Zuordnung.
+                  Maßgeblich ist, wann die Forderung <strong>entstand</strong>, nicht wann die Zahlung einging.
+                </p>
+
+                {/* Vorschlag aus Klassifikationsregel (Phase C) */}
+                {entry && (entry.suggestedServiceDate || entry.suggestedServicePeriodStart) && !serviceDate && !servicePeriodStart && (
+                  <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <span className="text-purple-600">💡</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-purple-800">
+                          Vorschlag aus Klassifikationsregel
+                          {entry.suggestedServiceDateRule && (
+                            <span className="ml-2 text-xs font-normal bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                              {entry.suggestedServiceDateRule === "VORMONAT" && "Vormonat (HZV)"}
+                              {entry.suggestedServiceDateRule === "SAME_MONTH" && "Gleicher Monat"}
+                              {entry.suggestedServiceDateRule === "PREVIOUS_QUARTER" && "Vorquartal (KV)"}
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-sm text-purple-700 mt-1">
+                          {entry.suggestedServiceDate && (
+                            <>Leistungsdatum: <strong>{new Date(entry.suggestedServiceDate).toLocaleDateString("de-DE")}</strong></>
+                          )}
+                          {entry.suggestedServicePeriodStart && entry.suggestedServicePeriodEnd && (
+                            <>Leistungszeitraum: <strong>{new Date(entry.suggestedServicePeriodStart).toLocaleDateString("de-DE")} - {new Date(entry.suggestedServicePeriodEnd).toLocaleDateString("de-DE")}</strong></>
+                          )}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (entry.suggestedServiceDate) {
+                              setServiceDateMode("single");
+                              setServiceDate(entry.suggestedServiceDate.split("T")[0]);
+                              setServicePeriodStart("");
+                              setServicePeriodEnd("");
+                            } else if (entry.suggestedServicePeriodStart && entry.suggestedServicePeriodEnd) {
+                              setServiceDateMode("period");
+                              setServicePeriodStart(entry.suggestedServicePeriodStart.split("T")[0]);
+                              setServicePeriodEnd(entry.suggestedServicePeriodEnd.split("T")[0]);
+                              setServiceDate("");
+                            }
+                          }}
+                          className="mt-2 text-xs text-purple-800 hover:text-purple-900 underline font-medium"
+                        >
+                          Vorschlag übernehmen
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Modus-Auswahl: Einzeldatum oder Zeitraum */}
+                <div className="space-y-3 mb-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="serviceDateMode"
+                      checked={serviceDateMode === "single"}
+                      onChange={() => {
+                        setServiceDateMode("single");
+                        setServicePeriodStart("");
+                        setServicePeriodEnd("");
+                      }}
+                      className="w-4 h-4 text-[var(--primary)]"
+                    />
+                    <span className="text-sm text-[var(--foreground)]">Einzelnes Leistungsdatum</span>
+                  </label>
+                  {serviceDateMode === "single" && (
+                    <div className="ml-6">
+                      <input
+                        type="date"
+                        value={serviceDate}
+                        onChange={(e) => setServiceDate(e.target.value)}
+                        className="input-field w-48"
+                      />
+                    </div>
+                  )}
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="serviceDateMode"
+                      checked={serviceDateMode === "period"}
+                      onChange={() => {
+                        setServiceDateMode("period");
+                        setServiceDate("");
+                      }}
+                      className="w-4 h-4 text-[var(--primary)]"
+                    />
+                    <span className="text-sm text-[var(--foreground)]">Leistungszeitraum</span>
+                  </label>
+                  {serviceDateMode === "period" && (
+                    <div className="ml-6 flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={servicePeriodStart}
+                        onChange={(e) => setServicePeriodStart(e.target.value)}
+                        className="input-field w-40"
+                        placeholder="Von"
+                      />
+                      <span className="text-[var(--muted)]">bis</span>
+                      <input
+                        type="date"
+                        value={servicePeriodEnd}
+                        onChange={(e) => setServicePeriodEnd(e.target.value)}
+                        className="input-field w-40"
+                        placeholder="Bis"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Hinweis zur aktuellen Zuordnung */}
+                {(serviceDate || (servicePeriodStart && servicePeriodEnd)) && (
+                  <p className="text-xs text-green-700 bg-green-50 p-2 rounded border border-green-100">
+                    Nach dem Speichern wird die Alt/Neu-Zuordnung automatisch berechnet.
+                  </p>
+                )}
               </div>
 
               {/* Massezuordnung (Alt/Neu) */}
