@@ -286,7 +286,7 @@ export default function CaseConfigPage({
           <button onClick={resetToDefaults} className="btn-secondary" disabled={saving}>
             Zurücksetzen
           </button>
-          <Link href={`/admin/cases/${id}/dashboard`} className="btn-secondary">
+          <Link href={`/admin/cases/${id}/results`} className="btn-secondary">
             Vorschau
           </Link>
           <button onClick={saveConfig} className="btn-primary" disabled={saving}>

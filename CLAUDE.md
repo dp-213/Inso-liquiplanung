@@ -191,3 +191,70 @@ Alle Dokumentation liegt in `/app/docs/`:
 ### Dokumentation aktualisieren
 
 Nach größeren Änderungen `/doku` ausführen, um alle relevanten Dokumentationsdateien zu aktualisieren.
+
+---
+
+## PFLICHT: Selbst-Review vor jedem "Fertig"
+
+**BEVOR du sagst, dass etwas fertig ist, MUSST du diese Checkliste durchgehen:**
+
+### 1. Build & TypeScript
+```bash
+cd app && npm run build
+```
+- [ ] Build muss FEHLERFREI durchlaufen
+- [ ] Keine TypeScript-Fehler
+- [ ] Keine unbenutzten Imports (werden zu Fehlern)
+
+### 2. Konsistenz prüfen
+- [ ] **Alle ähnlichen Stellen angepasst?** (z.B. wenn Dashboard-Link geändert wird, ALLE Dashboard-Links finden und prüfen)
+- [ ] **Routen konsistent?** Keine verwaisten Links zu alten Routen
+- [ ] **Imports korrekt?** Neue Dateien korrekt importiert, keine zirkulären Imports
+
+### 3. Datenbank-Änderungen
+- [ ] Schema-Änderungen → `npx prisma db push` lokal UND SQL für Turso vorbereiten
+- [ ] **Turso-Datetime-Format:** IMMER ISO-Format `2025-10-29T00:00:00.000Z`, NIE `2025-10-29` oder `2025-10-29 12:00:00`
+- [ ] Neue Felder haben sinnvolle Defaults oder sind nullable
+
+### 4. API-Änderungen
+- [ ] Response-Format dokumentiert/konsistent
+- [ ] Error-Handling vorhanden
+- [ ] Auth-Check (`getSession()`) vorhanden
+
+### 5. UI-Änderungen
+- [ ] Deutsche Texte mit echten Umlauten (ä, ö, ü, ß)
+- [ ] Loading-States vorhanden
+- [ ] Error-States vorhanden
+- [ ] Responsive/mobile-tauglich (zumindest nicht kaputt)
+
+### 6. Vor Deployment
+- [ ] `npm run build` erfolgreich
+- [ ] Manuelle Smoke-Tests der geänderten Features überlegt
+- [ ] Bei DB-Schema-Änderungen: Turso-Migration VOR Deployment
+
+### 7. Nach größeren Änderungen
+- [ ] `/doku` ausführen für Dokumentations-Update
+- [ ] CHANGELOG.md aktualisiert
+
+---
+
+## Häufige Fehler (NICHT wiederholen!)
+
+| Fehler | Lösung |
+|--------|--------|
+| Dashboard-Link geht zu falscher Route | ALLE Links zur Route suchen und prüfen (`grep -r "dashboard"`) |
+| Turso datetime Fehler | ISO-Format: `2025-10-29T00:00:00.000Z` |
+| Import nicht gefunden | Datei existiert? Pfad korrekt? Export vorhanden? |
+| Unbenutzte Variable/Import | Entfernen oder verwenden |
+| Route 404 | API-Route existiert? Datei am richtigen Ort? |
+| "Fälle konnten nicht geladen werden" | `credentials: 'include'` in ALLEN fetch-Aufrufen! |
+| 401 Unauthorized im Frontend | `credentials: 'include'` fehlt bei fetch() |
+
+---
+
+## Deployment-Workflow
+
+1. **Lokal testen:** `npm run build` muss durchlaufen
+2. **Bei Schema-Änderungen:** Turso-SQL zuerst ausführen
+3. **Deployen:** `vercel --prod`
+4. **Verifizieren:** Live-URL kurz prüfen (zumindest ob Seite lädt)

@@ -372,7 +372,7 @@ export default function IngestionJobDetailPage({
             </Link>
           )}
           <Link
-            href={`/admin/cases/${job.caseId}/dashboard`}
+            href={`/admin/cases/${job.caseId}/results`}
             className="btn-secondary flex items-center"
           >
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

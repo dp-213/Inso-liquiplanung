@@ -564,6 +564,74 @@ model BankAgreement {
 
 ---
 
+## Version 2.3.0 – 3-Ebenen-Import-Architektur
+
+**Datum:** 20. Januar 2026
+
+### Grundlegende Architekturänderung
+
+#### Strikte Trennung: Excel → Import Context → LedgerEntry
+
+Die Import-Architektur wurde grundlegend überarbeitet für bessere Wartbarkeit und Regeltrennung:
+
+1. **Excel/CSV (variabel):** Original-Spalten mit unterschiedlichen Namen je nach Quelle
+2. **Import Context (stabil):** Normalisierte fachliche Keys für Regeln
+3. **LedgerEntry (final):** Nur IDs und fachliche Ergebnisse
+
+#### NormalizedImportContext
+
+Neue stabile Struktur für Import-Daten:
+
+| Normalized Key | Excel-Varianten |
+|----------------|-----------------|
+| `standort` | "Standort", "Praxis", "Filiale", "Niederlassung" |
+| `counterpartyHint` | "Debitor", "Kreditor", "Auftraggeber", "Empfänger" |
+| `arzt` | "Arzt", "Behandler", "Leistungserbringer" |
+| `zeitraum` | "Zeitraum", "Abrechnungszeitraum", "Periode" |
+| `kategorie` | "Kategorie", "Buchungsart", "Cashflow Kategorie" |
+| `kontoname` | "Kontoname", "Konto", "Bankverbindung" |
+| `krankenkasse` | "Krankenkasse", "Kostenträger", "KV" |
+
+#### Rule Engine auf Normalized
+
+- **STRIKT:** Regeln arbeiten NUR auf `normalized`, NIE auf LedgerEntry
+- **ClassificationRule.matchField** referenziert normalized Keys
+- **Ergebnis:** Nur IDs werden ins LedgerEntry übertragen
+
+### Neue Module
+
+| Pfad | Beschreibung |
+|------|--------------|
+| `/lib/import/normalized-schema.ts` | NormalizedImportContext + COLUMN_MAPPINGS |
+| `/lib/import/rule-engine.ts` | applyRules() auf normalized |
+| `/lib/import/index.ts` | Export-Modul |
+
+### Technische Änderungen
+
+#### to-ledger API aktualisiert
+- Normalisierung vor Regelanwendung
+- Lädt ClassificationRules und wendet sie auf normalized an
+- Nur Ergebnis-IDs werden ins LedgerEntry übertragen
+- `allocationNote` enthält angewandte Regel-Information
+
+#### Schema-Kommentare
+- `ClassificationRule.matchField` dokumentiert: "NORMALIZED Keys only"
+- Architektur-Hinweise im Schema für zukünftige Entwickler
+
+### Architektur-Regeln (dokumentiert)
+
+1. **KEINE** Original-Excel-Spalten im LedgerEntry speichern
+2. **Regeln arbeiten NUR auf normalized**, NIE auf LedgerEntry
+3. **Normalisierung vor Regelanwendung** – verschiedene Spaltennamen → stabile Keys
+4. **LedgerEntry erhält nur Ergebnisse** – `locationId`, nicht "Standort"
+
+### Dokumentation
+- ARCHITECTURE.md mit detailliertem 3-Ebenen-Diagramm
+- Normalized Import Schema dokumentiert
+- Import-Flow mit allen 7 Schritten beschrieben
+
+---
+
 ## Geplante Änderungen
 
 Keine ausstehenden Änderungen

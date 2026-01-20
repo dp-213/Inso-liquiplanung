@@ -111,6 +111,8 @@ export async function GET(
     const counterpartyId = searchParams.get('counterpartyId');
     const locationId = searchParams.get('locationId');
     const hasDimensionSuggestions = searchParams.get('hasDimensionSuggestions');
+    // Import-Filter
+    const importJobId = searchParams.get('importJobId');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 100;
@@ -184,6 +186,11 @@ export async function GET(
         { suggestedCounterpartyId: { not: null } },
         { suggestedLocationId: { not: null } },
       ];
+    }
+
+    // Import-Filter
+    if (importJobId) {
+      where.importJobId = importJobId;
     }
 
     if (from || to) {

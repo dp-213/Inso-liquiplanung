@@ -72,6 +72,16 @@ interface Location {
   name: string;
 }
 
+interface ImportJob {
+  importJobId: string;
+  importSource: string | null;
+  entryCount: number;
+  totalAmountCents: string;
+  firstEntryDate: string;
+  lastEntryDate: string;
+  createdAt: string;
+}
+
 export default function CaseLedgerPage({
   params,
 }: {
@@ -102,6 +112,8 @@ export default function CaseLedgerPage({
   const [bankAccountsList, setBankAccountsList] = useState<BankAccount[]>([]);
   const [counterpartiesList, setCounterpartiesList] = useState<Counterparty[]>([]);
   const [locationsList, setLocationsList] = useState<Location[]>([]);
+  const [importJobs, setImportJobs] = useState<ImportJob[]>([]);
+  const [deletingImport, setDeletingImport] = useState<string | null>(null);
 
   // Tab switching
   const setActiveTab = (tab: TabType) => {
@@ -125,6 +137,8 @@ export default function CaseLedgerPage({
   const [filterBankAccountId, setFilterBankAccountId] = useState<string>("");
   const [filterCounterpartyId, setFilterCounterpartyId] = useState<string>("");
   const [filterLocationId, setFilterLocationId] = useState<string>("");
+  // Import-Filter
+  const [filterImportJobId, setFilterImportJobId] = useState<string>("");
 
   // Auto-set review filter when tab changes
   useEffect(() => {
@@ -157,17 +171,20 @@ export default function CaseLedgerPage({
       if (filterBankAccountId) queryParams.set("bankAccountId", filterBankAccountId);
       if (filterCounterpartyId) queryParams.set("counterpartyId", filterCounterpartyId);
       if (filterLocationId) queryParams.set("locationId", filterLocationId);
+      // Import-Filter
+      if (filterImportJobId) queryParams.set("importJobId", filterImportJobId);
 
       const queryString = queryParams.toString();
       const url = `/api/cases/${id}/ledger${queryString ? `?${queryString}` : ""}`;
 
-      const [caseRes, ledgerRes, intakeRes, bankRes, counterpartyRes, locationRes] = await Promise.all([
+      const [caseRes, ledgerRes, intakeRes, bankRes, counterpartyRes, locationRes, importJobsRes] = await Promise.all([
         fetch(`/api/cases/${id}`, { credentials: 'include' }),
         fetch(url, { credentials: 'include' }),
         fetch(`/api/cases/${id}/intake`, { credentials: 'include' }),
         fetch(`/api/cases/${id}/bank-accounts`, { credentials: 'include' }),
         fetch(`/api/cases/${id}/counterparties`, { credentials: 'include' }),
         fetch(`/api/cases/${id}/locations`, { credentials: 'include' }),
+        fetch(`/api/cases/${id}/import-jobs`, { credentials: 'include' }),
       ]);
 
       if (caseRes.ok) {
@@ -229,13 +246,17 @@ export default function CaseLedgerPage({
         locs.forEach((loc: Location) => map.set(loc.id, loc.name));
         setLocationsMap(map);
       }
+      if (importJobsRes.ok) {
+        const data = await importJobsRes.json();
+        setImportJobs(data.importJobs || []);
+      }
     } catch (err) {
       console.error("Error fetching data:", err);
       setError("Fehler beim Laden der Daten");
     } finally {
       setLoading(false);
     }
-  }, [id, filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountId, filterCounterpartyId, filterLocationId]);
+  }, [id, filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountId, filterCounterpartyId, filterLocationId, filterImportJobId]);
 
   useEffect(() => {
     fetchData();
@@ -285,9 +306,10 @@ export default function CaseLedgerPage({
     setFilterBankAccountId("");
     setFilterCounterpartyId("");
     setFilterLocationId("");
+    setFilterImportJobId("");
   };
 
-  const hasActiveFilters = filterValueType || filterLegalBucket || filterReviewStatus || filterSuggestedBucket || filterFrom || filterTo || filterBankAccountId || filterCounterpartyId || filterLocationId;
+  const hasActiveFilters = filterValueType || filterLegalBucket || filterReviewStatus || filterSuggestedBucket || filterFrom || filterTo || filterBankAccountId || filterCounterpartyId || filterLocationId || filterImportJobId;
 
   // Bulk Actions
   const handleBulkConfirm = async (filter?: { suggestedLegalBucket?: string; minConfidence?: number }) => {
@@ -404,6 +426,41 @@ export default function CaseLedgerPage({
       setError(err instanceof Error ? err.message : "Dimensions-Übernahme fehlgeschlagen");
     } finally {
       setBulkProcessing(false);
+    }
+  };
+
+  // Delete Import Job
+  const handleDeleteImport = async (importJobId: string, importSource: string | null) => {
+    if (!confirm(`Möchten Sie wirklich alle Einträge aus dem Import "${importSource || importJobId}" löschen?`)) {
+      return;
+    }
+
+    setDeletingImport(importJobId);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/cases/${id}/import-jobs/${encodeURIComponent(importJobId)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Löschen fehlgeschlagen");
+      }
+
+      setSuccessMessage(data.message);
+      // Clear import filter if we just deleted the filtered import
+      if (filterImportJobId === importJobId) {
+        setFilterImportJobId("");
+      }
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+    } finally {
+      setDeletingImport(null);
     }
   };
 
@@ -589,7 +646,7 @@ export default function CaseLedgerPage({
           <Link href={`/admin/cases/${id}`} className="btn-secondary">
             Zurück zum Fall
           </Link>
-          <Link href={`/admin/cases/${id}/dashboard`} className="btn-primary flex items-center">
+          <Link href={`/admin/cases/${id}/results`} className="btn-primary flex items-center">
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
@@ -749,6 +806,64 @@ export default function CaseLedgerPage({
                 )
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Jobs Overview */}
+      {importJobs.length > 0 && (
+        <div className="admin-card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-[var(--foreground)]">
+              Daten-Importe ({importJobs.length})
+            </h3>
+          </div>
+          <div className="space-y-2">
+            {importJobs.map((job) => {
+              const importDate = new Date(job.createdAt);
+              const isFiltered = filterImportJobId === job.importJobId;
+              return (
+                <div
+                  key={job.importJobId}
+                  className={`flex items-center justify-between p-3 rounded-md border ${
+                    isFiltered ? "bg-blue-50 border-blue-300" : "bg-gray-50 border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <div className="font-medium text-sm text-[var(--foreground)]">
+                        {job.importSource || job.importJobId.slice(0, 8) + "..."}
+                      </div>
+                      <div className="text-xs text-[var(--muted)]">
+                        {importDate.toLocaleDateString("de-DE")} {importDate.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })} • {job.entryCount} Einträge
+                      </div>
+                    </div>
+                    <span className="text-xs text-[var(--muted)]">
+                      {formatDate(job.firstEntryDate)} – {formatDate(job.lastEntryDate)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setFilterImportJobId(isFiltered ? "" : job.importJobId)}
+                      className={`text-xs px-2 py-1 rounded ${
+                        isFiltered
+                          ? "bg-blue-500 text-white"
+                          : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      }`}
+                    >
+                      {isFiltered ? "Filter aktiv" : "Filtern"}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteImport(job.importJobId, job.importSource)}
+                      disabled={deletingImport === job.importJobId}
+                      className="text-xs px-2 py-1 rounded bg-red-100 text-red-700 hover:bg-red-200 disabled:opacity-50"
+                    >
+                      {deletingImport === job.importJobId ? "Lösche..." : "Löschen"}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -977,6 +1092,26 @@ export default function CaseLedgerPage({
             </div>
           )}
 
+          {importJobs.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                Import
+              </label>
+              <select
+                value={filterImportJobId}
+                onChange={(e) => setFilterImportJobId(e.target.value)}
+                className="input-field min-w-[200px]"
+              >
+                <option value="">Alle Importe</option>
+                {importJobs.map((job) => (
+                  <option key={job.importJobId} value={job.importJobId}>
+                    {job.importSource || job.importJobId.slice(0, 8)} ({job.entryCount} Einträge)
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
@@ -1039,6 +1174,7 @@ export default function CaseLedgerPage({
                   <SortHeader field="reviewStatus" label="Review" />
                   <th>Vorschlag</th>
                   <th>Dim.-Vorschlag</th>
+                  <th>Import</th>
                   <th>Aktionen</th>
                 </tr>
               </thead>
@@ -1053,6 +1189,8 @@ export default function CaseLedgerPage({
                     suggestedBankAccountId?: string | null;
                     suggestedCounterpartyId?: string | null;
                     suggestedLocationId?: string | null;
+                    importSource?: string | null;
+                    importJobId?: string | null;
                   };
 
                   return (
@@ -1135,6 +1273,21 @@ export default function CaseLedgerPage({
                               </span>
                             )}
                           </div>
+                        ) : (
+                          <span className="text-[var(--muted)]">-</span>
+                        )}
+                      </td>
+                      <td className="text-xs">
+                        {entryWithExtras.importSource ? (
+                          <button
+                            onClick={() => setFilterImportJobId(entryWithExtras.importJobId || "")}
+                            className="badge badge-neutral hover:bg-gray-200 cursor-pointer truncate max-w-[100px]"
+                            title={`Import: ${entryWithExtras.importSource}\nKlicken zum Filtern`}
+                          >
+                            {entryWithExtras.importSource.length > 15
+                              ? entryWithExtras.importSource.slice(0, 12) + "..."
+                              : entryWithExtras.importSource}
+                          </button>
                         ) : (
                           <span className="text-[var(--muted)]">-</span>
                         )}

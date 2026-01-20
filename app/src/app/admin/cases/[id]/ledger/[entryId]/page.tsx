@@ -116,15 +116,22 @@ export default function LedgerEntryEditPage({
   const [reviewReason, setReviewReason] = useState<string>("");
   const [reviewingEntry, setReviewingEntry] = useState(false);
 
+  // Import data (original columns from source file)
+  const [importData, setImportData] = useState<{
+    rawData: Record<string, unknown> | null;
+    mappedData: Record<string, unknown> | null;
+    sheetName: string | null;
+  } | null>(null);
+
   useEffect(() => {
     async function fetchData() {
       try {
         const [caseRes, entryRes, bankRes, counterpartyRes, locationRes] = await Promise.all([
-          fetch(`/api/cases/${id}`),
-          fetch(`/api/cases/${id}/ledger/${entryId}`),
-          fetch(`/api/cases/${id}/bank-accounts`),
-          fetch(`/api/cases/${id}/counterparties`),
-          fetch(`/api/cases/${id}/locations`),
+          fetch(`/api/cases/${id}`, { credentials: 'include' }),
+          fetch(`/api/cases/${id}/ledger/${entryId}`, { credentials: 'include' }),
+          fetch(`/api/cases/${id}/bank-accounts`, { credentials: 'include' }),
+          fetch(`/api/cases/${id}/counterparties`, { credentials: 'include' }),
+          fetch(`/api/cases/${id}/locations`, { credentials: 'include' }),
         ]);
 
         if (caseRes.ok) {
@@ -160,6 +167,10 @@ export default function LedgerEntryEditPage({
           setFormCounterpartyId(data.counterpartyId || "");
           setFormLocationId(data.locationId || "");
           setFormSteeringTag(data.steeringTag || "");
+          // Import-Rohdaten speichern
+          if (data.importData) {
+            setImportData(data.importData);
+          }
         } else {
           setError("Eintrag nicht gefunden");
         }
@@ -183,6 +194,7 @@ export default function LedgerEntryEditPage({
       const res = await fetch(`/api/cases/${id}/ledger/${entryId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           legalBucket: formLegalBucket,
           note: formNote || null,
@@ -220,6 +232,7 @@ export default function LedgerEntryEditPage({
     try {
       const res = await fetch(`/api/cases/${id}/ledger/${entryId}`, {
         method: "DELETE",
+        credentials: "include",
       });
 
       if (!res.ok) {
@@ -243,6 +256,7 @@ export default function LedgerEntryEditPage({
       const res = await fetch(`/api/cases/${id}/ledger/${entryId}/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ action: "CONFIRM" }),
       });
 
@@ -290,6 +304,7 @@ export default function LedgerEntryEditPage({
       const res = await fetch(`/api/cases/${id}/ledger/${entryId}/review`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           action: "ADJUST",
           reason: reviewReason,
@@ -338,6 +353,55 @@ export default function LedgerEntryEditPage({
       hour: "2-digit",
       minute: "2-digit",
     });
+  };
+
+  // Flatten nested rawData structure to show original column names
+  const flattenImportData = (rawData: Record<string, unknown>): Array<{ key: string; value: string }> => {
+    const result: Array<{ key: string; value: string }> = [];
+    const meta = rawData._meta as Record<string, unknown> | undefined;
+    const originalHeaders = meta?.originalHeaders as string[] | undefined;
+
+    // Helper to add a key-value pair
+    const addEntry = (key: string, value: unknown) => {
+      if (value === null || value === undefined || value === '') {
+        result.push({ key, value: '' });
+      } else if (typeof value === 'object') {
+        result.push({ key, value: JSON.stringify(value) });
+      } else {
+        result.push({ key, value: String(value) });
+      }
+    };
+
+    // Process nested objects (core, standard, additional) and flatten them
+    for (const [section, sectionValue] of Object.entries(rawData)) {
+      // Skip meta fields
+      if (section.startsWith('_')) continue;
+
+      if (typeof sectionValue === 'object' && sectionValue !== null) {
+        // Flatten nested object
+        for (const [field, fieldValue] of Object.entries(sectionValue as Record<string, unknown>)) {
+          // Try to find original header name (capitalize first letter)
+          const originalKey = originalHeaders?.find(h =>
+            h.toLowerCase() === field.toLowerCase() ||
+            h.toLowerCase().replace(/\s+/g, '') === field.toLowerCase().replace(/\s+/g, '')
+          ) || field.charAt(0).toUpperCase() + field.slice(1);
+          addEntry(originalKey, fieldValue);
+        }
+      } else {
+        addEntry(section, sectionValue);
+      }
+    }
+
+    return result;
+  };
+
+  // Get sheet name and row number from meta
+  const getImportMeta = (rawData: Record<string, unknown>): { sheetName?: string; rowNumber?: number } => {
+    const meta = rawData._meta as Record<string, unknown> | undefined;
+    return {
+      sheetName: meta?.sheetName as string | undefined,
+      rowNumber: meta?.rowNumber as number | undefined,
+    };
   };
 
   if (loading) {
@@ -523,7 +587,7 @@ export default function LedgerEntryEditPage({
                       <option value="">-- Nicht zugeordnet --</option>
                       {bankAccounts.map((acc) => (
                         <option key={acc.id} value={acc.id}>
-                          {acc.bankName} ({acc.iban.slice(-8)})
+                          {acc.bankName} {acc.iban ? `(${acc.iban.slice(-8)})` : ''}
                         </option>
                       ))}
                     </select>
@@ -611,6 +675,69 @@ export default function LedgerEntryEditPage({
               </button>
             </div>
           </div>
+
+          {/* Original Import Data - Flat display like Excel columns */}
+          {importData?.rawData && Object.keys(importData.rawData).length > 0 && (
+            <div className="admin-card p-6">
+              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4 flex items-center gap-2">
+                <svg className="w-5 h-5 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Original-Daten aus Import
+              </h2>
+              {(() => {
+                const meta = getImportMeta(importData.rawData);
+                const flatData = flattenImportData(importData.rawData);
+                return (
+                  <>
+                    <div className="flex items-center gap-4 text-sm text-[var(--muted)] mb-4">
+                      {meta.sheetName && (
+                        <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                          Blatt: {meta.sheetName}
+                        </span>
+                      )}
+                      {meta.rowNumber && (
+                        <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                          Zeile {meta.rowNumber}
+                        </span>
+                      )}
+                    </div>
+                    <div className="bg-gray-50 rounded-lg border border-[var(--border)] overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="px-4 py-2 text-left font-medium text-[var(--foreground)] w-1/3">Spalte</th>
+                            <th className="px-4 py-2 text-left font-medium text-[var(--foreground)]">Wert</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--border)]">
+                          {flatData.map(({ key, value }, idx) => (
+                            <tr key={idx} className="hover:bg-white">
+                              <td className="px-4 py-2 font-medium text-[var(--secondary)]">{key}</td>
+                              <td className="px-4 py-2 text-[var(--foreground)]">
+                                {value === '' ? (
+                                  <span className="text-[var(--muted)] italic">–</span>
+                                ) : value.length > 200 ? (
+                                  <div className="max-h-24 overflow-auto text-xs whitespace-pre-wrap bg-white p-2 rounded border">
+                                    {value}
+                                  </div>
+                                ) : (
+                                  <span className="whitespace-pre-wrap">{value}</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className="text-xs text-[var(--muted)] mt-3">
+                      Diese Spalten stammen aus der Original-Importdatei. Nutze sie für die Regelerstellung und Zuordnung.
+                    </p>
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
 
         {/* Sidebar: Review + Audit Info */}

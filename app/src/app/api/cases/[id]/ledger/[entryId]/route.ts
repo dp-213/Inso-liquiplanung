@@ -75,7 +75,41 @@ export async function GET(
       return NextResponse.json({ error: 'Eintrag nicht gefunden' }, { status: 404 });
     }
 
-    return NextResponse.json(serializeLedgerEntry(entry));
+    // Try to fetch original import data if available
+    let importData: {
+      rawData: Record<string, unknown> | null;
+      mappedData: Record<string, unknown> | null;
+      sheetName: string | null;
+    } | null = null;
+
+    if (entry.importJobId && entry.importRowNumber !== null) {
+      const ingestionRecord = await prisma.ingestionRecord.findUnique({
+        where: {
+          jobId_rowNumber: {
+            jobId: entry.importJobId,
+            rowNumber: entry.importRowNumber,
+          },
+        },
+        select: {
+          rawData: true,
+          mappedData: true,
+          sheetName: true,
+        },
+      });
+
+      if (ingestionRecord) {
+        importData = {
+          rawData: ingestionRecord.rawData ? JSON.parse(ingestionRecord.rawData) : null,
+          mappedData: ingestionRecord.mappedData ? JSON.parse(ingestionRecord.mappedData) : null,
+          sheetName: ingestionRecord.sheetName,
+        };
+      }
+    }
+
+    return NextResponse.json({
+      ...serializeLedgerEntry(entry),
+      importData,
+    });
   } catch (error) {
     console.error('Error fetching ledger entry:', error);
     return NextResponse.json(

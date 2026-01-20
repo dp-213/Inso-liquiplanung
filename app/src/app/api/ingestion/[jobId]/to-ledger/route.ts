@@ -5,6 +5,8 @@ import { parseDate } from "@/lib/ingestion/transformations";
 import { parseGermanEuroToCents } from "@/lib/calculation-engine";
 import { markAggregationStale } from "@/lib/ledger/aggregation";
 import { classifyBatch, matchCounterpartyPatterns } from "@/lib/classification/engine";
+import { normalizeImportData, NormalizedImportContext } from "@/lib/import/normalized-schema";
+import { applyRules, ClassificationRule, ClassificationResult } from "@/lib/import/rule-engine";
 
 interface Mappings {
   transactionDate: string;
@@ -62,12 +64,20 @@ export async function POST(
     // Ergebnisse tracken
     let created = 0;
     let skipped = 0;
+    let rulesApplied = 0;
     const errors: Array<{ row: number; error: string }> = [];
 
     console.log(`[to-ledger] Processing ${job.records.length} records with mappings:`, mappings);
     if (bankAccountId) {
       console.log(`[to-ledger] Bankkonto zugeordnet: ${bankAccountId}`);
     }
+
+    // Klassifikationsregeln für diesen Case laden
+    const classificationRules = await prisma.classificationRule.findMany({
+      where: { caseId: job.caseId, isActive: true },
+      orderBy: { priority: 'asc' },
+    });
+    console.log(`[to-ledger] Loaded ${classificationRules.length} classification rules`);
 
     // Jeden Record verarbeiten
     for (const record of job.records) {
@@ -361,7 +371,59 @@ export async function POST(
       // Beschreibung
       const description = descriptionValue?.trim() || `Zeile ${record.rowNumber}`;
 
-      // LedgerEntry erstellen
+      // === NORMALISIERUNG: Raw → Normalized ===
+      // Flache rawData für Normalisierung erstellen
+      const flatRaw: Record<string, unknown> = {};
+      for (const [section, sectionValue] of Object.entries(rawData)) {
+        if (section.startsWith('_')) continue;
+        if (typeof sectionValue === 'object' && sectionValue !== null) {
+          for (const [k, v] of Object.entries(sectionValue as Record<string, unknown>)) {
+            flatRaw[k] = v;
+          }
+        } else {
+          flatRaw[section] = sectionValue;
+        }
+      }
+
+      const { normalized, fieldMapping } = normalizeImportData(flatRaw);
+
+      // Core-Werte überschreiben mit geparseten Werten
+      normalized.datum = transactionDate.toISOString().split('T')[0];
+      normalized.betrag = Number(amountCents) / 100;
+      normalized.bezeichnung = description;
+
+      // === REGEL-ENGINE: Auf normalized anwenden ===
+      let ruleResult: ClassificationResult | null = null;
+      if (classificationRules.length > 0) {
+        // Rules to correct format
+        const rules: ClassificationRule[] = classificationRules.map(r => ({
+          id: r.id,
+          caseId: r.caseId,
+          name: r.name,
+          isActive: r.isActive,
+          priority: r.priority,
+          matchField: r.matchField as any,
+          matchType: r.matchType as any,
+          matchValue: r.matchValue,
+          suggestedLegalBucket: r.suggestedLegalBucket || undefined,
+          assignBankAccountId: r.assignBankAccountId || undefined,
+          assignCounterpartyId: r.assignCounterpartyId || undefined,
+          assignLocationId: r.assignLocationId || undefined,
+        }));
+
+        ruleResult = applyRules(normalized, rules);
+
+        if (ruleResult.matchedRules.length > 0) {
+          rulesApplied++;
+          if (record.rowNumber <= 3) {
+            console.log(`[to-ledger] Row ${record.rowNumber}: ${ruleResult.matchedRules.length} rules matched:`,
+              ruleResult.matchedRules.map(m => m.rule.name));
+          }
+        }
+      }
+
+      // === LEDGER ENTRY ERSTELLEN ===
+      // Nur Ergebnisse (IDs) übertragen, KEINE Rohdaten!
       await prisma.ledgerEntry.create({
         data: {
           caseId: job.caseId,
@@ -369,11 +431,11 @@ export async function POST(
           amountCents,
           description,
           valueType,
-          legalBucket: "UNKNOWN", // Wird im Review zugewiesen
+          legalBucket: ruleResult?.suggestedLegalBucket || "UNKNOWN",
           reviewStatus: "UNREVIEWED",
           createdBy: session.username || "Import",
 
-          // Import-Herkunft
+          // Import-Herkunft (Referenz, keine Rohdaten!)
           importSource: job.fileName,
           importJobId: job.id,
           importFileHash: job.fileHashSha256,
@@ -384,8 +446,15 @@ export async function POST(
           bookingSourceId: bookingSourceId || null,
           bookingReference: bookingReference || null,
 
-          // Steuerungsdimension: Bankkonto (falls ausgewählt)
-          bankAccountId: bankAccountId || null,
+          // Steuerungsdimensionen: Von Regel oder manuell
+          bankAccountId: ruleResult?.assignBankAccountId || bankAccountId || null,
+          counterpartyId: ruleResult?.assignCounterpartyId || null,
+          locationId: ruleResult?.assignLocationId || null,
+
+          // Allocation Note: Begründung für Zuweisungen
+          allocationNote: ruleResult?.highestPriorityRule
+            ? `Regel: ${ruleResult.highestPriorityRule.name}`
+            : null,
         },
       });
 
@@ -437,7 +506,7 @@ export async function POST(
       }
     }
 
-    console.log(`[to-ledger] Finished: created=${created}, classified=${classified}, counterpartyMatched=${counterpartyMatched}, skipped=${skipped}, errors=${errors.length}`);
+    console.log(`[to-ledger] Finished: created=${created}, rulesApplied=${rulesApplied}, classified=${classified}, counterpartyMatched=${counterpartyMatched}, skipped=${skipped}, errors=${errors.length}`);
     if (errors.length > 0) {
       console.log(`[to-ledger] First errors:`, errors.slice(0, 5));
     }
@@ -445,6 +514,7 @@ export async function POST(
     // Message bauen
     let message = `${created} Zahlungen ins Ledger importiert`;
     const extras: string[] = [];
+    if (rulesApplied > 0) extras.push(`${rulesApplied} mit Regeln zugeordnet`);
     if (classified > 0) extras.push(`${classified} klassifiziert`);
     if (counterpartyMatched > 0) extras.push(`${counterpartyMatched} Gegenparteien erkannt`);
     if (extras.length > 0) message += ` (${extras.join(", ")})`;
@@ -452,6 +522,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       created,
+      rulesApplied,
       classified,
       counterpartyMatched,
       skipped,

@@ -899,6 +899,9 @@ model AggregationCache {
 // =============================================================================
 // CLASSIFICATION RULES - Rule Engine Light für Vorschläge
 // =============================================================================
+// ARCHITEKTUR: Regeln arbeiten NUR auf ImportContext.normalized, NIE auf LedgerEntry!
+// matchField referenziert normalized Keys: bezeichnung, standort, counterpartyHint, arzt, etc.
+// Siehe: /lib/import/normalized-schema.ts für vollständige Liste
 
 model ClassificationRule {
   id              String   @id @default(uuid())
@@ -907,8 +910,8 @@ model ClassificationRule {
   isActive        Boolean  @default(true)
   priority        Int      @default(100)  // Niedrigere Zahl = höhere Priorität
 
-  // Match-Kriterien
-  matchField      String   // description, bookingReference, bookingSource, etc.
+  // Match-Kriterien (auf ImportContext.normalized)
+  matchField      String   // NORMALIZED FIELDS: bezeichnung, standort, counterpartyHint, arzt, kategorie, etc.
   matchType       String   // CONTAINS, STARTS_WITH, ENDS_WITH, REGEX, EQUALS, AMOUNT_RANGE
   matchValue      String   // Der Suchwert oder Regex-Pattern
 

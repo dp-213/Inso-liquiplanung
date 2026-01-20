@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 interface ErrorProps {
@@ -9,8 +9,13 @@ interface ErrorProps {
 }
 
 export default function CasesError({ error, reset }: ErrorProps) {
+  const [showDetails, setShowDetails] = useState(false);
+
   useEffect(() => {
     console.error("Cases page error:", error);
+    console.error("Error name:", error.name);
+    console.error("Error message:", error.message);
+    console.error("Error stack:", error.stack);
   }, [error]);
 
   return (
@@ -48,11 +53,33 @@ export default function CasesError({ error, reset }: ErrorProps) {
             Die Daten konnten nicht abgerufen werden. Dies kann an einer Verbindungsstörung
             oder einem temporären Problem liegen.
           </p>
-          {error.digest && (
-            <p className="text-xs text-[var(--muted)] mb-4 font-mono bg-gray-50 p-2 rounded">
-              Fehler-Referenz: {error.digest}
+
+          {/* Error Details - immer sichtbar für Debugging */}
+          <div className="text-left bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <p className="text-sm font-medium text-red-800 mb-2">Fehler-Details:</p>
+            <p className="text-xs text-red-700 font-mono mb-1">
+              <span className="text-red-500">Name:</span> {error.name || "Unbekannt"}
             </p>
-          )}
+            <p className="text-xs text-red-700 font-mono mb-2">
+              <span className="text-red-500">Nachricht:</span> {error.message || "Keine Nachricht"}
+            </p>
+            {error.digest && (
+              <p className="text-xs text-red-700 font-mono mb-2">
+                <span className="text-red-500">Referenz:</span> {error.digest}
+              </p>
+            )}
+            <button
+              onClick={() => setShowDetails(!showDetails)}
+              className="text-xs text-red-600 underline"
+            >
+              {showDetails ? "Stack-Trace verbergen" : "Stack-Trace anzeigen"}
+            </button>
+            {showDetails && error.stack && (
+              <pre className="text-xs text-red-600 mt-2 whitespace-pre-wrap overflow-auto max-h-40 bg-red-100 p-2 rounded">
+                {error.stack}
+              </pre>
+            )}
+          </div>
           <div className="flex gap-3 justify-center">
             <button onClick={reset} className="btn-primary">
               Erneut laden
