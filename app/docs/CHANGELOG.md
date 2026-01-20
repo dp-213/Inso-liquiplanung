@@ -692,6 +692,21 @@ Neue stabile Struktur für Import-Daten:
 - Types aus `/lib/types/allocation.ts` importiert
 - Keine neuen Schema-Änderungen (nutzt bestehende Felder aus 2.2.0)
 
+### Fachliche Korrektur: Keine TRANSACTION_DATE_RULE
+**WICHTIG:** Das Buchungsdatum (transactionDate) ist KEINE gültige Entscheidungsgrundlage für die Alt/Neu-Zuordnung!
+
+Maßgeblich für die Zuordnung ist ausschließlich die **Forderungsentstehung**:
+- `serviceDate` – Wann wurde die Leistung erbracht?
+- `servicePeriod` – Welcher Zeitraum wird abgerechnet?
+- Vertragslogik – Explizite Split-Regeln (z.B. KV Q4: 1/3-2/3)
+
+Wenn keine Leistungsinformation vorhanden ist:
+- `estateAllocation = UNKLAR`
+- `allocationSource = UNKLAR`
+- Manuelle Zuordnung durch Benutzer erforderlich
+
+Das Buchungsdatum darf höchstens als technischer Hinweis dienen, niemals als automatischer Fallback.
+
 ---
 
 ## Geplante Änderungen
