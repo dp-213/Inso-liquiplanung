@@ -238,6 +238,12 @@ export interface LedgerEntryResponse {
   changeReason: string | null;
   previousAmountCents: string | null; // BigInt as string
 
+  // Estate Allocation (Alt-/Neumasse)
+  estateAllocation: string | null;
+  estateRatio: string | null;
+  allocationSource: string | null;
+  allocationNote: string | null;
+
   // Audit
   createdAt: string;
   createdBy: string;

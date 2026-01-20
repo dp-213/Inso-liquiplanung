@@ -40,6 +40,11 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
     reviewNote: entry.reviewNote,
     changeReason: entry.changeReason,
     previousAmountCents: entry.previousAmountCents?.toString() || null,
+    // Estate Allocation
+    estateAllocation: entry.estateAllocation,
+    estateRatio: entry.estateRatio?.toString() || null,
+    allocationSource: entry.allocationSource,
+    allocationNote: entry.allocationNote,
     createdAt: entry.createdAt.toISOString(),
     createdBy: entry.createdBy,
     updatedAt: entry.updatedAt.toISOString(),

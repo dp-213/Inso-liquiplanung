@@ -33,6 +33,15 @@ const REVIEW_STATUS_LABELS: Record<ReviewStatus, string> = {
   ADJUSTED: "Korrigiert",
 };
 
+// Estate Allocation (Alt-/Neumasse)
+type EstateAllocation = "ALTMASSE" | "NEUMASSE" | "MIXED" | "UNKLAR" | "";
+const ESTATE_ALLOCATION_LABELS: Record<string, string> = {
+  ALTMASSE: "Altmasse",
+  NEUMASSE: "Neumasse",
+  MIXED: "Gemischt",
+  UNKLAR: "Unklar",
+};
+
 interface CaseData {
   id: string;
   caseNumber: string;
@@ -139,6 +148,8 @@ export default function CaseLedgerPage({
   const [filterLocationId, setFilterLocationId] = useState<string>("");
   // Import-Filter
   const [filterImportJobId, setFilterImportJobId] = useState<string>("");
+  // Estate Allocation Filter (Alt-/Neumasse)
+  const [filterEstateAllocation, setFilterEstateAllocation] = useState<EstateAllocation>("");
 
   // Auto-set review filter when tab changes
   useEffect(() => {
@@ -173,6 +184,8 @@ export default function CaseLedgerPage({
       if (filterLocationId) queryParams.set("locationId", filterLocationId);
       // Import-Filter
       if (filterImportJobId) queryParams.set("importJobId", filterImportJobId);
+      // Estate Allocation Filter
+      if (filterEstateAllocation) queryParams.set("estateAllocation", filterEstateAllocation);
 
       const queryString = queryParams.toString();
       const url = `/api/cases/${id}/ledger${queryString ? `?${queryString}` : ""}`;
@@ -256,7 +269,7 @@ export default function CaseLedgerPage({
     } finally {
       setLoading(false);
     }
-  }, [id, filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountId, filterCounterpartyId, filterLocationId, filterImportJobId]);
+  }, [id, filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountId, filterCounterpartyId, filterLocationId, filterImportJobId, filterEstateAllocation]);
 
   useEffect(() => {
     fetchData();
@@ -307,9 +320,10 @@ export default function CaseLedgerPage({
     setFilterCounterpartyId("");
     setFilterLocationId("");
     setFilterImportJobId("");
+    setFilterEstateAllocation("");
   };
 
-  const hasActiveFilters = filterValueType || filterLegalBucket || filterReviewStatus || filterSuggestedBucket || filterFrom || filterTo || filterBankAccountId || filterCounterpartyId || filterLocationId || filterImportJobId;
+  const hasActiveFilters = filterValueType || filterLegalBucket || filterReviewStatus || filterSuggestedBucket || filterFrom || filterTo || filterBankAccountId || filterCounterpartyId || filterLocationId || filterImportJobId || filterEstateAllocation;
 
   // Bulk Actions
   const handleBulkConfirm = async (filter?: { suggestedLegalBucket?: string; minConfidence?: number }) => {
@@ -554,6 +568,21 @@ export default function CaseLedgerPage({
     if (confidence >= 0.8) return "badge-success";
     if (confidence >= 0.5) return "badge-warning";
     return "badge-danger";
+  };
+
+  const getEstateAllocationBadgeClass = (allocation: string | null): string => {
+    switch (allocation) {
+      case "ALTMASSE":
+        return "bg-amber-100 text-amber-800";
+      case "NEUMASSE":
+        return "bg-green-100 text-green-800";
+      case "MIXED":
+        return "bg-purple-100 text-purple-800";
+      case "UNKLAR":
+        return "bg-red-100 text-red-800";
+      default:
+        return "badge-neutral";
+    }
   };
 
   const handleSync = async () => {
@@ -1112,6 +1141,24 @@ export default function CaseLedgerPage({
             </div>
           )}
 
+          {/* Alt-/Neumasse Filter */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+              Alt-/Neumasse
+            </label>
+            <select
+              value={filterEstateAllocation}
+              onChange={(e) => setFilterEstateAllocation(e.target.value as EstateAllocation)}
+              className="input-field min-w-[130px]"
+            >
+              <option value="">Alle</option>
+              <option value="ALTMASSE">Altmasse</option>
+              <option value="NEUMASSE">Neumasse</option>
+              <option value="MIXED">Gemischt</option>
+              <option value="UNKLAR">Unklar</option>
+            </select>
+          </div>
+
           {hasActiveFilters && (
             <button
               onClick={clearFilters}
@@ -1170,6 +1217,7 @@ export default function CaseLedgerPage({
                   <SortHeader field="description" label="Beschreibung" />
                   <SortHeader field="amountCents" label="Betrag" className="text-right" />
                   <SortHeader field="valueType" label="Typ" />
+                  <th>Alt/Neu</th>
                   <SortHeader field="legalBucket" label="Rechtsstatus" />
                   <SortHeader field="reviewStatus" label="Review" />
                   <th>Vorschlag</th>
@@ -1191,6 +1239,9 @@ export default function CaseLedgerPage({
                     suggestedLocationId?: string | null;
                     importSource?: string | null;
                     importJobId?: string | null;
+                    estateAllocation?: string | null;
+                    allocationSource?: string | null;
+                    allocationNote?: string | null;
                   };
 
                   return (
@@ -1227,6 +1278,18 @@ export default function CaseLedgerPage({
                         <span className={`badge ${getValueTypeBadgeClass(entry.valueType)}`}>
                           {VALUE_TYPE_LABELS[entry.valueType]}
                         </span>
+                      </td>
+                      <td>
+                        {entryWithExtras.estateAllocation ? (
+                          <span
+                            className={`badge text-xs ${getEstateAllocationBadgeClass(entryWithExtras.estateAllocation)}`}
+                            title={entryWithExtras.allocationNote || entryWithExtras.allocationSource || ''}
+                          >
+                            {ESTATE_ALLOCATION_LABELS[entryWithExtras.estateAllocation] || entryWithExtras.estateAllocation}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-[var(--muted)]">-</span>
+                        )}
                       </td>
                       <td>
                         <span className={`badge ${getBucketBadgeClass(entry.legalBucket)}`}>

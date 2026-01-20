@@ -27,6 +27,33 @@ const LEGAL_BUCKET_LABELS: Record<LegalBucket, string> = {
   UNKNOWN: "Unbekannt",
 };
 
+// Estate Allocation (Alt-/Neumasse)
+type EstateAllocationType = "ALTMASSE" | "NEUMASSE" | "MIXED" | "UNKLAR" | "";
+const ESTATE_ALLOCATION_OPTIONS: { value: EstateAllocationType; label: string }[] = [
+  { value: "", label: "-- Nicht gesetzt --" },
+  { value: "ALTMASSE", label: "Altmasse" },
+  { value: "NEUMASSE", label: "Neumasse" },
+  { value: "MIXED", label: "Gemischt" },
+  { value: "UNKLAR", label: "Unklar / Prüfung nötig" },
+];
+
+const ESTATE_ALLOCATION_BADGE_CLASSES: Record<string, string> = {
+  ALTMASSE: "bg-amber-100 text-amber-800 border-amber-200",
+  NEUMASSE: "bg-green-100 text-green-800 border-green-200",
+  MIXED: "bg-purple-100 text-purple-800 border-purple-200",
+  UNKLAR: "bg-red-100 text-red-800 border-red-200",
+};
+
+const ALLOCATION_SOURCE_LABELS: Record<string, string> = {
+  VERTRAGSREGEL: "Vertragsregel",
+  SERVICE_DATE_RULE: "Leistungsdatum",
+  PERIOD_PRORATA: "Zeitanteilig",
+  VORMONAT_LOGIK: "Vormonat-Logik",
+  TRANSACTION_DATE_RULE: "Buchungsdatum",
+  MANUELL: "Manuell zugeordnet",
+  UNKLAR: "Automatische Zuordnung nicht möglich",
+};
+
 // Review Status Badge Component
 function ReviewStatusBadge({ status }: { status: ReviewStatus }) {
   const label = REVIEW_STATUS_LABELS[status];
@@ -106,6 +133,9 @@ export default function LedgerEntryEditPage({
   const [formLocationId, setFormLocationId] = useState<string>("");
   const [formSteeringTag, setFormSteeringTag] = useState<string>("");
 
+  // Estate Allocation (Alt-/Neumasse)
+  const [formEstateAllocation, setFormEstateAllocation] = useState<EstateAllocationType>("");
+
   // Dropdown-Listen
   const [bankAccounts, setBankAccounts] = useState<BankAccount[]>([]);
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
@@ -167,6 +197,8 @@ export default function LedgerEntryEditPage({
           setFormCounterpartyId(data.counterpartyId || "");
           setFormLocationId(data.locationId || "");
           setFormSteeringTag(data.steeringTag || "");
+          // Estate Allocation initialisieren
+          setFormEstateAllocation(data.estateAllocation || "");
           // Import-Rohdaten speichern
           if (data.importData) {
             setImportData(data.importData);
@@ -203,6 +235,11 @@ export default function LedgerEntryEditPage({
           counterpartyId: formCounterpartyId || null,
           locationId: formLocationId || null,
           steeringTag: formSteeringTag || null,
+          // Estate Allocation - wenn manuell geändert, setze MANUELL als Quelle
+          estateAllocation: formEstateAllocation || null,
+          allocationSource: formEstateAllocation && formEstateAllocation !== entry?.estateAllocation
+            ? "MANUELL"
+            : undefined,
         }),
       });
 
@@ -641,6 +678,63 @@ export default function LedgerEntryEditPage({
                       placeholder="z.B. TOP_PAYER"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Massezuordnung (Alt/Neu) */}
+              <div className="pt-4 border-t border-[var(--border)]">
+                <h3 className="text-sm font-medium text-[var(--foreground)] mb-3">
+                  Massezuordnung (Alt/Neu)
+                </h3>
+
+                {/* Aktuelle Zuordnung anzeigen */}
+                {entry && (entry as LedgerEntryResponse & { estateAllocation?: string; allocationSource?: string; allocationNote?: string }).estateAllocation && (
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-sm text-[var(--muted)]">Aktuell:</span>
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                        ESTATE_ALLOCATION_BADGE_CLASSES[(entry as LedgerEntryResponse & { estateAllocation?: string }).estateAllocation || ''] || 'badge-neutral'
+                      }`}>
+                        {ESTATE_ALLOCATION_OPTIONS.find(o => o.value === (entry as LedgerEntryResponse & { estateAllocation?: string }).estateAllocation)?.label || (entry as LedgerEntryResponse & { estateAllocation?: string }).estateAllocation}
+                      </span>
+                    </div>
+                    {(entry as LedgerEntryResponse & { allocationSource?: string }).allocationSource && (
+                      <p className="text-xs text-[var(--muted)]">
+                        <span className="font-medium">Quelle:</span>{' '}
+                        {ALLOCATION_SOURCE_LABELS[(entry as LedgerEntryResponse & { allocationSource?: string }).allocationSource || ''] || (entry as LedgerEntryResponse & { allocationSource?: string }).allocationSource}
+                      </p>
+                    )}
+                    {(entry as LedgerEntryResponse & { allocationNote?: string }).allocationNote && (
+                      <p className="text-xs text-[var(--muted)] mt-1">
+                        <span className="font-medium">Begründung:</span>{' '}
+                        {(entry as LedgerEntryResponse & { allocationNote?: string }).allocationNote}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Manuelles Setzen */}
+                <div>
+                  <label className="block text-sm text-[var(--muted)] mb-1">
+                    Massezuordnung ändern
+                  </label>
+                  <select
+                    value={formEstateAllocation}
+                    onChange={(e) => setFormEstateAllocation(e.target.value as EstateAllocationType)}
+                    className="input-field w-full"
+                  >
+                    {ESTATE_ALLOCATION_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-[var(--muted)] mt-1">
+                    {(entry as LedgerEntryResponse & { estateAllocation?: string })?.estateAllocation === 'UNKLAR'
+                      ? '⚠️ Automatische Zuordnung war nicht möglich - bitte manuell prüfen'
+                      : 'Manuelle Änderung überschreibt automatische Zuordnung'
+                    }
+                  </p>
                 </div>
               </div>
 

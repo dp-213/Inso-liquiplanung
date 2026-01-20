@@ -36,6 +36,11 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse & {
   suggestedBankAccountId: string | null;
   suggestedCounterpartyId: string | null;
   suggestedLocationId: string | null;
+  // Estate Allocation (Alt-/Neumasse)
+  estateAllocation: string | null;
+  estateRatio: string | null;
+  allocationSource: string | null;
+  allocationNote: string | null;
 } {
   return {
     id: entry.id,
@@ -78,6 +83,11 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse & {
     createdAt: entry.createdAt.toISOString(),
     createdBy: entry.createdBy,
     updatedAt: entry.updatedAt.toISOString(),
+    // Estate Allocation (Alt-/Neumasse)
+    estateAllocation: entry.estateAllocation,
+    estateRatio: entry.estateRatio?.toString() || null,
+    allocationSource: entry.allocationSource,
+    allocationNote: entry.allocationNote,
     // Derived
     flowType: deriveFlowType(BigInt(entry.amountCents)),
   };
@@ -113,6 +123,8 @@ export async function GET(
     const hasDimensionSuggestions = searchParams.get('hasDimensionSuggestions');
     // Import-Filter
     const importJobId = searchParams.get('importJobId');
+    // Estate Allocation Filter (Alt-/Neumasse)
+    const estateAllocation = searchParams.get('estateAllocation');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 100;
@@ -191,6 +203,15 @@ export async function GET(
     // Import-Filter
     if (importJobId) {
       where.importJobId = importJobId;
+    }
+
+    // Estate Allocation Filter
+    if (estateAllocation) {
+      if (estateAllocation === 'null') {
+        where.estateAllocation = null;
+      } else {
+        where.estateAllocation = estateAllocation;
+      }
     }
 
     if (from || to) {

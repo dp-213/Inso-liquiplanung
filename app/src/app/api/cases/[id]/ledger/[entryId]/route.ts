@@ -42,6 +42,11 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
     reviewNote: entry.reviewNote,
     changeReason: entry.changeReason,
     previousAmountCents: entry.previousAmountCents?.toString() || null,
+    // Estate Allocation
+    estateAllocation: entry.estateAllocation,
+    estateRatio: entry.estateRatio?.toString() || null,
+    allocationSource: entry.allocationSource,
+    allocationNote: entry.allocationNote,
     // Audit
     createdAt: entry.createdAt.toISOString(),
     createdBy: entry.createdBy,
@@ -211,6 +216,17 @@ export async function PUT(
 
     if (body.steeringTag !== undefined) {
       updateData.steeringTag = body.steeringTag || null;
+    }
+
+    // Estate Allocation (Alt-/Neumasse)
+    if (body.estateAllocation !== undefined) {
+      updateData.estateAllocation = body.estateAllocation || null;
+    }
+    if (body.allocationSource !== undefined) {
+      updateData.allocationSource = body.allocationSource || null;
+    }
+    if (body.allocationNote !== undefined) {
+      updateData.allocationNote = body.allocationNote || null;
     }
 
     // Build field changes for audit log

@@ -20,6 +20,7 @@ interface CaseData {
   courtName: string;
   filingDate: string;
   openingDate: string | null;
+  cutoffDate: string | null;  // Stichtag für Alt/Neu-Masse
   status: string;
   owner: { id: string; name: string; email: string };
   plans: Array<{
@@ -52,6 +53,7 @@ export default function CaseEditPage({
     courtName: "",
     filingDate: "",
     openingDate: "",
+    cutoffDate: "",  // Stichtag für Alt/Neu-Masse
     status: "",
   });
   const [planFormData, setPlanFormData] = useState({
@@ -84,6 +86,9 @@ export default function CaseEditPage({
             : "",
           openingDate: data.openingDate
             ? new Date(data.openingDate).toISOString().split("T")[0]
+            : "",
+          cutoffDate: data.cutoffDate
+            ? new Date(data.cutoffDate).toISOString().split("T")[0]
             : "",
           status: data.status,
         });
@@ -127,6 +132,7 @@ export default function CaseEditPage({
           courtName: formData.courtName,
           filingDate: formData.filingDate,
           openingDate: formData.openingDate || null,
+          cutoffDate: formData.cutoffDate || null,
           status: formData.status,
         }),
       });
@@ -409,6 +415,45 @@ export default function CaseEditPage({
             <p className="text-xs text-[var(--muted)] mt-1">
               {caseData.owner?.email || ""}
             </p>
+          </div>
+        </div>
+
+        {/* Insolvency Settings Section */}
+        <div className="pt-6 border-t border-[var(--border)]">
+          <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">Insolvenz-Einstellungen</h3>
+          <p className="text-sm text-[var(--muted)] mb-4">
+            Diese Einstellungen steuern die automatische Alt-/Neumasse-Zuordnung beim Datenimport.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label
+                htmlFor="cutoffDate"
+                className="block text-sm font-medium text-[var(--foreground)] mb-2"
+              >
+                Stichtag (Alt-/Neumasse)
+              </label>
+              <input
+                type="date"
+                id="cutoffDate"
+                name="cutoffDate"
+                value={formData.cutoffDate}
+                onChange={handleChange}
+                className="input-field"
+              />
+              <p className="text-xs text-[var(--muted)] mt-1">
+                Datum ab dem Forderungen/Leistungen als Neumasse gelten.
+                Typischerweise das Datum des Insolvenzantrags.
+              </p>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-blue-800 mb-2">Wie funktioniert die Zuordnung?</h4>
+              <ul className="text-xs text-blue-700 space-y-1">
+                <li>• <strong>Altmasse:</strong> Leistungen VOR dem Stichtag</li>
+                <li>• <strong>Neumasse:</strong> Leistungen NACH dem Stichtag</li>
+                <li>• <strong>Mixed:</strong> Leistungszeitraum überlappt Stichtag</li>
+                <li>• <strong>Unklar:</strong> Kein Leistungsdatum vorhanden</li>
+              </ul>
+            </div>
           </div>
         </div>
 

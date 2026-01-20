@@ -7,6 +7,8 @@ import { markAggregationStale } from "@/lib/ledger/aggregation";
 import { classifyBatch, matchCounterpartyPatterns } from "@/lib/classification/engine";
 import { normalizeImportData, NormalizedImportContext } from "@/lib/import/normalized-schema";
 import { applyRules, ClassificationRule, ClassificationResult } from "@/lib/import/rule-engine";
+import { determineEstateAllocation } from "@/lib/settlement/split-engine";
+import { AllocationSource, EstateAllocation, AllocationResult } from "@/lib/types/allocation";
 
 interface Mappings {
   transactionDate: string;
@@ -65,6 +67,7 @@ export async function POST(
     let created = 0;
     let skipped = 0;
     let rulesApplied = 0;
+    let estateAllocated = 0;  // Wie viele Einträge eine Alt/Neu-Zuordnung bekommen haben
     const errors: Array<{ row: number; error: string }> = [];
 
     console.log(`[to-ledger] Processing ${job.records.length} records with mappings:`, mappings);
@@ -422,6 +425,29 @@ export async function POST(
         }
       }
 
+      // === ESTATE ALLOCATION: Alt-/Neumasse-Zuordnung ===
+      let estateAllocationResult: AllocationResult | null = null;
+      if (job.case.cutoffDate) {
+        // Split-Engine aufrufen
+        // Hinweis: Ohne SettlerConfig nur binäre Zuordnung möglich (transactionDate vs cutoffDate)
+        // Für case-spezifische Regeln (z.B. HZV Vormonat-Logik) wäre SettlerConfig nötig
+        estateAllocationResult = determineEstateAllocation(
+          {
+            transactionDate,
+            serviceDate: null, // Wird beim Import typischerweise nicht mitgeliefert
+            servicePeriodStart: null,
+            servicePeriodEnd: null,
+          },
+          null, // SettlerConfig - für jetzt ohne case-spezifische Config
+          job.case.cutoffDate
+        );
+
+        // Track: Wurde eine Zuordnung gemacht (nicht UNKLAR)?
+        if (estateAllocationResult.estateAllocation !== EstateAllocation.UNKLAR) {
+          estateAllocated++;
+        }
+      }
+
       // === LEDGER ENTRY ERSTELLEN ===
       // Nur Ergebnisse (IDs) übertragen, KEINE Rohdaten!
       await prisma.ledgerEntry.create({
@@ -451,10 +477,19 @@ export async function POST(
           counterpartyId: ruleResult?.assignCounterpartyId || null,
           locationId: ruleResult?.assignLocationId || null,
 
-          // Allocation Note: Begründung für Zuweisungen
+          // Allocation Note: Begründung für Zuweisungen (Regel-Engine)
           allocationNote: ruleResult?.highestPriorityRule
             ? `Regel: ${ruleResult.highestPriorityRule.name}`
             : null,
+
+          // Estate Allocation: Alt-/Neumasse-Zuordnung (Split-Engine)
+          estateAllocation: estateAllocationResult?.estateAllocation || null,
+          estateRatio: estateAllocationResult?.estateRatio || null,
+          allocationSource: estateAllocationResult?.allocationSource || null,
+          // Wenn Split-Engine Allokation gemacht hat, deren Note verwenden
+          ...(estateAllocationResult?.allocationNote && {
+            allocationNote: estateAllocationResult.allocationNote,
+          }),
         },
       });
 
@@ -506,7 +541,7 @@ export async function POST(
       }
     }
 
-    console.log(`[to-ledger] Finished: created=${created}, rulesApplied=${rulesApplied}, classified=${classified}, counterpartyMatched=${counterpartyMatched}, skipped=${skipped}, errors=${errors.length}`);
+    console.log(`[to-ledger] Finished: created=${created}, rulesApplied=${rulesApplied}, estateAllocated=${estateAllocated}, classified=${classified}, counterpartyMatched=${counterpartyMatched}, skipped=${skipped}, errors=${errors.length}`);
     if (errors.length > 0) {
       console.log(`[to-ledger] First errors:`, errors.slice(0, 5));
     }
@@ -515,6 +550,7 @@ export async function POST(
     let message = `${created} Zahlungen ins Ledger importiert`;
     const extras: string[] = [];
     if (rulesApplied > 0) extras.push(`${rulesApplied} mit Regeln zugeordnet`);
+    if (estateAllocated > 0) extras.push(`${estateAllocated} Alt/Neu zugeordnet`);
     if (classified > 0) extras.push(`${classified} klassifiziert`);
     if (counterpartyMatched > 0) extras.push(`${counterpartyMatched} Gegenparteien erkannt`);
     if (extras.length > 0) message += ` (${extras.join(", ")})`;
@@ -523,6 +559,7 @@ export async function POST(
       success: true,
       created,
       rulesApplied,
+      estateAllocated,
       classified,
       counterpartyMatched,
       skipped,
