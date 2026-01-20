@@ -630,6 +630,13 @@ Neue stabile Struktur für Import-Daten:
 - Normalized Import Schema dokumentiert
 - Import-Flow mit allen 7 Schritten beschrieben
 
+### UI-Änderungen
+- **Rules-Seite:** Match-Felder aktualisiert auf normalized Fields
+  - Neue Felder: standort, counterpartyHint, arzt, zeitraum, kategorie, kontoname, krankenkasse, lanr, referenz
+  - Entfernt: description, bookingReference, bookingSourceId (Legacy)
+- **Quick-Start Examples:** Aktualisiert für typische Insolvenzfall-Szenarien
+- **Info-Box:** Erklärt jetzt normalized Fields
+
 ---
 
 ## Geplante Änderungen

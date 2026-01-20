@@ -59,18 +59,31 @@ const MATCH_TYPE_LABELS: Record<string, string> = {
   AMOUNT_RANGE: "liegt im Bereich (bei Betrag)",
 };
 
+// Normalized Fields für Rule-Matching (gem. 3-Ebenen-Import-Architektur)
 const MATCH_FIELD_LABELS: Record<string, string> = {
-  description: "Verwendungszweck / Buchungstext",
-  bookingReference: "Rechnungs-/Referenznummer",
-  bookingSourceId: "Gegenkonto (IBAN/Kontonr.)",
-  amountCents: "Betrag (in Cent)",
+  bezeichnung: "Bezeichnung / Verwendungszweck",
+  standort: "Standort",
+  counterpartyHint: "Gegenpartei (aus Import)",
+  arzt: "Arzt / Behandler",
+  zeitraum: "Zeitraum / Abrechnungsperiode",
+  kategorie: "Kategorie",
+  kontoname: "Kontoname / Bankverbindung",
+  krankenkasse: "Krankenkasse / Kostenträger",
+  lanr: "LANR (Arztnummer)",
+  referenz: "Referenz / Belegnummer",
 };
 
 const MATCH_FIELD_HINTS: Record<string, string> = {
-  description: 'Der Text aus dem Kontoauszug, z.B. "Miete Januar" oder "Gehalt Müller"',
-  bookingReference: "Rechnungsnummer, Auftragsnummer, Mandatsreferenz",
-  bookingSourceId: "IBAN oder Kontonummer des Absenders/Empfängers",
-  amountCents: 'Für Betragsbereich-Regeln, z.B. "1000-5000" (in Euro)',
+  bezeichnung: 'Der Text aus dem Kontoauszug, z.B. "Miete Januar" oder "KV-Abrechnung"',
+  standort: 'Standort/Praxis/Filiale aus der Import-Datei, z.B. "Velbert" oder "Uckerath"',
+  counterpartyHint: 'Gegenpartei-Hinweis aus Import, z.B. "KV Nordrhein" oder "PVS"',
+  arzt: 'Arzt/Behandler aus Abrechnungsdaten',
+  zeitraum: 'Abrechnungszeitraum, z.B. "Q4/2025" oder "Oktober 2025"',
+  kategorie: 'Kategorie aus Import, z.B. "Einnahmen" oder "Personalkosten"',
+  kontoname: 'Kontoname aus Bankexport',
+  krankenkasse: 'Krankenkasse/KV aus Abrechnungsdaten',
+  lanr: 'Lebenslange Arztnummer für Abrechner-Zuordnung',
+  referenz: 'Rechnungs- oder Belegnummer',
 };
 
 const LEGAL_BUCKET_LABELS: Record<string, string> = {
@@ -104,7 +117,7 @@ export default function CaseRulesPage({
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
-    matchField: "description",
+    matchField: "bezeichnung",  // Default: normalized field
     matchType: "CONTAINS",
     matchValue: "",
     suggestedLegalBucket: "MASSE",
@@ -178,6 +191,7 @@ export default function CaseRulesPage({
   useEffect(() => {
     const createFrom = searchParams.get("createFrom");
     const suggestBucket = searchParams.get("suggestBucket");
+    const matchField = searchParams.get("matchField");  // Optional: spezifisches Feld
 
     if (createFrom) {
       // Pre-fill form with entry description
@@ -187,7 +201,7 @@ export default function CaseRulesPage({
 
       setFormData({
         name: `Regel: ${shortPattern}...`,
-        matchField: "description",
+        matchField: matchField || "bezeichnung",  // Default: normalized field
         matchType: "CONTAINS",
         matchValue: createFrom,
         suggestedLegalBucket: suggestBucket || "MASSE",
@@ -320,7 +334,7 @@ export default function CaseRulesPage({
   const resetForm = () => {
     setFormData({
       name: "",
-      matchField: "description",
+      matchField: "bezeichnung",  // Default: normalized field
       matchType: "CONTAINS",
       matchValue: "",
       suggestedLegalBucket: "MASSE",
@@ -413,7 +427,7 @@ export default function CaseRulesPage({
           <div className="text-sm text-blue-800">
             <p className="font-medium">So funktionieren Rules:</p>
             <ul className="mt-1 list-disc list-inside space-y-1">
-              <li>Rules prüfen neue Ledger-Einträge automatisch</li>
+              <li>Rules prüfen Import-Daten auf <strong>normalized Fields</strong> (Standort, Gegenpartei, Bezeichnung, etc.)</li>
               <li>Wenn eine Rule matched, wird ein <strong>Vorschlag</strong> gespeichert (nicht die finale Klassifikation)</li>
               <li>Im Ledger können Sie dann alle Vorschläge per Bulk-Aktion bestätigen</li>
               <li>Niedrigere Priorität = wird zuerst geprüft</li>
@@ -498,10 +512,14 @@ export default function CaseRulesPage({
                   className="input-field w-full"
                   placeholder={
                     formData.matchType === "AMOUNT_RANGE"
-                      ? "z.B. 1000-5000 (Euro)"
-                      : formData.matchField === "bookingSourceId"
-                      ? "z.B. DE89370400440532013000"
-                      : "z.B. Miete, Gehalt, Sparkasse"
+                      ? "z.B. 1000-5000 oder >500"
+                      : formData.matchField === "standort"
+                      ? "z.B. Velbert, Uckerath, Eitorf"
+                      : formData.matchField === "counterpartyHint"
+                      ? "z.B. KV, PVS, HZV"
+                      : formData.matchField === "lanr"
+                      ? "z.B. 123456789"
+                      : "z.B. Miete, Gehalt, KV-Abrechnung"
                   }
                   required
                 />
@@ -735,8 +753,46 @@ export default function CaseRulesPage({
             <button
               onClick={() => {
                 setFormData({
+                  name: "Standort Velbert → Sparkasse",
+                  matchField: "standort",
+                  matchType: "EQUALS",
+                  matchValue: "Velbert",
+                  suggestedLegalBucket: "MASSE",
+                  assignBankAccountId: "",
+                  assignCounterpartyId: "",
+                  assignLocationId: "",
+                });
+                setShowForm(true);
+              }}
+              className="p-4 border border-dashed border-[var(--border)] rounded-lg hover:border-[var(--primary)] hover:bg-blue-50 transition-colors text-left"
+            >
+              <p className="font-medium">Standort → Bank</p>
+              <p className="text-sm text-[var(--muted)] mt-1">Standort-basierte Bankkonto-Zuordnung</p>
+            </button>
+            <button
+              onClick={() => {
+                setFormData({
+                  name: "KV-Zahlung → Gegenpartei",
+                  matchField: "counterpartyHint",
+                  matchType: "CONTAINS",
+                  matchValue: "KV",
+                  suggestedLegalBucket: "MASSE",
+                  assignBankAccountId: "",
+                  assignCounterpartyId: "",
+                  assignLocationId: "",
+                });
+                setShowForm(true);
+              }}
+              className="p-4 border border-dashed border-[var(--border)] rounded-lg hover:border-[var(--primary)] hover:bg-blue-50 transition-colors text-left"
+            >
+              <p className="font-medium">KV → Gegenpartei</p>
+              <p className="text-sm text-[var(--muted)] mt-1">KV-Zahlungen einer Gegenpartei zuordnen</p>
+            </button>
+            <button
+              onClick={() => {
+                setFormData({
                   name: "Miete → Neutral",
-                  matchField: "description",
+                  matchField: "bezeichnung",
                   matchType: "CONTAINS",
                   matchValue: "Miete",
                   suggestedLegalBucket: "NEUTRAL",
@@ -750,44 +806,6 @@ export default function CaseRulesPage({
             >
               <p className="font-medium">Miete → Neutral</p>
               <p className="text-sm text-[var(--muted)] mt-1">Mietkosten als neutral klassifizieren</p>
-            </button>
-            <button
-              onClick={() => {
-                setFormData({
-                  name: "Gehalt → Masse",
-                  matchField: "description",
-                  matchType: "CONTAINS",
-                  matchValue: "Gehalt",
-                  suggestedLegalBucket: "MASSE",
-                  assignBankAccountId: "",
-                  assignCounterpartyId: "",
-                  assignLocationId: "",
-                });
-                setShowForm(true);
-              }}
-              className="p-4 border border-dashed border-[var(--border)] rounded-lg hover:border-[var(--primary)] hover:bg-blue-50 transition-colors text-left"
-            >
-              <p className="font-medium">Gehalt → Masse</p>
-              <p className="text-sm text-[var(--muted)] mt-1">Gehaltszahlungen als Masse</p>
-            </button>
-            <button
-              onClick={() => {
-                setFormData({
-                  name: "Bank → Absonderung",
-                  matchField: "description",
-                  matchType: "STARTS_WITH",
-                  matchValue: "Bank",
-                  suggestedLegalBucket: "ABSONDERUNG",
-                  assignBankAccountId: "",
-                  assignCounterpartyId: "",
-                  assignLocationId: "",
-                });
-                setShowForm(true);
-              }}
-              className="p-4 border border-dashed border-[var(--border)] rounded-lg hover:border-[var(--primary)] hover:bg-blue-50 transition-colors text-left"
-            >
-              <p className="font-medium">Bank → Absonderung</p>
-              <p className="text-sm text-[var(--muted)] mt-1">Bankgebühren als Absonderung</p>
             </button>
           </div>
         </div>
