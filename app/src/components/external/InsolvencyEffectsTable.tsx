@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+
 interface InsolvencyEffect {
   name: string;
   description: string | null;
@@ -166,9 +168,9 @@ export default function InsolvencyEffectsTable({
 
               {/* Effect Groups */}
               {sortedGroups.map(([groupKey, groupEffects]) => (
-                <>
+                <React.Fragment key={groupKey}>
                   {/* Group Header */}
-                  <tr key={`group-${groupKey}`} className="bg-gray-100">
+                  <tr className="bg-gray-100">
                     <td colSpan={periodCount + 2} className="px-4 py-2 text-xs font-semibold text-[var(--secondary)] uppercase">
                       {EFFECT_GROUPS[groupKey]?.label || groupKey}
                     </td>
@@ -220,7 +222,7 @@ export default function InsolvencyEffectsTable({
                         </tr>
                       );
                     })}
-                </>
+                </React.Fragment>
               ))}
 
               {/* Subtotals */}

@@ -58,6 +58,31 @@ Dieses Dokument listet bekannte Einschränkungen und bewusste Nicht-Implementier
 
 ---
 
+### IST-Vorrang ist nicht umkehrbar
+
+**Beschreibung:** Wenn IST-Daten für eine Periode existieren, werden PLAN-Daten in der Liquiditätstabelle automatisch ignoriert. Dies kann nicht deaktiviert werden.
+
+**Begründung:** Bankbewegungen sind Realität. Planung ist nur noch historisch relevant, sobald echte Daten vorliegen.
+
+**Workaround:**
+- IST/PLAN-Vergleichs-Tab zeigt beide Werte nebeneinander
+- PLAN-Daten werden NICHT gelöscht, nur nicht mehr in Hauptansicht angezeigt
+- Bei Bedarf: PLAN-Entries filtern und einzeln prüfen
+
+---
+
+### Kein automatisches PLAN-Löschen bei IST-Import
+
+**Beschreibung:** Beim Import von IST-Daten werden existierende PLAN-Einträge nicht automatisch entfernt oder archiviert.
+
+**Begründung:** Bewusste Entscheidung. PLAN-Daten bleiben für Vergleich und Audit erhalten.
+
+**Workaround:**
+- IST-Vorrang-Logik ignoriert PLAN automatisch in Hauptansichten
+- Bei Bedarf: Manuelle Bereinigung über Ledger-Filter
+
+---
+
 ### Fester 13-Wochen-Horizont
 
 **Beschreibung:** Standard-Liquiditätsplan hat 13 Wochen. Monatsplanung ist optional.

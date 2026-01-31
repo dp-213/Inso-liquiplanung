@@ -355,6 +355,200 @@ BankAgreement hat KEINE `createdBy`/`updatedBy` Felder. Nur `createdAt`/`updated
 
 ---
 
+## ADR-012: ServiceDate-Regeln für Alt/Neu-Zuordnung
+
+**Datum:** 24. Januar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Die Split-Engine benötigt ein `serviceDate` (Leistungsdatum), um Buchungen der Alt- oder Neumasse zuzuordnen. Viele Buchungstypen folgen festen Mustern:
+- HZV-Monatsabschläge → Leistung = Zahlungsmonat
+- KV-Quartalsabrechnungen → Leistung = Vorquartal
+- Laufende Kosten → Leistung = Zahlungsmonat
+
+Bisher: 242 IST-Einträge hatten keine `estateAllocation`, weil `serviceDate` fehlte.
+
+### Entscheidung
+
+ClassificationRules können `assignServiceDateRule` mit einem von drei Regel-Typen setzen:
+
+1. **SAME_MONTH:** Leistungsdatum = 15. des Zahlungsmonats
+2. **VORMONAT:** Leistungsdatum = 15. des Vormonats (HZV-Logik)
+3. **PREVIOUS_QUARTER:** Leistungszeitraum = komplettes Vorquartal
+
+Die Classification Engine berechnet aus `transactionDate` + Regel das konkrete Datum und speichert es als Vorschlag (`suggestedServiceDate` / `suggestedServicePeriodStart/End`).
+
+### Begründung
+
+- **Effizienz:** 329 Einträge wurden mit einem Bulk-Accept klassifiziert
+- **Determinismus:** Regel + Buchungsdatum = eindeutiges Ergebnis
+- **Revisionssprache:** Jede Zuordnung dokumentiert die angewandte Regel
+- **Nur Vorschläge:** User muss explizit bestätigen (keine Auto-Commits)
+
+### Konsequenzen
+
+- `ClassificationRule.assignServiceDateRule` als neues Feld
+- `calculateServiceDate()` Funktion in Classification Engine
+- Bulk-Accept-API um `applyServiceDateSuggestions` erweitert
+- Preview-Modal zeigt alle Vorschläge vor Übernahme
+
+---
+
+## ADR-013: Standortspezifische Liquiditätssicht via Scope-Filter
+
+**Datum:** 24. Januar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Der IV (Insolvenzverwalter) wünscht sich standortspezifische Liquiditätssichten:
+- Velbert als Standalone-Einheit
+- Uckerath/Eitorf als zusammengefasste Einheit
+- Zentrale Verfahrenskosten sollen in Standort-Sichten nicht erscheinen
+
+Die bestehende Liquiditätstabelle soll unverändert bleiben (gleiche Zeilen, Perioden, Berechnung).
+
+### Entscheidung
+
+1. **Scope als Filter VOR der Aggregation:** Der Scope-Filter (`filterEntriesByScope()`) wird auf LedgerEntries angewandt, BEVOR sie in Perioden aggregiert werden.
+
+2. **Keine separate Tabelle:** Die gleiche Tabelle wird mit gefiltertem Datenbestand gerendert.
+
+3. **Zentrale Kosten explizit definiert:** `isCentralProcedureCost()` identifiziert insolvenzspezifische Kosten ohne Standortbezug.
+
+4. **Scope-spezifische Zeilen:** Via `visibleInScopes` können Zeilen nur in bestimmten Scopes erscheinen (z.B. Velbert-Personaldetails).
+
+### Begründung
+
+**Warum Filter vor Aggregation?**
+- Öffnungs-/Endbestände müssen konsistent sein
+- Keine nachträgliche UI-Filterung, die Summen verfälscht
+- Einfache Implementierung: Ein Filterschritt, danach normale Berechnung
+
+**Warum keine separate Tabelle?**
+- DRY-Prinzip: Gleiche Berechnungslogik
+- Konsistente Darstellung
+- Weniger Wartungsaufwand
+
+**Warum zentrale Kosten explizit?**
+- Entries ohne `locationId` sind nicht automatisch "zentral"
+- `ABSONDERUNG` ist typischerweise zentral
+- Pattern-Match als Fallback für insolvenzspezifische Beschreibungen
+
+### Konsequenzen
+
+- **Positiv:** IV erhält exakt gewünschte Standort-Sichten
+- **Positiv:** Keine Duplizierung von Logik
+- **Negativ:** Zentrale Kosten-Patterns müssen bei neuen Kostenarten erweitert werden
+- **Negativ:** Scope-spezifische Zeilen müssen in Konfiguration gepflegt werden
+
+---
+
+## ADR-014: Dashboard-Konsistenz via einheitliche Filter
+
+**Datum:** 24. Januar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Analyse der Dashboard-Tabs ergab kritische Inkonsistenzen:
+
+| Tab | reviewStatus-Filter | Estate-Trennung | Scope |
+|-----|---------------------|-----------------|-------|
+| Übersicht | CONFIRMED, ADJUSTED | ✅ Alt/Neu/Unklar | ❌ Nein |
+| Liquiditätstabelle | **≠ REJECTED** (inkl. UNREVIEWED!) | ✅ Optional | ✅ Ja |
+| Standorte | CONFIRMED, ADJUSTED | ❌ KEINE! | Implizit |
+
+**Problem:** IV sieht in der Liquiditätstabelle ungeprüfte Daten, in der Übersicht nicht.
+
+### Entscheidung
+
+1. **reviewStatus-Toggle statt automatischer Filterung:**
+   - Default: Nur geprüfte Buchungen (CONFIRMED + ADJUSTED)
+   - Admin kann "inkl. ungeprüfte" aktivieren → zeigt alles außer REJECTED
+   - Warnung-Banner wenn ungeprüfte enthalten sind
+
+2. **Globaler Scope-State im Dashboard:**
+   - Scope-Toggle im Dashboard-Header (über den Tabs)
+   - Scope gilt für alle Tabs (aktuell: Liquiditätstabelle, KPIs)
+   - Controlled Components: Child-Komponenten erhalten scope als Prop
+
+3. **Estate-Trennung in Locations:**
+   - API liefert `estateBreakdown` pro Standort
+   - Viability-Check pro Estate möglich
+
+### Begründung
+
+**Warum Toggle statt Automatik?**
+- Admin entscheidet bewusst, ob vorläufige Zahlen gezeigt werden
+- Warnung macht Unsicherheit explizit
+- Keine versteckten Unterschiede zwischen Ansichten
+
+**Warum globaler Scope-State?**
+- Vermeidet inkonsistente Filterung zwischen Tabs
+- User muss Scope nur einmal wählen
+- Tabs zeigen konsistente Zahlen für gleichen Scope
+
+**Warum zwei Aggregationsfunktionen beibehalten?**
+- `/lib/ledger-aggregation.ts`: Einfache Dashboard-Aggregation
+- `/lib/ledger/aggregation.ts`: Spezialisierte Funktionen (Rolling Forecast, Cache, etc.)
+- Unterschiedliche Zwecke, keine echte Duplizierung
+
+### Konsequenzen
+
+- **Positiv:** IV erhält konsistente Zahlen über alle Tabs
+- **Positiv:** Explizite Kontrolle über Datenqualität (geprüft vs. vorläufig)
+- **Negativ:** Mehr State-Management im Dashboard
+- **Negativ:** Alle Consumer müssen scope unterstützen
+
+---
+
+## ADR-015: IST-Vorrang-Logik
+
+**Datum:** 25. Januar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+In der Liquiditätsmatrix wurden Perioden mit IST-Daten und PLAN-Daten als "MIXED" angezeigt. Die Werte wurden addiert, was zu falschen Zahlen führte:
+- November/Dezember hatten reale Bankbewegungen (IST)
+- Aber auch noch alte PLAN-Werte für denselben Zeitraum
+- Badge zeigte "MIXED", Summen waren doppelt
+
+**User-Feedback:** "Wenn die Bankbewegungen da sind, ist das Realität. Planung interessiert mich nur noch historisch."
+
+### Entscheidung
+
+**IST hat Vorrang vor PLAN.** Wenn für eine Periode IST-Daten existieren, werden PLAN-Daten für diese Periode bei der Aggregation ignoriert.
+
+1. **Voranalyse:** Ermittle alle Perioden mit mindestens einer IST-Buchung
+2. **Aggregation:** PLAN-Entries für diese Perioden überspringen
+3. **Tracking:** `planIgnoredCount` zählt übersprungene PLAN-Buchungen
+4. **UI-Feedback:** Grünes Info-Banner zeigt Anzahl ersetzter PLAN-Buchungen
+
+### Begründung
+
+**Warum ignorieren statt filtern?**
+- PLAN-Buchungen bleiben in der DB erhalten (wichtig für Audit)
+- Nur die Anzeige/Aggregation wird angepasst
+- Separater IST/PLAN-Vergleichs-Tab kann weiterhin beide zeigen
+
+**Warum pro Periode, nicht pro Zeile?**
+- Wenn eine Periode IST-Daten hat, gilt die ganze Periode als "real"
+- Vermeidet Komplexität beim Matching einzelner Zeilen
+- Entspricht dem echten Planungsprozess: Periode für Periode wird IST ersetzt
+
+### Konsequenzen
+
+- **Positiv:** Badges zeigen "IST" statt irreführendem "MIXED"
+- **Positiv:** Zahlen in der Matrix entsprechen der Realität
+- **Positiv:** Keine Doppelzählung von PLAN + IST
+- **Negativ:** PLAN-Werte nicht mehr direkt sichtbar (benötigt Vergleichs-View)
+- **Offen:** Echter IST/PLAN-Vergleichs-Tab als nächster Schritt geplant
+
+---
+
 ## Template für neue Entscheidungen
 
 ```markdown

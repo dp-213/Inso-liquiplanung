@@ -98,10 +98,32 @@ export default function AdminDashboardPage() {
         <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
-        <span className="text-[var(--foreground)]">Liquiditätsplan</span>
+        <span className="text-[var(--foreground)]">Dashboard</span>
       </div>
 
-      {/* Unified Dashboard with Admin capabilities */}
+      {/* Quick Actions */}
+      <div className="flex items-center justify-end gap-2">
+        <Link
+          href={`/admin/cases/${caseId}/kontobewegungen`}
+          className="btn-secondary text-sm py-1.5 px-3 flex items-center"
+        >
+          <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          IST
+        </Link>
+        <Link
+          href={`/admin/cases/${caseId}/ledger`}
+          className="btn-secondary text-sm py-1.5 px-3 flex items-center"
+        >
+          <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+          </svg>
+          Ledger
+        </Link>
+      </div>
+
+      {/* Dashboard Content */}
       <UnifiedCaseDashboard
         data={data}
         accessMode="admin"

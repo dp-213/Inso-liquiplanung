@@ -269,6 +269,12 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
       ],
     },
     {
+      id: "liquidity-matrix",
+      label: "Liquiditätstabelle",
+      icon: "table",
+      panels: [],
+    },
+    {
       id: "banks",
       label: "Banken/Massekredit",
       icon: "bank",
@@ -306,6 +312,12 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
         { type: "estate-comparison", visible: true, order: 2 },
         { type: "estate-details", visible: true, order: 3 },
       ],
+    },
+    {
+      id: "locations",
+      label: "Standorte",
+      icon: "location",
+      panels: [],
     },
     {
       id: "waterfall",

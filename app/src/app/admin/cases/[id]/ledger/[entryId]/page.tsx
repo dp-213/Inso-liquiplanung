@@ -725,16 +725,26 @@ export default function LedgerEntryEditPage({
                     <div className="flex items-start gap-2">
                       <span className="text-purple-600">💡</span>
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-purple-800">
-                          Vorschlag aus Klassifikationsregel
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-medium text-purple-800">
+                            Vorschlag aus Klassifikationsregel
+                          </p>
                           {entry.suggestedServiceDateRule && (
-                            <span className="ml-2 text-xs font-normal bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
+                            <span className="text-xs font-normal bg-purple-100 text-purple-700 px-2 py-0.5 rounded">
                               {entry.suggestedServiceDateRule === "VORMONAT" && "Vormonat (HZV)"}
                               {entry.suggestedServiceDateRule === "SAME_MONTH" && "Gleicher Monat"}
                               {entry.suggestedServiceDateRule === "PREVIOUS_QUARTER" && "Vorquartal (KV)"}
                             </span>
                           )}
-                        </p>
+                          {(entry as LedgerEntryResponse & { suggestedRuleId?: string }).suggestedRuleId && (
+                            <Link
+                              href={`/admin/cases/${id}/rules?highlight=${(entry as LedgerEntryResponse & { suggestedRuleId?: string }).suggestedRuleId}`}
+                              className="text-xs text-purple-600 hover:text-purple-800 underline"
+                            >
+                              Regel anzeigen →
+                            </Link>
+                          )}
+                        </div>
                         <p className="text-sm text-purple-700 mt-1">
                           {entry.suggestedServiceDate && (
                             <>Leistungsdatum: <strong>{new Date(entry.suggestedServiceDate).toLocaleDateString("de-DE")}</strong></>
@@ -743,6 +753,11 @@ export default function LedgerEntryEditPage({
                             <>Leistungszeitraum: <strong>{new Date(entry.suggestedServicePeriodStart).toLocaleDateString("de-DE")} - {new Date(entry.suggestedServicePeriodEnd).toLocaleDateString("de-DE")}</strong></>
                           )}
                         </p>
+                        {(entry as LedgerEntryResponse & { suggestedReason?: string }).suggestedReason && (
+                          <p className="text-xs text-purple-600 mt-1">
+                            {(entry as LedgerEntryResponse & { suggestedReason?: string }).suggestedReason}
+                          </p>
+                        )}
                         <button
                           type="button"
                           onClick={() => {

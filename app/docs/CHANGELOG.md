@@ -709,6 +709,324 @@ Das Buchungsdatum darf höchstens als technischer Hinweis dienen, niemals als au
 
 ---
 
+## Version 2.5.0 – ServiceDate-Vorschläge & Bulk-Accept
+
+**Datum:** 24. Januar 2026
+
+### Neue Funktionen
+
+#### ServiceDate-Regeln für Alt/Neu-Zuordnung
+- **Regel-basierte Leistungsdatum-Zuweisung:** ClassificationRules können jetzt `assignServiceDateRule` setzen
+- **Drei Regel-Typen:**
+  - `SAME_MONTH`: Leistungsdatum = Zahlungsmonat (Miete, Software, laufende Kosten)
+  - `VORMONAT`: HZV-Logik, Zahlung bezieht sich auf Vormonat
+  - `PREVIOUS_QUARTER`: Quartals-Schlusszahlungen (KV/HZV)
+- **Automatische Berechnung:** Bei Übernahme wird `estateAllocation` via Split-Engine berechnet
+
+#### Bulk-Accept für ServiceDate-Vorschläge
+- **Neuer Button:** "ServiceDate-Vorschläge" (lila) im Ledger-Review-Tab
+- **Preview-Modal:** Zeigt alle Einträge mit Vorschlägen in Tabellenansicht
+  - Buchungsdatum, Beschreibung, Betrag
+  - Angewandte Regel (SAME_MONTH, VORMONAT, PREVIOUS_QUARTER)
+  - Vorgeschlagenes Leistungsdatum/-zeitraum
+- **"Alle übernehmen"-Button:** Bulk-Accept mit automatischer Alt/Neu-Berechnung
+
+#### Regel-Anzeige in Ledger-Details
+- **Regel-Name:** Zeigt `suggestedReason` mit erklärenden Texten
+- **Link zur Regel:** "Regel anzeigen →" verlinkt zur Rules-Übersicht
+
+### API-Erweiterungen
+
+#### POST /api/cases/[id]/ledger/bulk-review
+- **Neuer Parameter:** `applyServiceDateSuggestions: true`
+- **Funktionalität:**
+  - Übernimmt `suggestedServiceDate` oder `suggestedServicePeriodStart/End`
+  - Ruft Split-Engine auf mit `cutoffDate` des Falls
+  - Setzt `estateAllocation`, `estateRatio`, `allocationSource`, `allocationNote`
+
+#### GET /api/cases/[id]/ledger
+- **Neuer Filter:** `hasServiceDateSuggestion=true` für Preview-Modal
+
+### Neue Scripts
+
+| Script | Beschreibung |
+|--------|--------------|
+| `scripts/create-hvplus-service-date-rules.ts` | Erstellt 19 ServiceDate-Regeln für HVPlus |
+| `scripts/run-classification.ts` | Wendet Regeln auf bestehende UNREVIEWED-Einträge an |
+
+### Schema-Dokumentation
+
+LedgerEntry ServiceDate-Vorschläge (aus Phase C):
+```prisma
+// Vorgeschlagene ServiceDate-Werte (von Classification Engine)
+suggestedServiceDate          DateTime?
+suggestedServicePeriodStart   DateTime?
+suggestedServicePeriodEnd     DateTime?
+suggestedServiceDateRule      String?   // VORMONAT | SAME_MONTH | PREVIOUS_QUARTER
+```
+
+### HVPlus-spezifische Regeln
+
+19 Regeln für automatische ServiceDate-Zuweisung:
+
+| Kategorie | Anzahl | Regel |
+|-----------|--------|-------|
+| HZV-Monatsabschläge | 4 | SAME_MONTH |
+| KV/HZV Quartals-Schluss | 2 | PREVIOUS_QUARTER |
+| HAVG/HAEVG allgemein | 1 | VORMONAT |
+| Patientenzahlungen | 2 | SAME_MONTH |
+| Laufende Kosten | 10 | SAME_MONTH |
+
+---
+
+## Version 2.6.0 – Liquiditätsmatrix & Standort-Sichten
+
+**Datum:** 24. Januar 2026
+
+### Neue Funktionen
+
+#### IV-konforme Liquiditätstabelle
+- **Neuer Dashboard-Tab:** "Liquiditätstabelle" zwischen "Übersicht" und "Einnahmen"
+- **Block-Struktur nach IV-Standard:**
+  - Zahlungsmittelbestand am Anfang (mit Bank-Split: Sparkasse/apoBank)
+  - Operativer Cash-In (KV, HZV, PVS, Patientenzahlungen)
+  - Operativer Cash-Out (Personal je Standort, Miete, Betrieblich)
+  - Steuerlicher Cash-Out (USt, Sonstige Steuern)
+  - Insolvenzspezifischer Cash-Out (Verfahren, Beratung, Fortführung)
+  - Zahlungsmittelbestand am Ende (mit Bank-Split)
+- **IST/PLAN-Badge:** Pro Periode farbige Kennzeichnung (Grün/Lila/Grau)
+- **Validierungswarnungen:** Rechendifferenz, Negativsaldo, UNKLAR-Anteil
+
+#### Row-Mapping-Konfiguration
+- **Keine hardcodierten Text-Matches im View:** Alle Zuordnungen via `matrix-config.ts`
+- **Match-Kriterien:**
+  - `COUNTERPARTY_PATTERN`: Regex auf Gegenpartei-Name
+  - `LOCATION_ID`: Exakte Standort-ID
+  - `DESCRIPTION_PATTERN`: Regex auf Buchungsbeschreibung
+  - `LEGAL_BUCKET`: Rechtlicher Bucket (MASSE, ABSONDERUNG)
+  - `BANK_ACCOUNT_ID`: Für Bank-Splits
+  - `FALLBACK`: Catch-All für nicht zugeordnete Einträge
+
+#### Standortspezifische Liquiditätssicht (Scope)
+- **Scope-Toggle:** Gesamt / Velbert (Standalone) / Uckerath/Eitorf
+- **WICHTIG:** Filter erfolgt VOR der Aggregation (echte Standort-Sicht)
+- **Zentrale Verfahrenskosten:** In Standort-Scopes automatisch ausgeschlossen
+- **Hinweis-Banner:** Bei Standort-Sicht wird Einschränkung angezeigt
+
+#### Velbert-spezifische Personalzeilen
+- **Nur in Velbert-Scope sichtbar:**
+  - Personal – Vertretungsarzt
+  - – Wegfall Gehalt Arzt A
+  - – Wegfall Gehalt Arzt B
+- **In GLOBAL aggregiert:** Unter "Personal – Velbert"
+
+### API-Erweiterungen
+
+#### GET /api/cases/[id]/dashboard/liquidity-matrix
+- **Query-Parameter:**
+  - `estateFilter`: GESAMT | ALTMASSE | NEUMASSE | UNKLAR
+  - `showDetails`: true | false
+  - `scope`: GLOBAL | LOCATION_VELBERT | LOCATION_UCKERATH_EITORF
+- **Response enthält:**
+  - `scope`, `scopeLabel`, `scopeHint` für UI-Anzeige
+  - `blocks` mit aggregierten Zeilen und Werten
+  - `validation` mit Prüfergebnissen
+  - `meta` mit Statistiken (IST/PLAN-Counts)
+
+### Neue Dateien
+
+| Datei | Beschreibung |
+|-------|--------------|
+| `src/lib/cases/haevg-plus/matrix-config.ts` | Row-Mapping-Konfiguration mit ~25 Zeilen |
+| `src/app/api/cases/[id]/dashboard/liquidity-matrix/route.ts` | API-Endpoint |
+| `src/components/dashboard/LiquidityMatrixTable.tsx` | UI-Komponente |
+
+### Architektur-Entscheidungen
+
+#### Scope-Filter vor Aggregation
+Der Scope-Filter (`filterEntriesByScope()`) wird VOR der Perioden-Aggregation angewandt:
+```typescript
+// 3b. Apply Scope Filter - WICHTIG: VOR der Aggregation!
+const entries = filterEntriesByScope(allEntries, scope);
+```
+
+Dies stellt sicher, dass:
+- Öffnungs- und Endbestände nur für den Scope gelten
+- Summen nur Entries des Scopes enthalten
+- Keine doppelte Filterung (einmal für Anzeige, einmal für Berechnung)
+
+#### Zentrale Verfahrenskosten
+Erkennung via `isCentralProcedureCost()`:
+- Entries ohne `locationId`
+- Entries mit `legalBucket = ABSONDERUNG`
+- Pattern-Match auf insolvenzspezifische Beschreibungen
+
+---
+
+## Version 2.7.0 – Dashboard-Konsistenz & Globaler Scope
+
+**Datum:** 24. Januar 2026
+
+### Neue Funktionen
+
+#### reviewStatus-Toggle in Liquiditätsmatrix
+- **Admin-Toggle:** "inkl. ungeprüfte Buchungen" checkbox in der Liquiditätstabelle
+- **Query-Parameter:** `includeUnreviewed=true|false` (Default: false)
+- **Verhalten:**
+  - Default: Nur CONFIRMED + ADJUSTED Buchungen
+  - Mit Toggle: Alles außer REJECTED (inkl. UNREVIEWED)
+- **Warnung-Banner:** Wenn ungeprüfte Buchungen enthalten sind:
+  - Gelbes Banner mit Anzahl ungeprüfter Buchungen
+  - "Diese Zahlen sind vorläufig"
+- **Meta-Daten:** `unreviewedCount` in API-Response für Statistiken
+
+#### Estate-Trennung in Locations
+- **API-Parameter:** `estateFilter=GESAMT|ALTMASSE|NEUMASSE|UNKLAR`
+- **estateBreakdown pro Standort:** Jeder Standort enthält jetzt:
+  - `ALTMASSE`: inflowsCents, outflowsCents, netCents, count, isViable
+  - `NEUMASSE`: inflowsCents, outflowsCents, netCents, count, isViable
+  - `UNKLAR`: inflowsCents, outflowsCents, netCents, count, isViable
+- **Viability-Check:** `isViable: true` wenn Einnahmen > Ausgaben
+- **UI-Toggle:** Estate-Filter in LocationView (Gesamt/Altmasse/Neumasse/Unklar)
+- **Info-Banner:** Erklärt aktiven Filter mit Kontext zur Alt/Neu-Trennung
+
+#### Globaler Scope-State im Dashboard
+- **Neuer UI-Toggle:** "Standort-Sicht" im Dashboard-Header (über den Tabs)
+- **Drei Scopes:** Gesamt / Velbert (Standalone) / Uckerath/Eitorf
+- **Konsistente Anwendung:** Scope gilt für alle Tabs (aktuell: Liquiditätstabelle)
+- **Hinweis-Banner:** "Zentrale Verfahrenskosten sind in dieser Sicht nicht enthalten"
+- **Controlled Component:** LiquidityMatrixTable akzeptiert scope als Prop
+
+#### Scope in Dashboard-API (Übersicht)
+- **Query-Parameter:** `scope=GLOBAL|LOCATION_VELBERT|LOCATION_UCKERATH_EITORF`
+- **KPIs scope-aware:** Aggregation erfolgt nur für gewählten Scope
+- **Response enthält:** `scope`, `scopeLabel`, `scopeHint`
+- **Zentrale Verfahrenskosten:** Automatisch ausgeschlossen bei Standort-Scopes
+
+### API-Erweiterungen
+
+#### GET /api/cases/[id]/dashboard/liquidity-matrix
+- Neuer Parameter: `includeUnreviewed` (boolean)
+- Response erweitert um `unreviewedCount` in meta
+
+#### GET /api/cases/[id]/dashboard/locations
+- Neuer Parameter: `estateFilter` (GESAMT|ALTMASSE|NEUMASSE|UNKLAR)
+- Response erweitert um `estateBreakdown` pro Location
+
+#### GET /api/cases/[id]/dashboard
+- Neuer Parameter: `scope` (GLOBAL|LOCATION_VELBERT|LOCATION_UCKERATH_EITORF)
+- Response erweitert um `scope`, `scopeLabel`, `scopeHint`
+
+### Komponenten-Änderungen
+
+#### LiquidityMatrixTable.tsx
+- Neue Props: `scope?`, `onScopeChange?`, `hideScopeToggle?`
+- Controlled/Uncontrolled Mode für Scope
+- Exportiert: `LiquidityScope`, `SCOPE_LABELS`
+
+#### UnifiedCaseDashboard.tsx
+- Neuer State: `scope` (LiquidityScope)
+- Globaler Scope-Toggle im Header
+- Übergibt scope an LiquidityMatrixTable
+
+#### LocationView.tsx
+- Neuer State: `estateFilter` (EstateFilter)
+- Estate-Toggle (Gesamt/Altmasse/Neumasse/Unklar)
+- Info-Banner bei aktivem Filter
+
+### Architektur-Analyse
+
+#### Zwei Aggregationsfunktionen – bewusste Trennung
+Nach Analyse der bestehenden Aggregationsfunktionen:
+
+| Datei | Verwendung | Zweck |
+|-------|------------|-------|
+| `/lib/ledger-aggregation.ts` | Dashboard, Share, Customer | Einfache Dashboard-Aggregation mit Scope |
+| `/lib/ledger/aggregation.ts` | 8 API-Routen | Rolling Forecast, Availability, Counterparty-Aggregation, Cache |
+
+**Entscheidung:** Keine Konsolidierung – beide erfüllen unterschiedliche Anforderungen.
+
+### Technische Details
+
+#### Scope-Filterung
+- Filter erfolgt VOR Aggregation (nicht nachträglich)
+- Zentrale Verfahrenskosten erkannt via Pattern + legalBucket
+- Location-IDs case-insensitive gematcht
+
+---
+
+## Version 2.8.0 – IST-Vorrang & Scope-spezifische Zeilen
+
+**Datum:** 25. Januar 2026
+
+### Neue Funktionen
+
+#### IST-Vorrang-Logik
+- **Grundprinzip:** Wenn IST-Daten für eine Periode existieren, werden PLAN-Daten ignoriert
+- **Begründung:** Bankbewegungen sind Realität – Planung ist nur noch historisch relevant
+- **Implementierung:**
+  - Voranalyse: Welche Perioden haben IST-Daten?
+  - Aggregation: PLAN-Entries für diese Perioden werden übersprungen
+  - `planIgnoredCount` in Meta-Daten zeigt ignorierte PLAN-Buchungen
+- **UI-Banner:** Grünes Info-Banner "IST-Daten verwendet - X PLAN-Buchungen wurden durch IST-Daten ersetzt"
+- **Badge-Auswirkung:** Perioden zeigen jetzt "IST" statt "MIXED" wenn IST-Daten vorhanden
+
+#### Scope-spezifische Zeilen
+- **Personal-Zeilen nur im passenden Scope:**
+  - "Personal – Velbert" nur in GLOBAL + LOCATION_VELBERT
+  - "Personal – Uckerath/Eitorf" nur in GLOBAL + LOCATION_UCKERATH_EITORF
+- **Insolvenzspezifische Zeilen nur in GLOBAL:**
+  - "Insolvenzspezifischer Cash-Out" Block
+  - Alle IV-Vergütungs- und Verfahrenskosten-Zeilen
+- **Dynamische Filterung:** `visibleInScopes` in MatrixRowConfig
+- **Leere Blöcke ausgeblendet:** UI filtert Blöcke ohne sichtbare Zeilen
+
+#### Scope-Label-Verbesserung
+- **Vorher:** "Velbert (Standalone)"
+- **Nachher:** "Velbert"
+- **Konsistenz:** Label in matrix-config.ts und dashboard/route.ts vereinheitlicht
+
+### API-Erweiterungen
+
+#### GET /api/cases/[id]/dashboard/liquidity-matrix
+- Response erweitert um `planIgnoredCount` in meta
+- Zeilen-Filterung berücksichtigt `visibleInScopes`
+- IST-Vorrang-Logik in Aggregation integriert
+
+### Komponenten-Änderungen
+
+#### LiquidityMatrixTable.tsx
+- IST-Vorrang Info-Banner (grün) bei `planIgnoredCount > 0`
+- Filter für leere Blöcke (`.filter((block) => block.rows.length > 0)`)
+- Meta-Interface erweitert um `planIgnoredCount`
+
+#### matrix-config.ts
+- Neue Property: `visibleInScopes?: LiquidityScope[]`
+- Personal-Zeilen mit Scope-Einschränkung
+- Insolvenz-Zeilen nur in GLOBAL sichtbar
+
+#### Echter IST/PLAN-Vergleich Tab
+- **Neuer API-Endpoint:** `/api/cases/[id]/dashboard/ist-plan-comparison`
+- **WICHTIG:** Hier wird KEIN IST-Vorrang angewandt – beide Werte werden angezeigt
+- **Neue Komponente:** `IstPlanComparisonTable.tsx`
+- **Features:**
+  - Summary-Cards: IST-Summen, PLAN-Summen, Abweichung
+  - Zwei Ansichtsmodi: Netto-Ansicht und Detailansicht (Einnahmen/Ausgaben)
+  - Abweichungsspalten mit farblicher Kennzeichnung (grün = positiv, rot = negativ)
+  - Prozentuale Abweichung pro Periode
+  - Status-Badges pro Periode (IST, PLAN, IST+PLAN)
+- **Interpretation:** Positive Abweichung bei Einnahmen = gut, positive bei Ausgaben = schlecht
+
+### Architektur-Entscheidung
+
+#### IST vor PLAN (ADR)
+- **Problem:** Perioden mit IST+PLAN zeigten "MIXED" und summierten beide
+- **Entscheidung:** IST hat Vorrang – PLAN wird ignoriert wenn IST existiert
+- **Auswirkung:** Saubere Trennung zwischen Realität und Planung
+- **Vergleichs-View:** Separater Tab zeigt beide Werte für Vergleich
+
+---
+
 ## Geplante Änderungen
 
 Keine ausstehenden Änderungen

@@ -123,10 +123,33 @@ export interface AggregationWarning {
   totalCents: bigint;
 }
 
+// Scope-Typen für standortspezifische Filterung (aus matrix-config importiert)
+export type LiquidityScope = "GLOBAL" | "LOCATION_VELBERT" | "LOCATION_UCKERATH_EITORF";
+
+// Location-IDs für Standort-Scopes
+const SCOPE_LOCATION_IDS: Record<Exclude<LiquidityScope, "GLOBAL">, string[]> = {
+  LOCATION_VELBERT: ["velbert"],
+  LOCATION_UCKERATH_EITORF: ["uckerath", "eitorf"],
+};
+
+// Patterns für zentrale Verfahrenskosten (ohne Standortbezug)
+const CENTRAL_PROCEDURE_COST_PATTERNS = [
+  /verfahrenskosten/i,
+  /insolvenzverwalter/i,
+  /gerichtskosten/i,
+  /gutachter/i,
+  /rechtsanwalt.*insolvenz/i,
+  /steuerberater.*verfahren/i,
+  /zentral.*beratung/i,
+  /unternehmensberater/i,
+  /fortführungsbeitrag/i,
+];
+
 export interface AggregationOptions {
   valueTypes?: ValueType[]; // Wenn leer/undefined: beide
   reviewStatuses?: ReviewStatus[]; // Wenn leer/undefined: nur CONFIRMED + ADJUSTED
   includeSuggested?: boolean; // Für UNREVIEWED: suggestedLegalBucket verwenden
+  scope?: LiquidityScope; // Standortspezifische Filterung (Default: GLOBAL)
 }
 
 // =============================================================================
@@ -255,7 +278,7 @@ export async function aggregateLedgerEntries(
   const reviewStatuses = options.reviewStatuses || ["CONFIRMED", "ADJUSTED"];
 
   // Lade LedgerEntry für den Case
-  const entries = await prisma.ledgerEntry.findMany({
+  const allEntries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
       reviewStatus: { in: reviewStatuses },
@@ -263,11 +286,30 @@ export async function aggregateLedgerEntries(
     },
     include: {
       counterparty: { select: { name: true } },
-      location: { select: { name: true } },
+      location: { select: { id: true, name: true } },
       bankAccount: { select: { accountName: true } },
     },
     orderBy: { transactionDate: "asc" },
   });
+
+  // Scope-Filterung (WICHTIG: VOR der Aggregation!)
+  const scope = options.scope || "GLOBAL";
+  const entries = scope === "GLOBAL"
+    ? allEntries
+    : allEntries.filter((entry) => {
+        // Zentrale Verfahrenskosten in Standort-Scopes ausschließen
+        const isCentral =
+          !entry.location?.id &&
+          (entry.legalBucket === "ABSONDERUNG" ||
+            CENTRAL_PROCEDURE_COST_PATTERNS.some((p) => p.test(entry.description)));
+        if (isCentral) return false;
+
+        // Nur Entries des Standorts durchlassen
+        if (!entry.location?.id) return false;
+
+        const allowedLocationIds = SCOPE_LOCATION_IDS[scope as Exclude<LiquidityScope, "GLOBAL">];
+        return allowedLocationIds.includes(entry.location.id.toLowerCase());
+      });
 
   // Initialisiere Perioden
   const periods: PeriodAggregation[] = [];

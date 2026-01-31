@@ -130,13 +130,14 @@ export async function GET(
     const counterpartyId = searchParams.get('counterpartyId');
     const locationId = searchParams.get('locationId');
     const hasDimensionSuggestions = searchParams.get('hasDimensionSuggestions');
+    const hasServiceDateSuggestion = searchParams.get('hasServiceDateSuggestion');
     // Import-Filter
     const importJobId = searchParams.get('importJobId');
     // Estate Allocation Filter (Alt-/Neumasse)
     const estateAllocation = searchParams.get('estateAllocation');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
-    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 100;
+    const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 1000;
     const offset = searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0;
 
     // Verify case exists
@@ -206,6 +207,14 @@ export async function GET(
         { suggestedBankAccountId: { not: null } },
         { suggestedCounterpartyId: { not: null } },
         { suggestedLocationId: { not: null } },
+      ];
+    }
+
+    // Filter: Nur Einträge mit ServiceDate-Vorschlägen (für Bulk-Accept Preview)
+    if (hasServiceDateSuggestion === 'true') {
+      where.OR = [
+        { suggestedServiceDate: { not: null } },
+        { suggestedServicePeriodStart: { not: null } },
       ];
     }
 

@@ -31,7 +31,10 @@ import SecurityRightsChart from "@/components/dashboard/SecurityRightsChart";
 import RollingForecastChart from "@/components/dashboard/RollingForecastChart";
 import RollingForecastTable from "@/components/dashboard/RollingForecastTable";
 import MasseCreditTab from "@/components/dashboard/MasseCreditTab";
-// DataSourceLegend entfernt - nicht operativ relevant für Insolvenzverwalter
+import LocationView from "@/components/dashboard/iv-views/LocationView";
+import LiquidityMatrixTable, { LiquidityScope, SCOPE_LABELS } from "@/components/dashboard/LiquidityMatrixTable";
+import IstPlanComparisonTable from "@/components/dashboard/IstPlanComparisonTable";
+import Link from "next/link";
 
 // =============================================================================
 // Tab Navigation Icons
@@ -91,6 +94,19 @@ function TabIcon({ icon }: { icon: string }) {
       return (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      );
+    case "location":
+      return (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      );
+    case "table":
+      return (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
         </svg>
       );
     default:
@@ -160,6 +176,9 @@ export default function UnifiedCaseDashboard({
 }: UnifiedCaseDashboardProps) {
   const [activeTab, setActiveTab] = useState(config.tabs[0]?.id || "overview");
   const reportRef = useRef<HTMLDivElement>(null);
+
+  // Global scope state for consistent filtering across tabs
+  const [scope, setScope] = useState<LiquidityScope>("GLOBAL");
 
   // Get capabilities
   const capabilities = propCapabilities || getCapabilitiesForAccessMode(accessMode);
@@ -325,6 +344,26 @@ export default function UnifiedCaseDashboard({
           </div>
         );
 
+      case "liquidity-matrix":
+        return (
+          <div className="space-y-6">
+            {caseId ? (
+              <LiquidityMatrixTable
+                caseId={caseId}
+                scope={scope}
+                onScopeChange={setScope}
+                hideScopeToggle={true}
+              />
+            ) : (
+              <div className="admin-card p-6">
+                <div className="text-center text-gray-500">
+                  Case-ID nicht verfügbar
+                </div>
+              </div>
+            )}
+          </div>
+        );
+
       case "banks":
         return (
           <div className="space-y-6">
@@ -464,6 +503,51 @@ export default function UnifiedCaseDashboard({
       case "estate":
         return (
           <div className="space-y-6">
+            {/* Links zu Detail-Listen (Backup Pages) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Link
+                href={`/admin/cases/${caseId}/ledger?estateAllocation=ALTMASSE`}
+                className="admin-card p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-3 h-3 rounded-full bg-amber-500" />
+                  <span className="font-medium">Altmasse</span>
+                </div>
+                <p className="text-sm text-[var(--secondary)]">
+                  Alle Buchungen vor Insolvenzeröffnung ansehen →
+                </p>
+              </Link>
+
+              <Link
+                href={`/admin/cases/${caseId}/ledger?estateAllocation=NEUMASSE`}
+                className="admin-card p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-3 h-3 rounded-full bg-blue-500" />
+                  <span className="font-medium">Neumasse</span>
+                </div>
+                <p className="text-sm text-[var(--secondary)]">
+                  Alle Buchungen nach Insolvenzeröffnung ansehen →
+                </p>
+              </Link>
+
+              {/* UNKLAR - prominent, mit Warnung */}
+              <Link
+                href={`/admin/cases/${caseId}/ledger?estateAllocation=UNKLAR`}
+                className="admin-card p-4 hover:shadow-md transition-shadow border-l-4 border-amber-500 bg-amber-50"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span className="font-medium text-amber-800">Noch nicht zugeordnet</span>
+                </div>
+                <p className="text-sm text-amber-700">
+                  Buchungen ohne Alt/Neu-Zuordnung prüfen →
+                </p>
+              </Link>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="admin-card p-4">
                 <div className="text-sm text-[var(--secondary)]">Gesamteinnahmen</div>
@@ -537,6 +621,19 @@ export default function UnifiedCaseDashboard({
                 </div>
               </div>
             </div>
+          </div>
+        );
+
+      case "locations":
+        return (
+          <div className="space-y-6">
+            {caseId ? (
+              <LocationView caseId={caseId} />
+            ) : (
+              <div className="admin-card p-6 text-center text-gray-500">
+                Case-ID nicht verfügbar
+              </div>
+            )}
           </div>
         );
 
@@ -636,68 +733,11 @@ export default function UnifiedCaseDashboard({
       case "compare":
         return (
           <div className="space-y-6">
-            {data.ledgerStats && data.ledgerStats.istCount > 0 ? (
-              <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">IST vs PLAN Vergleich</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="p-4 rounded-lg bg-green-50 border border-green-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                        <span className="text-green-700 font-bold text-xs">IST</span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-green-800">Reale Zahlungen</h3>
-                        <p className="text-xs text-green-600">Aus dem Zahlungsregister</p>
-                      </div>
-                    </div>
-                    <div className="text-3xl font-bold text-green-700">{data.ledgerStats.istCount}</div>
-                    <p className="text-sm text-green-600 mt-1">Buchungen erfasst</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-purple-50 border border-purple-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                        <span className="text-purple-700 font-bold text-xs">PLAN</span>
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-purple-800">Geplante Werte</h3>
-                        <p className="text-xs text-purple-600">Prognose und Planung</p>
-                      </div>
-                    </div>
-                    <div className="text-3xl font-bold text-purple-700">{data.ledgerStats.planCount}</div>
-                    <p className="text-sm text-purple-600 mt-1">Planwerte eingetragen</p>
-                  </div>
-                </div>
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-medium text-blue-800 mb-2">Status der Datenerfassung</h4>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                      <span className="text-blue-700">Bestätigt: {data.ledgerStats.confirmedCount}</span>
-                    </div>
-                    {data.ledgerStats.unreviewedCount > 0 && (
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-                        <span className="text-blue-700">Zu prüfen: {data.ledgerStats.unreviewedCount}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+            {caseId ? (
+              <IstPlanComparisonTable caseId={caseId} />
             ) : (
-              <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">IST vs PLAN Vergleich</h2>
-                <p className="text-sm text-[var(--secondary)] mb-4">
-                  Der Vergleich zwischen geplanten und tatsächlichen Werten wird verfügbar sein, sobald IST-Daten erfasst werden.
-                </p>
-                <div className="p-8 bg-gray-50 rounded-lg text-center">
-                  <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  <p className="text-[var(--muted)]">Noch keine IST-Daten vorhanden</p>
-                  <p className="text-xs text-[var(--secondary)] mt-2">
-                    IST-Daten werden im Admin-Bereich unter Zahlungsregister erfasst.
-                  </p>
-                </div>
+              <div className="admin-card p-6 text-center text-gray-500">
+                Case-ID nicht verfügbar
               </div>
             )}
 
@@ -754,6 +794,36 @@ export default function UnifiedCaseDashboard({
             {headerContent}
           </div>
         )}
+
+        {/* Global Scope Toggle - affects multiple tabs */}
+        <div className="flex items-center justify-between bg-white rounded-lg border border-gray-200 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-gray-700">Standort-Sicht:</span>
+            <div className="flex items-center gap-1 bg-indigo-50 rounded-lg p-1">
+              {(["GLOBAL", "LOCATION_VELBERT", "LOCATION_UCKERATH_EITORF"] as LiquidityScope[]).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setScope(s)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    scope === s
+                      ? "bg-white shadow-sm text-indigo-900 border border-indigo-200"
+                      : "text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100"
+                  }`}
+                >
+                  {SCOPE_LABELS[s]}
+                </button>
+              ))}
+            </div>
+          </div>
+          {scope !== "GLOBAL" && (
+            <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded-md">
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Zentrale Verfahrenskosten sind in dieser Sicht nicht enthalten</span>
+            </div>
+          )}
+        </div>
 
         {/* Navigation Tabs */}
         <nav className="flex flex-wrap gap-2 p-1 bg-gray-100 rounded-lg">

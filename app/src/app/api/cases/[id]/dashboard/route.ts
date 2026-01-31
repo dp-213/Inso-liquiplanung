@@ -13,7 +13,17 @@ import {
   convertToLegacyFormat,
 } from "@/lib/ledger-aggregation";
 
+type LiquidityScope = "GLOBAL" | "LOCATION_VELBERT" | "LOCATION_UCKERATH_EITORF";
+
+const SCOPE_LABELS: Record<LiquidityScope, string> = {
+  GLOBAL: "Gesamt",
+  LOCATION_VELBERT: "Velbert",
+  LOCATION_UCKERATH_EITORF: "Uckerath/Eitorf",
+};
+
 // GET /api/cases/[id]/dashboard - Get case dashboard data for admin
+// Query-Parameter:
+// - scope: GLOBAL | LOCATION_VELBERT | LOCATION_UCKERATH_EITORF (Default: GLOBAL)
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -26,6 +36,11 @@ export async function GET(
     }
 
     const { id: caseId } = await params;
+    const { searchParams } = new URL(request.url);
+    const scopeParam = searchParams.get("scope") || "GLOBAL";
+    const scope: LiquidityScope = ["GLOBAL", "LOCATION_VELBERT", "LOCATION_UCKERATH_EITORF"].includes(scopeParam)
+      ? (scopeParam as LiquidityScope)
+      : "GLOBAL";
 
     // Fetch case data with all related entities
     const caseData = await prisma.case.findUnique({
@@ -126,7 +141,8 @@ export async function GET(
         new Date(plan.planStartDate),
         periodType,
         periodCount,
-        openingBalanceCents
+        openingBalanceCents,
+        { scope }  // Scope-Filter
       );
       const legacyFormat = convertToLegacyFormat(aggregation);
 
@@ -305,7 +321,15 @@ export async function GET(
     }
 
     // Prepare response in CaseDashboardData format
+    const scopeHint = scope !== "GLOBAL"
+      ? "Zentrale Verfahrenskosten und nicht zuordenbare Gemeinkosten sind in dieser Sicht nicht enthalten."
+      : null;
+
     const response = {
+      // Scope-Informationen
+      scope,
+      scopeLabel: SCOPE_LABELS[scope],
+      scopeHint,
       case: {
         id: caseData.id,
         caseNumber: caseData.caseNumber,

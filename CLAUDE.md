@@ -90,6 +90,8 @@ npx prisma db push   # Sync database schema
 - `ClassificationRule` matcht auf Beschreibung/Betrag
 - Erstellt nur Vorschläge (`suggested*`), nie Auto-Commit
 - `matchCounterpartyPatterns()` für automatische Gegenpartei-Erkennung
+- `assignServiceDateRule`: SAME_MONTH, VORMONAT, PREVIOUS_QUARTER für Alt/Neu-Zuordnung
+- Bulk-Accept mit Preview-Modal für effiziente Massenverarbeitung
 
 **Split-Engine** – Alt/Neu-Masse-Zuordnung (`/lib/settlement/split-engine.ts`):
 - Fallback-Kette: VERTRAGSREGEL → SERVICE_DATE_RULE → PERIOD_PRORATA → VORMONAT_LOGIK → UNKLAR

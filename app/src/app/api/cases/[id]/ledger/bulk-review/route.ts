@@ -9,6 +9,7 @@ import { prisma } from '@/lib/db';
 import { bulkConfirmEntries, createAuditLog } from '@/lib/ledger/governance';
 import { REVIEW_STATUS, AUDIT_ACTIONS } from '@/lib/ledger/types';
 import { markAggregationStale } from '@/lib/ledger/aggregation';
+import { determineEstateAllocation } from '@/lib/settlement/split-engine';
 
 // =============================================================================
 // TYPES
@@ -36,6 +37,7 @@ interface BulkReviewRequest {
   reason?: string;
   applyClassificationSuggestions?: boolean; // Übernimmt suggestedLegalBucket
   applyDimensionSuggestions?: boolean; // Übernimmt suggestedBankAccountId, suggestedCounterpartyId, suggestedLocationId
+  applyServiceDateSuggestions?: boolean; // Übernimmt suggestedServiceDate/Period und berechnet estateAllocation
 }
 
 // =============================================================================
@@ -66,9 +68,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Entweder filter oder entryIds ist erforderlich' }, { status: 400 });
     }
 
-    if (body.action === 'ADJUST' && !body.reason && !body.applyClassificationSuggestions && !body.applyDimensionSuggestions) {
+    if (body.action === 'ADJUST' && !body.reason && !body.applyClassificationSuggestions && !body.applyDimensionSuggestions && !body.applyServiceDateSuggestions) {
       return NextResponse.json(
-        { error: 'Bei ADJUST ist entweder reason, applyClassificationSuggestions oder applyDimensionSuggestions erforderlich' },
+        { error: 'Bei ADJUST ist entweder reason, applyClassificationSuggestions, applyDimensionSuggestions oder applyServiceDateSuggestions erforderlich' },
         { status: 400 }
       );
     }
@@ -138,10 +140,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       result = { processed: bulkResult.confirmed, errors: bulkResult.errors };
     } else {
       // ADJUST
-      result = await bulkAdjustEntries(prisma, caseId, entryIds, userId, {
+      result = await bulkAdjustEntries(prisma, caseId, entryIds, userId, existingCase.cutoffDate, {
         reason: body.reason || 'Vorschläge übernommen',
         applyClassificationSuggestions: body.applyClassificationSuggestions || false,
         applyDimensionSuggestions: body.applyDimensionSuggestions || false,
+        applyServiceDateSuggestions: body.applyServiceDateSuggestions || false,
       });
     }
 
@@ -175,10 +178,12 @@ async function bulkAdjustEntries(
   caseId: string,
   entryIds: string[],
   userId: string,
+  cutoffDate: Date | null,
   options: {
     reason: string;
     applyClassificationSuggestions: boolean;
     applyDimensionSuggestions: boolean;
+    applyServiceDateSuggestions: boolean;
   }
 ): Promise<{ processed: number; errors: string[] }> {
   const errors: string[] = [];
@@ -245,6 +250,62 @@ async function bulkAdjustEntries(
             old: entry.locationId,
             new: entry.suggestedLocationId,
           };
+        }
+      }
+
+      // Übernehme ServiceDate-Vorschläge wenn gewünscht
+      if (options.applyServiceDateSuggestions) {
+        const hasServiceDateSuggestion = entry.suggestedServiceDate || entry.suggestedServicePeriodStart;
+
+        if (hasServiceDateSuggestion) {
+          // Setze serviceDate oder servicePeriod
+          if (entry.suggestedServiceDate) {
+            updateData.serviceDate = entry.suggestedServiceDate;
+            fieldChanges.serviceDate = {
+              old: entry.serviceDate?.toISOString() || null,
+              new: entry.suggestedServiceDate.toISOString(),
+            };
+            // Clear period wenn einzelnes Datum
+            updateData.servicePeriodStart = null;
+            updateData.servicePeriodEnd = null;
+          } else if (entry.suggestedServicePeriodStart && entry.suggestedServicePeriodEnd) {
+            updateData.servicePeriodStart = entry.suggestedServicePeriodStart;
+            updateData.servicePeriodEnd = entry.suggestedServicePeriodEnd;
+            fieldChanges.servicePeriodStart = {
+              old: entry.servicePeriodStart?.toISOString() || null,
+              new: entry.suggestedServicePeriodStart.toISOString(),
+            };
+            fieldChanges.servicePeriodEnd = {
+              old: entry.servicePeriodEnd?.toISOString() || null,
+              new: entry.suggestedServicePeriodEnd.toISOString(),
+            };
+            // Clear serviceDate wenn Zeitraum
+            updateData.serviceDate = null;
+          }
+
+          // Berechne estateAllocation wenn cutoffDate vorhanden
+          if (cutoffDate) {
+            const allocation = determineEstateAllocation(
+              {
+                transactionDate: entry.transactionDate,
+                serviceDate: entry.suggestedServiceDate,
+                servicePeriodStart: entry.suggestedServicePeriodStart,
+                servicePeriodEnd: entry.suggestedServicePeriodEnd,
+              },
+              null, // Keine Counterparty-Config für Bulk
+              cutoffDate
+            );
+
+            updateData.estateAllocation = allocation.estateAllocation;
+            updateData.estateRatio = allocation.estateRatio || null;
+            updateData.allocationSource = allocation.allocationSource;
+            updateData.allocationNote = allocation.allocationNote;
+
+            fieldChanges.estateAllocation = {
+              old: entry.estateAllocation,
+              new: allocation.estateAllocation,
+            };
+          }
         }
       }
 

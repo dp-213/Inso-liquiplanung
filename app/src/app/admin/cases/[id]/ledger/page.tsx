@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback, use, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -13,7 +13,34 @@ import {
   REVIEW_STATUS,
 } from "@/lib/ledger";
 
-type TabType = "all" | "review" | "rules";
+type TabType = "all" | "review" | "rules" | "sources";
+
+// Column configuration
+interface ColumnConfig {
+  id: string;
+  label: string;
+  defaultVisible: boolean;
+  defaultWidth: number;
+  minWidth: number;
+}
+
+const COLUMN_DEFINITIONS: ColumnConfig[] = [
+  { id: "checkbox", label: "Auswahl", defaultVisible: true, defaultWidth: 40, minWidth: 40 },
+  { id: "transactionDate", label: "Datum", defaultVisible: true, defaultWidth: 100, minWidth: 80 },
+  { id: "description", label: "Beschreibung", defaultVisible: true, defaultWidth: 250, minWidth: 150 },
+  { id: "amountCents", label: "Betrag", defaultVisible: true, defaultWidth: 110, minWidth: 90 },
+  { id: "valueType", label: "Typ", defaultVisible: true, defaultWidth: 70, minWidth: 60 },
+  { id: "estateAllocation", label: "Alt/Neu", defaultVisible: true, defaultWidth: 90, minWidth: 70 },
+  { id: "legalBucket", label: "Rechtsstatus", defaultVisible: true, defaultWidth: 100, minWidth: 80 },
+  { id: "reviewStatus", label: "Review", defaultVisible: true, defaultWidth: 90, minWidth: 70 },
+  { id: "suggestion", label: "Vorschlag", defaultVisible: false, defaultWidth: 100, minWidth: 80 },
+  { id: "dimSuggestion", label: "Dim.-Vorschlag", defaultVisible: false, defaultWidth: 100, minWidth: 80 },
+  { id: "counterparty", label: "Gegenpartei", defaultVisible: false, defaultWidth: 150, minWidth: 100 },
+  { id: "location", label: "Standort", defaultVisible: false, defaultWidth: 120, minWidth: 80 },
+  { id: "bankAccount", label: "Bankkonto", defaultVisible: false, defaultWidth: 150, minWidth: 100 },
+  { id: "import", label: "Import", defaultVisible: true, defaultWidth: 100, minWidth: 80 },
+  { id: "actions", label: "Aktionen", defaultVisible: true, defaultWidth: 130, minWidth: 100 },
+];
 
 const VALUE_TYPE_LABELS: Record<ValueType, string> = {
   IST: "IST",
@@ -100,7 +127,10 @@ export default function CaseLedgerPage({
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab") as TabType | null;
-  const activeTab: TabType = tabParam === "review" || tabParam === "rules" ? tabParam : "all";
+  const activeTab: TabType = tabParam === "review" || tabParam === "rules" || tabParam === "sources" ? tabParam : "all";
+
+  // Read estate filter from URL (supports both 'estate' and 'estateAllocation')
+  const initialEstateAllocation = (searchParams.get("estateAllocation") || searchParams.get("estate") || "") as EstateAllocation;
 
   const [caseData, setCaseData] = useState<CaseData | null>(null);
   const [entries, setEntries] = useState<LedgerEntryResponse[]>([]);
@@ -113,6 +143,22 @@ export default function CaseLedgerPage({
   const [selectedEntries, setSelectedEntries] = useState<Set<string>>(new Set());
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "grouped">("table");
+
+  // Column visibility and widths
+  const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    COLUMN_DEFINITIONS.forEach(col => { initial[col.id] = col.defaultVisible; });
+    return initial;
+  });
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
+    const initial: Record<string, number> = {};
+    COLUMN_DEFINITIONS.forEach(col => { initial[col.id] = col.defaultWidth; });
+    return initial;
+  });
+  const [resizingColumn, setResizingColumn] = useState<string | null>(null);
+  const [showColumnMenu, setShowColumnMenu] = useState(false);
+  const [detailsEntry, setDetailsEntry] = useState<LedgerEntryResponse | null>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
 
   // Dimensions für Name-Lookup
   const [bankAccountsMap, setBankAccountsMap] = useState<Map<string, string>>(new Map());
@@ -148,8 +194,8 @@ export default function CaseLedgerPage({
   const [filterLocationId, setFilterLocationId] = useState<string>("");
   // Import-Filter
   const [filterImportJobId, setFilterImportJobId] = useState<string>("");
-  // Estate Allocation Filter (Alt-/Neumasse)
-  const [filterEstateAllocation, setFilterEstateAllocation] = useState<EstateAllocation>("");
+  // Estate Allocation Filter (Alt-/Neumasse) - initialized from URL
+  const [filterEstateAllocation, setFilterEstateAllocation] = useState<EstateAllocation>(initialEstateAllocation);
 
   // Auto-set review filter when tab changes
   useEffect(() => {
@@ -274,6 +320,41 @@ export default function CaseLedgerPage({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Column resize handlers
+  const handleResizeStart = (e: React.MouseEvent, columnId: string) => {
+    e.preventDefault();
+    setResizingColumn(columnId);
+    const startX = e.clientX;
+    const startWidth = columnWidths[columnId];
+    const colConfig = COLUMN_DEFINITIONS.find(c => c.id === columnId);
+    const minWidth = colConfig?.minWidth || 50;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const diff = moveEvent.clientX - startX;
+      const newWidth = Math.max(minWidth, startWidth + diff);
+      setColumnWidths(prev => ({ ...prev, [columnId]: newWidth }));
+    };
+
+    const handleMouseUp = () => {
+      setResizingColumn(null);
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  };
+
+  const toggleColumnVisibility = (columnId: string) => {
+    setColumnVisibility(prev => ({ ...prev, [columnId]: !prev[columnId] }));
+  };
+
+  const resetColumnWidths = () => {
+    const initial: Record<string, number> = {};
+    COLUMN_DEFINITIONS.forEach(col => { initial[col.id] = col.defaultWidth; });
+    setColumnWidths(initial);
+  };
 
   const formatCurrency = (cents: string | number): string => {
     const amount = typeof cents === "string" ? parseInt(cents) : cents;
@@ -443,6 +524,72 @@ export default function CaseLedgerPage({
     }
   };
 
+  // Service Date Suggestions Preview Modal State
+  const [showServiceDatePreviewModal, setShowServiceDatePreviewModal] = useState(false);
+  const [serviceDatePreviewEntries, setServiceDatePreviewEntries] = useState<LedgerEntryResponse[]>([]);
+  const [serviceDatePreviewLoading, setServiceDatePreviewLoading] = useState(false);
+
+  const handleShowServiceDatePreview = async () => {
+    setServiceDatePreviewLoading(true);
+    setShowServiceDatePreviewModal(true);
+    setError(null);
+
+    try {
+      // Hole alle UNREVIEWED Entries mit ServiceDate-Vorschlag
+      const res = await fetch(`/api/cases/${id}/ledger?reviewStatus=UNREVIEWED&hasServiceDateSuggestion=true`, {
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        throw new Error("Fehler beim Laden der Vorschläge");
+      }
+
+      const data = await res.json();
+      setServiceDatePreviewEntries(data.entries || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Fehler beim Laden der Vorschläge");
+      setShowServiceDatePreviewModal(false);
+    } finally {
+      setServiceDatePreviewLoading(false);
+    }
+  };
+
+  const handleApplyServiceDateSuggestions = async () => {
+    setBulkProcessing(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/bulk-review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "ADJUST",
+          filter: {
+            reviewStatus: "UNREVIEWED",
+          },
+          reason: "ServiceDate-Vorschläge übernommen (inkl. Alt/Neu-Berechnung)",
+          applyServiceDateSuggestions: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "ServiceDate-Übernahme fehlgeschlagen");
+      }
+
+      setSuccessMessage(data.message || `${data.processed} Einträge mit ServiceDate aktualisiert`);
+      setShowServiceDatePreviewModal(false);
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ServiceDate-Übernahme fehlgeschlagen");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
   // Delete Import Job
   const handleDeleteImport = async (importJobId: string, importSource: string | null) => {
     if (!confirm(`Möchten Sie wirklich alle Einträge aus dem Import "${importSource || importJobId}" löschen?`)) {
@@ -475,6 +622,33 @@ export default function CaseLedgerPage({
       setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
     } finally {
       setDeletingImport(null);
+    }
+  };
+
+  // Delete Single Entry
+  const handleDeleteEntry = async (entryId: string, description: string) => {
+    if (!confirm(`Möchten Sie den Eintrag "${description}" wirklich löschen?`)) {
+      return;
+    }
+
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/${entryId}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Löschen fehlgeschlagen");
+      }
+
+      setSuccessMessage("Eintrag gelöscht");
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
     }
   };
 
@@ -737,6 +911,21 @@ export default function CaseLedgerPage({
               Regeln
             </span>
           </button>
+          <button
+            onClick={() => setActiveTab("sources")}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "sources"
+                ? "bg-[var(--primary)] text-white"
+                : "text-[var(--secondary)] hover:bg-gray-100"
+            }`}
+          >
+            <span className="flex items-center">
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Quellen
+            </span>
+          </button>
         </nav>
       </div>
 
@@ -768,8 +957,240 @@ export default function CaseLedgerPage({
         </div>
       )}
 
-      {/* Stats Cards - only show for non-rules tabs */}
-      {activeTab !== "rules" && stats && (
+      {/* Sources Tab Content */}
+      {activeTab === "sources" && (
+        <div className="space-y-6">
+          <div className="admin-card p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <svg className="w-6 h-6 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--foreground)]">Quellen-Übersicht</h2>
+                <p className="text-sm text-[var(--muted)]">
+                  Alle Quelldateien und deren verarbeitete Daten im Überblick
+                </p>
+              </div>
+            </div>
+
+            {/* Sources Summary */}
+            {(() => {
+              // Group entries by importSource
+              const sourceGroups = entries.reduce((acc, entry) => {
+                const source = entry.importSource || "Manuell eingegeben";
+                if (!acc[source]) {
+                  acc[source] = {
+                    entries: [],
+                    byValueType: { IST: 0, PLAN: 0 },
+                    byReviewStatus: { UNREVIEWED: 0, CONFIRMED: 0, ADJUSTED: 0 },
+                    byEstate: { ALTMASSE: 0, NEUMASSE: 0, MIXED: 0, UNKLAR: 0, null: 0 },
+                    totalInflows: BigInt(0),
+                    totalOutflows: BigInt(0),
+                  };
+                }
+                acc[source].entries.push(entry);
+                acc[source].byValueType[entry.valueType as "IST" | "PLAN"]++;
+                acc[source].byReviewStatus[entry.reviewStatus as "UNREVIEWED" | "CONFIRMED" | "ADJUSTED"]++;
+                const estate = entry.estateAllocation || "null";
+                if (estate in acc[source].byEstate) {
+                  acc[source].byEstate[estate as keyof typeof acc[typeof source]["byEstate"]]++;
+                }
+                const amount = BigInt(entry.amountCents);
+                if (amount >= 0) {
+                  acc[source].totalInflows += amount;
+                } else {
+                  acc[source].totalOutflows += amount;
+                }
+                return acc;
+              }, {} as Record<string, {
+                entries: LedgerEntryResponse[];
+                byValueType: { IST: number; PLAN: number };
+                byReviewStatus: { UNREVIEWED: number; CONFIRMED: number; ADJUSTED: number };
+                byEstate: { ALTMASSE: number; NEUMASSE: number; MIXED: number; UNKLAR: number; null: number };
+                totalInflows: bigint;
+                totalOutflows: bigint;
+              }>);
+
+              const sourceList = Object.entries(sourceGroups).sort((a, b) => b[1].entries.length - a[1].entries.length);
+
+              if (sourceList.length === 0) {
+                return (
+                  <div className="text-center py-8 text-[var(--muted)]">
+                    <p>Keine Daten vorhanden</p>
+                  </div>
+                );
+              }
+
+              return (
+                <div className="space-y-4">
+                  {/* Summary Stats */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-[var(--muted)]">Quelldateien</p>
+                      <p className="text-2xl font-bold text-[var(--foreground)]">{sourceList.length}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-[var(--muted)]">Gesamteinträge</p>
+                      <p className="text-2xl font-bold text-[var(--foreground)]">{entries.length}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-[var(--muted)]">IST / PLAN</p>
+                      <p className="text-lg font-semibold">
+                        <span className="text-green-600">{entries.filter(e => e.valueType === "IST").length}</span>
+                        {" / "}
+                        <span className="text-blue-600">{entries.filter(e => e.valueType === "PLAN").length}</span>
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-[var(--muted)]">Ungeprüft</p>
+                      <p className="text-2xl font-bold text-orange-600">
+                        {entries.filter(e => e.reviewStatus === "UNREVIEWED").length}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Source Details */}
+                  {sourceList.map(([source, data]) => {
+                    const dateRange = data.entries.reduce((range, entry) => {
+                      const date = new Date(entry.transactionDate);
+                      if (!range.min || date < range.min) range.min = date;
+                      if (!range.max || date > range.max) range.max = date;
+                      return range;
+                    }, { min: null as Date | null, max: null as Date | null });
+
+                    return (
+                      <div key={source} className="border rounded-lg overflow-hidden">
+                        {/* Source Header */}
+                        <div className="bg-gray-50 px-4 py-3 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <svg className="w-5 h-5 text-[var(--primary)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            <div>
+                              <p className="font-medium text-[var(--foreground)]">{source}</p>
+                              {dateRange.min && dateRange.max && (
+                                <p className="text-xs text-[var(--muted)]">
+                                  Zeitraum: {dateRange.min.toLocaleDateString("de-DE")} – {dateRange.max.toLocaleDateString("de-DE")}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <span className="text-sm font-semibold text-[var(--foreground)]">
+                              {data.entries.length} Einträge
+                            </span>
+                            <button
+                              onClick={() => {
+                                // Filter to this source
+                                const sourceEntries = entries.filter(e => (e.importSource || "Manuell eingegeben") === source);
+                                if (sourceEntries.length > 0 && sourceEntries[0].importJobId) {
+                                  setFilterImportJobId(sourceEntries[0].importJobId);
+                                  setActiveTab("all");
+                                  router.push(`/admin/cases/${id}/ledger?tab=all`);
+                                }
+                              }}
+                              className="text-xs px-2 py-1 bg-[var(--primary)] text-white rounded hover:opacity-90"
+                            >
+                              Filtern
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Source Stats Grid */}
+                        <div className="p-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                          {/* Value Type */}
+                          <div>
+                            <p className="text-xs text-[var(--muted)] mb-1">Typ</p>
+                            <div className="flex gap-2">
+                              <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">
+                                IST: {data.byValueType.IST}
+                              </span>
+                              <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                                PLAN: {data.byValueType.PLAN}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Review Status */}
+                          <div>
+                            <p className="text-xs text-[var(--muted)] mb-1">Review-Status</p>
+                            <div className="flex flex-wrap gap-1">
+                              {data.byReviewStatus.UNREVIEWED > 0 && (
+                                <span className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-xs">
+                                  Offen: {data.byReviewStatus.UNREVIEWED}
+                                </span>
+                              )}
+                              {data.byReviewStatus.CONFIRMED > 0 && (
+                                <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">
+                                  Bestätigt: {data.byReviewStatus.CONFIRMED}
+                                </span>
+                              )}
+                              {data.byReviewStatus.ADJUSTED > 0 && (
+                                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                                  Korrigiert: {data.byReviewStatus.ADJUSTED}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Estate Allocation */}
+                          <div>
+                            <p className="text-xs text-[var(--muted)] mb-1">Alt/Neu-Masse</p>
+                            <div className="flex flex-wrap gap-1">
+                              {data.byEstate.ALTMASSE > 0 && (
+                                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                                  Alt: {data.byEstate.ALTMASSE}
+                                </span>
+                              )}
+                              {data.byEstate.NEUMASSE > 0 && (
+                                <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                                  Neu: {data.byEstate.NEUMASSE}
+                                </span>
+                              )}
+                              {data.byEstate.MIXED > 0 && (
+                                <span className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
+                                  Mix: {data.byEstate.MIXED}
+                                </span>
+                              )}
+                              {data.byEstate.UNKLAR > 0 && (
+                                <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs">
+                                  Unklar: {data.byEstate.UNKLAR}
+                                </span>
+                              )}
+                              {data.byEstate.null > 0 && (
+                                <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">
+                                  Keine: {data.byEstate.null}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Amounts */}
+                          <div>
+                            <p className="text-xs text-[var(--muted)] mb-1">Einzahlungen</p>
+                            <p className="font-medium text-green-600">
+                              {formatCurrency(data.totalInflows.toString())}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-[var(--muted)] mb-1">Auszahlungen</p>
+                            <p className="font-medium text-red-600">
+                              {formatCurrency(data.totalOutflows.toString())}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* Stats Cards - only show for non-rules/sources tabs */}
+      {activeTab !== "rules" && activeTab !== "sources" && stats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="admin-card p-4">
             <p className="text-sm text-[var(--muted)]">Anzahl Einträge</p>
@@ -798,8 +1219,8 @@ export default function CaseLedgerPage({
         </div>
       )}
 
-      {/* Review Status Cards */}
-      {classificationStats && (
+      {/* Review Status Cards - only show for non-rules/sources tabs */}
+      {activeTab !== "rules" && activeTab !== "sources" && classificationStats && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="admin-card p-4 border-l-4 border-gray-400">
             <p className="text-sm text-[var(--muted)]">Ungeprüft</p>
@@ -839,8 +1260,8 @@ export default function CaseLedgerPage({
         </div>
       )}
 
-      {/* Import Jobs Overview */}
-      {importJobs.length > 0 && (
+      {/* Import Jobs Overview - only show for non-sources tabs */}
+      {activeTab !== "sources" && importJobs.length > 0 && (
         <div className="admin-card p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-medium text-[var(--foreground)]">
@@ -897,8 +1318,8 @@ export default function CaseLedgerPage({
         </div>
       )}
 
-      {/* Bulk Actions Bar */}
-      {classificationStats && (classificationStats.byReviewStatus?.UNREVIEWED || 0) > 0 && (
+      {/* Bulk Actions Bar - only show for non-rules/sources tabs */}
+      {activeTab !== "rules" && activeTab !== "sources" && classificationStats && (classificationStats.byReviewStatus?.UNREVIEWED || 0) > 0 && (
         <div className="admin-card p-4 bg-blue-50 border-blue-200">
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-sm font-medium text-blue-800">Bulk-Aktionen:</span>
@@ -961,11 +1382,35 @@ export default function CaseLedgerPage({
                 Dimensionen übernehmen
               </button>
             )}
+
+            {/* ServiceDate-Vorschläge übernehmen */}
+            {entries.some((e) => {
+              const ext = e as LedgerEntryResponse & {
+                suggestedServiceDate?: string | null;
+                suggestedServicePeriodStart?: string | null;
+              };
+              return e.reviewStatus === "UNREVIEWED" && (ext.suggestedServiceDate || ext.suggestedServicePeriodStart);
+            }) && (
+              <button
+                onClick={handleShowServiceDatePreview}
+                disabled={bulkProcessing}
+                className="btn-secondary text-sm bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100 disabled:opacity-50"
+                title="Übernimmt ServiceDate-Vorschläge und berechnet Alt/Neu-Zuordnung"
+              >
+                <span className="flex items-center gap-1">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  ServiceDate-Vorschläge
+                </span>
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {/* Filters */}
+      {/* Filters - only show for non-rules/sources tabs */}
+      {activeTab !== "rules" && activeTab !== "sources" && (
       <div className="admin-card p-4">
         <div className="flex flex-wrap items-end gap-4">
           <div>
@@ -1169,6 +1614,7 @@ export default function CaseLedgerPage({
           )}
         </div>
       </div>
+      )}
 
       {/* Messages */}
       {error && (
@@ -1182,16 +1628,60 @@ export default function CaseLedgerPage({
         </div>
       )}
 
-      {/* Entries Table */}
+      {/* Entries Table - only show for non-rules/sources tabs */}
+      {activeTab !== "rules" && activeTab !== "sources" && (
       <div className="admin-card">
         <div className="p-4 border-b border-[var(--border)] flex items-center justify-between">
           <h2 className="text-lg font-medium text-[var(--foreground)]">
             Ledger-Einträge
             {loading && <span className="ml-2 text-sm text-[var(--muted)]">(lädt...)</span>}
           </h2>
-          <span className="text-sm text-[var(--muted)]">
-            {entries.length} Einträge
-          </span>
+          <div className="flex items-center gap-3">
+            {/* Column Visibility Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowColumnMenu(!showColumnMenu)}
+                className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                </svg>
+                Spalten
+              </button>
+              {showColumnMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-56 py-2">
+                  <div className="px-3 py-1.5 border-b border-gray-100 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-gray-500 uppercase">Spalten anzeigen</span>
+                    <button
+                      onClick={resetColumnWidths}
+                      className="text-xs text-[var(--primary)] hover:underline"
+                    >
+                      Breiten zurücksetzen
+                    </button>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto">
+                    {COLUMN_DEFINITIONS.filter(col => col.id !== "checkbox" && col.id !== "actions").map(col => (
+                      <label
+                        key={col.id}
+                        className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={columnVisibility[col.id]}
+                          onChange={() => toggleColumnVisibility(col.id)}
+                          className="rounded border-gray-300"
+                        />
+                        <span className="text-sm">{col.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <span className="text-sm text-[var(--muted)]">
+              {entries.length} Einträge
+            </span>
+          </div>
         </div>
 
         {entries.length === 0 ? (
@@ -1202,10 +1692,11 @@ export default function CaseLedgerPage({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="admin-table">
+            <table ref={tableRef} className="admin-table" style={{ tableLayout: "fixed" }}>
               <thead>
                 <tr>
-                  <th className="w-10">
+                  {/* Checkbox column */}
+                  <th style={{ width: columnWidths.checkbox }} className="relative">
                     <input
                       type="checkbox"
                       checked={selectedEntries.size === entries.length && entries.length > 0}
@@ -1213,17 +1704,138 @@ export default function CaseLedgerPage({
                       className="rounded border-gray-300"
                     />
                   </th>
-                  <SortHeader field="transactionDate" label="Datum" />
-                  <SortHeader field="description" label="Beschreibung" />
-                  <SortHeader field="amountCents" label="Betrag" className="text-right" />
-                  <SortHeader field="valueType" label="Typ" />
-                  <th>Alt/Neu</th>
-                  <SortHeader field="legalBucket" label="Rechtsstatus" />
-                  <SortHeader field="reviewStatus" label="Review" />
-                  <th>Vorschlag</th>
-                  <th>Dim.-Vorschlag</th>
-                  <th>Import</th>
-                  <th>Aktionen</th>
+                  {/* Datum */}
+                  {columnVisibility.transactionDate && (
+                    <th style={{ width: columnWidths.transactionDate }} className="relative group">
+                      <SortHeader field="transactionDate" label="Datum" />
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "transactionDate")}
+                      />
+                    </th>
+                  )}
+                  {/* Beschreibung */}
+                  {columnVisibility.description && (
+                    <th style={{ width: columnWidths.description }} className="relative group">
+                      <SortHeader field="description" label="Beschreibung" />
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "description")}
+                      />
+                    </th>
+                  )}
+                  {/* Betrag */}
+                  {columnVisibility.amountCents && (
+                    <th style={{ width: columnWidths.amountCents }} className="relative group text-right">
+                      <SortHeader field="amountCents" label="Betrag" className="text-right" />
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "amountCents")}
+                      />
+                    </th>
+                  )}
+                  {/* Typ */}
+                  {columnVisibility.valueType && (
+                    <th style={{ width: columnWidths.valueType }} className="relative group">
+                      <SortHeader field="valueType" label="Typ" />
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "valueType")}
+                      />
+                    </th>
+                  )}
+                  {/* Alt/Neu */}
+                  {columnVisibility.estateAllocation && (
+                    <th style={{ width: columnWidths.estateAllocation }} className="relative group">
+                      Alt/Neu
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "estateAllocation")}
+                      />
+                    </th>
+                  )}
+                  {/* Rechtsstatus */}
+                  {columnVisibility.legalBucket && (
+                    <th style={{ width: columnWidths.legalBucket }} className="relative group">
+                      <SortHeader field="legalBucket" label="Rechtsstatus" />
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "legalBucket")}
+                      />
+                    </th>
+                  )}
+                  {/* Review */}
+                  {columnVisibility.reviewStatus && (
+                    <th style={{ width: columnWidths.reviewStatus }} className="relative group">
+                      <SortHeader field="reviewStatus" label="Review" />
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "reviewStatus")}
+                      />
+                    </th>
+                  )}
+                  {/* Vorschlag */}
+                  {columnVisibility.suggestion && (
+                    <th style={{ width: columnWidths.suggestion }} className="relative group">
+                      Vorschlag
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "suggestion")}
+                      />
+                    </th>
+                  )}
+                  {/* Dim.-Vorschlag */}
+                  {columnVisibility.dimSuggestion && (
+                    <th style={{ width: columnWidths.dimSuggestion }} className="relative group">
+                      Dim.-Vorschlag
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "dimSuggestion")}
+                      />
+                    </th>
+                  )}
+                  {/* Gegenpartei */}
+                  {columnVisibility.counterparty && (
+                    <th style={{ width: columnWidths.counterparty }} className="relative group">
+                      Gegenpartei
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "counterparty")}
+                      />
+                    </th>
+                  )}
+                  {/* Standort */}
+                  {columnVisibility.location && (
+                    <th style={{ width: columnWidths.location }} className="relative group">
+                      Standort
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "location")}
+                      />
+                    </th>
+                  )}
+                  {/* Bankkonto */}
+                  {columnVisibility.bankAccount && (
+                    <th style={{ width: columnWidths.bankAccount }} className="relative group">
+                      Bankkonto
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "bankAccount")}
+                      />
+                    </th>
+                  )}
+                  {/* Import */}
+                  {columnVisibility.import && (
+                    <th style={{ width: columnWidths.import }} className="relative group">
+                      Import
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "import")}
+                      />
+                    </th>
+                  )}
+                  {/* Aktionen */}
+                  <th style={{ width: columnWidths.actions }}>Aktionen</th>
                 </tr>
               </thead>
               <tbody>
@@ -1242,6 +1854,9 @@ export default function CaseLedgerPage({
                     estateAllocation?: string | null;
                     allocationSource?: string | null;
                     allocationNote?: string | null;
+                    bankAccountId?: string | null;
+                    counterpartyId?: string | null;
+                    locationId?: string | null;
                   };
 
                   return (
@@ -1254,114 +1869,181 @@ export default function CaseLedgerPage({
                           className="rounded border-gray-300"
                         />
                       </td>
-                      <td className="whitespace-nowrap">
-                        {formatDate(entry.transactionDate)}
-                      </td>
-                      <td>
-                        <div className="max-w-xs">
-                          <div className="font-medium text-[var(--foreground)] truncate">
-                            {entry.description}
-                          </div>
-                          {entry.note && (
-                            <div className="text-xs text-[var(--muted)] truncate">
-                              {entry.note}
+                      {columnVisibility.transactionDate && (
+                        <td className="whitespace-nowrap">
+                          {formatDate(entry.transactionDate)}
+                        </td>
+                      )}
+                      {columnVisibility.description && (
+                        <td>
+                          <div className="truncate" style={{ maxWidth: columnWidths.description - 16 }}>
+                            <div className="font-medium text-[var(--foreground)] truncate">
+                              {entry.description}
                             </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className={`text-right font-mono whitespace-nowrap ${
-                        isInflow ? "text-[var(--success)]" : "text-[var(--danger)]"
-                      }`}>
-                        {formatCurrency(entry.amountCents)}
-                      </td>
-                      <td>
-                        <span className={`badge ${getValueTypeBadgeClass(entry.valueType)}`}>
-                          {VALUE_TYPE_LABELS[entry.valueType]}
-                        </span>
-                      </td>
-                      <td>
-                        {entryWithExtras.estateAllocation ? (
-                          <span
-                            className={`badge text-xs ${getEstateAllocationBadgeClass(entryWithExtras.estateAllocation)}`}
-                            title={entryWithExtras.allocationNote || entryWithExtras.allocationSource || ''}
-                          >
-                            {ESTATE_ALLOCATION_LABELS[entryWithExtras.estateAllocation] || entryWithExtras.estateAllocation}
+                            {entry.note && (
+                              <div className="text-xs text-[var(--muted)] truncate">
+                                {entry.note}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                      {columnVisibility.amountCents && (
+                        <td className={`text-right font-mono whitespace-nowrap ${
+                          isInflow ? "text-[var(--success)]" : "text-[var(--danger)]"
+                        }`}>
+                          {formatCurrency(entry.amountCents)}
+                        </td>
+                      )}
+                      {columnVisibility.valueType && (
+                        <td>
+                          <span className={`badge ${getValueTypeBadgeClass(entry.valueType)}`}>
+                            {VALUE_TYPE_LABELS[entry.valueType]}
                           </span>
-                        ) : (
-                          <span className="text-xs text-[var(--muted)]">-</span>
-                        )}
-                      </td>
-                      <td>
-                        <span className={`badge ${getBucketBadgeClass(entry.legalBucket)}`}>
-                          {LEGAL_BUCKET_LABELS[entry.legalBucket]}
-                        </span>
-                      </td>
-                      <td>
-                        <span className={`badge ${getReviewStatusBadgeClass(entry.reviewStatus as ReviewStatus)}`}>
-                          {REVIEW_STATUS_LABELS[entry.reviewStatus as ReviewStatus] || entry.reviewStatus}
-                        </span>
-                      </td>
-                      <td>
-                        {entryWithExtras.suggestedLegalBucket ? (
-                          <div className="flex flex-col gap-1">
-                            <span className="badge badge-info text-xs">
-                              {entryWithExtras.suggestedLegalBucket}
+                        </td>
+                      )}
+                      {columnVisibility.estateAllocation && (
+                        <td>
+                          {entryWithExtras.estateAllocation ? (
+                            <span
+                              className={`badge text-xs ${getEstateAllocationBadgeClass(entryWithExtras.estateAllocation)}`}
+                              title={entryWithExtras.allocationNote || entryWithExtras.allocationSource || ''}
+                            >
+                              {ESTATE_ALLOCATION_LABELS[entryWithExtras.estateAllocation] || entryWithExtras.estateAllocation}
                             </span>
-                            {entryWithExtras.suggestedConfidence && (
-                              <span className={`text-xs ${getConfidenceBadgeClass(entryWithExtras.suggestedConfidence)}`}>
-                                {Math.round(entryWithExtras.suggestedConfidence * 100)}%
+                          ) : (
+                            <span className="text-xs text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+                      )}
+                      {columnVisibility.legalBucket && (
+                        <td>
+                          <span className={`badge ${getBucketBadgeClass(entry.legalBucket)}`}>
+                            {LEGAL_BUCKET_LABELS[entry.legalBucket]}
+                          </span>
+                        </td>
+                      )}
+                      {columnVisibility.reviewStatus && (
+                        <td>
+                          <span className={`badge ${getReviewStatusBadgeClass(entry.reviewStatus as ReviewStatus)}`}>
+                            {REVIEW_STATUS_LABELS[entry.reviewStatus as ReviewStatus] || entry.reviewStatus}
+                          </span>
+                        </td>
+                      )}
+                      {columnVisibility.suggestion && (
+                        <td>
+                          {entryWithExtras.suggestedLegalBucket ? (
+                            <div className="flex flex-col gap-1">
+                              <span className="badge badge-info text-xs">
+                                {entryWithExtras.suggestedLegalBucket}
                               </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-xs text-[var(--muted)]">-</span>
-                        )}
-                      </td>
-                      <td className="text-xs">
-                        {(entryWithExtras.suggestedBankAccountId || entryWithExtras.suggestedCounterpartyId || entryWithExtras.suggestedLocationId) ? (
-                          <div className="flex flex-wrap gap-1">
-                            {entryWithExtras.suggestedBankAccountId && (
-                              <span className="badge badge-info text-xs" title={`Bankkonto: ${bankAccountsMap.get(entryWithExtras.suggestedBankAccountId) || '...'}`}>
-                                🏦
-                              </span>
-                            )}
-                            {entryWithExtras.suggestedCounterpartyId && (
-                              <span className="badge badge-info text-xs" title={`Gegenpartei: ${counterpartiesMap.get(entryWithExtras.suggestedCounterpartyId) || '...'}`}>
-                                👤
-                              </span>
-                            )}
-                            {entryWithExtras.suggestedLocationId && (
-                              <span className="badge badge-info text-xs" title={`Standort: ${locationsMap.get(entryWithExtras.suggestedLocationId) || '...'}`}>
-                                📍
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-[var(--muted)]">-</span>
-                        )}
-                      </td>
-                      <td className="text-xs">
-                        {entryWithExtras.importSource ? (
-                          <button
-                            onClick={() => setFilterImportJobId(entryWithExtras.importJobId || "")}
-                            className="badge badge-neutral hover:bg-gray-200 cursor-pointer truncate max-w-[100px]"
-                            title={`Import: ${entryWithExtras.importSource}\nKlicken zum Filtern`}
-                          >
-                            {entryWithExtras.importSource.length > 15
-                              ? entryWithExtras.importSource.slice(0, 12) + "..."
-                              : entryWithExtras.importSource}
-                          </button>
-                        ) : (
-                          <span className="text-[var(--muted)]">-</span>
-                        )}
-                      </td>
+                              {entryWithExtras.suggestedConfidence && (
+                                <span className={`text-xs ${getConfidenceBadgeClass(entryWithExtras.suggestedConfidence)}`}>
+                                  {Math.round(entryWithExtras.suggestedConfidence * 100)}%
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+                      )}
+                      {columnVisibility.dimSuggestion && (
+                        <td className="text-xs">
+                          {(entryWithExtras.suggestedBankAccountId || entryWithExtras.suggestedCounterpartyId || entryWithExtras.suggestedLocationId) ? (
+                            <div className="flex flex-wrap gap-1">
+                              {entryWithExtras.suggestedBankAccountId && (
+                                <span className="badge badge-info text-xs" title={`Bankkonto: ${bankAccountsMap.get(entryWithExtras.suggestedBankAccountId) || '...'}`}>
+                                  🏦
+                                </span>
+                              )}
+                              {entryWithExtras.suggestedCounterpartyId && (
+                                <span className="badge badge-info text-xs" title={`Gegenpartei: ${counterpartiesMap.get(entryWithExtras.suggestedCounterpartyId) || '...'}`}>
+                                  👤
+                                </span>
+                              )}
+                              {entryWithExtras.suggestedLocationId && (
+                                <span className="badge badge-info text-xs" title={`Standort: ${locationsMap.get(entryWithExtras.suggestedLocationId) || '...'}`}>
+                                  📍
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+                      )}
+                      {columnVisibility.counterparty && (
+                        <td className="text-xs truncate">
+                          {entryWithExtras.counterpartyId ? (
+                            <span title={counterpartiesMap.get(entryWithExtras.counterpartyId) || entryWithExtras.counterpartyId}>
+                              {counterpartiesMap.get(entryWithExtras.counterpartyId) || entryWithExtras.counterpartyId}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+                      )}
+                      {columnVisibility.location && (
+                        <td className="text-xs truncate">
+                          {entryWithExtras.locationId ? (
+                            <span title={locationsMap.get(entryWithExtras.locationId) || entryWithExtras.locationId}>
+                              {locationsMap.get(entryWithExtras.locationId) || entryWithExtras.locationId}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+                      )}
+                      {columnVisibility.bankAccount && (
+                        <td className="text-xs truncate">
+                          {entryWithExtras.bankAccountId ? (
+                            <span title={bankAccountsMap.get(entryWithExtras.bankAccountId) || entryWithExtras.bankAccountId}>
+                              {bankAccountsMap.get(entryWithExtras.bankAccountId) || entryWithExtras.bankAccountId}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+                      )}
+                      {columnVisibility.import && (
+                        <td className="text-xs">
+                          {entryWithExtras.importSource ? (
+                            <span
+                              className="cursor-pointer hover:text-[var(--primary)] truncate block"
+                              onClick={() => setFilterImportJobId(entryWithExtras.importJobId || "")}
+                              title={`Klicken zum Filtern nach diesem Import`}
+                            >
+                              {entryWithExtras.importSource}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+                      )}
                       <td>
-                        <Link
-                          href={`/admin/cases/${id}/ledger/${entry.id}`}
-                          className="text-[var(--primary)] hover:underline text-sm"
-                        >
-                          Bearbeiten
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setDetailsEntry(entry)}
+                            className="text-[var(--secondary)] hover:text-[var(--foreground)] text-sm"
+                            title="Details anzeigen"
+                          >
+                            Details
+                          </button>
+                          <Link
+                            href={`/admin/cases/${id}/ledger/${entry.id}`}
+                            className="text-[var(--primary)] hover:underline text-sm"
+                          >
+                            Bearbeiten
+                          </Link>
+                          <button
+                            onClick={() => handleDeleteEntry(entry.id, entry.description)}
+                            className="text-[var(--danger)] hover:underline text-sm"
+                            title="Eintrag löschen"
+                          >
+                            Löschen
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1371,6 +2053,436 @@ export default function CaseLedgerPage({
           </div>
         )}
       </div>
+      )}
+
+      {/* Details Modal */}
+      {detailsEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDetailsEntry(null)} />
+          <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Eintrag-Details</h3>
+              <button
+                onClick={() => setDetailsEntry(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              {(() => {
+                const e = detailsEntry as LedgerEntryResponse & {
+                  suggestedLegalBucket?: string | null;
+                  suggestedConfidence?: number | null;
+                  suggestedReason?: string | null;
+                  suggestedBankAccountId?: string | null;
+                  suggestedCounterpartyId?: string | null;
+                  suggestedLocationId?: string | null;
+                  importSource?: string | null;
+                  importJobId?: string | null;
+                  estateAllocation?: string | null;
+                  allocationSource?: string | null;
+                  allocationNote?: string | null;
+                  bankAccountId?: string | null;
+                  counterpartyId?: string | null;
+                  locationId?: string | null;
+                };
+                const amount = parseInt(e.amountCents);
+                const isInflow = amount >= 0;
+                return (
+                  <>
+                    {/* Grunddaten */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Grunddaten</h4>
+                      <dl className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <dt className="text-gray-500">Datum</dt>
+                          <dd className="font-medium">{formatDate(e.transactionDate)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-gray-500">Betrag</dt>
+                          <dd className={`font-mono font-medium ${isInflow ? "text-green-600" : "text-red-600"}`}>
+                            {formatCurrency(e.amountCents)}
+                          </dd>
+                        </div>
+                        <div className="col-span-2">
+                          <dt className="text-gray-500">Beschreibung</dt>
+                          <dd className="font-medium">{e.description}</dd>
+                        </div>
+                        {e.note && (
+                          <div className="col-span-2">
+                            <dt className="text-gray-500">Notiz</dt>
+                            <dd>{e.note}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </div>
+
+                    {/* Klassifikation */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Klassifikation</h4>
+                      <dl className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <dt className="text-gray-500">Werttyp</dt>
+                          <dd><span className={`badge ${getValueTypeBadgeClass(e.valueType)}`}>{VALUE_TYPE_LABELS[e.valueType]}</span></dd>
+                        </div>
+                        <div>
+                          <dt className="text-gray-500">Rechtsstatus</dt>
+                          <dd><span className={`badge ${getBucketBadgeClass(e.legalBucket)}`}>{LEGAL_BUCKET_LABELS[e.legalBucket]}</span></dd>
+                        </div>
+                        <div>
+                          <dt className="text-gray-500">Alt-/Neumasse</dt>
+                          <dd>
+                            {e.estateAllocation ? (
+                              <span className={`badge text-xs ${getEstateAllocationBadgeClass(e.estateAllocation)}`}>
+                                {ESTATE_ALLOCATION_LABELS[e.estateAllocation] || e.estateAllocation}
+                              </span>
+                            ) : "-"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-gray-500">Review-Status</dt>
+                          <dd><span className={`badge ${getReviewStatusBadgeClass(e.reviewStatus as ReviewStatus)}`}>{REVIEW_STATUS_LABELS[e.reviewStatus as ReviewStatus]}</span></dd>
+                        </div>
+                      </dl>
+                    </div>
+
+                    {/* Dimensionen */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Dimensionen</h4>
+                      <dl className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <dt className="text-gray-500">Bankkonto</dt>
+                          <dd>{e.bankAccountId ? bankAccountsMap.get(e.bankAccountId) || e.bankAccountId : "-"}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-gray-500">Gegenpartei</dt>
+                          <dd>{e.counterpartyId ? counterpartiesMap.get(e.counterpartyId) || e.counterpartyId : "-"}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-gray-500">Standort</dt>
+                          <dd>{e.locationId ? locationsMap.get(e.locationId) || e.locationId : "-"}</dd>
+                        </div>
+                      </dl>
+                    </div>
+
+                    {/* Alt-/Neumasse Zuordnung */}
+                    {(e.allocationSource || e.allocationNote) && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Alt-/Neumasse Zuordnung</h4>
+                        <dl className="grid grid-cols-1 gap-3 text-sm">
+                          {e.allocationSource && (
+                            <div>
+                              <dt className="text-gray-500">Zuordnungslogik</dt>
+                              <dd className="font-mono text-xs bg-gray-50 p-2 rounded">{e.allocationSource}</dd>
+                            </div>
+                          )}
+                          {e.allocationNote && (
+                            <div>
+                              <dt className="text-gray-500">Zuordnungshinweis</dt>
+                              <dd>{e.allocationNote}</dd>
+                            </div>
+                          )}
+                        </dl>
+                      </div>
+                    )}
+
+                    {/* Vorschläge */}
+                    {(e.suggestedLegalBucket || e.suggestedBankAccountId || e.suggestedCounterpartyId || e.suggestedLocationId) && (
+                      <div>
+                        <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Klassifikations-Vorschläge</h4>
+                        <dl className="grid grid-cols-2 gap-3 text-sm">
+                          {e.suggestedLegalBucket && (
+                            <div>
+                              <dt className="text-gray-500">Vorgeschlagener Rechtsstatus</dt>
+                              <dd className="flex items-center gap-2">
+                                <span className="badge badge-info text-xs">{e.suggestedLegalBucket}</span>
+                                {e.suggestedConfidence && (
+                                  <span className="text-xs text-gray-500">({Math.round(e.suggestedConfidence * 100)}%)</span>
+                                )}
+                              </dd>
+                            </div>
+                          )}
+                          {e.suggestedReason && (
+                            <div className="col-span-2">
+                              <dt className="text-gray-500">Begründung</dt>
+                              <dd className="text-xs">{e.suggestedReason}</dd>
+                            </div>
+                          )}
+                          {e.suggestedBankAccountId && (
+                            <div>
+                              <dt className="text-gray-500">Vorgeschlagenes Bankkonto</dt>
+                              <dd>{bankAccountsMap.get(e.suggestedBankAccountId) || e.suggestedBankAccountId}</dd>
+                            </div>
+                          )}
+                          {e.suggestedCounterpartyId && (
+                            <div>
+                              <dt className="text-gray-500">Vorgeschlagene Gegenpartei</dt>
+                              <dd>{counterpartiesMap.get(e.suggestedCounterpartyId) || e.suggestedCounterpartyId}</dd>
+                            </div>
+                          )}
+                          {e.suggestedLocationId && (
+                            <div>
+                              <dt className="text-gray-500">Vorgeschlagener Standort</dt>
+                              <dd>{locationsMap.get(e.suggestedLocationId) || e.suggestedLocationId}</dd>
+                            </div>
+                          )}
+                        </dl>
+                      </div>
+                    )}
+
+                    {/* Verwendung im System */}
+                    <div className="bg-blue-50 rounded-lg p-4">
+                      <h4 className="text-sm font-semibold text-blue-800 uppercase mb-3">Verwendung / Berechnungslogik</h4>
+                      <div className="text-sm text-blue-900 space-y-2">
+                        <p>
+                          <strong>Dieser Eintrag wird verwendet in:</strong>
+                        </p>
+                        <ul className="list-disc list-inside space-y-1 ml-2">
+                          <li>
+                            <strong>Rolling Forecast</strong>:
+                            {e.valueType === "IST"
+                              ? " Als IST-Wert (reale Bankbuchung) - ersetzt PLAN-Werte für diese Periode"
+                              : " Als PLAN-Wert (Prognose) - wird von IST-Werten ersetzt sobald verfügbar"
+                            }
+                          </li>
+                          <li>
+                            <strong>Liquiditätsübersicht</strong>:
+                            {isInflow ? " Einzahlung (+)" : " Auszahlung (-)"}
+                            {e.legalBucket === "MASSE" && " → zählt zur Insolvenzmasse"}
+                            {e.legalBucket === "ABSONDERUNG" && " → Absonderungsrecht, separat ausgewiesen"}
+                            {e.legalBucket === "NEUTRAL" && " → durchlaufender Posten"}
+                          </li>
+                          {e.estateAllocation && (
+                            <li>
+                              <strong>Alt-/Neumasse</strong>:
+                              {e.estateAllocation === "ALTMASSE" && " Vor Insolvenzeröffnung entstanden → Altmasse-Abrechnung"}
+                              {e.estateAllocation === "NEUMASSE" && " Nach Insolvenzeröffnung entstanden → Neumasse"}
+                              {e.estateAllocation === "MIXED" && " Teilweise Alt-/Neumasse (anteilig aufgeteilt)"}
+                              {e.estateAllocation === "UNKLAR" && " Zuordnung noch offen → muss manuell geklärt werden"}
+                            </li>
+                          )}
+                          {e.locationId && (
+                            <li>
+                              <strong>Standort-P&L</strong>: Wird dem Standort "{locationsMap.get(e.locationId) || e.locationId}" zugerechnet
+                            </li>
+                          )}
+                        </ul>
+
+                        {e.reviewStatus === "UNREVIEWED" && (
+                          <div className="mt-3 p-2 bg-amber-100 rounded text-amber-800 text-xs">
+                            <strong>Hinweis:</strong> Dieser Eintrag ist noch nicht geprüft.
+                            Ungeprüfte Einträge werden standardmäßig NICHT in Berechnungen einbezogen,
+                            es sei denn der Toggle "Ungeprüfte einbeziehen" ist aktiv.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Herkunft */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Herkunft / Import</h4>
+                      <dl className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <dt className="text-gray-500">Import-Quelle</dt>
+                          <dd>{e.importSource || "-"}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-gray-500">Import-Job-ID</dt>
+                          <dd className="font-mono text-xs">{e.importJobId || "-"}</dd>
+                        </div>
+                        {e.bookingSource && (
+                          <div>
+                            <dt className="text-gray-500">Buchungsquelle</dt>
+                            <dd>{e.bookingSource}</dd>
+                          </div>
+                        )}
+                        {e.bookingReference && (
+                          <div>
+                            <dt className="text-gray-500">Buchungsreferenz</dt>
+                            <dd className="font-mono text-xs">{e.bookingReference}</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </div>
+
+                    {/* Technische IDs */}
+                    <div className="border-t pt-4">
+                      <details className="text-xs text-gray-400">
+                        <summary className="cursor-pointer hover:text-gray-600">Technische Details</summary>
+                        <dl className="mt-2 space-y-1 font-mono">
+                          <div><dt className="inline">Entry-ID:</dt> <dd className="inline">{e.id}</dd></div>
+                          <div><dt className="inline">Case-ID:</dt> <dd className="inline">{e.caseId}</dd></div>
+                        </dl>
+                      </details>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex justify-end gap-2">
+              <button
+                onClick={() => setDetailsEntry(null)}
+                className="btn-secondary"
+              >
+                Schließen
+              </button>
+              <Link
+                href={`/admin/cases/${id}/ledger/${detailsEntry.id}`}
+                className="btn-primary"
+              >
+                Bearbeiten
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ServiceDate Preview Modal */}
+      {showServiceDatePreviewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">
+                  ServiceDate-Vorschläge übernehmen
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Übernimmt Leistungsdaten aus Klassifikationsregeln und berechnet die Alt/Neu-Zuordnung
+                </p>
+              </div>
+              <button
+                onClick={() => setShowServiceDatePreviewModal(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-auto px-6 py-4">
+              {serviceDatePreviewLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                </div>
+              ) : serviceDatePreviewEntries.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Keine Einträge mit ServiceDate-Vorschlägen gefunden.</p>
+                  <p className="text-sm text-gray-400 mt-2">
+                    Erstellen Sie zuerst Klassifikationsregeln mit ServiceDate-Zuordnung.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                    <p className="text-sm text-purple-800">
+                      <strong>{serviceDatePreviewEntries.length}</strong> Einträge mit ServiceDate-Vorschlägen gefunden.
+                      Bei Übernahme wird automatisch die Alt/Neu-Zuordnung basierend auf dem Stichtag berechnet.
+                    </p>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium text-gray-700">Datum</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-700">Beschreibung</th>
+                          <th className="px-3 py-2 text-right font-medium text-gray-700">Betrag</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-700">Regel</th>
+                          <th className="px-3 py-2 text-left font-medium text-gray-700">Vorgeschlagenes Leistungsdatum</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {serviceDatePreviewEntries.slice(0, 50).map((entry) => {
+                          const ext = entry as LedgerEntryResponse & {
+                            suggestedServiceDate?: string | null;
+                            suggestedServicePeriodStart?: string | null;
+                            suggestedServicePeriodEnd?: string | null;
+                            suggestedServiceDateRule?: string | null;
+                            suggestedReason?: string | null;
+                          };
+                          return (
+                            <tr key={entry.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-2 whitespace-nowrap">
+                                {new Date(entry.transactionDate).toLocaleDateString("de-DE")}
+                              </td>
+                              <td className="px-3 py-2 max-w-[200px] truncate" title={entry.description}>
+                                {entry.description}
+                              </td>
+                              <td className={`px-3 py-2 text-right whitespace-nowrap ${parseInt(entry.amountCents) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                                {formatCurrency(entry.amountCents)}
+                              </td>
+                              <td className="px-3 py-2">
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
+                                  {ext.suggestedServiceDateRule === "VORMONAT" && "Vormonat"}
+                                  {ext.suggestedServiceDateRule === "SAME_MONTH" && "Gleicher Monat"}
+                                  {ext.suggestedServiceDateRule === "PREVIOUS_QUARTER" && "Vorquartal"}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">
+                                {ext.suggestedServiceDate ? (
+                                  <span className="font-medium">
+                                    {new Date(ext.suggestedServiceDate).toLocaleDateString("de-DE")}
+                                  </span>
+                                ) : ext.suggestedServicePeriodStart && ext.suggestedServicePeriodEnd ? (
+                                  <span className="font-medium">
+                                    {new Date(ext.suggestedServicePeriodStart).toLocaleDateString("de-DE")} - {new Date(ext.suggestedServicePeriodEnd).toLocaleDateString("de-DE")}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {serviceDatePreviewEntries.length > 50 && (
+                    <p className="mt-4 text-sm text-gray-500 text-center">
+                      ... und {serviceDatePreviewEntries.length - 50} weitere Einträge
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowServiceDatePreviewModal(false)}
+                className="btn-secondary"
+                disabled={bulkProcessing}
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleApplyServiceDateSuggestions}
+                disabled={bulkProcessing || serviceDatePreviewEntries.length === 0}
+                className="btn-primary bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+              >
+                {bulkProcessing ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Übernehme...
+                  </span>
+                ) : (
+                  `Alle ${serviceDatePreviewEntries.length} übernehmen`
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

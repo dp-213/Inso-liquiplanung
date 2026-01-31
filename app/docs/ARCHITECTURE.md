@@ -1,7 +1,7 @@
 # System-Architektur
 
-**Version:** 2.2.0
-**Stand:** 20. Januar 2026
+**Version:** 2.8.0
+**Stand:** 25. Januar 2026
 
 ---
 
@@ -112,6 +112,12 @@ model LedgerEntry {
   suggestedCounterpartyId   String?
   suggestedLocationId       String?
 
+  // ServiceDate-Vorschläge (Phase C - für Alt/Neu-Zuordnung)
+  suggestedServiceDate          DateTime?
+  suggestedServicePeriodStart   DateTime?
+  suggestedServicePeriodEnd     DateTime?
+  suggestedServiceDateRule      String?   // VORMONAT | SAME_MONTH | PREVIOUS_QUARTER
+
   // Governance
   reviewStatus      String   // UNREVIEWED | CONFIRMED | ADJUSTED
   reviewedBy        String?
@@ -180,6 +186,9 @@ model ClassificationRule {
   assignBankAccountId   String?
   assignCounterpartyId  String?
   assignLocationId      String?
+
+  // ServiceDate-Regel (Phase C - für Alt/Neu-Zuordnung)
+  assignServiceDateRule String?  // VORMONAT | SAME_MONTH | PREVIOUS_QUARTER
 
   // Steuerung
   priority        Int     @default(100)  // Niedrigere Zahl = höhere Priorität
@@ -455,7 +464,9 @@ LedgerEntry (UNREVIEWED)
 ├── prisma/
 │   └── schema.prisma                 # Datenbank-Schema
 ├── scripts/                          # Utility-Skripte
-│   └── sanity-check-allocation.ts    # Alt/Neu-Allokation testen
+│   ├── sanity-check-allocation.ts    # Alt/Neu-Allokation testen
+│   ├── create-hvplus-service-date-rules.ts  # ServiceDate-Regeln erstellen
+│   └── run-classification.ts         # Klassifikation auf Einträge anwenden
 └── docs/                             # Dokumentation
     ├── CHANGELOG.md
     ├── ARCHITECTURE.md               # Diese Datei
@@ -500,3 +511,172 @@ LedgerEntry (UNREVIEWED)
    - Präsentationsschicht ändert nie Berechnungslogik
    - Calculation Engine ist "Black Box"
    - Konfiguration nur für Darstellung
+
+5. **IST vor PLAN (IST-Vorrang)**
+   - Wenn IST-Daten für eine Periode existieren, werden PLAN-Daten ignoriert
+   - Bankbewegungen sind Realität – Planung ist nur historisch relevant
+   - Vergleich zwischen IST und PLAN in separatem Tab
+
+---
+
+## IST/PLAN-Datenmodell
+
+### valueType: Die fundamentale Unterscheidung
+
+Jeder `LedgerEntry` hat ein `valueType`-Feld, das angibt ob es sich um reale oder geplante Daten handelt:
+
+| valueType | Bedeutung | Quelle | Beispiel |
+|-----------|-----------|--------|----------|
+| **IST** | Reale Bankbewegung | Kontoauszug, Zahlungseingang | "KV-Zahlung 15.000€ am 15.11." |
+| **PLAN** | Geplanter Wert | Prognose, Budget | "Erwartete KV-Zahlung ~15.000€ Nov" |
+
+### Wann IST, wann PLAN?
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    DATENQUELLEN                                  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  KONTOAUSZUG / BANKBEWEGUNGEN              PLANUNGSTABELLE       │
+│  ─────────────────────────────             ──────────────────    │
+│  - Tatsächliche Zahlungen                  - Erwartete Werte     │
+│  - Mit Buchungsdatum                       - Pro Periode         │
+│  - Exakte Beträge                          - Geschätzte Beträge  │
+│                                                                  │
+│           │                                       │              │
+│           │ valueType = IST                       │ valueType =  │
+│           │                                       │ PLAN         │
+│           v                                       v              │
+│      ┌─────────────────────────────────────────────────┐        │
+│      │              LEDGER ENTRY                        │        │
+│      │         (Single Source of Truth)                 │        │
+│      └─────────────────────────────────────────────────┘        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### IST-Vorrang-Logik (Dashboard)
+
+**Problem:** Was passiert, wenn für eine Periode sowohl IST als auch PLAN existiert?
+
+**Lösung:** IST hat Vorrang!
+
+```typescript
+// Voranalyse: Welche Perioden haben IST-Daten?
+const periodsWithIst = new Set<number>();
+for (const entry of entries) {
+  if (entry.valueType === 'IST') {
+    periodsWithIst.add(getPeriodIndex(entry.transactionDate));
+  }
+}
+
+// Aggregation: PLAN ignorieren wenn IST existiert
+for (const entry of entries) {
+  if (entry.valueType === 'PLAN' && periodsWithIst.has(periodIdx)) {
+    planIgnoredCount++;
+    continue;  // PLAN-Entry überspringen
+  }
+  // ... normale Aggregation
+}
+```
+
+**Auswirkungen:**
+
+| Daten in Periode | Angezeigte Quelle | Badge |
+|------------------|-------------------|-------|
+| Nur PLAN | PLAN-Werte | "PLAN" |
+| Nur IST | IST-Werte | "IST" |
+| IST + PLAN | Nur IST-Werte | "IST" |
+
+### Dashboard-Ansichten
+
+| Ansicht | IST-Vorrang? | Verwendung |
+|---------|--------------|------------|
+| **Liquiditätstabelle** | ✅ Ja | Zeigt aktuelle Realität |
+| **Rolling Forecast** | ✅ Ja | IST für Vergangenheit, PLAN für Zukunft |
+| **IST/PLAN-Vergleich** | ❌ Nein | Zeigt beide Werte nebeneinander |
+
+### IST/PLAN-Vergleich (separater Tab)
+
+Der Vergleichs-Tab zeigt BEIDE Werte, ohne IST-Vorrang:
+
+```
+┌────────┬──────────────┬──────────────┬──────────────┐
+│ Periode│ IST Netto    │ PLAN Netto   │ Abweichung   │
+├────────┼──────────────┼──────────────┼──────────────┤
+│ Nov 25 │  +45.000 €   │  +42.000 €   │   +3.000 €   │
+│ Dez 25 │  +38.000 €   │  +40.000 €   │   -2.000 €   │
+│ Jan 26 │      -       │  +35.000 €   │      -       │
+└────────┴──────────────┴──────────────┴──────────────┘
+```
+
+**Interpretation:**
+- **Positive Abweichung bei Einnahmen:** Mehr eingenommen als geplant ✅
+- **Negative Abweichung bei Einnahmen:** Weniger eingenommen als geplant ⚠️
+- **Positive Abweichung bei Ausgaben:** Mehr ausgegeben als geplant ⚠️
+- **Negative Abweichung bei Ausgaben:** Weniger ausgegeben als geplant ✅
+
+---
+
+## Dateneingabe-Richtlinien
+
+### WICHTIG: valueType richtig setzen!
+
+| Datenquelle | valueType | Beispiele |
+|-------------|-----------|-----------|
+| **Kontoauszug** | `IST` | Bankbewegungen, Zahlungseingänge, Abbuchungen |
+| **Kassenexport** | `IST` | Tatsächliche Bareinnahmen/-ausgaben |
+| **Planung/Budget** | `PLAN` | Erwartete Zahlungen, Prognosen |
+| **Hochrechnung** | `PLAN` | Geschätzte zukünftige Werte |
+
+### Import-Checkliste
+
+Beim Datenimport immer prüfen:
+
+1. **[ ] valueType korrekt?**
+   - Kontoauszug → `IST`
+   - Planung/Prognose → `PLAN`
+
+2. **[ ] Datum korrekt?**
+   - IST: Tatsächliches Buchungsdatum
+   - PLAN: Erwartetes Zahlungsdatum (Periodenmitte oder -anfang)
+
+3. **[ ] Keine Doppelungen?**
+   - IST und PLAN für denselben Vorgang? → PLAN löschen wenn IST kommt
+   - Oder: IST-Vorrang-Logik nutzt automatisch nur IST
+
+4. **[ ] reviewStatus beachten?**
+   - Default: `UNREVIEWED`
+   - Erst nach Prüfung: `CONFIRMED` oder `ADJUSTED`
+   - Dashboard (Default): Nur `CONFIRMED` + `ADJUSTED` anzeigen
+
+### Typische Import-Szenarien
+
+**Szenario 1: Monatsweise Planung + Kontoauszug**
+```
+1. Import PLAN-Daten für alle Monate (Jan-Dez)
+2. Import IST-Daten aus Kontoauszug (Jan-Mrz)
+3. Dashboard zeigt:
+   - Jan-Mrz: IST-Werte (PLAN ignoriert)
+   - Apr-Dez: PLAN-Werte
+4. Vergleichs-Tab zeigt: IST vs PLAN für Jan-Mrz
+```
+
+**Szenario 2: Laufende Aktualisierung**
+```
+1. Bereits: IST für Nov, Dez + PLAN für Jan-Aug
+2. Neuer Kontoauszug: IST für Januar
+3. Import IST für Januar
+4. Dashboard:
+   - Nov-Jan: IST (automatisch, durch IST-Vorrang)
+   - Feb-Aug: PLAN
+```
+
+**Szenario 3: Korrektur der Planung**
+```
+1. Bereits: PLAN für alle Monate
+2. Erkenntnis: Q1-Planung war zu optimistisch
+3. Optionen:
+   a) PLAN-Einträge anpassen (reviewStatus = ADJUSTED)
+   b) Neue Version des Plans erstellen
+   c) Abweichung im Vergleichs-Tab dokumentieren
+```
