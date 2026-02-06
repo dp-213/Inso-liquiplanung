@@ -6,6 +6,7 @@ import {
   deriveFlowType,
   VALUE_TYPES,
   LEGAL_BUCKETS,
+  CATEGORY_TAG_LABELS,
   LegalBucket,
   ValueType,
   ReviewStatus,
@@ -58,6 +59,14 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
     suggestedServicePeriodStart: entry.suggestedServicePeriodStart?.toISOString() || null,
     suggestedServicePeriodEnd: entry.suggestedServicePeriodEnd?.toISOString() || null,
     suggestedServiceDateRule: entry.suggestedServiceDateRule,
+    // Category Tag (Matrix-Zuordnung)
+    categoryTag: entry.categoryTag,
+    categoryTagSource: entry.categoryTagSource,
+    categoryTagNote: entry.categoryTagNote,
+    suggestedCategoryTag: entry.suggestedCategoryTag,
+    suggestedCategoryTagReason: entry.suggestedCategoryTagReason,
+    // Transfer Pairing (Umbuchungen)
+    transferPartnerEntryId: entry.transferPartnerEntryId,
     // Audit
     createdAt: entry.createdAt.toISOString(),
     createdBy: entry.createdBy,
@@ -237,6 +246,23 @@ export async function PUT(
       updateData.steeringTag = body.steeringTag || null;
     }
 
+    // Category Tag (Matrix-Zuordnung)
+    if (body.categoryTag !== undefined) {
+      const newTag = body.categoryTag || null;
+      // Validierung
+      if (newTag && !Object.keys(CATEGORY_TAG_LABELS).includes(newTag)) {
+        return NextResponse.json(
+          { error: `Ungültiger categoryTag: ${newTag}` },
+          { status: 400 }
+        );
+      }
+      updateData.categoryTag = newTag;
+      updateData.categoryTagSource = 'MANUELL';
+      const oldLabel = existing.categoryTag || '–';
+      const newLabel = newTag || '–';
+      updateData.categoryTagNote = `Manuell geändert von ${oldLabel} nach ${newLabel}`;
+    }
+
     // Estate Allocation (Alt-/Neumasse)
     if (body.estateAllocation !== undefined) {
       updateData.estateAllocation = body.estateAllocation || null;
@@ -286,6 +312,9 @@ export async function PUT(
       if (existing.transactionDate.toISOString() !== newDate) {
         fieldChanges.transactionDate = { old: existing.transactionDate.toISOString(), new: newDate };
       }
+    }
+    if (body.categoryTag !== undefined && existing.categoryTag !== (body.categoryTag || null)) {
+      fieldChanges.categoryTag = { old: existing.categoryTag, new: body.categoryTag || null };
     }
 
     // Update entry
@@ -389,6 +418,16 @@ export async function DELETE(
 
     if (!existing) {
       return NextResponse.json({ error: 'Eintrag nicht gefunden' }, { status: 404 });
+    }
+
+    // Falls gepairt: Partner-Referenz aufräumen
+    if (existing.transferPartnerEntryId) {
+      await prisma.ledgerEntry.update({
+        where: { id: existing.transferPartnerEntryId },
+        data: { transferPartnerEntryId: null },
+      }).catch(() => {
+        // Partner könnte bereits gelöscht sein — ignorieren
+      });
     }
 
     // Delete entry

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { calculateBankAccountBalances } from "@/lib/bank-accounts/calculate-balances";
 
 // GET /api/cases/[id]/bank-accounts - Get all bank accounts for a case
 export async function GET(
@@ -31,26 +32,23 @@ export async function GET(
       );
     }
 
-    // Calculate totals
-    const totalBalance = caseData.bankAccounts.reduce(
-      (sum, acc) => sum + acc.balanceCents,
-      BigInt(0)
-    );
-    const totalAvailable = caseData.bankAccounts.reduce(
-      (sum, acc) => sum + acc.availableCents,
-      BigInt(0)
-    );
+    // Berechnete Kontostände
+    const { balances, totalBalanceCents, totalAvailableCents } =
+      await calculateBankAccountBalances(caseId, caseData.bankAccounts);
 
     return NextResponse.json({
       caseId: caseData.id,
-      accounts: caseData.bankAccounts.map((acc) => ({
-        ...acc,
-        balanceCents: acc.balanceCents.toString(),
-        availableCents: acc.availableCents.toString(),
-      })),
+      accounts: caseData.bankAccounts.map((acc) => {
+        const bal = balances.get(acc.id);
+        return {
+          ...acc,
+          openingBalanceCents: acc.openingBalanceCents.toString(),
+          currentBalanceCents: (bal?.currentBalanceCents ?? acc.openingBalanceCents).toString(),
+        };
+      }),
       summary: {
-        totalBalanceCents: totalBalance.toString(),
-        totalAvailableCents: totalAvailable.toString(),
+        totalBalanceCents: totalBalanceCents.toString(),
+        totalAvailableCents: totalAvailableCents.toString(),
         accountCount: caseData.bankAccounts.length,
       },
     });
@@ -80,8 +78,7 @@ export async function POST(
       bankName,
       accountName,
       iban,
-      balanceCents,
-      availableCents,
+      openingBalanceCents,
       securityHolder,
       status,
       notes,
@@ -89,9 +86,9 @@ export async function POST(
     } = body;
 
     // Validate required fields
-    if (!bankName || !accountName || balanceCents === undefined) {
+    if (!bankName || !accountName || openingBalanceCents === undefined) {
       return NextResponse.json(
-        { error: "Erforderliche Felder: bankName, accountName, balanceCents" },
+        { error: "Erforderliche Felder: bankName, accountName, openingBalanceCents" },
         { status: 400 }
       );
     }
@@ -129,8 +126,7 @@ export async function POST(
         bankName: bankName.trim(),
         accountName: accountName.trim(),
         iban: iban?.trim() || null,
-        balanceCents: BigInt(balanceCents),
-        availableCents: BigInt(availableCents ?? balanceCents),
+        openingBalanceCents: BigInt(openingBalanceCents),
         securityHolder: securityHolder?.trim() || null,
         status: status || "available",
         notes: notes?.trim() || null,
@@ -144,8 +140,7 @@ export async function POST(
       success: true,
       account: {
         ...account,
-        balanceCents: account.balanceCents.toString(),
-        availableCents: account.availableCents.toString(),
+        openingBalanceCents: account.openingBalanceCents.toString(),
       },
     });
   } catch (error) {
@@ -175,8 +170,7 @@ export async function PUT(
       bankName,
       accountName,
       iban,
-      balanceCents,
-      availableCents,
+      openingBalanceCents,
       securityHolder,
       status,
       notes,
@@ -224,8 +218,7 @@ export async function PUT(
         ...(bankName && { bankName: bankName.trim() }),
         ...(accountName && { accountName: accountName.trim() }),
         ...(iban !== undefined && { iban: iban?.trim() || null }),
-        ...(balanceCents !== undefined && { balanceCents: BigInt(balanceCents) }),
-        ...(availableCents !== undefined && { availableCents: BigInt(availableCents) }),
+        ...(openingBalanceCents !== undefined && { openingBalanceCents: BigInt(openingBalanceCents) }),
         ...(securityHolder !== undefined && { securityHolder: securityHolder?.trim() || null }),
         ...(status && { status }),
         ...(notes !== undefined && { notes: notes?.trim() || null }),
@@ -238,8 +231,7 @@ export async function PUT(
       success: true,
       account: {
         ...account,
-        balanceCents: account.balanceCents.toString(),
-        availableCents: account.availableCents.toString(),
+        openingBalanceCents: account.openingBalanceCents.toString(),
       },
     });
   } catch (error) {

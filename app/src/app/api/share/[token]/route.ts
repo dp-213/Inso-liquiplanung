@@ -11,6 +11,7 @@ import {
   aggregateLedgerEntries,
   convertToLegacyFormat,
 } from "@/lib/ledger-aggregation";
+import { calculateBankAccountBalances } from "@/lib/bank-accounts/calculate-balances";
 
 // GET /api/share/[token] - Get case data via share link (no auth required)
 export async function GET(
@@ -330,24 +331,31 @@ export async function GET(
           isActive: e.isActive,
         })),
       },
-      bankAccounts: {
-        accounts: caseData.bankAccounts.map((acc) => ({
-          id: acc.id,
-          bankName: acc.bankName,
-          accountName: acc.accountName,
-          iban: acc.iban,
-          balanceCents: acc.balanceCents.toString(),
-          availableCents: acc.availableCents.toString(),
-          securityHolder: acc.securityHolder,
-          status: acc.status,
-          notes: acc.notes,
-        })),
-        summary: {
-          totalBalanceCents: caseData.bankAccounts.reduce((sum, acc) => sum + acc.balanceCents, BigInt(0)).toString(),
-          totalAvailableCents: caseData.bankAccounts.reduce((sum, acc) => sum + acc.availableCents, BigInt(0)).toString(),
-          accountCount: caseData.bankAccounts.length,
-        },
-      },
+      bankAccounts: await (async () => {
+        const { balances, totalBalanceCents, totalAvailableCents } =
+          await calculateBankAccountBalances(caseData.id, caseData.bankAccounts);
+        return {
+          accounts: caseData.bankAccounts.map((acc) => {
+            const bal = balances.get(acc.id);
+            return {
+              id: acc.id,
+              bankName: acc.bankName,
+              accountName: acc.accountName,
+              iban: acc.iban,
+              openingBalanceCents: acc.openingBalanceCents.toString(),
+              currentBalanceCents: (bal?.currentBalanceCents ?? acc.openingBalanceCents).toString(),
+              securityHolder: acc.securityHolder,
+              status: acc.status,
+              notes: acc.notes,
+            };
+          }),
+          summary: {
+            totalBalanceCents: totalBalanceCents.toString(),
+            totalAvailableCents: totalAvailableCents.toString(),
+            accountCount: caseData.bankAccounts.length,
+          },
+        };
+      })(),
       ledgerStats,
       calculation: {
         openingBalanceCents: result.openingBalanceCents.toString(),

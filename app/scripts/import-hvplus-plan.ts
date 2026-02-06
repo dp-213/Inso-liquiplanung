@@ -1,23 +1,23 @@
 /**
- * Import-Script: HVPlus PLAN-Daten
+ * Import-Script: HVPlus PLAN-Daten (überarbeitet)
  *
  * Importiert PLAN-Daten aus:
  * - Liquiditätsplanung_HVPlus_20260114_versendet.json
  *
- * WICHTIG - Alt/Neu-Zuordnung für PLAN:
- * - Reguläre Einnahmen (HZV/KV/PVS) → UNKLAR (Leistungsdatum unbekannt)
- * - "Altforderungen" → ALTMASSE (explizit so benannt)
- * - "Insolvenzspezifisch" → NEUMASSE (per Definition nach Insolvenz entstanden)
- * - Kosten → UNKLAR (Leistungsdatum unbekannt)
+ * Korrekturen gegenüber alter Version:
+ * 1. Doppelzählung behoben: "insolvenzspezifische Auszahlungen" (Summenzeile)
+ *    wird NICHT mehr importiert → nur deren "davon"-Detailzeilen
+ * 2. estateAllocation korrekt gesetzt (NEUMASSE/ALTMASSE statt null)
+ * 3. allocationSource + allocationNote für Audit-Trail
+ * 4. reviewStatus = UNREVIEWED (statt CONFIRMED)
  *
  * Werte sind in T€ (Tausend Euro) → Umrechnung in Cents: * 1000 * 100
  *
- * Ausführung: npx tsx scripts/import-hvplus-plan.ts
+ * Ausführung: cd app && npx tsx scripts/import-hvplus-plan.ts
  */
 
 import { PrismaClient } from '@prisma/client';
 import * as fs from 'fs';
-import * as path from 'path';
 
 const prisma = new PrismaClient();
 
@@ -25,15 +25,15 @@ const prisma = new PrismaClient();
 // CONFIGURATION
 // =============================================================================
 
-const CASE_NUMBER = '70d IN 362/25'; // Turso Production Case-Nummer
+const CASE_NUMBER = '70d IN 362/25';
 const DRY_RUN = false; // Set to true for preview only
 
-// JSON-Quelldatei (absoluter Pfad zum Cases-Verzeichnis)
+// JSON-Quelldatei
 const CASES_ROOT = '/Users/david/Projekte/AI Terminal/Inso-Liquiplanung/Cases';
-const PLAN_JSON_PATH = `${CASES_ROOT}/Hausärztliche Versorgung PLUS eG/02-extracted/Liquiditätsplanung_HVPlus_20260114_versendet.json`;
+const PLAN_JSON_PATH = `${CASES_ROOT}/Hausärztliche Versorgung PLUS eG/03-classified/PLAN/Liquiditätsplanung_HVPlus_20260114_versendet.json`;
 
-// Spalten-Mapping: Index → Monat (0-basiert ab Spalte 3)
-// Spalte 0: leer, Spalte 1: Zeilenname, Spalte 2: Summe, Spalte 3: Nov 2025, ...
+// Spalten-Mapping: Index → Monat (0-basiert)
+// Spalte 0: leer, Spalte 1: Zeilenname, Spalte 2: Summe, Spalte 3+: Monate
 const MONTH_COLUMNS = [
   { index: 3, date: new Date('2025-11-30') },
   { index: 4, date: new Date('2025-12-31') },
@@ -53,45 +53,139 @@ const MONTH_COLUMNS = [
 
 interface RowMapping {
   category: string;
-  locationKey: 'Velbert' | 'Uckerath' | 'Eitorf' | null; // angepasst an Turso Production
-  counterpartyKey: 'KVNO' | 'HAVG' | 'PVS' | null;
-  // estateAllocation = null wie in Turso Production (alle Werte ignoriert)
-  isSubRow: boolean; // "davon"-Zeilen → nur diese importieren, Summenzeilen überspringen
+  locationKey: 'Velbert' | 'Uckerath' | 'Eitorf' | null;
+  counterpartyKey: 'KV' | 'HZV' | 'PVS' | null;
+  estateAllocation: 'NEUMASSE' | 'ALTMASSE';
+  allocationSource: string;
+  allocationNote: string;
 }
 
-// ROW_MAPPING: Vereinfacht für Turso Production (estateAllocation = null)
 const ROW_MAPPING: Record<string, RowMapping> = {
-  // === EINNAHMEN: Reguläre Umsätze ===
-  'davon HZV Uckerath': { category: 'HZV', locationKey: 'Uckerath', counterpartyKey: 'HAVG', isSubRow: true },
-  'davon HZV Velbert': { category: 'HZV', locationKey: 'Velbert', counterpartyKey: 'HAVG', isSubRow: true },
-  'davon HZV Eitorf': { category: 'HZV', locationKey: 'Eitorf', counterpartyKey: 'HAVG', isSubRow: true },
-  'davon KV Uckerath': { category: 'KV', locationKey: 'Uckerath', counterpartyKey: 'KVNO', isSubRow: true },
-  'davon KV Velbert': { category: 'KV', locationKey: 'Velbert', counterpartyKey: 'KVNO', isSubRow: true },
-  'davon KV Eitorf': { category: 'KV', locationKey: 'Eitorf', counterpartyKey: 'KVNO', isSubRow: true },
-  'davon PVS Uckerath': { category: 'PVS', locationKey: 'Uckerath', counterpartyKey: 'PVS', isSubRow: true },
-  'davon PVS Velbert': { category: 'PVS', locationKey: 'Velbert', counterpartyKey: 'PVS', isSubRow: true },
-  'davon PVS Eitorf': { category: 'PVS', locationKey: 'Eitorf', counterpartyKey: 'PVS', isSubRow: true },
+  // === NEUMASSE-EINNAHMEN: Umsatz aus Fortführungsbetrieb (9 Zeilen) ===
+  'davon HZV Uckerath': {
+    category: 'HZV', locationKey: 'Uckerath', counterpartyKey: 'HZV',
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Umsatz aus Fortführungsbetrieb nach Insolvenz',
+  },
+  'davon HZV Velbert': {
+    category: 'HZV', locationKey: 'Velbert', counterpartyKey: 'HZV',
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Umsatz aus Fortführungsbetrieb nach Insolvenz',
+  },
+  'davon HZV Eitorf': {
+    category: 'HZV', locationKey: 'Eitorf', counterpartyKey: 'HZV',
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Umsatz aus Fortführungsbetrieb nach Insolvenz',
+  },
+  'davon KV Uckerath': {
+    category: 'KV', locationKey: 'Uckerath', counterpartyKey: 'KV',
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Umsatz aus Fortführungsbetrieb nach Insolvenz',
+  },
+  'davon KV Velbert': {
+    category: 'KV', locationKey: 'Velbert', counterpartyKey: 'KV',
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Umsatz aus Fortführungsbetrieb nach Insolvenz',
+  },
+  'davon KV Eitorf': {
+    category: 'KV', locationKey: 'Eitorf', counterpartyKey: 'KV',
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Umsatz aus Fortführungsbetrieb nach Insolvenz',
+  },
+  'davon PVS Uckerath': {
+    category: 'PVS', locationKey: 'Uckerath', counterpartyKey: 'PVS',
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Umsatz aus Fortführungsbetrieb nach Insolvenz',
+  },
+  'davon PVS Velbert': {
+    category: 'PVS', locationKey: 'Velbert', counterpartyKey: 'PVS',
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Umsatz aus Fortführungsbetrieb nach Insolvenz',
+  },
+  'davon PVS Eitorf': {
+    category: 'PVS', locationKey: 'Eitorf', counterpartyKey: 'PVS',
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Umsatz aus Fortführungsbetrieb nach Insolvenz',
+  },
 
-  // === ALTFORDERUNGEN ===
-  'davon aus Velbert KVNO': { category: 'ALTFORDERUNG_KV', locationKey: 'Velbert', counterpartyKey: 'KVNO', isSubRow: true },
-  'davon aus Velbert PVS': { category: 'ALTFORDERUNG_PVS', locationKey: 'Velbert', counterpartyKey: 'PVS', isSubRow: true },
-  'davon aus Velbert HZV': { category: 'ALTFORDERUNG_HZV', locationKey: 'Velbert', counterpartyKey: 'HAVG', isSubRow: true },
-  'davon aus Uckerath + Eitorf KVNO': { category: 'ALTFORDERUNG_KV', locationKey: 'Uckerath', counterpartyKey: 'KVNO', isSubRow: true },
-  'davon aus Uckerath + Eitorf PVS': { category: 'ALTFORDERUNG_PVS', locationKey: 'Uckerath', counterpartyKey: 'PVS', isSubRow: true },
-  'davon aus Uckerath + Eitorf HZV': { category: 'ALTFORDERUNG_HZV', locationKey: 'Uckerath', counterpartyKey: 'HAVG', isSubRow: true },
+  // === ALTMASSE-EINNAHMEN: Forderungen aus Leistung vor 29.10.2025 (6 Zeilen) ===
+  'davon aus Velbert KVNO': {
+    category: 'ALTFORDERUNG_KV', locationKey: 'Velbert', counterpartyKey: 'KV',
+    estateAllocation: 'ALTMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Altmasse: Forderung aus Leistung vor 29.10.2025',
+  },
+  'davon aus Velbert PVS': {
+    category: 'ALTFORDERUNG_PVS', locationKey: 'Velbert', counterpartyKey: 'PVS',
+    estateAllocation: 'ALTMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Altmasse: Forderung aus Leistung vor 29.10.2025',
+  },
+  'davon aus Velbert HZV': {
+    category: 'ALTFORDERUNG_HZV', locationKey: 'Velbert', counterpartyKey: 'HZV',
+    estateAllocation: 'ALTMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Altmasse: Forderung aus Leistung vor 29.10.2025',
+  },
+  'davon aus Uckerath + Eitorf KVNO': {
+    category: 'ALTFORDERUNG_KV', locationKey: 'Uckerath', counterpartyKey: 'KV',
+    estateAllocation: 'ALTMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Altmasse: Forderung aus Leistung vor 29.10.2025',
+  },
+  'davon aus Uckerath + Eitorf PVS': {
+    category: 'ALTFORDERUNG_PVS', locationKey: 'Uckerath', counterpartyKey: 'PVS',
+    estateAllocation: 'ALTMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Altmasse: Forderung aus Leistung vor 29.10.2025',
+  },
+  'davon aus Uckerath + Eitorf HZV': {
+    category: 'ALTFORDERUNG_HZV', locationKey: 'Uckerath', counterpartyKey: 'HZV',
+    estateAllocation: 'ALTMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Altmasse: Forderung aus Leistung vor 29.10.2025',
+  },
 
-  // === INSOLVENZSPEZIFISCH ===
-  'insolvenzspezifische Einzahlungen': { category: 'INSO_EINZAHLUNG', locationKey: null, counterpartyKey: null, isSubRow: false },
-  'insolvenzspezifische Auszahlungen': { category: 'INSO_AUSZAHLUNG', locationKey: null, counterpartyKey: null, isSubRow: false },
-  'davon Rückzahlung Insolvenzgeld Okt 25': { category: 'INSO_RUECKZAHLUNG', locationKey: null, counterpartyKey: null, isSubRow: true },
-  'davon Vorfinanzierung Insolvenzgeld': { category: 'INSO_VORFINANZIERUNG', locationKey: null, counterpartyKey: null, isSubRow: true },
-  'davon Sachaufnahme': { category: 'INSO_SACHAUFNAHME', locationKey: null, counterpartyKey: null, isSubRow: true },
+  // === AUSZAHLUNGEN: Kosten Fortführung (4 Zeilen) ===
+  'Personalaufwand': {
+    category: 'PERSONAL', locationKey: null, counterpartyKey: null,
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Personalkosten Fortführung',
+  },
+  'davon Betriebskosten Velbert': {
+    category: 'BETRIEBSKOSTEN', locationKey: 'Velbert', counterpartyKey: null,
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Betriebskosten Fortführung',
+  },
+  'davon Betriebskosten Uckerath': {
+    category: 'BETRIEBSKOSTEN', locationKey: 'Uckerath', counterpartyKey: null,
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Betriebskosten Fortführung',
+  },
+  'davon Betriebskosten Eitorf': {
+    category: 'BETRIEBSKOSTEN', locationKey: 'Eitorf', counterpartyKey: null,
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Betriebskosten Fortführung',
+  },
 
-  // === KOSTEN ===
-  'Personalaufwand': { category: 'PERSONAL', locationKey: null, counterpartyKey: null, isSubRow: false },
-  'davon Betriebskosten Velbert': { category: 'BETRIEBSKOSTEN', locationKey: 'Velbert', counterpartyKey: null, isSubRow: true },
-  'davon Betriebskosten Uckerath': { category: 'BETRIEBSKOSTEN', locationKey: 'Uckerath', counterpartyKey: null, isSubRow: true },
-  'davon Betriebskosten Eitorf': { category: 'BETRIEBSKOSTEN', locationKey: 'Eitorf', counterpartyKey: null, isSubRow: true },
+  // === INSOLVENZSPEZIFISCH (4 Zeilen) ===
+  // "insolvenzspezifische Einzahlungen" hat KEINE Detailzeilen → direkt importieren
+  'insolvenzspezifische Einzahlungen': {
+    category: 'INSO_EINZAHLUNG', locationKey: null, counterpartyKey: null,
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Insolvenzspezifische Einzahlung',
+  },
+  // "insolvenzspezifische Auszahlungen" ist SUMMENZEILE → wird NICHT importiert (in SKIP_ROWS)
+  // Nur die "davon"-Detailzeilen:
+  'davon Rückzahlung Insolvenzgeld Okt 25': {
+    category: 'INSO_RUECKZAHLUNG', locationKey: null, counterpartyKey: null,
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Rückzahlung Insolvenzgeld an Agentur für Arbeit',
+  },
+  'davon Vorfinanzierung Insolvenzgeld': {
+    category: 'INSO_VORFINANZIERUNG', locationKey: null, counterpartyKey: null,
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Vorfinanzierung Insolvenzgeld',
+  },
+  'davon Sachaufnahme': {
+    category: 'INSO_SACHAUFNAHME', locationKey: null, counterpartyKey: null,
+    estateAllocation: 'NEUMASSE', allocationSource: 'VERTRAGSREGEL',
+    allocationNote: 'Neumasse: Sachaufnahme durch Insolvenzverwalter',
+  },
 };
 
 // Zeilen die NICHT importiert werden (Summenzeilen, Header)
@@ -100,6 +194,7 @@ const SKIP_ROWS = [
   'Altforderungen',
   'Summe Einzahlungen',
   'Betriebliche Auszahlungen',
+  'insolvenzspezifische Auszahlungen', // SUMMENZEILE → nur Detailzeilen importieren
   'Liquiditätsplanung HVPlus per 03.11.2025 | in T€',
   'T€',
 ];
@@ -110,20 +205,19 @@ const SKIP_ROWS = [
 
 async function importPlanData() {
   console.log('='.repeat(60));
-  console.log('IMPORT: HVPlus PLAN-Daten');
+  console.log('IMPORT: HVPlus PLAN-Daten (überarbeitet)');
   console.log(`Mode: ${DRY_RUN ? 'DRY RUN (no writes)' : 'LIVE'}`);
   console.log('='.repeat(60));
 
   // 1. Load JSON
-  const jsonPath = PLAN_JSON_PATH; // Absoluter Pfad
-  console.log(`\n1. Lade JSON: ${jsonPath}`);
+  console.log(`\n1. Lade JSON: ${PLAN_JSON_PATH}`);
 
-  if (!fs.existsSync(jsonPath)) {
-    console.error(`   FEHLER: Datei nicht gefunden: ${jsonPath}`);
+  if (!fs.existsSync(PLAN_JSON_PATH)) {
+    console.error(`   FEHLER: Datei nicht gefunden: ${PLAN_JSON_PATH}`);
     process.exit(1);
   }
 
-  const jsonData = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+  const jsonData = JSON.parse(fs.readFileSync(PLAN_JSON_PATH, 'utf-8'));
   const sheet = jsonData.sheets['Tabelle_Monat_HVPlus'];
 
   if (!sheet) {
@@ -176,14 +270,16 @@ async function importPlanData() {
   });
 
   if (existingCount > 0) {
-    console.log(`   ⚠️  ${existingCount} Einträge mit dieser Quelle existieren bereits.`);
+    console.log(`   ${existingCount} Einträge mit dieser Quelle existieren bereits.`);
     console.log('   Überspringe Import um Duplikate zu vermeiden.');
-    console.log('   Zum erneuten Import: DELETE FROM ledger_entries WHERE importSource LIKE "%Liquiditätsplanung 20260114%"');
+    console.log('   Zum erneuten Import: Erst clean-slate-hvplus.ts ausführen.');
     process.exit(0);
   }
 
   // 4. Process rows
   console.log('\n4. Verarbeite Zeilen...');
+  console.log(`   Mapping: ${Object.keys(ROW_MAPPING).length} Zeilentypen definiert`);
+  console.log(`   Skip: ${SKIP_ROWS.length} Summenzeilen`);
 
   const stats = {
     rowsProcessed: 0,
@@ -192,6 +288,9 @@ async function importPlanData() {
     entriesCreated: 0,
     zeroValuesSkipped: 0,
     byCategory: {} as Record<string, number>,
+    byEstateAllocation: {} as Record<string, number>,
+    totalInflowCents: BigInt(0),
+    totalOutflowCents: BigInt(0),
   };
 
   const rows = sheet.preview_rows as unknown[][];
@@ -211,7 +310,7 @@ async function importPlanData() {
     if (!mapping) {
       if (rowName && !rowName.startsWith('Summe')) {
         stats.rowsUnmapped++;
-        console.log(`   ⚠️  Keine Zuordnung für: "${rowName}"`);
+        console.log(`   Keine Zuordnung für: "${rowName}"`);
       }
       continue;
     }
@@ -236,21 +335,28 @@ async function importPlanData() {
       const locationId = mapping.locationKey ? locationMap[mapping.locationKey] || null : null;
       const counterpartyId = mapping.counterpartyKey ? counterpartyMap[mapping.counterpartyKey] || null : null;
 
-      // Track stats (estateAllocation = null wie in Turso Production)
+      // Track stats
       stats.byCategory[mapping.category] = (stats.byCategory[mapping.category] || 0) + 1;
+      stats.byEstateAllocation[mapping.estateAllocation] = (stats.byEstateAllocation[mapping.estateAllocation] || 0) + 1;
+
+      if (amountCents > 0) {
+        stats.totalInflowCents += BigInt(amountCents);
+      } else {
+        stats.totalOutflowCents += BigInt(amountCents);
+      }
 
       if (DRY_RUN) {
-        if (stats.entriesCreated < 10) {
+        if (stats.entriesCreated < 15) {
           console.log(
             `   [PREVIEW] ${month.date.toISOString().slice(0, 10)} | ` +
               `${(valueNum * 1000).toFixed(0).padStart(10)} € | ` +
               `${mapping.category.padEnd(20)} | ` +
-              `${mapping.locationKey || '-'}`
+              `${(mapping.locationKey || '-').padEnd(10)} | ` +
+              `${mapping.estateAllocation}`
           );
         }
         stats.entriesCreated++;
       } else {
-        // Create LedgerEntry (estateAllocation = null wie Turso Production)
         await prisma.ledgerEntry.create({
           data: {
             caseId: hvplusCase.id,
@@ -261,13 +367,14 @@ async function importPlanData() {
             legalBucket: 'MASSE',
             locationId,
             counterpartyId,
-            estateAllocation: null, // Turso Production = null
+            categoryTag: mapping.category,
+            estateAllocation: mapping.estateAllocation,
             estateRatio: null,
-            allocationSource: null,
-            allocationNote: null,
+            allocationSource: mapping.allocationSource,
+            allocationNote: mapping.allocationNote,
             importSource: 'Liquiditätsplanung 20260114',
             importRowNumber: rowIndex + 1,
-            reviewStatus: 'CONFIRMED', // PLAN-Daten sind bereits geprüft
+            reviewStatus: 'UNREVIEWED',
             createdBy: 'import-hvplus-plan',
           },
         });
@@ -277,22 +384,36 @@ async function importPlanData() {
   }
 
   // 5. Summary
+  const inflowTEUR = Number(stats.totalInflowCents) / 100 / 1000;
+  const outflowTEUR = Number(stats.totalOutflowCents) / 100 / 1000;
+  const saldoTEUR = inflowTEUR + outflowTEUR;
+
   console.log('\n' + '='.repeat(60));
   console.log('IMPORT ABGESCHLOSSEN');
   console.log('='.repeat(60));
   console.log(`
-Zeilen verarbeitet:     ${stats.rowsProcessed}
-Zeilen übersprungen:    ${stats.rowsSkipped}
-Zeilen ohne Mapping:    ${stats.rowsUnmapped}
+Zeilen verarbeitet:      ${stats.rowsProcessed}
+Zeilen übersprungen:     ${stats.rowsSkipped}
+Zeilen ohne Mapping:     ${stats.rowsUnmapped}
 Null-Werte übersprungen: ${stats.zeroValuesSkipped}
 
-Einträge erstellt:      ${stats.entriesCreated}
-(estateAllocation = null wie Turso Production)
+Einträge erstellt:       ${stats.entriesCreated}
 
 Nach Kategorie:
 ${Object.entries(stats.byCategory)
-  .map(([cat, count]) => `  ${cat.padEnd(20)}: ${count}`)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([cat, count]) => `  ${cat.padEnd(25)}: ${count}`)
   .join('\n')}
+
+Nach Estate-Allocation:
+${Object.entries(stats.byEstateAllocation)
+  .map(([alloc, count]) => `  ${alloc.padEnd(25)}: ${count}`)
+  .join('\n')}
+
+Summenprüfung:
+  Einzahlungen:  ${inflowTEUR.toFixed(1)} T€
+  Auszahlungen:  ${outflowTEUR.toFixed(1)} T€
+  Saldo:         ${saldoTEUR.toFixed(1)} T€
 `);
 }
 

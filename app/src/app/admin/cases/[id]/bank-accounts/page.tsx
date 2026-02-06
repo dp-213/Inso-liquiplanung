@@ -9,8 +9,8 @@ interface BankAccount {
   bankName: string;
   accountName: string;
   iban: string | null;
-  balanceCents: string;
-  availableCents: string;
+  openingBalanceCents: string;
+  currentBalanceCents: string;
   securityHolder: string | null;
   status: string;
   notes: string | null;
@@ -38,8 +38,7 @@ export default function BankAccountsPage() {
     bankName: "",
     accountName: "",
     iban: "",
-    balanceCents: "",
-    availableCents: "",
+    openingBalanceCents: "",
     securityHolder: "",
     status: "available",
     notes: "",
@@ -79,10 +78,7 @@ export default function BankAccountsPage() {
           bankName: formData.bankName,
           accountName: formData.accountName,
           iban: formData.iban || null,
-          balanceCents: Math.round(parseFloat(formData.balanceCents) * 100),
-          availableCents: formData.availableCents
-            ? Math.round(parseFloat(formData.availableCents) * 100)
-            : Math.round(parseFloat(formData.balanceCents) * 100),
+          openingBalanceCents: Math.round(parseFloat(formData.openingBalanceCents) * 100),
           securityHolder: formData.securityHolder || null,
           status: formData.status,
           notes: formData.notes || null,
@@ -130,8 +126,7 @@ export default function BankAccountsPage() {
       bankName: account.bankName,
       accountName: account.accountName,
       iban: account.iban || "",
-      balanceCents: (Number(account.balanceCents) / 100).toString(),
-      availableCents: (Number(account.availableCents) / 100).toString(),
+      openingBalanceCents: (Number(account.openingBalanceCents) / 100).toString(),
       securityHolder: account.securityHolder || "",
       status: account.status,
       notes: account.notes || "",
@@ -144,8 +139,7 @@ export default function BankAccountsPage() {
       bankName: "",
       accountName: "",
       iban: "",
-      balanceCents: "",
-      availableCents: "",
+      openingBalanceCents: "",
       securityHolder: "",
       status: "available",
       notes: "",
@@ -169,9 +163,12 @@ export default function BankAccountsPage() {
     return STATUS_OPTIONS.find((s) => s.value === status) || STATUS_OPTIONS[0];
   };
 
-  // Calculate totals
-  const totalBalance = accounts.reduce((sum, acc) => sum + Number(acc.balanceCents), 0);
-  const totalAvailable = accounts.reduce((sum, acc) => sum + Number(acc.availableCents), 0);
+  // Calculate totals from currentBalanceCents
+  const totalBalance = accounts.reduce((sum, acc) => sum + Number(acc.currentBalanceCents), 0);
+  const totalAvailable = accounts.reduce(
+    (sum, acc) => acc.status !== "blocked" ? sum + Number(acc.currentBalanceCents) : sum,
+    0
+  );
 
   if (loading) {
     return (
@@ -230,7 +227,7 @@ export default function BankAccountsPage() {
           <p className="text-2xl font-bold text-[var(--foreground)]">{accounts.length}</p>
         </div>
         <div className="admin-card p-4">
-          <p className="text-sm text-[var(--muted)]">Guthaben Gesamt</p>
+          <p className="text-sm text-[var(--muted)]">Gesamtsaldo</p>
           <p className="text-2xl font-bold text-[var(--foreground)]">{formatCurrency(totalBalance)}</p>
         </div>
         <div className="admin-card p-4">
@@ -286,33 +283,21 @@ export default function BankAccountsPage() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Guthaben (€) *
+                Anfangssaldo (EUR) *
               </label>
               <input
                 type="number"
-                value={formData.balanceCents}
-                onChange={(e) => setFormData({ ...formData, balanceCents: e.target.value })}
+                value={formData.openingBalanceCents}
+                onChange={(e) => setFormData({ ...formData, openingBalanceCents: e.target.value })}
                 className="input w-full"
-                placeholder="z.B. 701365.10"
+                placeholder="z.B. 89775.00"
                 step="0.01"
                 required
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Liquide Mittel (€)
-              </label>
-              <input
-                type="number"
-                value={formData.availableCents}
-                onChange={(e) => setFormData({ ...formData, availableCents: e.target.value })}
-                className="input w-full"
-                placeholder="Gleich wie Guthaben wenn leer"
-                step="0.01"
-              />
+              <p className="text-xs text-[var(--muted)] mt-1">Saldo vor allen Ledger-Buchungen</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
@@ -386,8 +371,8 @@ export default function BankAccountsPage() {
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Kreditinstitut</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Konto</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">IBAN</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--secondary)] uppercase">Guthaben</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--secondary)] uppercase">Liquide Mittel</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--secondary)] uppercase">Anfangssaldo</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--secondary)] uppercase">Aktueller Saldo</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Sicherungsnehmer</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Status</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Aktionen</th>
@@ -403,8 +388,8 @@ export default function BankAccountsPage() {
                       <td className="px-4 py-3 text-sm font-mono text-[var(--secondary)]">
                         {account.iban ? formatIBAN(account.iban) : "-"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right font-medium">{formatCurrency(account.balanceCents)}</td>
-                      <td className="px-4 py-3 text-sm text-right font-medium text-green-600">{formatCurrency(account.availableCents)}</td>
+                      <td className="px-4 py-3 text-sm text-right text-[var(--secondary)]">{formatCurrency(account.openingBalanceCents)}</td>
+                      <td className="px-4 py-3 text-sm text-right font-medium">{formatCurrency(account.currentBalanceCents)}</td>
                       <td className="px-4 py-3 text-sm text-[var(--secondary)]">{account.securityHolder || "-"}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`px-2 py-1 text-xs rounded-full ${statusConfig.color}`}>
@@ -438,9 +423,8 @@ export default function BankAccountsPage() {
                 })}
                 {/* Totals Row */}
                 <tr className="bg-gray-100 font-semibold">
-                  <td className="px-4 py-3 text-sm" colSpan={3}>Summe</td>
+                  <td className="px-4 py-3 text-sm" colSpan={4}>Summe</td>
                   <td className="px-4 py-3 text-sm text-right">{formatCurrency(totalBalance)}</td>
-                  <td className="px-4 py-3 text-sm text-right text-green-600">{formatCurrency(totalAvailable)}</td>
                   <td colSpan={3}></td>
                 </tr>
               </tbody>

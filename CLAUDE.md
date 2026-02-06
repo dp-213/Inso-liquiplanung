@@ -184,11 +184,14 @@ Alle Dokumentation liegt in `/app/docs/`:
 
 | Datei | Zweck |
 |-------|-------|
-| `CLAUDE.md` (root) | Diese Datei – Projekt-Kontext für Claude |
+| `CLAUDE.md` (root) | Diese Datei – Projekt-Kontext + Case-Übersicht (auto-geladen) |
 | `.claude/agents/insolvency-liquidity-engineer.md` | Agent für Berechnungslogik |
 | `.claude/agents/insolvency-admin-architect.md` | Agent für Admin/Ingestion |
+| `.claude/agents/case-intake-analyst.md` | Agent für Case-Daten-Intake |
 | `.claude/commands/doku.md` | `/doku` Command für Doku-Updates |
-| `.claude/commands/liqui.md` | `/liqui` Command für Projekt-Kontext |
+| `.claude/commands/liqui.md` | `/liqui` Command – Lädt vollständigen Case-Kontext |
+| `.claude/commands/input.md` | `/input` Command – Case-Intake-Workflow |
+| `Cases/*/case-context.json` | Akkumuliertes Case-Wissen (von `/liqui` gelesen) |
 
 ### Dokumentation aktualisieren
 
@@ -260,3 +263,73 @@ cd app && npm run build
 2. **Bei Schema-Änderungen:** Turso-SQL zuerst ausführen
 3. **Deployen:** `vercel --prod`
 4. **Verifizieren:** Live-URL kurz prüfen (zumindest ob Seite lädt)
+
+---
+
+## Aktive Fälle (Case Knowledge)
+
+### Case-Ordner-Struktur
+
+Alle Falldaten liegen unter `/Cases/<Case-Name>/`:
+
+```
+/Cases/<Case-Name>/
+    case-context.json           # Akkumuliertes Wissen (IMMER zuerst lesen!)
+    /01-raw/                    # Original-Dateien
+    /02-extracted/              # Strukturierte JSONs
+    /03-classified/             # IST/PLAN/ANNAHMEN/STRUKTUR/VERTRAEGE/REFERENZ
+    /06-review/                 # Analysen, Traceability, offene Fragen
+```
+
+**Wichtig:** Bei Arbeit an einem Fall IMMER zuerst `case-context.json` lesen. Dort stehen alle Kontakte, Bankverbindungen, Standorte, LANR-Zuordnungen, Abrechnungsregeln und offene Datenanforderungen.
+
+---
+
+### Fall: Hausärztliche Versorgung PLUS eG (HVPlus)
+
+**Pfad:** `/Cases/Hausärztliche Versorgung PLUS eG/`
+**Vollständiger Kontext:** `case-context.json` (555 Zeilen, alle Details)
+
+#### Eckdaten
+
+| Feld | Wert |
+|------|------|
+| **Aktenzeichen** | 70d IN 362/25, AG Köln |
+| **Insolvenz-Eröffnung** | 29.10.2025 |
+| **IV** | Sarah Wolf (Anchor Rechtsanwälte, Hannes Rieger operativ) |
+| **Beraterin** | Sonja Prinz (unser Team) |
+| **Buchhalterin** | Frau Dupke |
+| **Rechtsform** | eG (eingetragene Genossenschaft) |
+| **Massekredit** | Sparkasse HRV, max. 137.000 EUR |
+
+#### 3 Standorte
+
+| Standort | Bank | HZV | KV (BSNR) |
+|----------|------|-----|-----------|
+| **Velbert** | Sparkasse HRV + ISK BW-Bank | Beyer, van Suntum, Kamler | Eigene BSNR |
+| **Uckerath** | apoBank + ISK BW-Bank | Binas, Fischer, Ludwig, Schweitzer | BSNR 273203300 |
+| **Eitorf** | Läuft über Uckerath | Rösing (aktivster Arzt!) | Über Uckerath |
+
+#### Einnahmeströme & Alt/Neu-Regeln
+
+| Quelle | Alt/Neu-Regel | Quelle der Regel |
+|--------|---------------|------------------|
+| **KV (KVNO)** | Q4/2025: 1/3 Alt, 2/3 Neu | Massekreditvertrag §1(2)a |
+| **HZV (HAVG)** | Oktober: 28/31 Alt, 3/31 Neu; Zahlung M = Leistung M-1 | Massekreditvertrag §1(2)b |
+| **PVS** | Nach Behandlungsdatum | Massekreditvertrag §1(2)c |
+
+#### Wichtige Dokumente im Case-Ordner
+
+| Datei | Inhalt |
+|-------|--------|
+| `case-context.json` | Vollständiger Kontext (Kontakte, Banken, LANR, Regeln) |
+| `06-review/plan-traceability-matrix.md` | Herleitung jeder Zahl der IV-Liquiditätsplanung |
+| `03-classified/PLAN/Liquiditätsplanung_HVPlus_20260114_versendet.json` | Die aktuelle Planung als JSON |
+| `02-extracted/Annahme_Einnahmen_bis_Juni26.json` | Einnahmen-Prognosen je Standort |
+
+#### Arbeitsstand
+
+- IST-Daten: Oktober + November importiert, Dezember teilweise, Januar fehlt
+- PLAN-Daten: Liquiditätsplanung vom 14.01.2026 analysiert und nachvollzogen
+- Traceability-Matrix: Jede Zahl der Planung zu Quelldatei zurückverfolgt
+- Offene Punkte: ISK-PDF-Extraktion Dez/Jan, apoBank-Vereinbarung klären

@@ -13,6 +13,10 @@ import {
   REVIEW_STATUS,
   REVIEW_STATUS_LABELS,
   REVIEW_STATUS_COLORS,
+  CATEGORY_TAG_LABELS,
+  CATEGORY_TAG_OPTIONS,
+  CATEGORY_TAG_SOURCE_LABELS,
+  CategoryTagSource,
 } from "@/lib/ledger";
 
 const VALUE_TYPE_LABELS: Record<ValueType, string> = {
@@ -134,6 +138,9 @@ export default function LedgerEntryEditPage({
   const [formLocationId, setFormLocationId] = useState<string>("");
   const [formSteeringTag, setFormSteeringTag] = useState<string>("");
 
+  // Matrix-Kategorie (categoryTag)
+  const [formCategoryTag, setFormCategoryTag] = useState<string>("");
+
   // Estate Allocation (Alt-/Neumasse)
   const [formEstateAllocation, setFormEstateAllocation] = useState<EstateAllocationType>("");
 
@@ -159,6 +166,10 @@ export default function LedgerEntryEditPage({
     mappedData: Record<string, unknown> | null;
     sheetName: string | null;
   } | null>(null);
+
+  // Transfer Partner
+  const [transferPartner, setTransferPartner] = useState<LedgerEntryResponse | null>(null);
+  const [unpairingTransfer, setUnpairingTransfer] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -204,6 +215,8 @@ export default function LedgerEntryEditPage({
           setFormCounterpartyId(data.counterpartyId || "");
           setFormLocationId(data.locationId || "");
           setFormSteeringTag(data.steeringTag || "");
+          // Matrix-Kategorie initialisieren
+          setFormCategoryTag(data.categoryTag || "");
           // Estate Allocation initialisieren
           setFormEstateAllocation(data.estateAllocation || "");
           // Service Date / Period initialisieren
@@ -226,6 +239,21 @@ export default function LedgerEntryEditPage({
           // Import-Rohdaten speichern
           if (data.importData) {
             setImportData(data.importData);
+          }
+          // Transfer-Partner laden
+          if (data.transferPartnerEntryId) {
+            try {
+              const partnerRes = await fetch(
+                `/api/cases/${id}/ledger/${data.transferPartnerEntryId}`,
+                { credentials: 'include' }
+              );
+              if (partnerRes.ok) {
+                const partnerData = await partnerRes.json();
+                setTransferPartner(partnerData);
+              }
+            } catch {
+              // Partner nicht ladbar — ignorieren
+            }
           }
         } else {
           setError("Eintrag nicht gefunden");
@@ -259,6 +287,8 @@ export default function LedgerEntryEditPage({
           counterpartyId: formCounterpartyId || null,
           locationId: formLocationId || null,
           steeringTag: formSteeringTag || null,
+          // Matrix-Kategorie
+          categoryTag: formCategoryTag || null,
           // Estate Allocation - wenn manuell geändert, setze MANUELL als Quelle
           estateAllocation: formEstateAllocation || null,
           allocationSource: formEstateAllocation && formEstateAllocation !== entry?.estateAllocation
@@ -309,6 +339,45 @@ export default function LedgerEntryEditPage({
     } catch (err) {
       setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
       setSaving(false);
+    }
+  };
+
+  const handleUnpairTransfer = async () => {
+    if (!confirm("Möchten Sie die Umbuchungs-Verknüpfung wirklich aufheben?")) {
+      return;
+    }
+
+    setUnpairingTransfer(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/unpair-transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ entryId }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Aufheben fehlgeschlagen");
+      }
+
+      // Entry neu laden
+      const entryRes = await fetch(`/api/cases/${id}/ledger/${entryId}`, {
+        credentials: "include",
+      });
+      if (entryRes.ok) {
+        const data = await entryRes.json();
+        setEntry(data);
+      }
+      setTransferPartner(null);
+      setSuccessMessage("Umbuchungs-Verknüpfung aufgehoben");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Aufheben fehlgeschlagen");
+    } finally {
+      setUnpairingTransfer(false);
     }
   };
 
@@ -546,6 +615,50 @@ export default function LedgerEntryEditPage({
         </div>
       )}
 
+      {/* Transfer-Partner Info */}
+      {entry.transferPartnerEntryId && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-lg">⇄</span>
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">Umbuchung</h3>
+                {transferPartner ? (
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-sm text-gray-600">
+                      Gegenbuchung: {transferPartner.description}
+                    </span>
+                    <span className={`text-sm font-medium ${parseInt(transferPartner.amountCents) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(transferPartner.amountCents)}
+                    </span>
+                    <Link
+                      href={`/admin/cases/${id}/ledger/${transferPartner.id}`}
+                      className="text-sm text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Gegenbuchung öffnen →
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Gegenbuchung: {entry.transferPartnerEntryId}
+                  </p>
+                )}
+              </div>
+            </div>
+            <button
+              onClick={handleUnpairTransfer}
+              disabled={unpairingTransfer}
+              className="text-sm text-gray-500 hover:text-red-600 disabled:opacity-50"
+            >
+              {unpairingTransfer ? "..." : "Verknüpfung aufheben"}
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            Umbuchungen werden in konsolidierten Summen (Matrix, Gesamtübersicht) nicht mitgezählt.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Info (Read-only) */}
         <div className="lg:col-span-2 space-y-6">
@@ -707,6 +820,76 @@ export default function LedgerEntryEditPage({
                     />
                   </div>
                 </div>
+              </div>
+
+              {/* Matrix-Kategorie (categoryTag) */}
+              <div className="pt-4 border-t border-[var(--border)]">
+                <h3 className="text-sm font-medium text-[var(--foreground)] mb-3">Matrix-Kategorie</h3>
+
+                {/* Vorschlag-Hinweis wenn abweichend */}
+                {entry?.suggestedCategoryTag && entry.suggestedCategoryTag !== entry.categoryTag && (
+                  <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <span className="text-blue-600 text-sm">💡</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-blue-800">
+                          Vorschlag: {CATEGORY_TAG_LABELS[entry.suggestedCategoryTag] || entry.suggestedCategoryTag}
+                        </p>
+                        {entry.suggestedCategoryTagReason && (
+                          <p className="text-xs text-blue-600 mt-0.5">{entry.suggestedCategoryTagReason}</p>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setFormCategoryTag(entry.suggestedCategoryTag!)}
+                          className="mt-1.5 text-xs text-blue-800 hover:text-blue-900 underline font-medium"
+                        >
+                          Vorschlag übernehmen
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <select
+                  value={formCategoryTag}
+                  onChange={(e) => setFormCategoryTag(e.target.value)}
+                  className="input-field w-full"
+                >
+                  <option value="">-- Nicht zugeordnet --</option>
+                  {CATEGORY_TAG_OPTIONS.map((group) => (
+                    <optgroup key={group.group} label={group.group}>
+                      {group.tags.map((tag) => (
+                        <option key={tag} value={tag}>
+                          {CATEGORY_TAG_LABELS[tag] || tag}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+
+                {/* Source + Note anzeigen */}
+                {entry?.categoryTagSource && (
+                  <div className="mt-2 flex items-center gap-2 text-xs">
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${
+                      entry.categoryTagSource === 'MANUELL'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                        : entry.categoryTagSource === 'AUTO'
+                          ? 'bg-green-50 text-green-700 border-green-200'
+                          : 'bg-gray-50 text-gray-700 border-gray-200'
+                    }`}>
+                      {CATEGORY_TAG_SOURCE_LABELS[entry.categoryTagSource as CategoryTagSource] || entry.categoryTagSource}
+                    </span>
+                    {entry.categoryTagNote && (
+                      <span className="text-[var(--muted)] truncate" title={entry.categoryTagNote}>
+                        {entry.categoryTagNote}
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                <p className="text-xs text-[var(--muted)] mt-1">
+                  Bestimmt die Zeile in der Liquiditätsmatrix
+                </p>
               </div>
 
               {/* Leistungszuordnung (für Alt/Neu-Berechnung) */}

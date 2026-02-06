@@ -549,6 +549,63 @@ In der Liquiditätsmatrix wurden Perioden mit IST-Daten und PLAN-Daten als "MIXE
 
 ---
 
+## ADR-016: Berechnete Kontostände statt manueller Eingabe
+
+**Datum:** 5. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+`BankAccount.balanceCents` und `BankAccount.availableCents` waren manuelle Eingabefelder. Da Kontoauszüge als IST-Buchungen im Ledger liegen (mit `bankAccountId`), wurden Kontostände doppelt gepflegt — manuell im Bankenspiegel und implizit durch Ledger-Buchungen. Das war fehleranfällig und widersprach dem Prinzip "LedgerEntry als Single Source of Truth".
+
+### Entscheidung
+
+Kontostände werden berechnet:
+
+```
+currentBalanceCents = openingBalanceCents + SUM(IST-LedgerEntries.amountCents WHERE bankAccountId = X)
+```
+
+- **`openingBalanceCents`** — einmaliger Anfangssaldo (manuell, vor allen Ledger-Buchungen)
+- **`currentBalanceCents`** — berechnet, nie gespeichert
+- **"Liquide Mittel"** — Summe aller `currentBalanceCents` für Konten mit `status !== 'blocked'`
+- **`balanceCents` / `availableCents`** — entfernt
+
+### Begründung
+
+- **Single Source of Truth:** Ledger-Buchungen bestimmen den Saldo, nicht manuelle Eingaben
+- **Automatisch aktuell:** Import neuer Kontoauszüge → Saldo aktualisiert sich sofort
+- **Keine Doppelpflege:** Kein Risiko, dass manueller Saldo und Ledger-Daten divergieren
+- **Performant:** Eine gruppierte SUM-Query über 4-8 Konten, trivial schnell
+
+### Deployment-Checkliste
+
+**VOR dem Deployment auf Turso:**
+
+```sql
+-- 1. Neue Spalte anlegen (mit Default)
+ALTER TABLE bank_accounts ADD COLUMN openingBalanceCents INTEGER NOT NULL DEFAULT 0;
+
+-- 2. Bestehende Salden als Anfangssaldo übernehmen
+UPDATE bank_accounts SET openingBalanceCents = balanceCents;
+```
+
+**Hinweis:** `balanceCents` und `availableCents` bleiben als Ghost-Columns in Turso (SQLite kann keine Spalten droppen). Prisma ignoriert sie, da sie nicht mehr im Schema stehen.
+
+**NACH dem SQL:**
+- `vercel --prod` deployen
+- Verifizieren: Bankenspiegel zeigt Salden, Dashboard lädt korrekt
+
+### Konsequenzen
+
+- **Positiv:** Kontostände sind immer konsistent mit Ledger-Daten
+- **Positiv:** Weniger manuelle Pflege
+- **Positiv:** "Verfügbar"-Spalte entfällt (war de facto immer gleich oder unklar)
+- **Negativ:** `openingBalanceCents` muss einmalig korrekt gesetzt werden
+- **Negativ:** Ghost-Columns in Turso (kosmetisch, kein funktionales Problem)
+
+---
+
 ## Template für neue Entscheidungen
 
 ```markdown

@@ -11,6 +11,9 @@ import {
   LedgerEntryResponse,
   ReviewStatus,
   REVIEW_STATUS,
+  CATEGORY_TAG_LABELS,
+  CATEGORY_TAG_OPTIONS,
+  CATEGORY_TAG_SOURCE_LABELS,
 } from "@/lib/ledger";
 
 type TabType = "all" | "review" | "rules" | "sources";
@@ -38,6 +41,7 @@ const COLUMN_DEFINITIONS: ColumnConfig[] = [
   { id: "counterparty", label: "Gegenpartei", defaultVisible: false, defaultWidth: 150, minWidth: 100 },
   { id: "location", label: "Standort", defaultVisible: false, defaultWidth: 120, minWidth: 80 },
   { id: "bankAccount", label: "Bankkonto", defaultVisible: false, defaultWidth: 150, minWidth: 100 },
+  { id: "categoryTag", label: "Matrix-Kat.", defaultVisible: true, defaultWidth: 120, minWidth: 80 },
   { id: "import", label: "Import", defaultVisible: true, defaultWidth: 100, minWidth: 80 },
   { id: "actions", label: "Aktionen", defaultVisible: true, defaultWidth: 130, minWidth: 100 },
 ];
@@ -196,6 +200,11 @@ export default function CaseLedgerPage({
   const [filterImportJobId, setFilterImportJobId] = useState<string>("");
   // Estate Allocation Filter (Alt-/Neumasse) - initialized from URL
   const [filterEstateAllocation, setFilterEstateAllocation] = useState<EstateAllocation>(initialEstateAllocation);
+  // Category Tag Filter (Matrix-Kategorie)
+  const [filterCategoryTag, setFilterCategoryTag] = useState<string>("");
+  // Transfer-Filter (Umbuchungen)
+  const [filterIsTransfer, setFilterIsTransfer] = useState<string>("");
+  const [pairingTransfer, setPairingTransfer] = useState(false);
 
   // Auto-set review filter when tab changes
   useEffect(() => {
@@ -232,6 +241,10 @@ export default function CaseLedgerPage({
       if (filterImportJobId) queryParams.set("importJobId", filterImportJobId);
       // Estate Allocation Filter
       if (filterEstateAllocation) queryParams.set("estateAllocation", filterEstateAllocation);
+      // Category Tag Filter
+      if (filterCategoryTag) queryParams.set("categoryTag", filterCategoryTag);
+      // Transfer-Filter
+      if (filterIsTransfer) queryParams.set("isTransfer", filterIsTransfer);
 
       const queryString = queryParams.toString();
       const url = `/api/cases/${id}/ledger${queryString ? `?${queryString}` : ""}`;
@@ -315,7 +328,7 @@ export default function CaseLedgerPage({
     } finally {
       setLoading(false);
     }
-  }, [id, filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountId, filterCounterpartyId, filterLocationId, filterImportJobId, filterEstateAllocation]);
+  }, [id, filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountId, filterCounterpartyId, filterLocationId, filterImportJobId, filterEstateAllocation, filterCategoryTag, filterIsTransfer]);
 
   useEffect(() => {
     fetchData();
@@ -402,9 +415,11 @@ export default function CaseLedgerPage({
     setFilterLocationId("");
     setFilterImportJobId("");
     setFilterEstateAllocation("");
+    setFilterCategoryTag("");
+    setFilterIsTransfer("");
   };
 
-  const hasActiveFilters = filterValueType || filterLegalBucket || filterReviewStatus || filterSuggestedBucket || filterFrom || filterTo || filterBankAccountId || filterCounterpartyId || filterLocationId || filterImportJobId || filterEstateAllocation;
+  const hasActiveFilters = filterValueType || filterLegalBucket || filterReviewStatus || filterSuggestedBucket || filterFrom || filterTo || filterBankAccountId || filterCounterpartyId || filterLocationId || filterImportJobId || filterEstateAllocation || filterCategoryTag || filterIsTransfer;
 
   // Bulk Actions
   const handleBulkConfirm = async (filter?: { suggestedLegalBucket?: string; minConfidence?: number }) => {
@@ -590,6 +605,63 @@ export default function CaseLedgerPage({
     }
   };
 
+  // Category Tag Suggestions
+  const handleApplyCategoryTagSuggestions = async () => {
+    setBulkProcessing(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/bulk-review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: "ADJUST",
+          entryIds: Array.from(selectedEntries),
+          reason: "Kategorie-Vorschläge übernommen",
+          applyCategoryTagSuggestions: true,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Bulk-Review fehlgeschlagen");
+
+      const result = await res.json();
+      setSuccessMessage(`${result.processed} Kategorie-Vorschläge übernommen`);
+      setSelectedEntries(new Set());
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const handleSuggestCategoryTags = async () => {
+    setBulkProcessing(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/suggest-category-tags`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({}),
+      });
+
+      if (!res.ok) throw new Error("Vorschlagsberechnung fehlgeschlagen");
+
+      const result = await res.json();
+      setSuccessMessage(`${result.updated} Kategorie-Vorschläge berechnet, ${result.skipped} übersprungen`);
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
   // Delete Import Job
   const handleDeleteImport = async (importJobId: string, importSource: string | null) => {
     if (!confirm(`Möchten Sie wirklich alle Einträge aus dem Import "${importSource || importJobId}" löschen?`)) {
@@ -649,6 +721,67 @@ export default function CaseLedgerPage({
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Löschen fehlgeschlagen");
+    }
+  };
+
+  // Transfer Pairing (Umbuchungen verknüpfen)
+  const handlePairTransfer = async () => {
+    if (selectedEntries.size !== 2) {
+      setError("Bitte genau 2 Einträge auswählen");
+      return;
+    }
+
+    setPairingTransfer(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    const ids = Array.from(selectedEntries);
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/pair-transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ entryIdA: ids[0], entryIdB: ids[1] }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Verknüpfung fehlgeschlagen");
+      }
+
+      setSuccessMessage(data.message + (data.warning ? ` (${data.warning})` : ""));
+      setSelectedEntries(new Set());
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verknüpfung fehlgeschlagen");
+    } finally {
+      setPairingTransfer(false);
+    }
+  };
+
+  const handleUnpairTransfer = async (entryId: string) => {
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/unpair-transfer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ entryId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Aufheben fehlgeschlagen");
+      }
+
+      setSuccessMessage(data.message);
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Aufheben fehlgeschlagen");
     }
   };
 
@@ -1405,6 +1538,38 @@ export default function CaseLedgerPage({
                 </span>
               </button>
             )}
+
+            {/* Kategorie-Vorschläge berechnen */}
+            <button
+              onClick={handleSuggestCategoryTags}
+              disabled={bulkProcessing}
+              className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              title="Berechnet Matrix-Kategorie-Vorschläge für alle Einträge ohne Zuordnung"
+            >
+              Kat.-Vorschläge berechnen
+            </button>
+            {selectedEntries.size > 0 && (
+              <button
+                onClick={handleApplyCategoryTagSuggestions}
+                disabled={bulkProcessing}
+                className="text-xs px-3 py-1.5 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                title="Übernimmt die berechneten Kategorie-Vorschläge für ausgewählte Einträge"
+              >
+                Kat.-Vorschläge übernehmen ({selectedEntries.size})
+              </button>
+            )}
+
+            {/* Umbuchung verknüpfen */}
+            {selectedEntries.size === 2 && (
+              <button
+                onClick={handlePairTransfer}
+                disabled={pairingTransfer}
+                className="text-xs px-3 py-1.5 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+                title="Die beiden ausgewählten Einträge als interne Umbuchung verknüpfen"
+              >
+                {pairingTransfer ? "Verknüpfe..." : "Als Umbuchung verknüpfen"}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1601,6 +1766,44 @@ export default function CaseLedgerPage({
               <option value="NEUMASSE">Neumasse</option>
               <option value="MIXED">Gemischt</option>
               <option value="UNKLAR">Unklar</option>
+            </select>
+          </div>
+
+          {/* Matrix-Kategorie Filter */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+              Matrix-Kat.
+            </label>
+            <select
+              value={filterCategoryTag}
+              onChange={(e) => setFilterCategoryTag(e.target.value)}
+              className="input-field min-w-[150px]"
+            >
+              <option value="">Alle</option>
+              <option value="null">Nicht zugeordnet</option>
+              {CATEGORY_TAG_OPTIONS.map(group => (
+                <optgroup key={group.group} label={group.group}>
+                  {group.tags.map(tag => (
+                    <option key={tag} value={tag}>{CATEGORY_TAG_LABELS[tag]}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
+          {/* Umbuchungs-Filter */}
+          <div>
+            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+              Umbuchungen
+            </label>
+            <select
+              value={filterIsTransfer}
+              onChange={(e) => setFilterIsTransfer(e.target.value)}
+              className="input-field min-w-[150px]"
+            >
+              <option value="">Alle Einträge</option>
+              <option value="false">Ohne Umbuchungen</option>
+              <option value="true">Nur Umbuchungen</option>
             </select>
           </div>
 
@@ -1824,6 +2027,16 @@ export default function CaseLedgerPage({
                       />
                     </th>
                   )}
+                  {/* Matrix-Kategorie */}
+                  {columnVisibility.categoryTag && (
+                    <th style={{ width: columnWidths.categoryTag }} className="relative group px-2 py-2 text-left text-xs font-medium text-[var(--muted)] uppercase whitespace-nowrap">
+                      Matrix-Kat.
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "categoryTag")}
+                      />
+                    </th>
+                  )}
                   {/* Import */}
                   {columnVisibility.import && (
                     <th style={{ width: columnWidths.import }} className="relative group">
@@ -1859,8 +2072,10 @@ export default function CaseLedgerPage({
                     locationId?: string | null;
                   };
 
+                  const isTransfer = !!(entryWithExtras as unknown as { transferPartnerEntryId: string | null }).transferPartnerEntryId;
+
                   return (
-                    <tr key={entry.id} className={selectedEntries.has(entry.id) ? "bg-blue-50" : ""}>
+                    <tr key={entry.id} className={`${selectedEntries.has(entry.id) ? "bg-blue-50" : isTransfer ? "bg-gray-50 text-gray-500" : ""}`}>
                       <td>
                         <input
                           type="checkbox"
@@ -1878,6 +2093,11 @@ export default function CaseLedgerPage({
                         <td>
                           <div className="truncate" style={{ maxWidth: columnWidths.description - 16 }}>
                             <div className="font-medium text-[var(--foreground)] truncate">
+                              {isTransfer && (
+                                <span className="inline-flex items-center mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                  &#8644; Umbuchung
+                                </span>
+                              )}
                               {entry.description}
                             </div>
                             {entry.note && (
@@ -2006,6 +2226,51 @@ export default function CaseLedgerPage({
                           )}
                         </td>
                       )}
+                      {columnVisibility.categoryTag && (
+                        <td className="px-2 py-1.5 text-xs">
+                          {(() => {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const ext = entryWithExtras as any;
+                            const tag = ext.categoryTag as string | null;
+                            const source = ext.categoryTagSource as string | null;
+                            const note = ext.categoryTagNote as string | null;
+                            const suggested = ext.suggestedCategoryTag as string | null;
+                            const reason = ext.suggestedCategoryTagReason as string | null;
+
+                            if (tag) {
+                              // Confirmed tag
+                              const label = CATEGORY_TAG_LABELS[tag] || tag;
+                              const sourceLabel = source ? CATEGORY_TAG_SOURCE_LABELS[source as keyof typeof CATEGORY_TAG_SOURCE_LABELS] || source : '';
+                              return (
+                                <span
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-300"
+                                  title={`${sourceLabel}${note ? ` | ${note}` : ''}`}
+                                >
+                                  {label}
+                                  {source === 'AUTO' && <span className="text-[9px] opacity-60">A</span>}
+                                  {source === 'MANUELL' && <span className="text-[9px] opacity-60">M</span>}
+                                </span>
+                              );
+                            }
+
+                            if (suggested) {
+                              // Only suggestion
+                              const label = CATEGORY_TAG_LABELS[suggested] || suggested;
+                              return (
+                                <span
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 border border-dashed border-blue-300"
+                                  title={reason || 'Vorschlag'}
+                                >
+                                  {label}
+                                  <span className="text-[9px] opacity-60">?</span>
+                                </span>
+                              );
+                            }
+
+                            return <span className="text-[var(--muted)]">&ndash;</span>;
+                          })()}
+                        </td>
+                      )}
                       {columnVisibility.import && (
                         <td className="text-xs">
                           {entryWithExtras.importSource ? (
@@ -2036,6 +2301,15 @@ export default function CaseLedgerPage({
                           >
                             Bearbeiten
                           </Link>
+                          {isTransfer && (
+                            <button
+                              onClick={() => handleUnpairTransfer(entry.id)}
+                              className="text-indigo-600 hover:underline text-sm"
+                              title="Umbuchungs-Verknüpfung aufheben"
+                            >
+                              Entknüpfen
+                            </button>
+                          )}
                           <button
                             onClick={() => handleDeleteEntry(entry.id, entry.description)}
                             className="text-[var(--danger)] hover:underline text-sm"

@@ -638,13 +638,12 @@ export default function PDFExportButton({ data, pdfTexts }: PDFExportButtonProps
       yPos += 8;
 
       if (data.bankAccounts && data.bankAccounts.accounts.length > 0) {
-        const bankHeaders = ["Kreditinstitut", "Kontobezeichnung", "IBAN", "Guthaben", "Verfügbar", "Status"];
+        const bankHeaders = ["Kreditinstitut", "Kontobezeichnung", "IBAN", "Aktueller Saldo", "Status"];
         const bankData = data.bankAccounts.accounts.map((acc) => [
           acc.bankName,
           acc.accountName,
           acc.iban || "-",
-          formatCurrencyForPDF(acc.balanceCents),
-          formatCurrencyForPDF(acc.availableCents),
+          formatCurrencyForPDF(acc.currentBalanceCents || "0"),
           acc.status === "available" ? "Verfügbar" : acc.securityHolder ? `Sicherung: ${acc.securityHolder}` : "Gesperrt",
         ]);
 
@@ -654,7 +653,6 @@ export default function PDFExportButton({ data, pdfTexts }: PDFExportButtonProps
           "",
           "",
           formatCurrencyForPDF(data.bankAccounts.summary.totalBalanceCents),
-          formatCurrencyForPDF(data.bankAccounts.summary.totalAvailableCents),
           `${data.bankAccounts.summary.accountCount} Konten`,
         ]);
 

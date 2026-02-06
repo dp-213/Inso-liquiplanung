@@ -56,6 +56,14 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
     suggestedServicePeriodStart: entry.suggestedServicePeriodStart?.toISOString() || null,
     suggestedServicePeriodEnd: entry.suggestedServicePeriodEnd?.toISOString() || null,
     suggestedServiceDateRule: entry.suggestedServiceDateRule,
+    // Category Tag (Matrix-Zeilen-Zuordnung)
+    categoryTag: entry.categoryTag,
+    categoryTagSource: entry.categoryTagSource,
+    categoryTagNote: entry.categoryTagNote,
+    suggestedCategoryTag: entry.suggestedCategoryTag,
+    suggestedCategoryTagReason: entry.suggestedCategoryTagReason,
+    // Transfer Pairing (Umbuchungen)
+    transferPartnerEntryId: entry.transferPartnerEntryId,
     // Audit
     createdAt: entry.createdAt.toISOString(),
     createdBy: entry.createdBy,

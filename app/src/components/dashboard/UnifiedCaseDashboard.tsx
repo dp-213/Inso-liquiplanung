@@ -264,8 +264,11 @@ export default function UnifiedCaseDashboard({
     const accounts = data.bankAccounts?.accounts || [];
     return {
       accounts,
-      totalBalance: accounts.reduce((sum, acc) => sum + BigInt(acc.balanceCents), BigInt(0)),
-      totalAvailable: accounts.reduce((sum, acc) => sum + BigInt(acc.availableCents), BigInt(0)),
+      totalBalance: accounts.reduce((sum, acc) => sum + BigInt(acc.currentBalanceCents || "0"), BigInt(0)),
+      totalAvailable: accounts.reduce(
+        (sum, acc) => acc.status !== "blocked" ? sum + BigInt(acc.currentBalanceCents || "0") : sum,
+        BigInt(0)
+      ),
     };
   }, [data.bankAccounts]);
 
@@ -459,8 +462,7 @@ export default function UnifiedCaseDashboard({
                       <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Konto</th>
                       <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Bank</th>
                       <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">IBAN</th>
-                      <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">Guthaben</th>
-                      <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">Verfügbar</th>
+                      <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">Aktueller Saldo</th>
                       <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Sicherungsnehmer</th>
                       <th className="text-center py-3 px-4 font-medium text-[var(--secondary)]">Status</th>
                     </tr>
@@ -471,8 +473,7 @@ export default function UnifiedCaseDashboard({
                         <td className="py-3 px-4 font-medium">{acc.accountName}</td>
                         <td className="py-3 px-4 text-[var(--secondary)]">{acc.bankName}</td>
                         <td className="py-3 px-4 text-[var(--secondary)] font-mono text-xs">{acc.iban || "-"}</td>
-                        <td className="py-3 px-4 text-right font-medium">{formatCurrencyFn(acc.balanceCents)}</td>
-                        <td className="py-3 px-4 text-right font-medium text-green-600">{formatCurrencyFn(acc.availableCents)}</td>
+                        <td className="py-3 px-4 text-right font-medium">{formatCurrencyFn(acc.currentBalanceCents || "0")}</td>
                         <td className="py-3 px-4 text-[var(--secondary)]">{acc.securityHolder || "-"}</td>
                         <td className="py-3 px-4 text-center">{getStatusBadge(acc.status)}</td>
                       </tr>
@@ -482,7 +483,6 @@ export default function UnifiedCaseDashboard({
                     <tr className="bg-gray-50 font-medium">
                       <td className="py-3 px-4" colSpan={3}>Summe ({bankAccountData.accounts.length} Konten)</td>
                       <td className="py-3 px-4 text-right">{formatCurrencyFn(bankAccountData.totalBalance)}</td>
-                      <td className="py-3 px-4 text-right text-green-600">{formatCurrencyFn(bankAccountData.totalAvailable)}</td>
                       <td colSpan={2}></td>
                     </tr>
                   </tfoot>
@@ -795,53 +795,56 @@ export default function UnifiedCaseDashboard({
           </div>
         )}
 
-        {/* Global Scope Toggle - affects multiple tabs */}
-        <div className="flex items-center justify-between bg-white rounded-lg border border-gray-200 px-4 py-3">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-medium text-gray-700">Standort-Sicht:</span>
-            <div className="flex items-center gap-1 bg-indigo-50 rounded-lg p-1">
-              {(["GLOBAL", "LOCATION_VELBERT", "LOCATION_UCKERATH_EITORF"] as LiquidityScope[]).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => setScope(s)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                    scope === s
-                      ? "bg-white shadow-sm text-indigo-900 border border-indigo-200"
-                      : "text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100"
-                  }`}
-                >
-                  {SCOPE_LABELS[s]}
-                </button>
-              ))}
+        {/* Sticky Navigation: Scope Toggle + Tabs */}
+        <div className="sticky top-0 z-30 -mx-1 px-1 pt-1 pb-2 bg-[var(--background)] space-y-3">
+          {/* Global Scope Toggle - affects multiple tabs */}
+          <div className="flex items-center justify-between bg-white rounded-lg border border-gray-200 px-4 py-2.5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-gray-700">Standort:</span>
+              <div className="flex items-center gap-1 bg-indigo-50 rounded-lg p-1">
+                {(["GLOBAL", "LOCATION_VELBERT", "LOCATION_UCKERATH_EITORF"] as LiquidityScope[]).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setScope(s)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                      scope === s
+                        ? "bg-white shadow-sm text-indigo-900 border border-indigo-200"
+                        : "text-indigo-700 hover:text-indigo-900 hover:bg-indigo-100"
+                    }`}
+                  >
+                    {SCOPE_LABELS[s]}
+                  </button>
+                ))}
+              </div>
             </div>
+            {scope !== "GLOBAL" && (
+              <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded-md">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Zentrale Verfahrenskosten sind in dieser Sicht nicht enthalten</span>
+              </div>
+            )}
           </div>
-          {scope !== "GLOBAL" && (
-            <div className="flex items-center gap-2 text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded-md">
-              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>Zentrale Verfahrenskosten sind in dieser Sicht nicht enthalten</span>
-            </div>
-          )}
-        </div>
 
-        {/* Navigation Tabs */}
-        <nav className="flex flex-wrap gap-2 p-1 bg-gray-100 rounded-lg">
-          {visibleTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? "bg-white text-[var(--primary)] shadow-sm"
-                  : "text-[var(--secondary)] hover:text-[var(--foreground)] hover:bg-white/50"
-              }`}
-            >
-              <TabIcon icon={tab.icon} />
-              {tab.label}
-            </button>
-          ))}
-        </nav>
+          {/* Navigation Tabs */}
+          <nav className="flex flex-wrap gap-2 p-1 bg-gray-100 rounded-lg">
+            {visibleTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? "bg-white text-[var(--primary)] shadow-sm"
+                    : "text-[var(--secondary)] hover:text-[var(--foreground)] hover:bg-white/50"
+                }`}
+              >
+                <TabIcon icon={tab.icon} />
+                {tab.label}
+              </button>
+            ))}
+          </nav>
+        </div>
 
         {/* Tab Content */}
         {visibleTabs.map((tab) => (

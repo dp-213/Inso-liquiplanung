@@ -638,10 +638,9 @@ model BankAccount {
   caseId          String
   bankName        String   // e.g., "Sparkasse", "Münchner Bank"
   accountName     String   // e.g., "Geschäftskonto", "Treuhandkonto"
-  iban            String?  // DE11701500001009210475
-  balanceCents    BigInt   // Total balance (Guthaben)
-  availableCents  BigInt   // Available for use (Liquide Mittel)
-  securityHolder  String?  // e.g., "Globalzession Bank XY"
+  iban                String?  // DE11701500001009210475
+  openingBalanceCents BigInt   @default(0) // Anfangssaldo vor allen Ledger-Buchungen
+  securityHolder      String?  // e.g., "Globalzession Bank XY"
   status          String   @default("available") // available, blocked, restricted
   notes           String?  // Additional notes about this account
   displayOrder    Int      @default(0)
@@ -797,6 +796,13 @@ model LedgerEntry {
   counterpartyId    String?   // Referenz auf Gegenpartei (z.B. HAEVG, KV)
   locationId        String?   // Referenz auf Standort/Praxis
   steeringTag       String?   // Freies Tag (z.B. TOP_PAYER, SYSTEMRELEVANT)
+  categoryTag       String?   // Geschäftskategorie für Matrix-Zuordnung (z.B. HZV, KV, ALTFORDERUNG_KV, PERSONAL)
+  categoryTagSource String?   // IMPORT, AUTO, MANUELL -- WIE wurde der Tag gesetzt?
+  categoryTagNote   String?   // Entscheidungsnotiz (z.B. "Übernommen: HZV (COUNTERPARTY_PATTERN)")
+
+  // === CATEGORY TAG VORSCHLÄGE (Engine-Vorschlag, flüchtig) ===
+  suggestedCategoryTag        String?   // Vorgeschlagener Matrix-Tag (z.B. "HZV")
+  suggestedCategoryTagReason  String?   // Engine-Begründung: "HZV (COUNTERPARTY_PATTERN)"
 
   // === GOVERNANCE (Review-Status) ===
   reviewStatus      String    @default("UNREVIEWED")  // UNREVIEWED, CONFIRMED, ADJUSTED
@@ -831,6 +837,9 @@ model LedgerEntry {
   // Ermöglicht idempotente Überführung (Effekt-Änderung → DELETE + CREATE)
   sourceEffectId    String?
 
+  // === TRANSFER PAIRING (Umbuchungen zwischen Bankkonten) ===
+  transferPartnerEntryId  String?   // Gegenbuchung bei interner Umbuchung (symmetrisch)
+
   // === AUDIT ===
   createdAt         DateTime  @default(now())
   createdBy         String
@@ -860,6 +869,7 @@ model LedgerEntry {
   @@index([sourceEffectId])
   @@index([parentEntryId])
   @@index([estateAllocation])
+  @@index([transferPartnerEntryId])
   @@map("ledger_entries")
 }
 

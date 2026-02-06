@@ -7,6 +7,8 @@
 
 import { PrismaClient, ClassificationRule, LedgerEntry } from '@prisma/client';
 import { ClassificationSuggestion, MatchType, MATCH_TYPES, ServiceDateRule, SERVICE_DATE_RULES } from './types';
+import { findMatchingRow, HVPLUS_MATRIX_ROWS, MatrixRowConfig } from '@/lib/cases/haevg-plus/matrix-config';
+import { deriveFlowType } from '@/lib/ledger/types';
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -615,4 +617,127 @@ export async function matchCounterpartyPatterns(
   }
 
   return { matched, skipped, errors };
+}
+
+// =============================================================================
+// CATEGORY TAG SUGGESTION ENGINE
+// =============================================================================
+
+/**
+ * Berechnet categoryTag-Vorschläge für Einträge ohne categoryTag.
+ *
+ * Nutzt exakt findMatchingRow() aus der Matrix-Config -- dieselbe Logik
+ * wie die Matrix-Darstellung. Kein zweites Matching-System.
+ *
+ * Für IST-Daten: Findet die passende Matrix-Zeile und extrahiert den
+ * CATEGORY_TAG-Match daraus als Vorschlag.
+ */
+export async function suggestCategoryTags(
+  prisma: PrismaClient,
+  caseId: string,
+  entryIds?: string[]
+): Promise<{ updated: number; skipped: number }> {
+  // Lade Entries ohne categoryTag (= noch nicht zugeordnet)
+  const whereClause: Record<string, unknown> = {
+    caseId,
+    categoryTag: null,
+  };
+  if (entryIds && entryIds.length > 0) {
+    whereClause.id = { in: entryIds };
+  }
+
+  const entries = await prisma.ledgerEntry.findMany({
+    where: whereClause,
+    include: {
+      counterparty: { select: { name: true } },
+    },
+  });
+
+  let updated = 0;
+  let skipped = 0;
+
+  for (const entry of entries) {
+    const flowType = deriveFlowType(BigInt(entry.amountCents));
+    const flowTypeStr = flowType === 'INFLOW' ? 'INFLOW' : 'OUTFLOW';
+
+    // findMatchingRow() mit denselben Daten wie die Matrix-Berechnung
+    const matchedRow = findMatchingRow(
+      {
+        description: entry.description,
+        amountCents: entry.amountCents,
+        counterpartyId: entry.counterpartyId,
+        counterpartyName: entry.counterparty?.name || null,
+        locationId: entry.locationId,
+        bankAccountId: entry.bankAccountId,
+        legalBucket: entry.legalBucket,
+        categoryTag: null, // Explizit null -- wir suchen ja gerade den Vorschlag
+      },
+      HVPLUS_MATRIX_ROWS,
+      flowTypeStr
+    );
+
+    if (!matchedRow) {
+      skipped++;
+      continue;
+    }
+
+    // Suche den CATEGORY_TAG-Match in der gefundenen Zeile
+    const tagMatch = matchedRow.matches.find(m => m.type === 'CATEGORY_TAG');
+
+    if (!tagMatch) {
+      // Zeile gefunden aber hat keinen CATEGORY_TAG (z.B. Fallback-Zeile)
+      skipped++;
+      continue;
+    }
+
+    // Bestimme welcher Match-Typ tatsächlich gegriffen hat (für Reason)
+    const actualMatchType = determineActualMatchType(entry, matchedRow);
+
+    await prisma.ledgerEntry.update({
+      where: { id: entry.id },
+      data: {
+        suggestedCategoryTag: tagMatch.value,
+        suggestedCategoryTagReason: `${matchedRow.label} (${actualMatchType})`,
+      },
+    });
+
+    updated++;
+  }
+
+  return { updated, skipped };
+}
+
+/**
+ * Bestimmt welcher Match-Typ bei findMatchingRow() tatsächlich gegriffen hat.
+ * Minimal und stabil -- nur für die Reason-Anzeige.
+ */
+function determineActualMatchType(
+  entry: LedgerEntry & { counterparty?: { name: string } | null },
+  row: MatrixRowConfig
+): string {
+  for (const match of row.matches) {
+    switch (match.type) {
+      case 'COUNTERPARTY_PATTERN':
+        if (entry.counterparty?.name && new RegExp(match.value, 'i').test(entry.counterparty.name)) {
+          return 'COUNTERPARTY_PATTERN';
+        }
+        break;
+      case 'COUNTERPARTY_ID':
+        if (entry.counterpartyId === match.value) return 'COUNTERPARTY_ID';
+        break;
+      case 'DESCRIPTION_PATTERN':
+        if (new RegExp(match.value, 'i').test(entry.description)) return 'DESCRIPTION_PATTERN';
+        break;
+      case 'LOCATION_ID':
+        if (entry.locationId === match.value) return 'LOCATION_ID';
+        break;
+      case 'BANK_ACCOUNT_ID':
+        if (entry.bankAccountId === match.value) return 'BANK_ACCOUNT_ID';
+        break;
+      case 'LEGAL_BUCKET':
+        if (entry.legalBucket === match.value) return 'LEGAL_BUCKET';
+        break;
+    }
+  }
+  return 'FALLBACK';
 }

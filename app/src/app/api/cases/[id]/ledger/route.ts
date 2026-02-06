@@ -9,6 +9,7 @@ import {
   BOOKING_SOURCES,
   VALUE_TYPES,
   REVIEW_STATUS,
+  CATEGORY_TAG_LABELS,
   LegalBucket,
   ValueType,
   BookingSource,
@@ -97,6 +98,14 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse & {
     suggestedServicePeriodStart: entry.suggestedServicePeriodStart?.toISOString() || null,
     suggestedServicePeriodEnd: entry.suggestedServicePeriodEnd?.toISOString() || null,
     suggestedServiceDateRule: entry.suggestedServiceDateRule,
+    // Category Tag (Matrix-Zuordnung)
+    categoryTag: entry.categoryTag,
+    categoryTagSource: entry.categoryTagSource,
+    categoryTagNote: entry.categoryTagNote,
+    suggestedCategoryTag: entry.suggestedCategoryTag,
+    suggestedCategoryTagReason: entry.suggestedCategoryTagReason,
+    // Transfer Pairing (Umbuchungen)
+    transferPartnerEntryId: entry.transferPartnerEntryId,
     // Derived
     flowType: deriveFlowType(BigInt(entry.amountCents)),
   };
@@ -135,6 +144,11 @@ export async function GET(
     const importJobId = searchParams.get('importJobId');
     // Estate Allocation Filter (Alt-/Neumasse)
     const estateAllocation = searchParams.get('estateAllocation');
+    // Category Tag Filter (Matrix-Zuordnung)
+    const categoryTag = searchParams.get('categoryTag');
+    const hasCategoryTagSuggestion = searchParams.get('hasCategoryTagSuggestion');
+    // Transfer-Filter (Umbuchungen)
+    const isTransfer = searchParams.get('isTransfer');
     const from = searchParams.get('from');
     const to = searchParams.get('to');
     const limit = searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 1000;
@@ -232,6 +246,27 @@ export async function GET(
       }
     }
 
+    // Category Tag Filter
+    if (categoryTag) {
+      if (categoryTag === 'null') {
+        where.categoryTag = null;
+      } else {
+        where.categoryTag = categoryTag;
+      }
+    }
+
+    // Filter: Nur Einträge mit CategoryTag-Vorschlägen
+    if (hasCategoryTagSuggestion === 'true') {
+      where.suggestedCategoryTag = { not: null };
+    }
+
+    // Transfer-Filter (Umbuchungen)
+    if (isTransfer === 'true') {
+      where.transferPartnerEntryId = { not: null };
+    } else if (isTransfer === 'false') {
+      where.transferPartnerEntryId = null;
+    }
+
     if (from || to) {
       where.transactionDate = {};
       if (from) {
@@ -242,8 +277,11 @@ export async function GET(
       }
     }
 
+    // Stats-Where: Transfers aus Summen ausschließen
+    const statsWhere = { ...where, transferPartnerEntryId: null };
+
     // Fetch entries and stats
-    const [entries, total, inflowStats, outflowStats] = await Promise.all([
+    const [entries, total, inflowStats, outflowStats, transferVolumeStats] = await Promise.all([
       prisma.ledgerEntry.findMany({
         where,
         orderBy: { transactionDate: 'asc' },
@@ -252,11 +290,16 @@ export async function GET(
       }),
       prisma.ledgerEntry.count({ where }),
       prisma.ledgerEntry.aggregate({
-        where: { ...where, amountCents: { gte: 0 } },
+        where: { ...statsWhere, amountCents: { gte: 0 } },
         _sum: { amountCents: true },
       }),
       prisma.ledgerEntry.aggregate({
-        where: { ...where, amountCents: { lt: 0 } },
+        where: { ...statsWhere, amountCents: { lt: 0 } },
+        _sum: { amountCents: true },
+      }),
+      // Transfer-Volumen: Nur positive Seite (um Doppelzählung zu vermeiden)
+      prisma.ledgerEntry.aggregate({
+        where: { ...where, transferPartnerEntryId: { not: null }, amountCents: { gte: 0 } },
         _sum: { amountCents: true },
       }),
     ]);
@@ -264,6 +307,7 @@ export async function GET(
     const totalInflows = inflowStats._sum.amountCents || BigInt(0);
     const totalOutflows = outflowStats._sum.amountCents || BigInt(0);
     const netAmount = totalInflows + totalOutflows;
+    const transferVolume = transferVolumeStats._sum.amountCents || BigInt(0);
 
     // Transform to response format
     const response: LedgerEntryResponse[] = entries.map(serializeLedgerEntry);
@@ -274,6 +318,7 @@ export async function GET(
       totalInflows: totalInflows.toString(),
       totalOutflows: totalOutflows.toString(),
       netAmount: netAmount.toString(),
+      transferVolume: transferVolume.toString(),
       limit,
       offset,
     });
@@ -348,6 +393,10 @@ export async function POST(
         bookingReference: body.bookingReference || null,
         reviewStatus: REVIEW_STATUS.UNREVIEWED,
         createdBy: session.username,
+        // Category Tag (Matrix-Zuordnung)
+        categoryTag: body.categoryTag || null,
+        categoryTagSource: body.categoryTag ? 'IMPORT' : null,
+        categoryTagNote: body.categoryTag ? 'Bei Import gesetzt' : null,
       },
     });
 

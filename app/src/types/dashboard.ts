@@ -84,8 +84,8 @@ export interface BankAccountInfo {
   bankName: string;
   accountName: string;
   iban: string | null;
-  balanceCents: string;
-  availableCents: string;
+  openingBalanceCents: string;
+  currentBalanceCents: string;
   securityHolder: string | null;
   status: string;
   notes: string | null;

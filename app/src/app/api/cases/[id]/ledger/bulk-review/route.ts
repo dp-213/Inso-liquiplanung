@@ -38,6 +38,7 @@ interface BulkReviewRequest {
   applyClassificationSuggestions?: boolean; // Übernimmt suggestedLegalBucket
   applyDimensionSuggestions?: boolean; // Übernimmt suggestedBankAccountId, suggestedCounterpartyId, suggestedLocationId
   applyServiceDateSuggestions?: boolean; // Übernimmt suggestedServiceDate/Period und berechnet estateAllocation
+  applyCategoryTagSuggestions?: boolean; // Übernimmt suggestedCategoryTag → categoryTag
 }
 
 // =============================================================================
@@ -68,9 +69,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Entweder filter oder entryIds ist erforderlich' }, { status: 400 });
     }
 
-    if (body.action === 'ADJUST' && !body.reason && !body.applyClassificationSuggestions && !body.applyDimensionSuggestions && !body.applyServiceDateSuggestions) {
+    if (body.action === 'ADJUST' && !body.reason && !body.applyClassificationSuggestions && !body.applyDimensionSuggestions && !body.applyServiceDateSuggestions && !body.applyCategoryTagSuggestions) {
       return NextResponse.json(
-        { error: 'Bei ADJUST ist entweder reason, applyClassificationSuggestions, applyDimensionSuggestions oder applyServiceDateSuggestions erforderlich' },
+        { error: 'Bei ADJUST ist entweder reason, applyClassificationSuggestions, applyDimensionSuggestions, applyServiceDateSuggestions oder applyCategoryTagSuggestions erforderlich' },
         { status: 400 }
       );
     }
@@ -145,6 +146,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         applyClassificationSuggestions: body.applyClassificationSuggestions || false,
         applyDimensionSuggestions: body.applyDimensionSuggestions || false,
         applyServiceDateSuggestions: body.applyServiceDateSuggestions || false,
+        applyCategoryTagSuggestions: body.applyCategoryTagSuggestions || false,
       });
     }
 
@@ -184,6 +186,7 @@ async function bulkAdjustEntries(
     applyClassificationSuggestions: boolean;
     applyDimensionSuggestions: boolean;
     applyServiceDateSuggestions: boolean;
+    applyCategoryTagSuggestions: boolean;
   }
 ): Promise<{ processed: number; errors: string[] }> {
   const errors: string[] = [];
@@ -251,6 +254,17 @@ async function bulkAdjustEntries(
             new: entry.suggestedLocationId,
           };
         }
+      }
+
+      // Übernehme CategoryTag-Vorschläge wenn gewünscht
+      if (options.applyCategoryTagSuggestions && entry.suggestedCategoryTag) {
+        updateData.categoryTag = entry.suggestedCategoryTag;
+        updateData.categoryTagSource = 'AUTO';
+        updateData.categoryTagNote = `Übernommen: ${entry.suggestedCategoryTagReason || entry.suggestedCategoryTag}`;
+        fieldChanges.categoryTag = {
+          old: entry.categoryTag,
+          new: entry.suggestedCategoryTag,
+        };
       }
 
       // Übernehme ServiceDate-Vorschläge wenn gewünscht

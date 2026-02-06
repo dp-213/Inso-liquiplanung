@@ -16,7 +16,7 @@
  * - IST/PLAN-Badge pro Periode
  */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 
 // =============================================================================
 // TYPES (from API)
@@ -45,6 +45,7 @@ interface MatrixRow {
   order: number;
   isSubRow: boolean;
   isSummary: boolean;
+  isSectionHeader?: boolean;
   flowType?: "INFLOW" | "OUTFLOW";
   values: MatrixRowValue[];
   total: string;
@@ -125,6 +126,8 @@ function getBlockColorClass(blockId: string): string {
       return "bg-orange-50";
     case "CASH_OUT_INSOLVENCY":
       return "bg-purple-50";
+    case "CASH_OUT_TOTAL":
+      return "bg-red-100";
     case "CLOSING_BALANCE":
       return "bg-blue-50";
     default:
@@ -173,6 +176,9 @@ export default function LiquidityMatrixTable({
   const [showDetails, setShowDetails] = useState(true);
   const [localScope, setLocalScope] = useState<LiquidityScope>("GLOBAL");
   const [includeUnreviewed, setIncludeUnreviewed] = useState(false);
+  const [showLocationBreakdown, setShowLocationBreakdown] = useState(false);
+  const [locationData, setLocationData] = useState<Record<string, LiquidityMatrixData>>({});
+  const [locationLoading, setLocationLoading] = useState(false);
 
   // Use controlled scope if provided, otherwise use local state
   const isControlled = controlledScope !== undefined;
@@ -213,6 +219,56 @@ export default function LiquidityMatrixTable({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Fetch location breakdown data (parallel fetch for Velbert + Uckerath/Eitorf)
+  useEffect(() => {
+    if (!showLocationBreakdown || scope !== "GLOBAL") {
+      setLocationData({});
+      return;
+    }
+
+    let cancelled = false;
+    const fetchLocations = async () => {
+      setLocationLoading(true);
+      try {
+        const baseParams = new URLSearchParams({
+          estateFilter,
+          showDetails: "true",
+          includeUnreviewed: includeUnreviewed.toString(),
+        });
+
+        const [velbert, uckerath] = await Promise.all([
+          fetch(`/api/cases/${caseId}/dashboard/liquidity-matrix?${baseParams}&scope=LOCATION_VELBERT`, { credentials: "include" }).then(r => r.json()),
+          fetch(`/api/cases/${caseId}/dashboard/liquidity-matrix?${baseParams}&scope=LOCATION_UCKERATH_EITORF`, { credentials: "include" }).then(r => r.json()),
+        ]);
+
+        if (!cancelled) {
+          setLocationData({
+            LOCATION_VELBERT: velbert,
+            LOCATION_UCKERATH_EITORF: uckerath,
+          });
+        }
+      } catch (err) {
+        console.error("Standort-Aufgliederung Fehler:", err);
+      } finally {
+        if (!cancelled) setLocationLoading(false);
+      }
+    };
+
+    fetchLocations();
+    return () => { cancelled = true; };
+  }, [showLocationBreakdown, scope, caseId, estateFilter, includeUnreviewed]);
+
+  // Helper: Find row in location data
+  function getLocationRow(locationKey: string, rowId: string): MatrixRow | null {
+    const locData = locationData[locationKey];
+    if (!locData) return null;
+    for (const block of locData.blocks) {
+      const row = block.rows.find(r => r.id === rowId);
+      if (row) return row;
+    }
+    return null;
+  }
 
   // Loading state
   if (loading) {
@@ -332,6 +388,21 @@ export default function LiquidityMatrixTable({
                 inkl. ungeprüfte
               </span>
             </label>
+
+            {/* Location Breakdown Toggle (nur in Gesamtsicht) */}
+            {scope === "GLOBAL" && (
+              <label className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-colors bg-gray-50 border-gray-200 hover:bg-gray-100">
+                <input
+                  type="checkbox"
+                  checked={showLocationBreakdown}
+                  onChange={(e) => setShowLocationBreakdown(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className={showLocationBreakdown ? "text-indigo-700" : "text-gray-600"}>
+                  {locationLoading ? "Lade..." : "Standort-Aufgliederung"}
+                </span>
+              </label>
+            )}
           </div>
         </div>
       </div>
@@ -414,40 +485,41 @@ export default function LiquidityMatrixTable({
       )}
 
       {/* Table */}
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[75vh]">
         <table className="w-full text-sm">
-          {/* Header Row 1: IST/PLAN Badges */}
-          <thead>
-            <tr className="border-b border-gray-200">
-              <th className="px-4 py-2 text-left font-medium text-gray-700 sticky left-0 bg-white z-10 min-w-[200px]">
+          {/* Sticky Header */}
+          <thead className="sticky top-0 z-20">
+            {/* Header Row 1: IST/PLAN Badges */}
+            <tr className="border-b border-gray-200 bg-white">
+              <th className="px-4 py-2 text-left font-medium text-gray-700 sticky left-0 bg-white z-30 min-w-[200px]">
                 Position
               </th>
               {data.periods.map((period) => {
                 const colors = getValueTypeColor(period.valueType);
                 return (
-                  <th key={period.periodIndex} className="px-2 py-2 text-center min-w-[80px]">
+                  <th key={period.periodIndex} className="px-2 py-2 text-center min-w-[80px] bg-white">
                     <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded ${colors.bg} ${colors.text}`}>
                       {period.valueType}
                     </span>
                   </th>
                 );
               })}
-              <th className="px-4 py-2 text-right font-medium text-gray-700 min-w-[100px]">
+              <th className="px-4 py-2 text-right font-medium text-gray-700 min-w-[100px] bg-white">
                 Summe
               </th>
             </tr>
 
             {/* Header Row 2: Period Labels */}
             <tr className="border-b border-gray-300 bg-gray-50">
-              <th className="px-4 py-2 text-left font-semibold text-gray-900 sticky left-0 bg-gray-50 z-10">
+              <th className="px-4 py-2 text-left font-semibold text-gray-900 sticky left-0 bg-gray-50 z-30">
                 Periode
               </th>
               {data.periods.map((period) => (
-                <th key={period.periodIndex} className="px-2 py-2 text-center font-semibold text-gray-900">
+                <th key={period.periodIndex} className="px-2 py-2 text-center font-semibold text-gray-900 bg-gray-50">
                   {period.periodLabel}
                 </th>
               ))}
-              <th className="px-4 py-2 text-right font-semibold text-gray-900">
+              <th className="px-4 py-2 text-right font-semibold text-gray-900 bg-gray-50">
                 Gesamt
               </th>
             </tr>
@@ -459,53 +531,116 @@ export default function LiquidityMatrixTable({
               .map((block) => (
               <>
                 {/* Block rows */}
-                {block.rows.map((row, rowIdx) => {
+                {block.rows.map((row) => {
+                  // Section headers: Visuelle Trennung ohne Werte
+                  if (row.isSectionHeader) {
+                    return (
+                      <tr
+                        key={row.id}
+                        className="border-b border-gray-200"
+                      >
+                        <td
+                          colSpan={data.periods.length + 2}
+                          className="px-4 py-1.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50/70 sticky left-0 z-10"
+                        >
+                          {row.label}
+                        </td>
+                      </tr>
+                    );
+                  }
+
                   const isNegative = BigInt(row.total) < BigInt(0);
                   const bgClass = row.isSummary ? getBlockColorClass(block.id) : "";
+                  const showBreakdown = showLocationBreakdown && scope === "GLOBAL" && !row.isSummary && Object.keys(locationData).length > 0;
 
                   return (
-                    <tr
-                      key={row.id}
-                      className={`border-b border-gray-100 ${bgClass} ${
-                        row.isSummary ? "font-semibold" : ""
-                      } hover:bg-gray-50`}
-                    >
-                      {/* Row Label */}
-                      <td
-                        className={`px-4 py-2 text-left sticky left-0 z-10 ${bgClass || "bg-white"} ${
-                          row.isSubRow ? "pl-8 text-gray-600" : "text-gray-900"
-                        }`}
+                    <Fragment key={row.id}>
+                      <tr
+                        className={`border-b border-gray-100 ${bgClass} ${
+                          row.isSummary ? "font-semibold" : ""
+                        } hover:bg-gray-50`}
                       >
-                        {row.label}
-                      </td>
+                        {/* Row Label */}
+                        <td
+                          className={`px-4 py-2 text-left sticky left-0 z-10 ${bgClass || "bg-white"} ${
+                            row.isSubRow ? "pl-8 text-gray-600" : "text-gray-900"
+                          }`}
+                        >
+                          {row.label}
+                        </td>
 
-                      {/* Period Values */}
-                      {row.values.map((value) => {
-                        const amount = BigInt(value.amountCents);
-                        const isValueNegative = amount < BigInt(0);
-                        const isError = data.validation.errorPeriods.includes(value.periodIndex) && row.isSummary && block.id === "CLOSING_BALANCE";
+                        {/* Period Values */}
+                        {row.values.map((value) => {
+                          const amount = BigInt(value.amountCents);
+                          const isValueNegative = amount < BigInt(0);
+                          const isError = data.validation.errorPeriods.includes(value.periodIndex) && row.isSummary && block.id === "CLOSING_BALANCE";
 
-                        return (
-                          <td
-                            key={`${row.id}-${value.periodIndex}`}
-                            className={`px-2 py-2 text-right tabular-nums ${
-                              isValueNegative ? "text-red-600" : row.flowType === "INFLOW" ? "text-green-600" : ""
-                            } ${isError ? "bg-red-100" : ""}`}
-                          >
-                            {formatCurrency(value.amountCents)}
-                          </td>
-                        );
-                      })}
+                          return (
+                            <td
+                              key={`${row.id}-${value.periodIndex}`}
+                              className={`px-2 py-2 text-right tabular-nums ${
+                                isValueNegative ? "text-red-600" : row.flowType === "INFLOW" ? "text-green-600" : ""
+                              } ${isError ? "bg-red-100" : ""}`}
+                            >
+                              {formatCurrency(value.amountCents)}
+                            </td>
+                          );
+                        })}
 
-                      {/* Row Total */}
-                      <td
-                        className={`px-4 py-2 text-right tabular-nums font-medium ${
-                          isNegative ? "text-red-600" : row.flowType === "INFLOW" ? "text-green-600" : ""
-                        }`}
-                      >
-                        {formatCurrency(row.total)}
-                      </td>
-                    </tr>
+                        {/* Row Total */}
+                        <td
+                          className={`px-4 py-2 text-right tabular-nums font-medium ${
+                            isNegative ? "text-red-600" : row.flowType === "INFLOW" ? "text-green-600" : ""
+                          }`}
+                        >
+                          {formatCurrency(row.total)}
+                        </td>
+                      </tr>
+
+                      {/* Standort-Aufgliederung Sub-Rows */}
+                      {showBreakdown && (
+                        <>
+                          {(["LOCATION_VELBERT", "LOCATION_UCKERATH_EITORF"] as const).map((locKey) => {
+                            const locRow = getLocationRow(locKey, row.id);
+                            if (!locRow) return null;
+                            const locTotal = BigInt(locRow.total);
+                            const locNegative = locTotal < BigInt(0);
+
+                            return (
+                              <tr
+                                key={`${row.id}-${locKey}`}
+                                className="border-b border-gray-50"
+                              >
+                                <td className="pl-12 pr-4 py-1 text-left text-xs text-gray-400 italic sticky left-0 bg-white z-10">
+                                  {SCOPE_LABELS[locKey]}
+                                </td>
+                                {locRow.values.map((value) => {
+                                  const amount = BigInt(value.amountCents);
+                                  const isLocNeg = amount < BigInt(0);
+                                  return (
+                                    <td
+                                      key={`${row.id}-${locKey}-${value.periodIndex}`}
+                                      className={`px-2 py-1 text-right text-xs tabular-nums ${
+                                        isLocNeg ? "text-red-400" : amount > BigInt(0) ? "text-gray-400" : "text-gray-300"
+                                      }`}
+                                    >
+                                      {amount === BigInt(0) ? "\u2013" : formatCurrency(value.amountCents)}
+                                    </td>
+                                  );
+                                })}
+                                <td
+                                  className={`px-4 py-1 text-right text-xs tabular-nums ${
+                                    locNegative ? "text-red-400" : locTotal > BigInt(0) ? "text-gray-400" : "text-gray-300"
+                                  }`}
+                                >
+                                  {locTotal === BigInt(0) ? "\u2013" : formatCurrency(locRow.total)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </>
+                      )}
+                    </Fragment>
                   );
                 })}
 

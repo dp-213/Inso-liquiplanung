@@ -1,6 +1,7 @@
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { calculateBankAccountBalances } from "@/lib/bank-accounts/calculate-balances";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -30,15 +31,26 @@ export default async function SecurityRightsPage({ params }: PageProps) {
     notFound();
   }
 
+  // Berechnete Kontostände
+  const { balances, totalBalanceCents, totalAvailableCents } =
+    await calculateBankAccountBalances(id, caseData.bankAccounts);
+
+  // Enrich accounts with computed balances
+  const enrichedAccounts = caseData.bankAccounts.map((a) => {
+    const bal = balances.get(a.id);
+    return {
+      ...a,
+      currentBalanceCents: bal?.currentBalanceCents ?? a.openingBalanceCents,
+    };
+  });
+
   // Separate accounts with and without security holders
-  const securedAccounts = caseData.bankAccounts.filter(a => a.securityHolder);
-  const unsecuredAccounts = caseData.bankAccounts.filter(a => !a.securityHolder);
+  const securedAccounts = enrichedAccounts.filter(a => a.securityHolder);
+  const unsecuredAccounts = enrichedAccounts.filter(a => !a.securityHolder);
 
   // Calculate totals
-  const totalBalanceCents = caseData.bankAccounts.reduce((sum, a) => sum + BigInt(a.balanceCents), BigInt(0));
-  const totalAvailableCents = caseData.bankAccounts.reduce((sum, a) => sum + BigInt(a.availableCents), BigInt(0));
-  const securedBalanceCents = securedAccounts.reduce((sum, a) => sum + BigInt(a.balanceCents), BigInt(0));
-  const unsecuredBalanceCents = unsecuredAccounts.reduce((sum, a) => sum + BigInt(a.balanceCents), BigInt(0));
+  const securedBalanceCents = securedAccounts.reduce((sum, a) => sum + a.currentBalanceCents, BigInt(0));
+  const unsecuredBalanceCents = unsecuredAccounts.reduce((sum, a) => sum + a.currentBalanceCents, BigInt(0));
 
   const formatCurrency = (cents: bigint) => {
     return (Number(cents) / 100).toLocaleString("de-DE", {
@@ -103,11 +115,11 @@ export default async function SecurityRightsPage({ params }: PageProps) {
       {/* Summary KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="admin-card p-4">
-          <p className="text-sm text-[var(--muted)]">Gesamtguthaben</p>
+          <p className="text-sm text-[var(--muted)]">Gesamtsaldo</p>
           <p className="text-xl font-bold text-[var(--foreground)]">{formatCurrency(totalBalanceCents)}</p>
         </div>
         <div className="admin-card p-4">
-          <p className="text-sm text-[var(--muted)]">Verfügbare Mittel</p>
+          <p className="text-sm text-[var(--muted)]">Liquide Mittel</p>
           <p className="text-xl font-bold text-green-600">{formatCurrency(totalAvailableCents)}</p>
         </div>
         <div className="admin-card p-4">
@@ -141,8 +153,7 @@ export default async function SecurityRightsPage({ params }: PageProps) {
                   <th>Bank / Konto</th>
                   <th>IBAN</th>
                   <th>Sicherungsnehmer</th>
-                  <th className="text-right">Guthaben</th>
-                  <th className="text-right">Verfügbar</th>
+                  <th className="text-right">Aktueller Saldo</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -161,8 +172,7 @@ export default async function SecurityRightsPage({ params }: PageProps) {
                         {account.securityHolder}
                       </span>
                     </td>
-                    <td className="text-right font-medium">{formatCurrency(BigInt(account.balanceCents))}</td>
-                    <td className="text-right font-medium text-green-600">{formatCurrency(BigInt(account.availableCents))}</td>
+                    <td className="text-right font-medium">{formatCurrency(account.currentBalanceCents)}</td>
                     <td>{getStatusBadge(account.status)}</td>
                   </tr>
                 ))}
@@ -171,9 +181,6 @@ export default async function SecurityRightsPage({ params }: PageProps) {
                 <tr className="font-semibold bg-orange-50">
                   <td colSpan={3}>Summe besichert</td>
                   <td className="text-right">{formatCurrency(securedBalanceCents)}</td>
-                  <td className="text-right text-green-600">
-                    {formatCurrency(securedAccounts.reduce((sum, a) => sum + BigInt(a.availableCents), BigInt(0)))}
-                  </td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -214,8 +221,7 @@ export default async function SecurityRightsPage({ params }: PageProps) {
                 <tr>
                   <th>Bank / Konto</th>
                   <th>IBAN</th>
-                  <th className="text-right">Guthaben</th>
-                  <th className="text-right">Verfügbar</th>
+                  <th className="text-right">Aktueller Saldo</th>
                   <th>Status</th>
                   <th>Notizen</th>
                 </tr>
@@ -230,8 +236,7 @@ export default async function SecurityRightsPage({ params }: PageProps) {
                       </div>
                     </td>
                     <td className="font-mono text-sm">{account.iban || "-"}</td>
-                    <td className="text-right font-medium">{formatCurrency(BigInt(account.balanceCents))}</td>
-                    <td className="text-right font-medium text-green-600">{formatCurrency(BigInt(account.availableCents))}</td>
+                    <td className="text-right font-medium">{formatCurrency(account.currentBalanceCents)}</td>
                     <td>{getStatusBadge(account.status)}</td>
                     <td className="text-sm text-[var(--muted)] max-w-xs truncate">{account.notes || "-"}</td>
                   </tr>
@@ -241,9 +246,6 @@ export default async function SecurityRightsPage({ params }: PageProps) {
                 <tr className="font-semibold bg-green-50">
                   <td colSpan={2}>Summe unbesichert</td>
                   <td className="text-right">{formatCurrency(unsecuredBalanceCents)}</td>
-                  <td className="text-right text-green-600">
-                    {formatCurrency(unsecuredAccounts.reduce((sum, a) => sum + BigInt(a.availableCents), BigInt(0)))}
-                  </td>
                   <td colSpan={2}></td>
                 </tr>
               </tfoot>

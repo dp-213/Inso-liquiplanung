@@ -137,6 +137,9 @@ export async function aggregateLedgerEntries(
   let totalOutflows = BigInt(0);
 
   for (const entry of entries) {
+    // Transfers aus konsolidierten Summen ausschließen
+    if (entry.transferPartnerEntryId) continue;
+
     const periodIndex = calculatePeriodIndex({
       transactionDate: entry.transactionDate,
       planStartDate: plan.planStartDate,
@@ -592,6 +595,9 @@ export async function aggregateByAvailability(
 
   // Aggregate entries by period and availability
   for (const entry of entries) {
+    // Transfers aus konsolidierten Summen ausschließen
+    if (entry.transferPartnerEntryId) continue;
+
     const periodIndex = calculatePeriodIndex({
       transactionDate: entry.transactionDate,
       planStartDate: plan.planStartDate,
@@ -952,6 +958,9 @@ export async function aggregateRollingForecast(
 
   // 4. Aggregate entries into periods
   for (const entry of entries) {
+    // Transfers aus konsolidierten Summen ausschließen
+    if (entry.transferPartnerEntryId) continue;
+
     const periodIndex = calculatePeriodIndex({
       transactionDate: entry.transactionDate,
       planStartDate: plan.planStartDate,

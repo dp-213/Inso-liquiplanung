@@ -54,8 +54,7 @@ async function main() {
       bankName: 'BW-Bank (LBBW)',
       accountName: 'ISK Velbert',
       iban: 'DE87600501010400080228',
-      balanceCents: BigInt(8977500), // 89.775,00 € (Stand 30.12.2025)
-      availableCents: BigInt(8977500),
+      openingBalanceCents: BigInt(8977500), // 89.775,00 € (Stand 30.12.2025)
       securityHolder: null, // Keine Sicherungsrechte auf ISK
       status: 'ACTIVE',
       notes: 'Insolvenzsonderkonto Velbert - erhält Sparkasse-Auskehrungen',
@@ -73,8 +72,7 @@ async function main() {
       bankName: 'BW-Bank (LBBW)',
       accountName: 'ISK Uckerath',
       iban: 'DE91600501010400080156',
-      balanceCents: BigInt(38944400), // 389.444,00 € (Stand 30.12.2025)
-      availableCents: BigInt(38944400),
+      openingBalanceCents: BigInt(38944400), // 389.444,00 € (Stand 30.12.2025)
       securityHolder: null,
       status: 'ACTIVE',
       notes: 'Insolvenzsonderkonto Uckerath - Hauptkonto für HZV-Zahlungen',
@@ -92,8 +90,7 @@ async function main() {
       bankName: 'Sparkasse Hilden-Ratingen-Velbert',
       accountName: 'Geschäftskonto Velbert',
       iban: null, // Konto 34379768
-      balanceCents: BigInt(2064474), // 20.644,74 € Saldo
-      availableCents: BigInt(0), // Unter Sicherungsrecht
+      openingBalanceCents: BigInt(2064474), // 20.644,74 € Saldo
       securityHolder: 'Sparkasse HRV',
       status: 'SECURED',
       notes: JSON.stringify({
@@ -124,8 +121,7 @@ async function main() {
       bankName: 'Deutsche Apotheker- und Ärztebank',
       accountName: 'Geschäftskonto Uckerath+Eitorf',
       iban: null,
-      balanceCents: BigInt(0),
-      availableCents: BigInt(0),
+      openingBalanceCents: BigInt(0),
       securityHolder: 'apoBank',
       status: 'DISPUTED',
       notes: JSON.stringify({

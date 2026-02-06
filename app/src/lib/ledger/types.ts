@@ -54,6 +54,47 @@ export const BOOKING_SOURCE_LABELS: Record<BookingSource, string> = {
 };
 
 // =============================================================================
+// CATEGORY TAG TYPES (Matrix-Zeilen-Zuordnung)
+// =============================================================================
+
+export const CATEGORY_TAG_LABELS: Record<string, string> = {
+  HZV: 'HZV',
+  KV: 'KV',
+  PVS: 'PVS',
+  ALTFORDERUNG_HZV: 'Alt HZV',
+  ALTFORDERUNG_KV: 'Alt KV',
+  ALTFORDERUNG_PVS: 'Alt PVS',
+  INSO_EINZAHLUNG: 'Inso-Einzahlung',
+  PERSONAL: 'Personal',
+  BETRIEBSKOSTEN: 'Betriebskosten',
+  INSO_RUECKZAHLUNG: 'Rückz. InsoGeld',
+  INSO_VORFINANZIERUNG: 'Vorfin. InsoGeld',
+  INSO_SACHAUFNAHME: 'Sachaufnahme',
+};
+
+export const CATEGORY_TAG_OPTIONS = [
+  { group: 'Einzahlungen (Neumasse)', tags: ['HZV', 'KV', 'PVS'] },
+  { group: 'Altforderungen (Altmasse)', tags: ['ALTFORDERUNG_HZV', 'ALTFORDERUNG_KV', 'ALTFORDERUNG_PVS'] },
+  { group: 'Sonstige Einzahlungen', tags: ['INSO_EINZAHLUNG'] },
+  { group: 'Betriebliche Auszahlungen', tags: ['PERSONAL', 'BETRIEBSKOSTEN'] },
+  { group: 'Insolvenzspezifische Auszahlungen', tags: ['INSO_RUECKZAHLUNG', 'INSO_VORFINANZIERUNG', 'INSO_SACHAUFNAHME'] },
+];
+
+export const CATEGORY_TAG_SOURCES = {
+  IMPORT: 'IMPORT',
+  AUTO: 'AUTO',
+  MANUELL: 'MANUELL',
+} as const;
+
+export type CategoryTagSource = (typeof CATEGORY_TAG_SOURCES)[keyof typeof CATEGORY_TAG_SOURCES];
+
+export const CATEGORY_TAG_SOURCE_LABELS: Record<CategoryTagSource, string> = {
+  IMPORT: 'Import',
+  AUTO: 'Automatisch',
+  MANUELL: 'Manuell',
+};
+
+// =============================================================================
 // GOVERNANCE TYPES (Review-Status)
 // =============================================================================
 
@@ -255,6 +296,16 @@ export interface LedgerEntryResponse {
   suggestedServicePeriodEnd: string | null;
   suggestedServiceDateRule: string | null;
 
+  // Category Tag (Matrix-Zeilen-Zuordnung)
+  categoryTag: string | null;
+  categoryTagSource: string | null;
+  categoryTagNote: string | null;
+  suggestedCategoryTag: string | null;
+  suggestedCategoryTagReason: string | null;
+
+  // Transfer Pairing (Umbuchungen)
+  transferPartnerEntryId: string | null;
+
   // Audit
   createdAt: string;
   createdBy: string;
@@ -262,6 +313,13 @@ export interface LedgerEntryResponse {
 
   // Derived (calculated at runtime)
   flowType: FlowType;
+}
+
+/**
+ * Check if a LedgerEntry is part of a transfer pair (Umbuchung)
+ */
+export function isTransferEntry(entry: { transferPartnerEntryId: string | null }): boolean {
+  return entry.transferPartnerEntryId !== null;
 }
 
 /**
