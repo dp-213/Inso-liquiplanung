@@ -150,6 +150,7 @@ export interface AggregationOptions {
   reviewStatuses?: ReviewStatus[]; // Wenn leer/undefined: nur CONFIRMED + ADJUSTED
   includeSuggested?: boolean; // Für UNREVIEWED: suggestedLegalBucket verwenden
   scope?: LiquidityScope; // Standortspezifische Filterung (Default: GLOBAL)
+  excludeSteeringTags?: string[]; // Filtere Einträge mit diesen steeringTags aus (z.B. ['INTERNE_UMBUCHUNG'])
 }
 
 // =============================================================================
@@ -283,6 +284,14 @@ export async function aggregateLedgerEntries(
       caseId,
       reviewStatus: { in: reviewStatuses },
       ...(options.valueTypes?.length ? { valueType: { in: options.valueTypes } } : {}),
+      ...(options.excludeSteeringTags?.length
+        ? {
+            OR: [
+              { steeringTag: null },
+              { steeringTag: { notIn: options.excludeSteeringTags } },
+            ],
+          }
+        : {}),
     },
     include: {
       counterparty: { select: { name: true } },

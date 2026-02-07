@@ -841,21 +841,19 @@ export default function CaseLedgerPage({
 
   // Sort header component
   const SortHeader = ({ field, label, className = "" }: { field: SortField; label: string; className?: string }) => (
-    <th
-      className={`cursor-pointer hover:bg-gray-100 select-none ${className}`}
+    <div
+      className={`cursor-pointer hover:bg-gray-100 select-none flex items-center gap-1 ${className}`}
       onClick={() => handleSort(field)}
     >
-      <div className="flex items-center gap-1">
-        {label}
-        <span className="text-[var(--muted)]">
-          {sortBy === field ? (
-            sortOrder === "asc" ? "↑" : "↓"
-          ) : (
-            <span className="opacity-30">↕</span>
-          )}
-        </span>
-      </div>
-    </th>
+      {label}
+      <span className="text-[var(--muted)]">
+        {sortBy === field ? (
+          sortOrder === "asc" ? "↑" : "↓"
+        ) : (
+          <span className="opacity-30">↕</span>
+        )}
+      </span>
+    </div>
   );
 
   const getReviewStatusBadgeClass = (status: ReviewStatus): string => {
@@ -1909,7 +1907,7 @@ export default function CaseLedgerPage({
                   </th>
                   {/* Datum */}
                   {columnVisibility.transactionDate && (
-                    <th style={{ width: columnWidths.transactionDate }} className="relative group">
+                    <th style={{ width: columnWidths.transactionDate }} className="relative group cursor-pointer">
                       <SortHeader field="transactionDate" label="Datum" />
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
@@ -1919,7 +1917,7 @@ export default function CaseLedgerPage({
                   )}
                   {/* Beschreibung */}
                   {columnVisibility.description && (
-                    <th style={{ width: columnWidths.description }} className="relative group">
+                    <th style={{ width: columnWidths.description }} className="relative group cursor-pointer">
                       <SortHeader field="description" label="Beschreibung" />
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
@@ -1929,7 +1927,7 @@ export default function CaseLedgerPage({
                   )}
                   {/* Betrag */}
                   {columnVisibility.amountCents && (
-                    <th style={{ width: columnWidths.amountCents }} className="relative group text-right">
+                    <th style={{ width: columnWidths.amountCents }} className="relative group text-right cursor-pointer">
                       <SortHeader field="amountCents" label="Betrag" className="text-right" />
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
@@ -1939,7 +1937,7 @@ export default function CaseLedgerPage({
                   )}
                   {/* Typ */}
                   {columnVisibility.valueType && (
-                    <th style={{ width: columnWidths.valueType }} className="relative group">
+                    <th style={{ width: columnWidths.valueType }} className="relative group cursor-pointer">
                       <SortHeader field="valueType" label="Typ" />
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"

@@ -143,7 +143,10 @@ export async function GET(
         periodType,
         periodCount,
         openingBalanceCents,
-        { scope }  // Scope-Filter
+        {
+          scope,
+          excludeSteeringTags: ['INTERNE_UMBUCHUNG']  // Umbuchungen ausblenden
+        }
       );
       const legacyFormat = convertToLegacyFormat(aggregation);
 
