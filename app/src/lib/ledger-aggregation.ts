@@ -128,8 +128,8 @@ export type LiquidityScope = "GLOBAL" | "LOCATION_VELBERT" | "LOCATION_UCKERATH_
 
 // Location-IDs für Standort-Scopes
 const SCOPE_LOCATION_IDS: Record<Exclude<LiquidityScope, "GLOBAL">, string[]> = {
-  LOCATION_VELBERT: ["velbert"],
-  LOCATION_UCKERATH_EITORF: ["uckerath", "eitorf"],
+  LOCATION_VELBERT: ["loc-haevg-velbert"],
+  LOCATION_UCKERATH_EITORF: ["loc-haevg-uckerath", "loc-haevg-eitorf"],
 };
 
 // Patterns für zentrale Verfahrenskosten (ohne Standortbezug)
@@ -319,6 +319,9 @@ export async function aggregateLedgerEntries(
         const allowedLocationIds = SCOPE_LOCATION_IDS[scope as Exclude<LiquidityScope, "GLOBAL">];
         return allowedLocationIds.includes(entry.location.id.toLowerCase());
       });
+
+  // Debug-Logging
+  console.log(`[Ledger Aggregation] Scope: ${scope}, All Entries: ${allEntries.length}, Filtered: ${entries.length}`);
 
   // Initialisiere Perioden
   const periods: PeriodAggregation[] = [];

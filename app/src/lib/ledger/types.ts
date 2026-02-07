@@ -269,6 +269,12 @@ export interface LedgerEntryResponse {
   bookingSourceId: string | null;
   bookingReference: string | null;
 
+  // Steuerungsdimensionen
+  bankAccountId: string | null;
+  counterpartyId: string | null;
+  locationId: string | null;
+  steeringTag: string | null;
+
   // Governance (Review-Status)
   reviewStatus: ReviewStatus;
   reviewedBy: string | null;

@@ -33,6 +33,7 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse & {
   bankAccountId: string | null;
   counterpartyId: string | null;
   locationId: string | null;
+  steeringTag: string | null;
   // Dimensions-Vorschläge (von Rule Engine)
   suggestedBankAccountId: string | null;
   suggestedCounterpartyId: string | null;
@@ -76,6 +77,7 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse & {
     bankAccountId: entry.bankAccountId,
     counterpartyId: entry.counterpartyId,
     locationId: entry.locationId,
+    steeringTag: entry.steeringTag,
     // Dimensions-Vorschläge (von Rule Engine)
     suggestedBankAccountId: entry.suggestedBankAccountId,
     suggestedCounterpartyId: entry.suggestedCounterpartyId,

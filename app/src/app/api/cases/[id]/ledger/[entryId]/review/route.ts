@@ -34,6 +34,11 @@ function serializeLedgerEntry(entry: LedgerEntry): LedgerEntryResponse {
     bookingSource: entry.bookingSource,
     bookingSourceId: entry.bookingSourceId,
     bookingReference: entry.bookingReference,
+    // Steuerungsdimensionen
+    bankAccountId: entry.bankAccountId,
+    counterpartyId: entry.counterpartyId,
+    locationId: entry.locationId,
+    steeringTag: entry.steeringTag,
     reviewStatus: entry.reviewStatus as ReviewStatus,
     reviewedBy: entry.reviewedBy,
     reviewedAt: entry.reviewedAt?.toISOString() || null,

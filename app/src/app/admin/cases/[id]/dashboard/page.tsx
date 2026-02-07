@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use, useCallback } from "react";
+import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import {
   CaseDashboardConfig,
@@ -92,6 +92,7 @@ export default function CaseDashboardPage({
   const [showStructureManager, setShowStructureManager] = useState(false);
   const [metadata, setMetadata] = useState<ConfigResponse["metadata"] | null>(null);
   const [drillDownPeriod, setDrillDownPeriod] = useState<number | null>(null);
+  const [scope, setScope] = useState<"GLOBAL" | "LOCATION_VELBERT" | "LOCATION_UCKERATH_EITORF">("GLOBAL");
   // Estate Allocation (Alt/Neu aus Leistungsdatum)
   const [estateAllocation, setEstateAllocation] = useState<{
     totalAltmasseInflowsCents: string;
@@ -104,8 +105,8 @@ export default function CaseDashboardPage({
     warnings: { type: string; severity: string; message: string; count: number; totalCents: string }[];
   } | null>(null);
 
-  // Load config and calculate
-  const loadData = useCallback(async () => {
+  // Load config and calculate - defined outside useEffect so it can be called from error button
+  const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -119,67 +120,62 @@ export default function CaseDashboardPage({
       setConfig(configData.config);
       setMetadata(configData.metadata);
 
-      // Trigger calculation (GET for read-only calculation)
-      const calcRes = await fetch(`/api/cases/${id}/calculate`);
-      if (!calcRes.ok) {
-        const errData = await calcRes.json();
-        throw new Error(errData.error || "Calculation failed");
+      // Load dashboard data with scope (includes calculation + estate allocation)
+      const dashboardRes = await fetch(`/api/cases/${id}/dashboard?scope=${scope}`, {
+        credentials: "include",
+      });
+      if (!dashboardRes.ok) {
+        const errData = await dashboardRes.json();
+        throw new Error(errData.error || "Dashboard data failed to load");
       }
-      const calcData = await calcRes.json();
+      const dashboardData = await dashboardRes.json();
 
-      // Load estate allocation data from dashboard API (for Alt/Neu warnings)
-      try {
-        const dashboardRes = await fetch(`/api/cases/${id}/dashboard`, {
-          credentials: "include",
-        });
-        if (dashboardRes.ok) {
-          const dashboardData = await dashboardRes.json();
-          if (dashboardData.estateAllocation) {
-            setEstateAllocation(dashboardData.estateAllocation);
-          }
-        }
-      } catch {
-        // Estate allocation is optional, don't fail if it doesn't load
-        console.warn("Could not load estate allocation data");
+      // Use dashboard result as calcData (it has the same structure)
+      const calcData = dashboardData.result || {};
+
+      // Set estate allocation
+      if (dashboardData.estateAllocation) {
+        setEstateAllocation(dashboardData.estateAllocation);
       }
 
-      // Find minimum balance week
+      // Find minimum balance week (use periods from dashboard)
+      const periods = calcData.periods || [];
       let minBalanceWeek = 0;
       let minBalance = BigInt(calcData.openingBalanceCents || "0");
-      calcData.weeks?.forEach((w: { weekOffset: number; closingBalanceCents: string }) => {
-        const balance = BigInt(w.closingBalanceCents);
+      periods.forEach((p: { periodIndex: number; closingBalanceCents: string }) => {
+        const balance = BigInt(p.closingBalanceCents);
         if (balance < minBalance) {
           minBalance = balance;
-          minBalanceWeek = w.weekOffset;
+          minBalanceWeek = p.periodIndex;
         }
       });
 
-      // Transform to DashboardCalculationData (GET returns flat structure)
+      // Transform to DashboardCalculationData (dashboard uses periods, not weeks)
       const transformed: DashboardCalculationData = {
         caseInfo: {
           caseId: id,
-          caseNumber: calcData.caseNumber || "",
-          debtorName: calcData.debtorName || "",
-          courtName: "",
-          planStartDate: calcData.planStartDate || new Date().toISOString(),
+          caseNumber: dashboardData.caseInfo?.caseNumber || "",
+          debtorName: dashboardData.caseInfo?.debtorName || "",
+          courtName: dashboardData.caseInfo?.courtName || "",
+          planStartDate: dashboardData.caseInfo?.planStartDate || new Date().toISOString(),
         },
         kpis: {
           openingBalanceCents: BigInt(calcData.openingBalanceCents || "0"),
           closingBalanceCents: BigInt(calcData.finalClosingBalanceCents || "0"),
           totalInflowsCents: BigInt(calcData.totalInflowsCents || "0"),
           totalOutflowsCents: BigInt(calcData.totalOutflowsCents || "0"),
-          netChangeCents: BigInt(calcData.totalNetCashflowCents || "0"),
+          netChangeCents: BigInt(calcData.totalNetCashflowsCents || "0"),
           minBalanceCents: minBalance,
           minBalanceWeek: minBalanceWeek,
-          negativeWeeksCount: (calcData.weeks || []).filter(
-            (w: { closingBalanceCents: string }) => BigInt(w.closingBalanceCents) < BigInt(0)
+          negativeWeeksCount: periods.filter(
+            (p: { closingBalanceCents: string }) => BigInt(p.closingBalanceCents) < BigInt(0)
           ).length,
         },
-        weeks: (calcData.weeks || []).map((w: {
-          weekOffset: number;
-          weekLabel: string;
-          weekStartDate: string;
-          weekEndDate: string;
+        weeks: periods.map((p: {
+          periodIndex: number;
+          periodLabel: string;
+          periodStartDate: string;
+          periodEndDate: string;
           openingBalanceCents: string;
           closingBalanceCents: string;
           totalInflowsCents: string;
@@ -190,49 +186,47 @@ export default function CaseDashboardPage({
           outflowsAltmasseCents: string;
           outflowsNeumasseCents: string;
         }) => ({
-          weekOffset: w.weekOffset,
-          weekLabel: w.weekLabel,
-          weekStartDate: w.weekStartDate,
-          weekEndDate: w.weekEndDate,
-          openingBalanceCents: BigInt(w.openingBalanceCents || "0"),
-          closingBalanceCents: BigInt(w.closingBalanceCents || "0"),
-          totalInflowsCents: BigInt(w.totalInflowsCents || "0"),
-          totalOutflowsCents: BigInt(w.totalOutflowsCents || "0"),
-          netCashflowCents: BigInt(w.netCashflowCents || "0"),
-          inflowsAltmasseCents: BigInt(w.inflowsAltmasseCents || "0"),
-          inflowsNeumasseCents: BigInt(w.inflowsNeumasseCents || "0"),
-          outflowsAltmasseCents: BigInt(w.outflowsAltmasseCents || "0"),
-          outflowsNeumasseCents: BigInt(w.outflowsNeumasseCents || "0"),
+          weekOffset: p.periodIndex,
+          weekLabel: p.periodLabel,
+          weekStartDate: p.periodStartDate,
+          weekEndDate: p.periodEndDate,
+          openingBalanceCents: BigInt(p.openingBalanceCents || "0"),
+          closingBalanceCents: BigInt(p.closingBalanceCents || "0"),
+          totalInflowsCents: BigInt(p.totalInflowsCents || "0"),
+          totalOutflowsCents: BigInt(p.totalOutflowsCents || "0"),
+          netCashflowCents: BigInt(p.netCashflowCents || "0"),
+          inflowsAltmasseCents: BigInt(p.inflowsAltmasseCents || "0"),
+          inflowsNeumasseCents: BigInt(p.inflowsNeumasseCents || "0"),
+          outflowsAltmasseCents: BigInt(p.outflowsAltmasseCents || "0"),
+          outflowsNeumasseCents: BigInt(p.outflowsNeumasseCents || "0"),
         })),
         categories: (calcData.categories || []).map((c: {
-          id: string;
-          name: string;
+          categoryName: string;
           flowType: "INFLOW" | "OUTFLOW";
           estateType: "ALTMASSE" | "NEUMASSE";
-          totalCents: string;
-          weeklyTotals: string[];
+          totalCents: string | bigint;
+          periodTotals: (string | bigint)[];
           lines: Array<{
-            id: string;
-            name: string;
-            totalCents: string;
-            weeklyValues: Array<{ effectiveCents: string }>;
+            lineName: string;
+            totalCents: string | bigint;
+            periodValues: Array<{ periodIndex: number; effectiveCents: string | bigint }>;
           }>;
         }) => ({
-          categoryId: c.id,
-          categoryName: c.name,
+          categoryId: c.categoryName.toLowerCase().replace(/\s+/g, '-'),
+          categoryName: c.categoryName,
           flowType: c.flowType,
           estateType: c.estateType,
-          totalCents: BigInt(c.totalCents || "0"),
-          weeklyTotalsCents: (c.weeklyTotals || []).map((v: string) => BigInt(v || "0")),
+          totalCents: typeof c.totalCents === 'bigint' ? c.totalCents : BigInt(c.totalCents || "0"),
+          weeklyTotalsCents: (c.periodTotals || []).map((v) => typeof v === 'bigint' ? v : BigInt(v || "0")),
           lines: (c.lines || []).map((l) => ({
-            lineId: l.id,
-            lineName: l.name,
-            totalCents: BigInt(l.totalCents || "0"),
-            weeklyValuesCents: (l.weeklyValues || []).map((wv) => BigInt(wv.effectiveCents || "0")),
+            lineId: l.lineName.toLowerCase().replace(/\s+/g, '-'),
+            lineName: l.lineName,
+            totalCents: typeof l.totalCents === 'bigint' ? l.totalCents : BigInt(l.totalCents || "0"),
+            weeklyValuesCents: (l.periodValues || []).map((pv) => typeof pv.effectiveCents === 'bigint' ? pv.effectiveCents : BigInt(pv.effectiveCents || "0")),
           })),
         })),
         calculationMeta: {
-          calculatedAt: new Date().toISOString(),
+          calculatedAt: calcData.calculatedAt || new Date().toISOString(),
           engineVersion: "1.0.0",
           dataHash: calcData.dataHash || "",
         },
@@ -244,11 +238,12 @@ export default function CaseDashboardPage({
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  };
 
+  // Load config and calculate - runs whenever id or scope changes
   useEffect(() => {
     loadData();
-  }, [loadData]);
+  }, [id, scope]);
 
   if (loading) {
     return (
@@ -387,6 +382,42 @@ export default function CaseDashboardPage({
               </svg>
               Struktur verwalten
             </button>
+          )}
+
+          {/* Location Scope Toggle */}
+          {!editMode && (
+            <div className="flex items-center bg-blue-50 rounded-lg p-1">
+              <button
+                onClick={() => setScope("GLOBAL")}
+                className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+                  scope === "GLOBAL"
+                    ? "bg-white text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                Gesamt
+              </button>
+              <button
+                onClick={() => setScope("LOCATION_VELBERT")}
+                className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+                  scope === "LOCATION_VELBERT"
+                    ? "bg-white text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                Velbert
+              </button>
+              <button
+                onClick={() => setScope("LOCATION_UCKERATH_EITORF")}
+                className={`px-4 py-1.5 text-sm rounded-md transition-colors ${
+                  scope === "LOCATION_UCKERATH_EITORF"
+                    ? "bg-white text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                Uckerath/Eitorf
+              </button>
+            </div>
           )}
 
           {/* View Mode Toggle */}
