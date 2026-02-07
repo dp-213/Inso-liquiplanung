@@ -1,0 +1,3 @@
+# Force Vercel Rebuild
+Timestamp: 2026-02-07 23:20
+Reason: Prisma Client regeneration - bank_accounts schema sync
