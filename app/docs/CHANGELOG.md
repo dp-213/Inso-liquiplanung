@@ -4,6 +4,111 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.13.0 – Alt/Neu-Masse estateRatio-Splitting in Liquiditätsmatrix
+
+**Datum:** 08. Februar 2026
+
+### Kritisches Feature: MIXED-Entries korrekte Aufteilung
+
+**Problem:** MIXED-Entries (z.B. KV Q4 mit estateRatio=0.67) wurden zu 100% einer Zeile zugeordnet
+- 150.000 EUR → 100% Zeile "KV" (Neumasse)
+- Zeile "Altforderungen KV" blieb leer (0 EUR)
+- **Inkorrekte Darstellung:** Altmasse-Anteil wurde nicht ausgewiesen
+
+**Lösung:** estateRatio-Splitting in Backend-Aggregation implementiert
+- MIXED-Entries werden nach `estateRatio` aufgeteilt
+- Neu-Anteil (67%) → Zeile "KV" (100.000 EUR)
+- Alt-Anteil (33%) → Zeile "Altforderungen KV" (50.000 EUR)
+- Beide Anteile werden unabhängig gematcht
+
+**Technische Details:**
+- Rundungssicherheit: `Math.min(Math.max(estateRatio, 0), 1)`
+- Entry-Count ohne Doppelzählung: `entryWasAggregated` Flag
+- Error-Logging für fehlgeschlagene Alt-Matches
+- Neue Funktion: `getAltforderungCategoryTag()`
+
+**Location:** `/app/src/app/api/cases/[id]/dashboard/liquidity-matrix/route.ts` (Zeilen 350-450)
+
+### Änderung: estateFilter jetzt Frontend-only
+
+**Vorher:** estateFilter filterte Daten im Backend (WHERE-Clause auf DB)
+**Nachteil:** MIXED-Entries wurden komplett ausgefiltert
+
+**Jetzt:** Backend liefert IMMER GESAMT, Filter wirkt nur im Frontend
+- Zeilen-Ausblendung basierend auf `shouldShowRow()` Funktion
+- EINNAHMEN-Summen werden gefiltert neu berechnet
+- AUSGABEN und BALANCES bleiben ungefiltert
+
+**Begründung:**
+- MIXED-Entries müssen immer aggregiert werden (für beide Zeilen)
+- Filter dient nur der Darstellung, nicht der Datenauswahl
+- Balances zeigen echte Kontostände (unabhängig vom Filter)
+
+**Location:** `/app/src/components/dashboard/LiquidityMatrixTable.tsx`
+
+### Funktionalität: Gefilterte Einnahmen-Summen
+
+**Verhalten nach estateFilter:**
+
+**GESAMT (Standard):**
+- Summe Einzahlungen: 185.000 EUR (alle Einnahmen)
+
+**NEUMASSE:**
+- Zeigt: Umsatz (HZV, KV, PVS) + Sonstige
+- Blendet aus: Altforderungen
+- Summe Einzahlungen: 130.000 EUR (gefiltert)
+
+**ALTMASSE:**
+- Zeigt: Altforderungen (HZV, KV, PVS)
+- Blendet aus: Umsatz + Sonstige
+- Summe Einzahlungen: 55.000 EUR (gefiltert)
+
+**Wichtig:** Ausgaben und Balances immer ungefiltert sichtbar
+
+### Bugfix: Portal/Customer-Zugriff wiederhergestellt
+
+**Problem:** Externe Freigabe und Kundenzugang zeigten leeres Dashboard
+- API-Routen prüften nur Admin-Session
+- Customer-Sessions wurden abgelehnt
+
+**Lösung:** Dual-Auth-Support in 5 API-Routen
+- `/api/cases/[id]/dashboard/liquidity-matrix`
+- `/api/cases/[id]/bank-accounts`
+- `/api/cases/[id]/ledger/revenue`
+- `/api/cases/[id]/ledger/estate-summary`
+- `/api/cases/[id]/ledger/rolling-forecast`
+
+**Pattern:**
+```typescript
+const adminSession = await getSession();
+const customerSession = await getCustomerSession();
+if (!adminSession && !customerSession) return 401;
+if (customerSession && !adminSession) {
+  const access = await checkCaseAccess(...);
+  if (!access.hasAccess) return 403;
+}
+```
+
+### Bugfix: Bank-Balances Forward-Carrying beendet
+
+**Problem:** Kontostände wurden bis August 2026 fortgeschrieben, obwohl keine Daten existieren
+- ISK Velbert: 103.000 EUR bis Aug 2026 (tatsächlich nur bis Jan 2026)
+- Verwirrend für IV: Suggerierte Daten, die nicht vorliegen
+
+**Lösung:** Zeige "–" ab letzter Periode mit echten IST-Daten
+- Backend trackt `lastPeriodWithData` pro Bankkonto
+- Perioden ohne Daten: `entryCount: -1` als Marker
+- Frontend zeigt "–" (em dash) in grau
+
+**Location:** `/app/src/app/api/cases/[id]/dashboard/liquidity-matrix/route.ts` (Zeilen 443-497)
+
+### Technischer Fix: TypeScript-Fehler in planung/route.ts
+
+**Problem:** `orderBy: { date: 'asc' }` - Feld existiert nicht mehr
+**Lösung:** Korrigiert zu `orderBy: { transactionDate: 'asc' }`
+
+---
+
 ## Version 2.12.1 – Business-Logic Admin-Seite wiederhergestellt
 
 **Datum:** 08. Februar 2026

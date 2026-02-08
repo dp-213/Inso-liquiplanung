@@ -4,6 +4,111 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-020: estateRatio-Splitting in Liquiditätsmatrix
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+MIXED-Entries (z.B. KV-Quartalsabrechnungen) enthalten Anteile von Altmasse UND Neumasse im Verhältnis `estateRatio`. Beispiel: KV Q4/2025 mit estateRatio=0.67 bedeutet 67% Neumasse (Nov+Dez), 33% Altmasse (Okt).
+
+**Bisheriges Verhalten:** Entry wurde zu 100% einer Zeile zugeordnet (basierend auf categoryTag), der andere Anteil ging verloren.
+
+**Problem:** IV-unzulässige Darstellung - Altmasse-Anteile wurden nicht ausgewiesen.
+
+### Entscheidung
+
+MIXED-Entries werden im Backend während der Aggregation aufgeteilt:
+1. Berechne Neu-Anteil: `amount * estateRatio`
+2. Berechne Alt-Anteil: `amount * (1 - estateRatio)`
+3. Matche BEIDE Anteile unabhängig:
+   - Neu-Anteil → Neumasse-Zeile (z.B. "KV")
+   - Alt-Anteil → Altmasse-Zeile (z.B. "Altforderungen KV")
+
+### Begründung
+
+**Fachlich:**
+- Massekreditverträge definieren Alt/Neu-Zuordnung explizit
+- IV benötigt getrennte Ausweisung für Massekredit-Verwaltung
+- Aufsichtsbehörden prüfen korrekte Alt/Neu-Trennung
+
+**Technisch:**
+- estateRatio ist bereits am LedgerEntry vorhanden
+- Aufteilung während Aggregation (nicht bei Speicherung) → Entry bleibt atomar
+- Dual-Matching ermöglicht flexible Zeilen-Konfiguration
+
+### Konsequenzen
+
+**Positiv:**
+- ✅ Korrekte IV-Darstellung gemäß Massekreditvertrag
+- ✅ Summe(Neu-Zeilen) + Summe(Alt-Zeilen) = GESAMT stimmt
+- ✅ Entry-Count korrekt (1 Entry = 1 Count, nicht 2)
+
+**Negativ:**
+- ⚠️ Komplexere Aggregations-Logik
+- ⚠️ Neue Funktion `getAltforderungCategoryTag()` nötig
+
+**Implementierung:**
+- Backend: `/app/src/app/api/cases/[id]/dashboard/liquidity-matrix/route.ts`
+- Helper: `/app/src/lib/cases/haevg-plus/matrix-config.ts`
+
+---
+
+## ADR-021: estateFilter als Frontend-only Filter
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+**Bisheriges Verhalten:** estateFilter wurde im Backend als WHERE-Clause angewendet:
+```typescript
+where: { estateAllocation: 'ALTMASSE' }  // Filtert DB-Abfrage
+```
+
+**Problem:** MIXED-Entries wurden komplett ausgefiltert, da `estateAllocation='MIXED'` weder 'ALTMASSE' noch 'NEUMASSE' ist.
+
+### Entscheidung
+
+estateFilter wirkt NUR im Frontend (Zeilen-Ausblendung):
+- Backend liefert IMMER GESAMT (alle Entries)
+- Frontend blendet Zeilen aus basierend auf `shouldShowRow()`
+- EINNAHMEN-Summen werden gefiltert neu berechnet
+- AUSGABEN und BALANCES bleiben ungefiltert
+
+### Begründung
+
+**Fachlich:**
+- MIXED-Entries müssen IMMER aggregiert werden (für beide Zeilen)
+- estateFilter ist Darstellungs-Präferenz, keine Datenauswahl
+- Balances zeigen echte Kontostände (unabhängig vom Filter)
+
+**Technisch:**
+- estateRatio-Splitting benötigt alle Entries
+- Frontend kann flexibel filtern ohne Backend-Änderung
+- Performance: Aggregation nur einmal (nicht pro Filter)
+
+### Konsequenzen
+
+**Positiv:**
+- ✅ MIXED-Entries korrekt aufgeteilt
+- ✅ Konsistente Darstellung über alle Filter
+- ✅ Balances immer korrekt (ungefiltert)
+
+**Negativ:**
+- ⚠️ Frontend muss Block-Summen neu berechnen
+
+**Filter-Verhalten:**
+
+| Filter | Zeigt EINNAHMEN | Zeigt AUSGABEN | Zeigt BALANCES | Summe Einzahlungen |
+|--------|----------------|----------------|----------------|-------------------|
+| GESAMT | Alle | Alle | Alle | 185k (ungefiltert) |
+| NEUMASSE | Nur Umsatz + Sonstige | Alle | Alle | 130k (gefiltert) |
+| ALTMASSE | Nur Altforderungen | Alle | Alle | 55k (gefiltert) |
+
+---
+
 ## ADR-001: LedgerEntry als Single Source of Truth
 
 **Datum:** 18. Januar 2026

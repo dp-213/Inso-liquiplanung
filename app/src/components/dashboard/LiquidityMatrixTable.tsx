@@ -588,8 +588,28 @@ export default function LiquidityMatrixTable({
           <tbody>
             {data.blocks
               .filter((block) => block.rows.length > 0)  // Skip empty blocks
-              .map((block) => (
-              <>
+              .map((block) => {
+                // Berechne gefilterte Block-Summe für EINNAHMEN (nur sichtbare Zeilen)
+                // Ausgaben und Balances bleiben ungefiltert
+                const isCashInBlock = block.id === 'CASH_IN';
+                const filteredBlockTotals = isCashInBlock
+                  ? data.periods.map((_, periodIdx) => {
+                      let sum = BigInt(0);
+                      for (const row of block.rows) {
+                        // Skip section headers, summary rows, and filtered rows
+                        if (row.isSectionHeader || row.isSummary) continue;
+                        if (!shouldShowRow(row.id, estateFilter)) continue;
+                        const value = row.values.find(v => v.periodIndex === periodIdx);
+                        if (value) {
+                          sum += BigInt(value.amountCents);
+                        }
+                      }
+                      return sum;
+                    })
+                  : null;
+
+                return (
+              <Fragment key={block.id}>
                 {/* Block rows */}
                 {block.rows.map((row) => {
                   // estateFilter: Zeile ausblenden, wenn sie nicht zum Filter passt
@@ -635,10 +655,11 @@ export default function LiquidityMatrixTable({
                   const isBankBlockTotal = row.isSummary && (block.id === "OPENING_BALANCE" || block.id === "CLOSING_BALANCE");
                   const isExpanded = !collapsedBankBlocks.has(block.id);
 
-                  // Summary-Zeilen (Totals) IMMER ungefiltert anzeigen für konsistente Rechnung:
-                  // Opening + Cash-In (Total) - Cash-Out (Total) = Closing
-                  // Nur Detail-Zeilen werden gefiltert
-                  const rowTotal = BigInt(row.total);
+                  // Bei EINNAHMEN-Summary: Verwende gefilterte Summe wenn estateFilter aktiv
+                  // Bei Balances und Ausgaben: Immer ungefiltert (echte Werte)
+                  const rowTotal = row.isSummary && isCashInBlock && estateFilter !== 'GESAMT' && filteredBlockTotals
+                    ? filteredBlockTotals.reduce((sum, val) => sum + val, BigInt(0))
+                    : BigInt(row.total);
 
                   const isNegative = rowTotal < BigInt(0);
                   const bgClass = row.isSummary ? getBlockColorClass(block.id) : "";
@@ -687,9 +708,11 @@ export default function LiquidityMatrixTable({
 
                         {/* Period Values */}
                         {row.values.map((value) => {
-                          // Summary-Zeilen (Totals) IMMER ungefiltert anzeigen für konsistente Rechnung
-                          // Nur Detail-Zeilen werden gefiltert (durch shouldShowRow)
-                          const amount = BigInt(value.amountCents);
+                          // Bei EINNAHMEN-Summary: Verwende gefilterte Summe wenn estateFilter aktiv
+                          // Bei Balances und Ausgaben: Immer ungefiltert
+                          const amount = row.isSummary && isCashInBlock && estateFilter !== 'GESAMT' && filteredBlockTotals
+                            ? filteredBlockTotals[value.periodIndex]
+                            : BigInt(value.amountCents);
 
                           const isValueNegative = amount < BigInt(0);
                           const isError = data.validation.errorPeriods.includes(value.periodIndex) && row.isSummary && block.id === "CLOSING_BALANCE";
@@ -770,8 +793,9 @@ export default function LiquidityMatrixTable({
                     <td colSpan={data.periods.length + 2}></td>
                   </tr>
                 )}
-              </>
-            ))}
+              </Fragment>
+            );
+              })}
           </tbody>
         </table>
       </div>
