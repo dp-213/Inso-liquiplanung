@@ -629,15 +629,16 @@ export default function LiquidityMatrixTable({
                           const amount = BigInt(value.amountCents);
                           const isValueNegative = amount < BigInt(0);
                           const isError = data.validation.errorPeriods.includes(value.periodIndex) && row.isSummary && block.id === "CLOSING_BALANCE";
+                          const hasNoData = value.entryCount === -1;
 
                           return (
                             <td
                               key={`${row.id}-${value.periodIndex}`}
                               className={`px-2 py-2 text-right tabular-nums ${
-                                isValueNegative ? "text-red-600" : row.flowType === "INFLOW" ? "text-green-600" : ""
+                                hasNoData ? "text-gray-300" : isValueNegative ? "text-red-600" : row.flowType === "INFLOW" ? "text-green-600" : ""
                               } ${isError ? "bg-red-100" : ""}`}
                             >
-                              {formatCurrency(value.amountCents)}
+                              {hasNoData ? "–" : formatCurrency(value.amountCents)}
                             </td>
                           );
                         })}
