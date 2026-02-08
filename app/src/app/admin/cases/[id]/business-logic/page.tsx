@@ -274,13 +274,13 @@ function Abrechnungslogik() {
             <div>
               <strong>Monat M:</strong>
               <ul className="ml-4 mt-1 space-y-1 text-muted-foreground">
-                <li>• Abschlag für Leistung M-1 (Vormonat) = 28 T€ (Velbert) / 40 T€ (Uckerath)</li>
+                <li>• Abschlag für Leistung M-1 (Vormonat) = 30 T€ (Velbert) / 40 T€ (Uckerath)</li>
               </ul>
             </div>
             <div className="mt-3">
               <strong>Quartalsende (März, Juni, September, Dezember):</strong>
               <ul className="ml-4 mt-1 space-y-1 text-muted-foreground">
-                <li>• Schlusszahlung für Quartal = ~113 T€ (Velbert) / ~60 T€ (Uckerath)</li>
+                <li>• Schlusszahlung für Quartal = ~100 T€ (Velbert) / ~110 T€ (Uckerath)</li>
               </ul>
             </div>
           </div>
@@ -300,21 +300,21 @@ function Abrechnungslogik() {
             <tbody>
               <tr className="border-b border-[var(--border)]">
                 <td className="py-3 px-3">Oktober</td>
-                <td className="py-3 px-3 text-right text-muted-foreground">28 T€ (Sep)</td>
+                <td className="py-3 px-3 text-right text-muted-foreground">30 T€ (Sep)</td>
                 <td className="py-3 px-3 text-right">—</td>
-                <td className="py-3 px-3 text-right font-medium">28 T€</td>
+                <td className="py-3 px-3 text-right font-medium">30 T€</td>
               </tr>
               <tr className="border-b border-[var(--border)]">
                 <td className="py-3 px-3">November</td>
-                <td className="py-3 px-3 text-right text-muted-foreground">28 T€ (Okt)</td>
+                <td className="py-3 px-3 text-right text-muted-foreground">30 T€ (Okt)</td>
                 <td className="py-3 px-3 text-right">—</td>
-                <td className="py-3 px-3 text-right font-medium">28 T€</td>
+                <td className="py-3 px-3 text-right font-medium">30 T€</td>
               </tr>
               <tr className="bg-green-500/10">
                 <td className="py-3 px-3 font-semibold">Dezember</td>
-                <td className="py-3 px-3 text-right text-muted-foreground">28 T€ (Nov)</td>
-                <td className="py-3 px-3 text-right font-semibold text-green-400">113 T€ (Q3)</td>
-                <td className="py-3 px-3 text-right font-bold text-green-400">141 T€</td>
+                <td className="py-3 px-3 text-right text-muted-foreground">30 T€ (Nov)</td>
+                <td className="py-3 px-3 text-right font-semibold text-green-400">100 T€ (Q4)</td>
+                <td className="py-3 px-3 text-right font-bold text-green-400">130 T€</td>
               </tr>
             </tbody>
           </table>
@@ -367,16 +367,24 @@ function Abrechnungslogik() {
               <tr className="bg-red-500/10">
                 <td className="py-3 px-3 font-semibold">Restzahlung Q3</td>
                 <td className="py-3 px-3 text-muted-foreground">10.12.2025</td>
-                <td className="py-3 px-3 text-right font-semibold text-red-400">-7,89 T€</td>
+                <td className="py-3 px-3 text-right font-semibold text-red-400">-7,8 T€</td>
                 <td className="py-3 px-3 text-red-400 font-medium">Rückzahlung (Overpayment)</td>
               </tr>
             </tbody>
           </table>
         </div>
 
+        <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+          <p className="text-sm font-semibold mb-2">Beispiel Uckerath Q3/2025:</p>
+          <ul className="space-y-1 text-sm">
+            <li>• <strong>Abschlag Q3:</strong> 42,7 T€ (10.10.2025)</li>
+            <li>• <strong>Restzahlung Q3:</strong> +8,4 T€ (10.12.2025, Nachzahlung)</li>
+          </ul>
+        </div>
+
         <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
           <p className="text-sm font-medium text-red-400">
-            ➡️ Restzahlungen können negativ sein!
+            ➡️ Restzahlungen können negativ (Velbert) oder positiv (Uckerath) sein!
           </p>
         </div>
       </div>
@@ -393,6 +401,15 @@ function Abrechnungslogik() {
           <p className="text-sm text-muted-foreground">
             Patient behandelt → Rechnung an PVS → PVS zahlt nach ~30-60 Tagen
           </p>
+        </div>
+
+        <div className="mt-4 bg-[var(--card)] border border-[var(--border)] rounded-lg p-4">
+          <p className="text-sm font-semibold mb-2">Durchschnittswerte (monatlich):</p>
+          <ul className="space-y-1 text-sm text-muted-foreground">
+            <li>• <strong>Velbert:</strong> ~7.500 EUR/Monat</li>
+            <li>• <strong>Uckerath:</strong> Keine Daten</li>
+            <li>• <strong>Eitorf:</strong> Keine Daten (läuft evtl. über Uckerath)</li>
+          </ul>
         </div>
 
         <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
@@ -585,9 +602,9 @@ function Datenqualitaet() {
               </tr>
               <tr className="border-b border-[var(--border)] bg-amber-500/10">
                 <td className="py-3 px-3">Personal Uckerath</td>
-                <td className="py-3 px-3">⚠️ Niedrig</td>
-                <td className="py-3 px-3 text-muted-foreground">23 Lohnabrechnungen, keine Details</td>
-                <td className="py-3 px-3 text-right font-semibold text-amber-400">50%</td>
+                <td className="py-3 px-3">⚠️ Mittel</td>
+                <td className="py-3 px-3 text-muted-foreground">Datenraum-Zugang verfügbar (Details zu extrahieren)</td>
+                <td className="py-3 px-3 text-right font-semibold text-amber-400">70%</td>
               </tr>
               <tr className="border-b border-[var(--border)] bg-red-500/10">
                 <td className="py-3 px-3">Personal Eitorf</td>
@@ -628,9 +645,9 @@ function Datenqualitaet() {
         <div className="space-y-3">
           <QuestionBox
             number={1}
-            question="Personalkosten Uckerath (23 Mitarbeiter ohne Detaildaten)"
-            priority="KRITISCH"
-            impact="±20.000 EUR/Monat (±100.000 EUR gesamt)"
+            question="Personalkosten Uckerath detailliert (Datenraum-Daten extrahieren)"
+            priority="WICHTIG"
+            impact="±5.000 EUR/Monat (Präzision verbessern)"
           />
           <QuestionBox
             number={2}
@@ -646,14 +663,20 @@ function Datenqualitaet() {
           />
           <QuestionBox
             number={4}
+            question="PVS-Durchschnittswerte Uckerath/Eitorf"
+            priority="WICHTIG"
+            impact="±5.000 EUR/Monat (Planungssicherheit)"
+          />
+          <QuestionBox
+            number={5}
             question="Wartungsverträge (Medizintechnik, IT)"
             priority="WICHTIG"
             impact="±1.500 EUR/Monat (±15.000 EUR gesamt)"
           />
           <QuestionBox
-            number={5}
+            number={6}
             question="Genaue AG-SV-Beiträge (statt 20%-Schätzung)"
-            priority="WICHTIG"
+            priority="NIEDRIG"
             impact="±1.000 EUR/Monat (±10.000 EUR gesamt)"
           />
         </div>
