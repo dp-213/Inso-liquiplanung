@@ -8,7 +8,10 @@ import {
   PeriodValueInput,
   PeriodType,
 } from "@/lib/calculation-engine";
-import { calculateBankAccountBalances } from "@/lib/bank-accounts/calculate-balances";
+import {
+  calculateBankAccountBalances,
+  calculateOpeningBalanceByScope,
+} from "@/lib/bank-accounts/calculate-balances";
 import {
   aggregateLedgerEntries,
   convertToLegacyFormat,
@@ -101,11 +104,14 @@ export async function GET(
       );
     }
 
-    // Get opening balance
+    // Get latest version for metadata (versionNumber, snapshotDate)
     const latestVersion = plan.versions[0];
-    const openingBalanceCents = latestVersion
-      ? BigInt(latestVersion.openingBalanceCents)
-      : BigInt(0);
+
+    // Get opening balance BY SCOPE (scope-aware)
+    const openingBalanceCents = await calculateOpeningBalanceByScope(
+      caseData.id,
+      scope
+    );
 
     // Get period type and count from plan
     const periodType = (plan.periodType as PeriodType) || "WEEKLY";

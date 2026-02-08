@@ -21,6 +21,7 @@ import {
   AggregationStatusResponse,
 } from './types';
 import { createHash } from 'crypto';
+import { calculateOpeningBalanceByScope } from '@/lib/bank-accounts/calculate-balances';
 
 // =============================================================================
 // SCOPE TYPES & CONSTANTS
@@ -905,24 +906,18 @@ export async function aggregateRollingForecast(
     excludeSteeringTags = []
   } = options;
 
-  // 1. Load plan with latest version for opening balance
+  // 1. Load plan
   const plan = await prisma.liquidityPlan.findUnique({
     where: { id: planId },
-    include: {
-      versions: {
-        orderBy: { versionNumber: 'desc' },
-        take: 1,
-      },
-    },
+    select: { id: true, periodType: true, periodCount: true, planStartDate: true },
   });
 
   if (!plan) {
     throw new Error(`Plan ${planId} nicht gefunden`);
   }
 
-  // Get opening balance from latest version (or default to 0)
-  const latestVersion = plan.versions[0];
-  const openingBalanceCents = latestVersion?.openingBalanceCents ?? BigInt(0);
+  // Get opening balance BY SCOPE (scope-aware)
+  const openingBalanceCents = await calculateOpeningBalanceByScope(caseId, scope);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);

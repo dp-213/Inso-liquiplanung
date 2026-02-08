@@ -3,7 +3,34 @@ import prisma from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { calculateBankAccountBalances } from "@/lib/bank-accounts/calculate-balances";
 
-// GET /api/cases/[id]/bank-accounts - Get all bank accounts for a case
+/**
+ * GET /api/cases/[id]/bank-accounts
+ *
+ * Gibt detaillierte Bankkonto-Informationen zurück:
+ * - Opening Balance pro Konto
+ * - Aktuelle Balance (Opening + IST-Summe aus Ledger)
+ * - Zuordnung zu Location
+ * - Status (available, blocked, restricted)
+ *
+ * Response: {
+ *   accounts: Array<{
+ *     id: string;
+ *     bankName: string;
+ *     accountName: string;
+ *     iban: string | null;
+ *     status: string;
+ *     location: { id: string; name: string } | null;
+ *     openingBalanceCents: string;
+ *     ledgerSumCents: string;
+ *     currentBalanceCents: string;
+ *   }>;
+ *   summary: {
+ *     totalBalanceCents: string;
+ *     totalAvailableCents: string;
+ *     accountCount: number;
+ *   }
+ * }
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -11,291 +38,61 @@ export async function GET(
   try {
     const session = await getSession();
     if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
     }
 
     const { id: caseId } = await params;
 
-    const caseData = await prisma.case.findUnique({
-      where: { id: caseId },
-      include: {
-        bankAccounts: {
-          orderBy: { displayOrder: "asc" },
-        },
-      },
-    });
-
-    if (!caseData) {
-      return NextResponse.json(
-        { error: "Fall nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    // Berechnete Kontostände
-    const { balances, totalBalanceCents, totalAvailableCents } =
-      await calculateBankAccountBalances(caseId, caseData.bankAccounts);
-
-    return NextResponse.json({
-      caseId: caseData.id,
-      accounts: caseData.bankAccounts.map((acc) => {
-        const bal = balances.get(acc.id);
-        return {
-          ...acc,
-          openingBalanceCents: acc.openingBalanceCents.toString(),
-          currentBalanceCents: (bal?.currentBalanceCents ?? acc.openingBalanceCents).toString(),
-        };
-      }),
-      summary: {
-        totalBalanceCents: totalBalanceCents.toString(),
-        totalAvailableCents: totalAvailableCents.toString(),
-        accountCount: caseData.bankAccounts.length,
-      },
-    });
-  } catch (error) {
-    console.error("Error fetching bank accounts:", error);
-    return NextResponse.json(
-      { error: "Fehler beim Laden der Bankkonten" },
-      { status: 500 }
-    );
-  }
-}
-
-// POST /api/cases/[id]/bank-accounts - Create a new bank account
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id: caseId } = await params;
-    const body = await request.json();
-    const {
-      bankName,
-      accountName,
-      iban,
-      openingBalanceCents,
-      securityHolder,
-      status,
-      notes,
-      displayOrder,
-    } = body;
-
-    // Validate required fields
-    if (!bankName || !accountName || openingBalanceCents === undefined) {
-      return NextResponse.json(
-        { error: "Erforderliche Felder: bankName, accountName, openingBalanceCents" },
-        { status: 400 }
-      );
-    }
-
-    // Verify case exists
-    const caseData = await prisma.case.findUnique({
-      where: { id: caseId },
-    });
-
-    if (!caseData) {
-      return NextResponse.json(
-        { error: "Fall nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    // Validate status
-    const validStatuses = ["available", "blocked", "restricted"];
-    if (status && !validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: `status muss einer der folgenden Werte sein: ${validStatuses.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    // Get max displayOrder for this case
-    const maxOrder = await prisma.bankAccount.aggregate({
+    // Lade BankAccounts mit Location-Relation
+    const accounts = await prisma.bankAccount.findMany({
       where: { caseId },
-      _max: { displayOrder: true },
+      include: {
+        location: { select: { id: true, name: true } },
+      },
+      orderBy: { displayOrder: "asc" },
     });
 
-    const account = await prisma.bankAccount.create({
-      data: {
-        caseId,
-        bankName: bankName.trim(),
-        accountName: accountName.trim(),
-        iban: iban?.trim() || null,
-        openingBalanceCents: BigInt(openingBalanceCents),
-        securityHolder: securityHolder?.trim() || null,
-        status: status || "available",
-        notes: notes?.trim() || null,
-        displayOrder: displayOrder ?? (maxOrder._max.displayOrder ?? 0) + 1,
-        createdBy: session.username,
-        updatedBy: session.username,
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      account: {
-        ...account,
-        openingBalanceCents: account.openingBalanceCents.toString(),
-      },
-    });
-  } catch (error) {
-    console.error("Error creating bank account:", error);
-    return NextResponse.json(
-      { error: "Fehler beim Erstellen des Bankkontos" },
-      { status: 500 }
+    // Berechne aktuelle Balances (Opening + IST-Ledger-Summen)
+    const balanceData = await calculateBankAccountBalances(
+      caseId,
+      accounts.map((a) => ({
+        id: a.id,
+        openingBalanceCents: a.openingBalanceCents,
+        status: a.status,
+      }))
     );
-  }
-}
 
-// PUT /api/cases/[id]/bank-accounts - Update a bank account
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id: caseId } = await params;
-    const body = await request.json();
-    const {
-      accountId,
-      bankName,
-      accountName,
-      iban,
-      openingBalanceCents,
-      securityHolder,
-      status,
-      notes,
-      displayOrder,
-    } = body;
-
-    if (!accountId) {
-      return NextResponse.json(
-        { error: "accountId ist erforderlich" },
-        { status: 400 }
-      );
-    }
-
-    // Verify account exists and belongs to this case
-    const existingAccount = await prisma.bankAccount.findUnique({
-      where: { id: accountId },
-    });
-
-    if (!existingAccount) {
-      return NextResponse.json(
-        { error: "Bankkonto nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    if (existingAccount.caseId !== caseId) {
-      return NextResponse.json(
-        { error: "Bankkonto gehört nicht zu diesem Fall" },
-        { status: 403 }
-      );
-    }
-
-    // Validate status if provided
-    const validStatuses = ["available", "blocked", "restricted"];
-    if (status && !validStatuses.includes(status)) {
-      return NextResponse.json(
-        { error: `status muss einer der folgenden Werte sein: ${validStatuses.join(", ")}` },
-        { status: 400 }
-      );
-    }
-
-    const account = await prisma.bankAccount.update({
-      where: { id: accountId },
-      data: {
-        ...(bankName && { bankName: bankName.trim() }),
-        ...(accountName && { accountName: accountName.trim() }),
-        ...(iban !== undefined && { iban: iban?.trim() || null }),
-        ...(openingBalanceCents !== undefined && { openingBalanceCents: BigInt(openingBalanceCents) }),
-        ...(securityHolder !== undefined && { securityHolder: securityHolder?.trim() || null }),
-        ...(status && { status }),
-        ...(notes !== undefined && { notes: notes?.trim() || null }),
-        ...(displayOrder !== undefined && { displayOrder }),
-        updatedBy: session.username,
-      },
+    // Response mit allen Details
+    const result = accounts.map((acc) => {
+      const balance = balanceData.balances.get(acc.id);
+      return {
+        id: acc.id,
+        bankName: acc.bankName,
+        accountName: acc.accountName,
+        iban: acc.iban,
+        status: acc.status,
+        location: acc.location
+          ? { id: acc.location.id, name: acc.location.name }
+          : null,
+        openingBalanceCents: acc.openingBalanceCents.toString(),
+        ledgerSumCents: balance?.ledgerSumCents.toString() ?? "0",
+        currentBalanceCents:
+          balance?.currentBalanceCents.toString() ?? acc.openingBalanceCents.toString(),
+      };
     });
 
     return NextResponse.json({
-      success: true,
-      account: {
-        ...account,
-        openingBalanceCents: account.openingBalanceCents.toString(),
+      accounts: result,
+      summary: {
+        totalBalanceCents: balanceData.totalBalanceCents.toString(),
+        totalAvailableCents: balanceData.totalAvailableCents.toString(),
+        accountCount: accounts.length,
       },
     });
   } catch (error) {
-    console.error("Error updating bank account:", error);
+    console.error("BankAccounts API Fehler:", error);
     return NextResponse.json(
-      { error: "Fehler beim Aktualisieren des Bankkontos" },
-      { status: 500 }
-    );
-  }
-}
-
-// DELETE /api/cases/[id]/bank-accounts - Delete a bank account
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const session = await getSession();
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const { id: caseId } = await params;
-    const { searchParams } = new URL(request.url);
-    const accountId = searchParams.get("accountId");
-
-    if (!accountId) {
-      return NextResponse.json(
-        { error: "accountId ist erforderlich" },
-        { status: 400 }
-      );
-    }
-
-    // Verify account exists and belongs to this case
-    const existingAccount = await prisma.bankAccount.findUnique({
-      where: { id: accountId },
-    });
-
-    if (!existingAccount) {
-      return NextResponse.json(
-        { error: "Bankkonto nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    if (existingAccount.caseId !== caseId) {
-      return NextResponse.json(
-        { error: "Bankkonto gehört nicht zu diesem Fall" },
-        { status: 403 }
-      );
-    }
-
-    await prisma.bankAccount.delete({
-      where: { id: accountId },
-    });
-
-    return NextResponse.json({
-      success: true,
-      message: "Bankkonto gelöscht",
-    });
-  } catch (error) {
-    console.error("Error deleting bank account:", error);
-    return NextResponse.json(
-      { error: "Fehler beim Löschen des Bankkontos" },
+      { error: "Interner Serverfehler" },
       { status: 500 }
     );
   }

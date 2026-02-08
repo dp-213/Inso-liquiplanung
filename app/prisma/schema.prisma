@@ -636,6 +636,7 @@ model InsolvencyEffect {
 model BankAccount {
   id              String   @id @default(uuid())
   caseId          String
+  locationId      String?  // Optional FK zu Location (null = zentrales Konto)
   bankName        String   // e.g., "Sparkasse", "Münchner Bank"
   accountName     String   // e.g., "Geschäftskonto", "Treuhandkonto"
   iban                String?  // DE11701500001009210475
@@ -650,10 +651,12 @@ model BankAccount {
   updatedBy       String
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  location Location? @relation(fields: [locationId], references: [id])
   ledgerEntries LedgerEntry[]
   bankAgreements BankAgreement[]
 
   @@index([caseId])
+  @@index([locationId])
   @@map("bank_accounts")
 }
 
@@ -735,6 +738,7 @@ model Location {
   updatedAt     DateTime @updatedAt
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  bankAccounts BankAccount[]
   ledgerEntries LedgerEntry[]
 
   @@index([caseId])

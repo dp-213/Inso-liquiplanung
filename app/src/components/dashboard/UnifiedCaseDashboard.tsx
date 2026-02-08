@@ -34,6 +34,7 @@ import MasseCreditTab from "@/components/dashboard/MasseCreditTab";
 import LocationView from "@/components/dashboard/iv-views/LocationView";
 import LiquidityMatrixTable, { LiquidityScope, SCOPE_LABELS } from "@/components/dashboard/LiquidityMatrixTable";
 import IstPlanComparisonTable from "@/components/dashboard/IstPlanComparisonTable";
+import BankAccountsTab from "@/components/dashboard/BankAccountsTab";
 import Link from "next/link";
 
 // =============================================================================
@@ -371,7 +372,15 @@ export default function UnifiedCaseDashboard({
         return (
           <div className="space-y-6">
             {caseId ? (
-              <MasseCreditTab caseId={caseId} />
+              <>
+                {/* Bankkonto-Übersicht mit Opening Balance und aktuellen Salden */}
+                <div className="admin-card p-6">
+                  <BankAccountsTab caseId={caseId} />
+                </div>
+
+                {/* Massekredit-Analyse (bestehend) */}
+                <MasseCreditTab caseId={caseId} />
+              </>
             ) : (
               <div className="admin-card p-6">
                 <div className="text-center text-gray-500">
