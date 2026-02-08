@@ -13,5 +13,5 @@ Thumbs.db
 .env.local
 .env.*.local
 
-# Case data (sensitive, not for git)
-Cases/
+# Case data (sensitive, not for git) - NUR im Root-Verzeichnis!
+/Cases/
