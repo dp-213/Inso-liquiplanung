@@ -149,44 +149,35 @@ function getValueTypeColor(valueType: string): { bg: string; text: string } {
 /**
  * Prüft, ob eine Zeile im aktuellen estateFilter angezeigt werden soll.
  * estateFilter wirkt NUR im Frontend (zeilen-ausblendung), Backend liefert IMMER GESAMT.
+ *
+ * WICHTIG: estateFilter filtert nur EINNAHMEN nach Alt/Neu.
+ * Balances und Ausgaben werden IMMER angezeigt (unabhängig vom Filter).
  */
 function shouldShowRow(rowId: string, estateFilter: EstateFilter): boolean {
   // GESAMT: Alle Zeilen anzeigen
   if (estateFilter === 'GESAMT') return true;
 
-  // NEUMASSE: Neumasse-Einnahmen + ALLE Ausgaben + Balances
+  // Balances und Ausgaben immer anzeigen (unabhängig vom Filter)
+  const alwaysShow =
+    rowId.startsWith('opening_balance_') ||
+    rowId.startsWith('closing_balance_') ||
+    rowId.startsWith('cash_out_') ||
+    rowId === 'cash_in_total';  // Summenzeile immer zeigen
+
+  if (alwaysShow) return true;
+
+  // Jetzt nur noch EINNAHMEN-Zeilen filtern:
+
+  // NEUMASSE: Zeige Neumasse-Einnahmen (Umsatz + Sonstige)
   if (estateFilter === 'NEUMASSE') {
-    // Zeige alles AUSSER Altforderungs-Zeilen
+    // Blende nur Altforderungs-Zeilen aus
     return !rowId.includes('altforderung');
   }
 
-  // ALTMASSE: Nur Altforderungs-Einnahmen + Balances + Summenzeilen
+  // ALTMASSE: Zeige nur Altforderungs-Einnahmen
   if (estateFilter === 'ALTMASSE') {
-    // Zeige: Balances, Cash-In-Total, Altforderungs-Zeilen
-    const altmasseRows = [
-      // Balances
-      'opening_balance_total',
-      'closing_balance_total',
-      // Bank-spezifische Balances
-      'opening_balance_isk_velbert',
-      'opening_balance_sparkasse_velbert',
-      'opening_balance_isk_uckerath',
-      'opening_balance_apobank_uckerath',
-      'opening_balance_apobank_hvplus',
-      'closing_balance_isk_velbert',
-      'closing_balance_sparkasse_velbert',
-      'closing_balance_isk_uckerath',
-      'closing_balance_apobank_uckerath',
-      'closing_balance_apobank_hvplus',
-      // Cash-In Summe
-      'cash_in_total',
-      // Altforderungs-Zeilen
-      'cash_in_altforderung_header',
-      'cash_in_altforderung_hzv',
-      'cash_in_altforderung_kv',
-      'cash_in_altforderung_pvs',
-    ];
-    return altmasseRows.includes(rowId);
+    // Zeige nur Altforderungs-Zeilen
+    return rowId.includes('altforderung');
   }
 
   // UNKLAR: Zeige nur Zeilen mit unklar-Anteil (aktuell nicht implementiert)
@@ -597,23 +588,7 @@ export default function LiquidityMatrixTable({
           <tbody>
             {data.blocks
               .filter((block) => block.rows.length > 0)  // Skip empty blocks
-              .map((block) => {
-                // Berechne gefilterte Block-Summe (nur sichtbare Zeilen)
-                const filteredBlockTotals = data.periods.map((_, periodIdx) => {
-                  let sum = BigInt(0);
-                  for (const row of block.rows) {
-                    // Skip section headers, summary rows, and filtered rows
-                    if (row.isSectionHeader || row.isSummary) continue;
-                    if (!shouldShowRow(row.id, estateFilter)) continue;
-                    const value = row.values.find(v => v.periodIndex === periodIdx);
-                    if (value) {
-                      sum += BigInt(value.amountCents);
-                    }
-                  }
-                  return sum;
-                });
-
-                return (
+              .map((block) => (
               <>
                 {/* Block rows */}
                 {block.rows.map((row) => {
@@ -656,18 +631,18 @@ export default function LiquidityMatrixTable({
                     return null;
                   }
 
-                  // Bei Summary-Zeilen: Verwende gefilterte Gesamt-Summe wenn estateFilter aktiv
-                  const rowTotal = row.isSummary && estateFilter !== 'GESAMT'
-                    ? filteredBlockTotals.reduce((sum, val) => sum + val, BigInt(0))
-                    : BigInt(row.total);
+                  // Bank Block Total Row ist clickable zum Expand/Collapse
+                  const isBankBlockTotal = row.isSummary && (block.id === "OPENING_BALANCE" || block.id === "CLOSING_BALANCE");
+                  const isExpanded = !collapsedBankBlocks.has(block.id);
+
+                  // Summary-Zeilen (Totals) IMMER ungefiltert anzeigen für konsistente Rechnung:
+                  // Opening + Cash-In (Total) - Cash-Out (Total) = Closing
+                  // Nur Detail-Zeilen werden gefiltert
+                  const rowTotal = BigInt(row.total);
 
                   const isNegative = rowTotal < BigInt(0);
                   const bgClass = row.isSummary ? getBlockColorClass(block.id) : "";
                   const showBreakdown = showLocationBreakdown && scope === "GLOBAL" && !row.isSummary && Object.keys(locationData).length > 0;
-
-                  // Bank Block Total Row ist clickable zum Expand/Collapse
-                  const isBankBlockTotal = row.isSummary && (block.id === "OPENING_BALANCE" || block.id === "CLOSING_BALANCE");
-                  const isExpanded = !collapsedBankBlocks.has(block.id);
 
                   return (
                     <Fragment key={row.id}>
@@ -712,10 +687,9 @@ export default function LiquidityMatrixTable({
 
                         {/* Period Values */}
                         {row.values.map((value) => {
-                          // Bei Summary-Zeilen: Verwende gefilterte Summen wenn estateFilter aktiv
-                          const amount = row.isSummary && estateFilter !== 'GESAMT'
-                            ? filteredBlockTotals[value.periodIndex]
-                            : BigInt(value.amountCents);
+                          // Summary-Zeilen (Totals) IMMER ungefiltert anzeigen für konsistente Rechnung
+                          // Nur Detail-Zeilen werden gefiltert (durch shouldShowRow)
+                          const amount = BigInt(value.amountCents);
 
                           const isValueNegative = amount < BigInt(0);
                           const isError = data.validation.errorPeriods.includes(value.periodIndex) && row.isSummary && block.id === "CLOSING_BALANCE";
@@ -797,8 +771,7 @@ export default function LiquidityMatrixTable({
                   </tr>
                 )}
               </>
-            );
-              })}
+            ))}
           </tbody>
         </table>
       </div>
