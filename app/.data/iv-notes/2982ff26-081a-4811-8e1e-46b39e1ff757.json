@@ -1,0 +1,29 @@
+[
+  {
+    "id": "note-initial-1",
+    "content": "**FEHLENDE ZAHLBELEGE - TOP PRIORITÄT**\n\nBei IV anfragen (20 Zahlbelege, gesamt 179.698 EUR):\n\n**KRITISCH:**\n- EBICS 52.683 EUR (25 Umsätze) - 27.01.2026\n- ONLINE 44.764 EUR (18 Umsätze) - 31.01.2026\n→ Zusammen 97.447 EUR = 54% der fehlenden Summe!\n\n**Weitere Details:**\nSiehe `/06-review/FEHLENDE_ZAHLBELEGE_IV_ANFRAGE.md`\nExcel-Liste: `/06-review/FEHLENDE_ZAHLBELEGE_LISTE.csv`",
+    "priority": "KRITISCH",
+    "status": "OFFEN",
+    "createdAt": "2026-02-07T18:00:00.000Z",
+    "updatedAt": "2026-02-07T18:00:00.000Z",
+    "author": "Sonja Prinz"
+  },
+  {
+    "id": "note-initial-2",
+    "content": "**ZAHLBELEG-COVERAGE UNVOLLSTÄNDIG**\n\nAktueller Stand:\n- SAMMELÜBERWEISUNGEN: 11 von 28 (39%)\n- EBICS/ONLINE: 2 von 14 (14%)\n- Fehlende Summe: 179.698 EUR\n\n17 SAMMELÜBERWEISUNGS-Belege fehlen (62.148 EUR)\n3 große EBICS/ONLINE-Batches fehlen (117.551 EUR)\n\nNach Erhalt: Extraktion + Counterparty-Zuordnung + Ledger-Update",
+    "priority": "HOCH",
+    "status": "WARTET",
+    "createdAt": "2026-02-07T17:30:00.000Z",
+    "updatedAt": "2026-02-07T17:30:00.000Z",
+    "author": "Sonja Prinz"
+  },
+  {
+    "id": "note-initial-3",
+    "content": "**DATENSTAND IST-KLASSIFIKATION**\n\nSTATUS: ✅ 100% klassifiziert\n\n- 1.248 IST-Einträge (Nov 2025 - Jan 2026)\n- 0 orphaned IDs\n- 0 UNREVIEWED\n- 8 Umbuchungen gekennzeichnet (steeringTag)\n- 12 Privatrechnungen gekennzeichnet\n- 5 Duplikate entfernt\n\n⚠️ EINSCHRÄNKUNG:\n71 Einträge (5,7%) ohne counterpartyId (Batches ohne Zahlbeleg)",
+    "priority": "MITTEL",
+    "status": "ERLEDIGT",
+    "createdAt": "2026-02-07T17:00:00.000Z",
+    "updatedAt": "2026-02-07T18:00:00.000Z",
+    "author": "Sonja Prinz"
+  }
+]

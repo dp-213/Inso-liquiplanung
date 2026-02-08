@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { getCustomerSession, checkCaseAccess } from '@/lib/customer-auth';
 import { aggregateEstateAllocation, type LiquidityScope } from '@/lib/ledger/aggregation';
 
 /**
@@ -29,12 +30,23 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const session = await getSession();
-    if (!session) {
+    const { id: caseId } = await params;
+
+    // Auth: Prüfe Admin- ODER Customer-Session
+    const adminSession = await getSession();
+    const customerSession = await getCustomerSession();
+
+    if (!adminSession && !customerSession) {
       return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
     }
 
-    const { id: caseId } = await params;
+    // Falls Customer-Session: Prüfe Case-Access
+    if (customerSession && !adminSession) {
+      const access = await checkCaseAccess(customerSession.customerId, caseId);
+      if (!access.hasAccess) {
+        return NextResponse.json({ error: 'Zugriff verweigert' }, { status: 403 });
+      }
+    }
     const { searchParams } = new URL(request.url);
     const scopeParam = searchParams.get('scope');
     const startDateParam = searchParams.get('startDate');

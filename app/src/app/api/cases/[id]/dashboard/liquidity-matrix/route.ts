@@ -15,6 +15,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { getSession } from '@/lib/auth';
+import { getCustomerSession, checkCaseAccess } from '@/lib/customer-auth';
 import {
   HVPLUS_MATRIX_CONFIG,
   HVPLUS_MATRIX_BLOCKS,
@@ -24,6 +26,7 @@ import {
   getRowsForScope,
   filterEntriesByScope,
   getScopeHintText,
+  getAltforderungCategoryTag,
   LIQUIDITY_SCOPE_LABELS,
   type MatrixBlockId,
   type MatrixRowConfig,
@@ -155,6 +158,22 @@ export async function GET(
     const { id: caseId } = await params;
     const { searchParams } = new URL(request.url);
 
+    // Auth: Prüfe Admin- ODER Customer-Session
+    const adminSession = await getSession();
+    const customerSession = await getCustomerSession();
+
+    if (!adminSession && !customerSession) {
+      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
+    }
+
+    // Falls Customer-Session: Prüfe Case-Access
+    if (customerSession && !adminSession) {
+      const access = await checkCaseAccess(customerSession.customerId, caseId);
+      if (!access.hasAccess) {
+        return NextResponse.json({ error: 'Zugriff verweigert' }, { status: 403 });
+      }
+    }
+
     // Query Parameters
     const estateFilter = searchParams.get('estateFilter') || 'GESAMT';
     const showDetails = searchParams.get('showDetails') !== 'false';
@@ -190,13 +209,10 @@ export async function GET(
     const periodCount = plan.periodCount || 10;
     const startDate = plan.planStartDate ? new Date(plan.planStartDate) : new Date();
 
-    // 2. Build estate filter
-    const estateWhere: Record<string, unknown> = {};
-    if (estateFilter !== 'GESAMT') {
-      estateWhere.estateAllocation = estateFilter;
-    }
-
-    // 3. Load LedgerEntries
+    // 2. Load LedgerEntries
+    // WICHTIG: estateFilter wird NICHT im Backend angewendet!
+    // Backend aggregiert IMMER GESAMT. estateFilter wirkt nur im Frontend (Zeilen-Ausblendung).
+    //
     // reviewStatus-Filter: Default nur geprüfte (CONFIRMED, ADJUSTED)
     // Mit includeUnreviewed=true auch UNREVIEWED
     const reviewStatusFilter = includeUnreviewed
@@ -207,7 +223,7 @@ export async function GET(
       where: {
         caseId,
         reviewStatus: reviewStatusFilter,
-        ...estateWhere,
+        // KEIN estateWhere mehr! Backend liefert ALLE Entries.
       },
       include: {
         counterparty: { select: { id: true, name: true } },

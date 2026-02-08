@@ -850,3 +850,24 @@ export function getScopeHintText(scope: LiquidityScope): string | null {
   if (scope === 'GLOBAL') return null;
   return 'Zentrale Verfahrenskosten, Personalaufwand und insolvenzspezifische Kosten sind in dieser Sicht nicht enthalten.';
 }
+
+/**
+ * Mappt einen Neumasse-categoryTag auf den entsprechenden Altforderungs-categoryTag.
+ *
+ * Beispiel: 'HZV' → 'ALTFORDERUNG_HZV'
+ *
+ * Wird verwendet für estateRatio-Splitting:
+ * - Neu-Anteil → Original categoryTag
+ * - Alt-Anteil → Altforderungs-categoryTag
+ */
+export function getAltforderungCategoryTag(neumasseTag: string | null): string | null {
+  if (!neumasseTag) return null;
+
+  const mapping: Record<string, string> = {
+    'HZV': 'ALTFORDERUNG_HZV',
+    'KV': 'ALTFORDERUNG_KV',
+    'PVS': 'ALTFORDERUNG_PVS',
+  };
+
+  return mapping[neumasseTag] || null;
+}
