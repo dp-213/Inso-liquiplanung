@@ -696,6 +696,7 @@ export async function aggregateByCounterparty(
     startDate?: Date;
     endDate?: Date;
     flowType?: 'INFLOW' | 'OUTFLOW' | 'ALL';
+    scope?: LiquidityScope;
   }
 ): Promise<RevenueBySource[]> {
   const plan = await prisma.liquidityPlan.findUnique({
@@ -707,6 +708,7 @@ export async function aggregateByCounterparty(
   }
 
   const flowType = options?.flowType || 'INFLOW';
+  const scope = options?.scope || 'GLOBAL';
 
   // Build date filter
   const dateFilter: { gte?: Date; lte?: Date } = {};
@@ -717,13 +719,19 @@ export async function aggregateByCounterparty(
     dateFilter.lte = options.endDate;
   }
 
+  // Build location filter based on scope
+  const locationFilter: { in?: string[] } | undefined =
+    scope !== 'GLOBAL' ? { in: SCOPE_LOCATION_IDS[scope] } : undefined;
+
   // Get entries with counterparty and location
   const entries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
+      valueType: 'IST', // Nur IST-Einnahmen (keine PLAN)
       ...(Object.keys(dateFilter).length > 0 ? { transactionDate: dateFilter } : {}),
       ...(flowType === 'INFLOW' ? { amountCents: { gt: 0 } } : {}),
       ...(flowType === 'OUTFLOW' ? { amountCents: { lt: 0 } } : {}),
+      ...(locationFilter ? { locationId: locationFilter } : {}),
     },
     include: {
       counterparty: true,
@@ -748,6 +756,12 @@ export async function aggregateByCounterparty(
 
     const periodLabel = formatPeriodLabel(periodStart, plan.periodType as 'WEEKLY' | 'MONTHLY');
 
+    // Apply estate allocation: Only count Neumasse-portion
+    // estateRatio: 0.0 = 100% Alt, 1.0 = 100% Neu
+    // For MIXED entries (e.g. KV Q4 with 2/3 Neu), only count the Neu-portion
+    const estateRatio = entry.estateRatio !== null ? Number(entry.estateRatio) : 1.0; // Default to 1.0 (Neumasse) if not set
+    const neumasseAmountCents = BigInt(Math.round(Number(entry.amountCents) * estateRatio));
+
     return {
       counterpartyId: entry.counterpartyId,
       counterpartyName: entry.counterparty?.name || 'Unbekannt',
@@ -755,7 +769,7 @@ export async function aggregateByCounterparty(
       locationName: entry.location?.name || 'Ohne Standort',
       periodIndex,
       periodLabel,
-      amountCents: BigInt(entry.amountCents),
+      amountCents: neumasseAmountCents, // Nur Neumasse-Anteil
       transactionDate: entry.transactionDate,
       description: entry.description,
     };
@@ -772,6 +786,7 @@ export async function summarizeByCounterparty(
   options?: {
     startDate?: Date;
     endDate?: Date;
+    scope?: LiquidityScope;
   }
 ): Promise<Array<{
   counterpartyId: string | null;
@@ -811,6 +826,135 @@ export async function summarizeByCounterparty(
   return Array.from(byCounterparty.values()).sort((a, b) =>
     Number(b.totalCents - a.totalCents)
   );
+}
+
+// =============================================================================
+// ESTATE ALLOCATION AGGREGATION
+// =============================================================================
+
+export interface EstateAllocationSummary {
+  altmasseInflowCents: bigint;
+  altmasseOutflowCents: bigint;
+  neumasseInflowCents: bigint;
+  neumasseOutflowCents: bigint;
+  unklarInflowCents: bigint;
+  unklarOutflowCents: bigint;
+  unklarCount: number;
+}
+
+/**
+ * Aggregate estate allocation (Alt/Neu-Masse) from IST LedgerEntries
+ *
+ * WICHTIG: Nutzt estateAllocation + estateRatio aus LedgerEntries, NICHT aus PLAN-Kategorien
+ *
+ * Logik:
+ * - ALTMASSE (estateRatio = 0.0): Betrag → Altmasse
+ * - NEUMASSE (estateRatio = 1.0): Betrag → Neumasse
+ * - MIXED (estateRatio = 0.0-1.0): Betrag aufteilen (Alt-Anteil = 1-estateRatio, Neu-Anteil = estateRatio)
+ * - UNKLAR: Betrag → UNKLAR (Warnung!)
+ */
+export async function aggregateEstateAllocation(
+  prisma: PrismaClient,
+  caseId: string,
+  options?: {
+    scope?: LiquidityScope;
+    startDate?: Date;
+    endDate?: Date;
+  }
+): Promise<EstateAllocationSummary> {
+  const scope = options?.scope || 'GLOBAL';
+
+  // Build date filter
+  const dateFilter: { gte?: Date; lte?: Date } = {};
+  if (options?.startDate) {
+    dateFilter.gte = options.startDate;
+  }
+  if (options?.endDate) {
+    dateFilter.lte = options.endDate;
+  }
+
+  // Build location filter based on scope
+  const locationFilter: { in?: string[] } | undefined =
+    scope !== 'GLOBAL' ? { in: SCOPE_LOCATION_IDS[scope] } : undefined;
+
+  // Get ALL IST entries
+  const entries = await prisma.ledgerEntry.findMany({
+    where: {
+      caseId,
+      valueType: 'IST', // Nur IST-Einträge
+      ...(Object.keys(dateFilter).length > 0 ? { transactionDate: dateFilter } : {}),
+      ...(locationFilter ? { locationId: locationFilter } : {}),
+    },
+    select: {
+      id: true,
+      amountCents: true,
+      estateAllocation: true,
+      estateRatio: true,
+    },
+  });
+
+  let altmasseInflowCents = BigInt(0);
+  let altmasseOutflowCents = BigInt(0);
+  let neumasseInflowCents = BigInt(0);
+  let neumasseOutflowCents = BigInt(0);
+  let unklarInflowCents = BigInt(0);
+  let unklarOutflowCents = BigInt(0);
+  let unklarCount = 0;
+
+  for (const entry of entries) {
+    const amountCents = BigInt(entry.amountCents);
+    const isInflow = amountCents > BigInt(0);
+    const estateAllocation = entry.estateAllocation || 'UNKLAR';
+    const estateRatio = entry.estateRatio !== null ? Number(entry.estateRatio) : null;
+
+    if (estateAllocation === 'UNKLAR' || estateRatio === null) {
+      // UNKLAR: Keine Zuordnung möglich
+      if (isInflow) {
+        unklarInflowCents += amountCents;
+      } else {
+        unklarOutflowCents += amountCents < BigInt(0) ? -amountCents : BigInt(0);
+      }
+      unklarCount++;
+    } else if (estateAllocation === 'ALTMASSE') {
+      // ALTMASSE: 100% Alt
+      if (isInflow) {
+        altmasseInflowCents += amountCents;
+      } else {
+        altmasseOutflowCents += -amountCents;
+      }
+    } else if (estateAllocation === 'NEUMASSE') {
+      // NEUMASSE: 100% Neu
+      if (isInflow) {
+        neumasseInflowCents += amountCents;
+      } else {
+        neumasseOutflowCents += -amountCents;
+      }
+    } else if (estateAllocation === 'MIXED') {
+      // MIXED: Aufteilen nach estateRatio
+      // estateRatio = Neu-Anteil, (1 - estateRatio) = Alt-Anteil
+      const absoluteAmount = amountCents < BigInt(0) ? -amountCents : amountCents;
+      const neuAnteilCents = BigInt(Math.round(Number(absoluteAmount) * estateRatio));
+      const altAnteilCents = absoluteAmount - neuAnteilCents;
+
+      if (isInflow) {
+        altmasseInflowCents += altAnteilCents;
+        neumasseInflowCents += neuAnteilCents;
+      } else {
+        altmasseOutflowCents += altAnteilCents;
+        neumasseOutflowCents += neuAnteilCents;
+      }
+    }
+  }
+
+  return {
+    altmasseInflowCents,
+    altmasseOutflowCents,
+    neumasseInflowCents,
+    neumasseOutflowCents,
+    unklarInflowCents,
+    unklarOutflowCents,
+    unklarCount,
+  };
 }
 
 // =============================================================================

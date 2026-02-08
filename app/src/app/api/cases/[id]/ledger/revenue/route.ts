@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { getSession } from '@/lib/auth';
-import { aggregateByCounterparty, summarizeByCounterparty } from '@/lib/ledger/aggregation';
+import { aggregateByCounterparty, summarizeByCounterparty, type LiquidityScope } from '@/lib/ledger/aggregation';
 
 /**
  * GET /api/cases/[id]/ledger/revenue
@@ -51,9 +51,11 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const monthsParam = searchParams.get('months');
     const summarizeParam = searchParams.get('summarize');
+    const scopeParam = searchParams.get('scope');
 
     const months = monthsParam ? parseInt(monthsParam, 10) : 6;
     const shouldSummarize = summarizeParam === 'true';
+    const scope = (scopeParam as 'GLOBAL' | 'LOCATION_VELBERT' | 'LOCATION_UCKERATH_EITORF') || 'GLOBAL';
 
     // Get active plan for case
     const plan = await prisma.liquidityPlan.findFirst({
@@ -78,6 +80,7 @@ export async function GET(
       const summary = await summarizeByCounterparty(prisma, caseId, plan.id, {
         startDate,
         endDate,
+        scope,
       });
 
       // Convert BigInt to string for JSON serialization
@@ -99,6 +102,7 @@ export async function GET(
         startDate,
         endDate,
         flowType: 'INFLOW',
+        scope,
       });
 
       // Convert BigInt to string for JSON serialization

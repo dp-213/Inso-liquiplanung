@@ -26,6 +26,7 @@ interface RevenueTableProps {
   caseId: string;
   months?: number;
   showSummary?: boolean;
+  scope?: 'GLOBAL' | 'LOCATION_VELBERT' | 'LOCATION_UCKERATH_EITORF';
 }
 
 // Farben für Quellen
@@ -44,6 +45,7 @@ export default function RevenueTable({
   caseId,
   months = 6,
   showSummary = true,
+  scope = 'GLOBAL',
 }: RevenueTableProps) {
   const [entries, setEntries] = useState<RevenueEntry[]>([]);
   const [summary, setSummary] = useState<RevenueSummary[]>([]);
@@ -59,10 +61,10 @@ export default function RevenueTable({
       setError(null);
 
       try {
-        // Fetch both summary and details
+        // Fetch both summary and details with scope parameter
         const [summaryRes, detailsRes] = await Promise.all([
-          fetch(`/api/cases/${caseId}/ledger/revenue?months=${months}&summarize=true`),
-          fetch(`/api/cases/${caseId}/ledger/revenue?months=${months}`),
+          fetch(`/api/cases/${caseId}/ledger/revenue?months=${months}&summarize=true&scope=${scope}`),
+          fetch(`/api/cases/${caseId}/ledger/revenue?months=${months}&scope=${scope}`),
         ]);
 
         if (summaryRes.ok) {
@@ -83,7 +85,7 @@ export default function RevenueTable({
     }
 
     fetchData();
-  }, [caseId, months]);
+  }, [caseId, months, scope]);
 
   // Group entries by month for details view
   const entriesByMonth = useMemo(() => {

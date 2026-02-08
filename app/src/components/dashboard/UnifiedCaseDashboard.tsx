@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useRef } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import {
   CaseDashboardData,
   AccessMode,
@@ -190,6 +190,17 @@ export default function UnifiedCaseDashboard({
   // Global scope state for consistent filtering across tabs
   const [scope, setScope] = useState<LiquidityScope>("GLOBAL");
 
+  // Estate allocation state (loaded from API)
+  const [estateData, setEstateData] = useState<{
+    altmasseInflowTotal: bigint;
+    altmasseOutflowTotal: bigint;
+    neumasseInflowTotal: bigint;
+    neumasseOutflowTotal: bigint;
+    unklarInflowTotal: bigint;
+    unklarOutflowTotal: bigint;
+    unklarCount: number;
+  } | null>(null);
+
   // Get capabilities
   const capabilities = propCapabilities || getCapabilitiesForAccessMode(accessMode);
 
@@ -241,23 +252,34 @@ export default function UnifiedCaseDashboard({
     outflowCategories: data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && BigInt(c.totalCents) > BigInt(0)),
   }), [data.calculation.categories]);
 
-  // Estate calculations
-  const estateData = useMemo(() => {
-    const altIn = data.calculation.categories.filter((c) => c.flowType === "INFLOW" && c.estateType === "ALTMASSE");
-    const altOut = data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && c.estateType === "ALTMASSE");
-    const neuIn = data.calculation.categories.filter((c) => c.flowType === "INFLOW" && c.estateType === "NEUMASSE");
-    const neuOut = data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && c.estateType === "NEUMASSE");
-    return {
-      altmasseInflows: altIn,
-      altmasseOutflows: altOut,
-      neumasseInflows: neuIn,
-      neumasseOutflows: neuOut,
-      altmasseInflowTotal: altIn.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0)),
-      altmasseOutflowTotal: altOut.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0)),
-      neumasseInflowTotal: neuIn.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0)),
-      neumasseOutflowTotal: neuOut.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0)),
-    };
-  }, [data.calculation.categories]);
+  // Load estate allocation data from API (IST LedgerEntries, not PLAN categories)
+  useEffect(() => {
+    if (!caseId) return;
+
+    async function fetchEstateData() {
+      try {
+        const res = await fetch(`/api/cases/${caseId}/ledger/estate-summary?scope=${scope}`, {
+          credentials: 'include',
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setEstateData({
+            altmasseInflowTotal: BigInt(data.altmasseInflowCents),
+            altmasseOutflowTotal: BigInt(data.altmasseOutflowCents),
+            neumasseInflowTotal: BigInt(data.neumasseInflowCents),
+            neumasseOutflowTotal: BigInt(data.neumasseOutflowCents),
+            unklarInflowTotal: BigInt(data.unklarInflowCents),
+            unklarOutflowTotal: BigInt(data.unklarOutflowCents),
+            unklarCount: data.unklarCount,
+          });
+        }
+      } catch (error) {
+        console.error('Fehler beim Laden der Estate-Daten:', error);
+      }
+    }
+
+    fetchEstateData();
+  }, [caseId, scope]);
 
   // Revenue totals
   const { grandTotal, sourceTotals } = useMemo(() => ({
@@ -287,6 +309,7 @@ export default function UnifiedCaseDashboard({
     "liquidity-matrix",
     "banks",
     "revenue", // RevenueTable braucht API
+    "estate", // Estate-Summary API
     "security",
     "locations",
     "compare",
@@ -295,8 +318,7 @@ export default function UnifiedCaseDashboard({
 
   // Tabs die Scope NICHT unterstützen (zeigen immer global)
   const tabsWithoutScopeSupport = new Set([
-    "revenue",  // RevenueTable ignoriert Scope
-    "banks",    // BankAccountsTab ignoriert Scope
+    "banks",    // BankAccountsTab zeigt alle Konten (Scope-Filter wäre irreführend für Bank-Übersicht)
   ]);
 
   // Get visible tabs
@@ -438,7 +460,7 @@ export default function UnifiedCaseDashboard({
             {caseId && (
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen nach Quelle</h2>
-                <RevenueTable caseId={caseId} months={6} showSummary={true} />
+                <RevenueTable caseId={caseId} months={6} showSummary={true} scope={scope} />
               </div>
             )}
 
@@ -504,45 +526,12 @@ export default function UnifiedCaseDashboard({
 
             <div className="admin-card p-6">
               <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Bankkonto-Übersicht (Bankenspiegel)</h2>
-              {bankAccountData.accounts.length > 0 ? (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--border)]">
-                      <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Konto</th>
-                      <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Bank</th>
-                      <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">IBAN</th>
-                      <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">Aktueller Saldo</th>
-                      <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Sicherungsnehmer</th>
-                      <th className="text-center py-3 px-4 font-medium text-[var(--secondary)]">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {bankAccountData.accounts.map((acc) => (
-                      <tr key={acc.id} className="border-b border-[var(--border)]">
-                        <td className="py-3 px-4 font-medium">{acc.accountName}</td>
-                        <td className="py-3 px-4 text-[var(--secondary)]">{acc.bankName}</td>
-                        <td className="py-3 px-4 text-[var(--secondary)] font-mono text-xs">{acc.iban || "-"}</td>
-                        <td className="py-3 px-4 text-right font-medium">{formatCurrencyFn(acc.currentBalanceCents || "0")}</td>
-                        <td className="py-3 px-4 text-[var(--secondary)]">{acc.securityHolder || "-"}</td>
-                        <td className="py-3 px-4 text-center">{getStatusBadge(acc.status)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="bg-gray-50 font-medium">
-                      <td className="py-3 px-4" colSpan={3}>Summe ({bankAccountData.accounts.length} Konten)</td>
-                      <td className="py-3 px-4 text-right">{formatCurrencyFn(bankAccountData.totalBalance)}</td>
-                      <td colSpan={2}></td>
-                    </tr>
-                  </tfoot>
-                </table>
+              <p className="text-sm text-[var(--secondary)] mb-4">Zeigt alle Bankkonten mit Standort-Zuordnung, Opening Balance und aktuellen Salden</p>
+              {caseId ? (
+                <BankAccountsTab caseId={caseId} />
               ) : (
                 <div className="p-8 bg-gray-50 rounded-lg text-center">
-                  <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                  </svg>
-                  <p className="text-[var(--muted)]">Noch keine Bankkonten erfasst</p>
-                  <p className="text-sm text-[var(--secondary)] mt-1">Die Bankkonten können im Admin-Bereich angelegt werden.</p>
+                  <p className="text-[var(--muted)]">Case-ID nicht verfügbar</p>
                 </div>
               )}
             </div>
@@ -550,6 +539,15 @@ export default function UnifiedCaseDashboard({
         );
 
       case "estate":
+        if (!estateData) {
+          return (
+            <div className="flex items-center justify-center p-8">
+              <div className="w-6 h-6 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
+              <span className="ml-3 text-[var(--secondary)]">Lade Estate-Daten...</span>
+            </div>
+          );
+        }
+
         return (
           <div className="space-y-6">
             {/* Links zu Detail-Listen (Backup Pages) */}
@@ -581,20 +579,22 @@ export default function UnifiedCaseDashboard({
               </Link>
 
               {/* UNKLAR - prominent, mit Warnung */}
-              <Link
-                href={`/admin/cases/${caseId}/ledger?estateAllocation=UNKLAR`}
-                className="admin-card p-4 hover:shadow-md transition-shadow border-l-4 border-amber-500 bg-amber-50"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <span className="font-medium text-amber-800">Noch nicht zugeordnet</span>
-                </div>
-                <p className="text-sm text-amber-700">
-                  Buchungen ohne Alt/Neu-Zuordnung prüfen →
-                </p>
-              </Link>
+              {estateData.unklarCount > 0 && (
+                <Link
+                  href={`/admin/cases/${caseId}/ledger?estateAllocation=UNKLAR`}
+                  className="admin-card p-4 hover:shadow-md transition-shadow border-l-4 border-amber-500 bg-amber-50"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span className="font-medium text-amber-800">{estateData.unklarCount} nicht zugeordnet</span>
+                  </div>
+                  <p className="text-sm text-amber-700">
+                    Buchungen ohne Alt/Neu-Zuordnung prüfen →
+                  </p>
+                </Link>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -624,20 +624,16 @@ export default function UnifiedCaseDashboard({
                   <div className="w-3 h-3 rounded-full bg-amber-500" />
                   <h2 className="text-lg font-semibold text-[var(--foreground)]">Altmasse</h2>
                 </div>
-                <p className="text-sm text-[var(--secondary)] mb-4">Vor Insolvenzeröffnung entstanden</p>
-                <div className="space-y-2">
-                  {estateData.altmasseInflows.map((cat) => (
-                    <div key={cat.categoryName} className="flex justify-between py-2 px-3 bg-green-50 rounded">
-                      <span className="text-sm">{cat.categoryName}</span>
-                      <span className="text-sm font-medium text-green-600">{formatCurrencyFn(cat.totalCents)}</span>
-                    </div>
-                  ))}
-                  {estateData.altmasseOutflows.map((cat) => (
-                    <div key={cat.categoryName} className="flex justify-between py-2 px-3 bg-red-50 rounded">
-                      <span className="text-sm">{cat.categoryName}</span>
-                      <span className="text-sm font-medium text-red-600">-{formatCurrencyFn(cat.totalCents)}</span>
-                    </div>
-                  ))}
+                <p className="text-sm text-[var(--secondary)] mb-4">Vor Insolvenzeröffnung entstanden (inkl. anteilige MIXED-Buchungen)</p>
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div className="p-3 bg-green-50 rounded">
+                    <div className="text-xs text-[var(--secondary)] mb-1">Einnahmen</div>
+                    <div className="text-lg font-semibold text-green-600">{formatCurrencyFn(estateData.altmasseInflowTotal)}</div>
+                  </div>
+                  <div className="p-3 bg-red-50 rounded">
+                    <div className="text-xs text-[var(--secondary)] mb-1">Ausgaben</div>
+                    <div className="text-lg font-semibold text-red-600">{formatCurrencyFn(estateData.altmasseOutflowTotal)}</div>
+                  </div>
                 </div>
                 <div className={`mt-4 p-3 rounded-lg ${estateData.altmasseInflowTotal >= estateData.altmasseOutflowTotal ? "bg-green-600" : "bg-red-600"} text-white`}>
                   <div className="flex justify-between"><span>Netto Altmasse</span><span className="font-bold">{formatCurrencyFn(estateData.altmasseInflowTotal - estateData.altmasseOutflowTotal)}</span></div>
@@ -650,20 +646,16 @@ export default function UnifiedCaseDashboard({
                   <div className="w-3 h-3 rounded-full bg-blue-500" />
                   <h2 className="text-lg font-semibold text-[var(--foreground)]">Neumasse</h2>
                 </div>
-                <p className="text-sm text-[var(--secondary)] mb-4">Nach Insolvenzeröffnung entstanden</p>
-                <div className="space-y-2">
-                  {estateData.neumasseInflows.map((cat) => (
-                    <div key={cat.categoryName} className="flex justify-between py-2 px-3 bg-green-50 rounded">
-                      <span className="text-sm">{cat.categoryName}</span>
-                      <span className="text-sm font-medium text-green-600">{formatCurrencyFn(cat.totalCents)}</span>
-                    </div>
-                  ))}
-                  {estateData.neumasseOutflows.map((cat) => (
-                    <div key={cat.categoryName} className="flex justify-between py-2 px-3 bg-red-50 rounded">
-                      <span className="text-sm">{cat.categoryName}</span>
-                      <span className="text-sm font-medium text-red-600">-{formatCurrencyFn(cat.totalCents)}</span>
-                    </div>
-                  ))}
+                <p className="text-sm text-[var(--secondary)] mb-4">Nach Insolvenzeröffnung entstanden (inkl. anteilige MIXED-Buchungen)</p>
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div className="p-3 bg-green-50 rounded">
+                    <div className="text-xs text-[var(--secondary)] mb-1">Einnahmen</div>
+                    <div className="text-lg font-semibold text-green-600">{formatCurrencyFn(estateData.neumasseInflowTotal)}</div>
+                  </div>
+                  <div className="p-3 bg-red-50 rounded">
+                    <div className="text-xs text-[var(--secondary)] mb-1">Ausgaben</div>
+                    <div className="text-lg font-semibold text-red-600">{formatCurrencyFn(estateData.neumasseOutflowTotal)}</div>
+                  </div>
                 </div>
                 <div className={`mt-4 p-3 rounded-lg ${estateData.neumasseInflowTotal >= estateData.neumasseOutflowTotal ? "bg-green-600" : "bg-red-600"} text-white`}>
                   <div className="flex justify-between"><span>Netto Neumasse</span><span className="font-bold">{formatCurrencyFn(estateData.neumasseInflowTotal - estateData.neumasseOutflowTotal)}</span></div>

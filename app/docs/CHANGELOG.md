@@ -4,6 +4,156 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.12.0 – Dashboard-Komponenten Scope-Aware + IST-basiert
+
+**Datum:** 08. Februar 2026
+
+### Kritischer Fix: IST-Vorrang implementiert
+
+**Problem:** Dashboard summierte IST + PLAN für dieselbe Periode → +327K Fehler bei HVPlus
+
+**Lösung:** IST-Vorrang in `aggregateLedgerEntries()`:
+- Wenn Periode IST-Daten hat → PLAN ignorieren
+- Wenn Periode keine IST-Daten hat → PLAN verwenden
+- Logging: `[IST-Vorrang] X PLAN-Einträge ignoriert (IST-Daten vorhanden)`
+
+**Ergebnis (HVPlus):**
+- 21 PLAN-Einträge korrekt verdrängt (Dez 2025 + Jan 2026)
+- Net Cashflow: 502.742 EUR (vorher: 874.129 EUR)
+- **Dashboard-Zahlen jetzt korrekt!** ✅
+
+**Location:** `/src/lib/ledger-aggregation.ts:323-372`
+
+### Dashboard-Korrekturen
+
+#### BankAccountsTab (Bankkonto-Übersicht)
+- **Workaround entfernt:** API `/api/cases/[id]/bank-accounts` nutzt jetzt echte DB-Relation statt Name-Matching
+  - Vorher: `getLocationByAccountName()` erriet Location aus accountName
+  - Nachher: `acc.location` aus Prisma-Relation
+- **Location-Anzeige:** Standort-Spalte zeigt korrekte Zuordnung (Velbert, Uckerath, Zentral)
+
+#### Revenue-Tab (Einnahmen)
+- **Scope-aware:** API `/api/cases/[id]/ledger/revenue` unterstützt jetzt `scope` Parameter
+  - Filtert LedgerEntries nach `locationId` basierend auf Scope
+  - `GLOBAL`: Alle Einträge
+  - `LOCATION_VELBERT`: Nur Velbert-Einträge
+  - `LOCATION_UCKERATH_EITORF`: Nur Uckerath/Eitorf-Einträge
+- **Nur IST-Daten:** `valueType = 'IST'` Filter hinzugefügt (keine PLAN-Einträge mehr)
+- **Estate Allocation:** MIXED-Einträge werden anteilig gezählt
+  - `estateRatio = 0.6667` (KV Q4) → Nur 66.7% des Betrags wird als Neumasse-Einnahme gezählt
+  - Frontend: RevenueTable akzeptiert `scope` Prop und reaktiviert bei Scope-Wechsel
+- **UI-Änderung:** Revenue-Tab wird bei Standort-Ansicht nicht mehr ausgeblendet
+
+#### Estate-Tab (Masseübersicht)
+- **IST-basiert:** Neue API `/api/cases/[id]/ledger/estate-summary` ersetzt PLAN-Kategorien
+  - Aggregiert direkt aus LedgerEntries statt aus `data.calculation.categories`
+  - MIXED-Entries korrekt aufgeteilt: `(1-estateRatio)` → Altmasse, `estateRatio` → Neumasse
+- **Scope-aware:** Berücksichtigt gewählten Standort
+- **Neue Aggregationsfunktion:** `aggregateEstateAllocation()` in `/lib/ledger/aggregation.ts`
+  - Unterstützt ALTMASSE, NEUMASSE, MIXED, UNKLAR
+  - Berechnet Einnahmen/Ausgaben pro Estate-Typ
+- **UNKLAR-Anzeige:** Zeigt Anzahl nicht zugeordneter Buchungen prominent
+- **UI-Vereinfachung:** Keine Detail-Listen mehr (nur Summen + Chart + Links zum Ledger)
+
+#### Security-Tab (Bankenspiegel)
+- **Konsistenz:** Verwendet jetzt `BankAccountsTab` statt eigene Tabelle
+  - Zeigt Location-Zuordnung
+  - Zeigt Opening Balance + aktuelle Salden
+  - Zeigt Perioden-Verläufe
+
+### Neue APIs
+- `/api/cases/[id]/ledger/estate-summary` – Aggregiert Alt/Neu-Masse aus IST LedgerEntries
+  - Query-Parameter: `scope`, `startDate`, `endDate`
+  - Response: `altmasseInflowCents`, `altmasseOutflowCents`, `neumasseInflowCents`, `neumasseOutflowCents`, `unklarInflowCents`, `unklarOutflowCents`, `unklarCount`
+
+### Code-Qualität
+- **TypeScript BigInt Fehler behoben:** `/scripts/calculate-estate-ratio-v2.ts` + `/scripts/calculate-estate-ratio.ts`
+  - Prisma's `_avg.estateRatio` (Decimal | null) → `Number()` Conversion vor Arithmetik
+
+### Architektur-Änderungen
+- **Scope-Filter-Logik:** `aggregateByCounterparty()` und `summarizeByCounterparty()` unterstützen jetzt `scope` Parameter
+- **Estate Allocation in Revenue:** Einnahmen-Aggregation berücksichtigt `estateRatio` für korrekte Neumasse-Berechnung
+
+---
+
+## Version 2.11.0 – Vollständige IST-Daten-Klassifikation
+
+**Datum:** 08. Februar 2026
+
+### Datenqualität & Klassifikation
+
+#### Datenbereinigung
+- **False Januar 2025 Daten gelöscht:** 226 Einträge (HV PLUS, Sparkasse, apoBank) entfernt, die fälschlicherweise als "Januar 2026" importiert waren
+  - Backup erstellt vor Löschung: `dev.db.backup-before-delete-false-jan`
+  - ISK-Einträge (115 Stück) bewusst erhalten
+- **Defekte Split-Einträge bereinigt:** 15 Einträge mit ungültigen bankAccountIds (`acc-*`) entfernt
+
+#### Classification Engine Fixes
+- **Regex-Pattern-Fehler behoben:** JavaScript RegExp verwendet jetzt `i`-Flag statt Perl-Syntax `(?i)`
+  - Betraf alle Counterparty-Patterns
+  - 56 Patterns korrigiert
+- **reviewStatus-Filter umgangen:** `matchCounterpartyPatterns()` filtert standardmäßig nur `UNREVIEWED`, IST-Daten waren aber `CONFIRMED`
+  - Lösung: Explizite Entry-IDs übergeben
+
+#### Counterparty-Klassifikation
+- **84 Counterparty-Patterns erstellt:**
+  - KV, HZV, PVS (Abrechnungsstellen)
+  - DRV, Landeshauptkasse, Bundesagentur (Behörden)
+  - Mitarbeiter (Gaenssler, Steinmetzler, Dupke, Stiebe, Weber)
+  - Dienstleister (AWADO, Jahn, MICROLOGIC, D.O.C., RiG, GGEW, Peoplefone, I-Motion, Allane, Telekonnekt)
+  - Krankenkassen (hkk, PRONOVA BKK, AOK, BARMER, DAK, Knappschaft)
+  - Sonstige (Privatpatient*innen, Sammelüberweisung, BW-Bank ISK-Auskehrung, Sonstige Betriebsausgaben)
+- **Ergebnis:** 610 von 691 Einträgen (88.3%) mit counterpartyId klassifiziert
+- **Verbleibend:** 81 Einträge (hauptsächlich Privatpatienten-Rechnungen ohne einheitliches Format)
+
+#### Location-Klassifikation
+- **BankAccount.locationId gesetzt:**
+  - `ba-sparkasse-velbert` → `loc-haevg-velbert`
+  - `ba-isk-velbert` → `loc-haevg-velbert`
+  - `ba-apobank-uckerath` → `loc-haevg-uckerath`
+  - `ba-isk-uckerath` → `loc-haevg-uckerath`
+  - `ba-apobank-hvplus` → `loc-hvplus-gesellschaft` (Gesellschafts-Ebene)
+- **Zwei Zuordnungsstrategien:**
+  1. Aus BankAccount.locationId (652 Einträge)
+  2. Aus LANR in description (0 zusätzliche, da bereits über BankAccount zugeordnet)
+- **Ergebnis:** 691 von 691 Einträgen (100%) mit locationId klassifiziert
+
+#### Estate-Ratio-Berechnung
+- **Alt/Neu-Masse-Regeln implementiert:**
+  - Vor 29.10.2025: 100% ALTMASSE
+  - Nach 29.10.2025: 100% NEUMASSE
+  - KV Q4/2025: 66.7% NEUMASSE (2/3 Neu, gem. Massekreditvertrag §1(2)a)
+  - HZV Oktober 2025: 9.7% NEUMASSE (3/31 Tage, gem. §1(2)b)
+  - HZV November+: 100% NEUMASSE
+- **Fix:** Verwendet `suggestedCounterpartyId` falls `counterpartyId` noch NULL
+- **Ergebnis:** 691 von 691 Einträgen (100%) mit estateRatio berechnet
+  - 131 ALTMASSE (19.0%)
+  - 473 NEUMASSE (68.5%)
+  - 87 MIXED (12.6%)
+
+### Neue Scripts
+- `/src/scripts/classify-all-entries-v2.ts` – Testet Pattern-Matching mit expliziten Entry-IDs
+- `/src/scripts/assign-locations.ts` – Weist locationId basierend auf BankAccount + LANR zu
+- `/src/scripts/calculate-estate-ratio-v2.ts` – Berechnet Alt/Neu-Split mit Massekreditvertrag-Regeln
+- `/src/scripts/bulk-accept-suggestions.ts` – Übernimmt suggested* Fields in finale Felder
+
+### Offene Punkte dokumentiert
+- **case-context.json aktualisiert:**
+  - SAMMELÜBERWEISUNGEN-Frage für IV (29 Einträge, 179K EUR)
+  - ISK-Auskehrungen Alt/Neu-Zuordnung (6 Einträge, 127K EUR)
+
+### Statistik (HVPlus Case)
+- **691 IST-Einträge total:**
+  - 88.3% mit counterpartyId
+  - 100% mit locationId
+  - 100% mit estateRatio
+- **Location-Verteilung:**
+  - 530 Uckerath (76.7%)
+  - 122 Velbert (17.7%)
+  - 39 Gesellschaft (5.6%)
+
+---
+
 ## Version 2.10.0 – Dashboard-Stabilität + Datenqualität
 
 **Datum:** 08. Februar 2026

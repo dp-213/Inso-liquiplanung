@@ -119,6 +119,96 @@ Counterparty-Entitäten haben ein optionales `matchPattern` (Regex). Nach jedem 
 
 ---
 
+## ADR-008: BankAccount.locationId für Standort-Zuordnung
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Opening Balance und Cashflows müssen standort-spezifisch aggregiert werden können (Scope-Filter: GLOBAL, VELBERT, UCKERATH_EITORF). Ohne explizite BankAccount→Location-Zuordnung war dies nur über komplexe LedgerEntry-Queries möglich.
+
+### Entscheidung
+
+BankAccount erhält optionales `locationId`-Feld:
+- Standort-spezifische Konten (z.B. "Geschäftskonto MVZ Velbert") → `locationId = "loc-haevg-velbert"`
+- Zentrale Konten (z.B. "HV PLUS eG Konto") → `locationId = "loc-hvplus-gesellschaft"`
+
+### Begründung
+
+- **Explizit:** Klare Zuordnung ohne Ableitung aus LedgerEntries
+- **Deterministisch:** Jedes BankAccount hat genau eine Location
+- **Opening Balance:** Kann direkt per `SUM(openingBalanceCents) WHERE locationId IN (...)` berechnet werden
+- **Performance:** Keine komplexen Joins für Scope-Filter nötig
+
+### Konsequenzen
+
+- Opening Balance wird scope-aware berechnet
+- LocationId für LedgerEntries kann aus BankAccount abgeleitet werden (Strategie 1)
+- Zentrale Konten benötigen eigene Location "Gesellschaft"
+- Migration: Alle existierenden BankAccounts müssen locationId gesetzt bekommen
+
+---
+
+## ADR-009: JavaScript RegExp statt Perl-Syntax für Counterparty-Patterns
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Counterparty-Patterns verwendeten ursprünglich `(?i)`-Prefix für Case-Insensitivity (Perl-Syntax). JavaScript RegExp unterstützt diese Syntax nicht und wirft `SyntaxError: Invalid group`.
+
+### Entscheidung
+
+Alle Patterns verwenden JavaScript RegExp mit `i`-Flag:
+```typescript
+new RegExp(pattern, 'i')  // ✅ Korrekt
+// NICHT: /(?i)pattern/   // ❌ Invalid in JavaScript
+```
+
+### Begründung
+
+- **Runtime-Fehler vermeiden:** `(?i)` wirft Exception
+- **Standard-Konvention:** JavaScript RegExp-Flags sind gut dokumentiert
+- **Konsistenz:** Alle Patterns einheitlich
+
+### Konsequenzen
+
+- Alle existierenden Patterns mit `(?i)` mussten korrigiert werden
+- Classification Engine testet Patterns auf Gültigkeit vor Verwendung
+
+---
+
+## ADR-010: Suggested-Fields für Classification Proposals
+
+**Datum:** 08. Februar 2026
+**Status:** Erweitert (ursprünglich ADR-002)
+
+### Kontext
+
+Classification Engine schlägt Dimensionen vor (counterpartyId, locationId). User muss diese explizit akzeptieren. Bei Bulk-Operations (100+ Einträge) ist einzelnes Akzeptieren ineffizient.
+
+### Entscheidung
+
+**Zwei Akzeptanz-Modi:**
+1. **Einzeln:** UI zeigt Vorschlag + Accept/Reject-Buttons
+2. **Bulk:** Script kopiert `suggested*` → finale Felder für alle Entries mit `WHERE counterpartyId IS NULL AND suggestedCounterpartyId IS NOT NULL`
+
+### Begründung
+
+- **Effizienz:** Bulk-Accept spart Zeit bei offensichtlichen Zuordnungen
+- **Kontrolle:** User entscheidet pro Batch
+- **Auditierbarkeit:** Suggested-Felder bleiben erhalten (History)
+
+### Konsequenzen
+
+- `bulk-accept-suggestions.ts` Script erstellt
+- UI kann optional Bulk-Accept-Button anbieten
+- Suggested-Felder werden NICHT überschrieben (nur einmal gesetzt)
+
+---
+
 ## ADR-005: Turso als Produktionsdatenbank
 
 **Datum:** 17. Januar 2026
@@ -143,6 +233,140 @@ Turso (libSQL) für Production, SQLite für lokale Entwicklung. Prisma-Schema bl
 - Schema-Änderungen müssen manuell per SQL auf Turso angewendet werden (ALTER TABLE)
 - `prisma db push` funktioniert nicht mit Turso-URL
 - db.ts enthält Adapter-Logik für beide Modi
+
+---
+
+## ADR-011: Dashboard-Komponenten nutzen IST-Daten statt PLAN-Kategorien
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Ursprünglich basierten Dashboard-Komponenten (Revenue, Estate-Übersicht) auf `data.calculation.categories`, die aus PLAN-Kategorien abgeleitet wurden. Mit dem Umstieg auf LedgerEntry als Single Source of Truth enthielten diese Komponenten veraltete/falsche Daten.
+
+**Problem:**
+- Revenue-Tab zeigte PLAN-Einnahmen statt IST-Einnahmen
+- Estate-Tab (Masseübersicht) nutzte PLAN-Kategorien, die kein `estateAllocation` oder `estateRatio` hatten
+- Scope-Filter (GLOBAL/VELBERT/UCKERATH) wurde ignoriert
+- MIXED-Einträge (z.B. KV Q4 mit 2/3 Neu) wurden nicht korrekt aufgeteilt
+
+### Entscheidung
+
+Alle Dashboard-Komponenten laden Daten direkt aus LedgerEntries via dedizierte APIs:
+1. **Revenue-Tab:** `/api/cases/[id]/ledger/revenue` mit `scope` Parameter
+2. **Estate-Tab:** `/api/cases/[id]/ledger/estate-summary` mit `scope` Parameter
+3. **Aggregationsfunktionen:** `aggregateByCounterparty()`, `aggregateEstateAllocation()` arbeiten auf LedgerEntries
+
+### Begründung
+
+- **Korrektheit:** IST-Daten aus LedgerEntries sind die Wahrheit
+- **Estate Allocation:** Nur LedgerEntries haben `estateRatio` für MIXED-Buchungen
+- **Scope-Aware:** Location-Filter funktioniert nur auf LedgerEntries (`locationId`)
+- **Konsistenz:** Alle Dashboard-Tabs zeigen dieselbe Datenquelle
+
+### Konsequenzen
+
+- `data.calculation.categories` wird nicht mehr für Revenue/Estate verwendet
+- Frontend lädt Daten per `useEffect()` + fetch statt `useMemo()` + props
+- Loading States nötig (Spinner während API-Aufruf)
+- Estate-Tab zeigt keine Detail-Listen mehr (nur Summen + Links zum Ledger)
+
+---
+
+## ADR-012: Scope-Filter für alle Dashboard-Tabs
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Dashboard hatte globalen Scope-Toggle (GLOBAL/VELBERT/UCKERATH), aber manche Tabs ignorierten diesen Filter. Dies führte zu Inkonsistenzen und Verwirrung.
+
+**Bisheriges Verhalten:**
+- Revenue-Tab: Ignorierte Scope, wurde bei Standort-Ansicht ausgeblendet
+- Estate-Tab: Ignorierte Scope, zeigte immer globale Summen
+- Banks-Tab: Zeigt absichtlich ALLE Konten (Scope wäre irreführend)
+
+### Entscheidung
+
+**Scope-Aware Tabs:**
+- Liquiditätstabelle: ✅ Bereits implementiert
+- Revenue-Tab: ✅ Jetzt scope-aware
+- Estate-Tab: ✅ Jetzt scope-aware
+- Rolling Forecast: ✅ Bereits implementiert
+
+**Scope-Unaware Tabs (absichtlich):**
+- Banks-Tab: Zeigt ALLE Bankkonten (Scope-Filter wäre irreführend für Bank-Übersicht)
+- Security-Tab: Zeigt ALLE Sicherungsrechte
+
+### Begründung
+
+- **Konsistenz:** User erwartet, dass Scope-Toggle alle Tabs beeinflusst
+- **Transparenz:** Tabs ohne Scope-Support werden ausgeblendet bei Standort-Ansicht
+- **Sinnhaftigkeit:** Bankkonto-Übersicht soll immer vollständig sein (unabhängig von Location-Filter)
+
+### Konsequenzen
+
+- `tabsWithoutScopeSupport` Set definiert Ausnahmen
+- Scope-Parameter wird an alle relevanten APIs übergeben
+- Frontend: `useEffect` Dependencies enthalten `scope` für Re-Fetch bei Änderung
+- API-Routen: `scope` Query-Parameter standardisiert
+
+---
+
+## ADR-013: IST-Vorrang in Ledger-Aggregation
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Dashboard summierte IST + PLAN für dieselbe Periode, was zu Doppelzählungen führte. Bei HVPlus Case: +327K Fehler (Dez 2025 + Jan 2026 hatte beide IST und PLAN).
+
+**Problem:**
+- Dez 2025: IST -3.321 € + PLAN +343.003 € = +339.682 € (falsch)
+- Jan 2026: IST -47.901 € + PLAN +35.397 € = -12.504 € (falsch)
+- Total: 874.129 € (falsch) statt 502.742 € (korrekt)
+
+### Entscheidung
+
+IST-Daten haben Vorrang vor PLAN-Daten **auf Perioden-Ebene**:
+- Wenn für Periode N IST-Einträge existieren → PLAN-Einträge für Periode N ignorieren
+- Wenn für Periode N keine IST-Einträge → PLAN-Einträge verwenden
+
+**Implementierung:**
+1. Gruppiere LedgerEntries nach `periodIndex` + `valueType`
+2. Für jede Periode: Checke ob IST vorhanden
+3. Wenn ja: Nur IST-Entries in Aggregation, PLAN verwerfen
+4. Logging: Anzahl ignorierter PLAN-Entries
+
+### Begründung
+
+- **Semantik:** IST = Realität (Bankbewegungen), PLAN = Vorhersage
+- **Fachlich korrekt:** Sobald IST-Daten vorliegen, ist PLAN obsolet
+- **Einfachheit:** Perioden-basierte Entscheidung (kein komplexes Matching nötig)
+- **Transparent:** Log-Ausgabe zeigt verdrängte PLAN-Entries
+
+**Nicht gewählt:**
+- ❌ Entry-basiertes Matching (zu komplex: Was ist "dieselbe Buchung"?)
+- ❌ PLAN-Daten löschen (würden für Vergleiche fehlen)
+- ❌ Beide zeigen + UI-Toggle (verwirrt User)
+
+### Konsequenzen
+
+**Positiv:**
+- Dashboard-Zahlen korrekt
+- Keine manuellen Workarounds mehr (PLAN-Daten löschen)
+- IST/PLAN-Vergleich weiterhin möglich (PLAN-Daten bleiben in DB)
+
+**Neutral:**
+- PLAN-Entries bleiben in DB (für Soll/Ist-Vergleich)
+- Log-Ausgabe informiert über ignorierte Entries
+
+**Performance:**
+- Einmalige Gruppierung nach periodIndex (O(n))
+- Vernachlässigbare Mehrkosten
 
 ---
 

@@ -134,14 +134,13 @@ async function importBankStatement(filePath: string, caseId: string) {
     const amountCents = euroToCents(tx.amount);
     const txDate = new Date(tx.date);
 
-    // Check for duplicates
+    // Check for duplicates (Triple-Match: bankAccountId + transactionDate + amountCents)
+    // NOTE: Description-Match entfernt, da Variationen zu False Negatives führen
     const existing = await prisma.ledgerEntry.findFirst({
       where: {
-        caseId,
         bankAccountId,
         transactionDate: txDate,
         amountCents,
-        description: tx.description,
       },
     });
 

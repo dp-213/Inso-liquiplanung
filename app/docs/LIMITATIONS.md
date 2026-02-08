@@ -48,22 +48,62 @@ Dieses Dokument listet bekannte Einschränkungen und bewusste Nicht-Implementier
 
 ---
 
+### Classification Engine filtert nach reviewStatus
+
+**Beschreibung:** `matchCounterpartyPatterns()` matched standardmäßig nur Entries mit `reviewStatus = 'UNREVIEWED'`. Bereits bestätigte Entries (`CONFIRMED`) werden übersprungen.
+
+**Begründung:** Verhindert ungewolltes Überschreiben manuell bestätigter Klassifikationen.
+
+**Workaround:** Explizite Entry-IDs übergeben, um Filter zu umgehen:
+```typescript
+const entryIds = entries.map(e => e.id);
+await matchCounterpartyPatterns(prisma, caseId, entryIds);
+```
+
+---
+
+### Privatpatienten-Rechnungen ohne einheitliches Format
+
+**Beschreibung:** ~60 Privatpatienten-Rechnungen haben sehr unterschiedliche Formate ("RE .70", "RN-NR 45", "Rechnung: 46349", "Todesbescheinigung 46333"). Ein einziges Pattern würde zu viele False Positives erzeugen.
+
+**Begründung:** Medizinische Abrechnungen folgen keinem Standard-Format (jede Praxis/Arzt hat eigenes System).
+
+**Workaround:**
+- Sammel-Counterparty "Privatpatient*innen" für häufigste Formate
+- Verbleibende Einträge manuell klassifizieren oder als "Sonstige Privateinnahmen" gruppieren
+
+---
+
+### Sammelüberweisungen ohne Einzelaufschlüsselung
+
+**Beschreibung:** 29 Sammelüberweisungen (179K EUR) haben keine Details zu Empfängern/Zwecken im Verwendungszweck.
+
+**Begründung:** Banken zeigen bei Sammelzahlungen nur Gesamtbetrag, keine Einzelpositionen.
+
+**Workaround:**
+- Counterparty "Sammelüberweisung (nicht zugeordnet)" erstellt
+- Details müssen von IV/Buchhalterin nachgeliefert werden (siehe case-context.json offeneDatenanforderungen)
+
+---
+
 ## Daten-Aggregation Einschränkungen
 
-### Kein IST-Vorrang bei parallelen IST/PLAN-Daten
+### Kein IST-Vorrang bei parallelen IST/PLAN-Daten (GELÖST)
 
-**Beschreibung:** Wenn für dieselbe Periode sowohl IST- als auch PLAN-Buchungen existieren, werden beide summiert. Dies führt zu Überdeckung/Doppelzählung.
+**Beschreibung:** Wenn für dieselbe Periode sowohl IST- als auch PLAN-Buchungen existierten, wurden beide summiert. Dies führte zu Überdeckung/Doppelzählung.
 
-**Begründung:** IST-Vorrang-Logik erfordert komplexe Gruppierung und Architektur-Entscheidungen:
-- Was definiert "dieselbe Buchung"? (periodIndex + categoryKey + bankAccountId?)
-- Wie wird IST-Vorrang transparent dokumentiert?
-- Performance-Impact bei großen Datenmengen?
+**Status:** ✅ GELÖST am 08.02.2026
 
-Aktuell zu komplex für Schnellfix → als Feature-Ticket dokumentiert (siehe TODO.md).
+**Lösung:** IST-Vorrang in `aggregateLedgerEntries()` implementiert:
+- Entries werden nach Periode gruppiert
+- Für Perioden mit IST-Daten werden PLAN-Entries ignoriert
+- Für Perioden ohne IST-Daten werden PLAN-Entries verwendet
+- Logging: `[IST-Vorrang] X PLAN-Einträge ignoriert`
 
-**Workaround:** Workflow soll sicherstellen, dass PLAN-Daten gelöscht/deaktiviert werden, wenn IST-Daten importiert werden.
-
-**Status:** TODO für v2.11.0 (siehe `/app/docs/TODO.md`)
+**Ergebnis (HVPlus Case):**
+- 21 PLAN-Einträge korrekt verdrängt (Dez 2025 + Jan 2026)
+- Net Cashflow korrigiert: 502.742 EUR (vorher: 874.129 EUR)
+- Differenz: -327K EUR Überdeckung eliminiert
 
 ---
 
@@ -288,35 +328,25 @@ Aktuell zu komplex für Schnellfix → als Feature-Ticket dokumentiert (siehe TO
 
 ## Bekannte Bugs
 
-### Prisma Client gibt locationId nicht zurück
+### Prisma Client gibt locationId nicht zurück (GELÖST)
 
-**Beschreibung:** Trotz korrektem Schema und Datenmigration liefert Prisma Client `locationId: null` für BankAccounts, obwohl die Datenbank korrekte Werte enthält.
+**Beschreibung:** Trotz korrektem Schema und Datenmigration lieferte Prisma Client `locationId: null` für BankAccounts, obwohl die Datenbank korrekte Werte enthielt.
 
-**Symptome:**
+**Status:** ✅ GELÖST am 08.02.2026
+
+**Lösung:** Workaround entfernt, API nutzt jetzt echte DB-Relation `acc.location` aus Prisma-Include.
 ```typescript
+// Vorher: Workaround mit Name-Matching
+const getLocationByAccountName = (accountName: string) => { ... }
+
+// Nachher: Echte DB-Relation
 const accounts = await prisma.bankAccount.findMany({
-  include: { location: true }
+  include: { location: { select: { id: true, name: true } } }
 });
-// accounts[0].locationId === null (aber DB zeigt loc-haevg-velbert)
+// accounts[0].location funktioniert korrekt
 ```
 
-**Begründung:** Wahrscheinlich Prisma Client Module-Caching-Problem. Mehrfache `prisma generate` und Cache-Clears hatten keine Wirkung.
-
-**Workaround:**
-```typescript
-// In /api/cases/[id]/bank-accounts/route.ts
-const getLocationByAccountName = (accountName: string) => {
-  if (accountName.toLowerCase().includes("velbert")) {
-    return { id: "loc-haevg-velbert", name: "Praxis Velbert" };
-  }
-  if (accountName.toLowerCase().includes("uckerath")) {
-    return { id: "loc-haevg-uckerath", name: "Praxis Uckerath" };
-  }
-  return null;
-};
-```
-
-**Zukünftig:** Bei nächstem Prisma-Major-Update erneut testen. Issue bei Prisma melden.
+**Root Cause:** Unbekannt. Vermutlich Prisma Client Cache-Problem, das sich nach mehreren `prisma generate` + Rebuilds von selbst behoben hat.
 
 ---
 

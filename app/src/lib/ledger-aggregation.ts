@@ -322,6 +322,55 @@ export async function aggregateLedgerEntries(
   // Debug-Logging
   console.log(`[Ledger Aggregation] Scope: ${scope}, All Entries: ${allEntries.length}, Filtered: ${entries.length}`);
 
+  // =========================================================================
+  // IST-VORRANG: Wenn für eine Periode IST-Daten existieren, PLAN ignorieren
+  // =========================================================================
+
+  // 1. Gruppiere Entries nach Periode + ValueType
+  const periodMap = new Map<number, { ist: typeof entries; plan: typeof entries }>();
+
+  for (const entry of entries) {
+    const periodIndex = getPeriodIndex(entry.transactionDate, planStartDate, periodType);
+
+    // Nur Einträge innerhalb des Planungszeitraums
+    if (periodIndex < 0 || periodIndex >= periodCount) continue;
+
+    if (!periodMap.has(periodIndex)) {
+      periodMap.set(periodIndex, { ist: [], plan: [] });
+    }
+
+    const periodEntries = periodMap.get(periodIndex)!;
+    if (entry.valueType === 'IST') {
+      periodEntries.ist.push(entry);
+    } else if (entry.valueType === 'PLAN') {
+      periodEntries.plan.push(entry);
+    }
+  }
+
+  // 2. Wende IST-Vorrang an: Für Perioden mit IST-Daten, ignoriere PLAN
+  const entriesWithIstPriority: typeof entries = [];
+  let planEntriesIgnored = 0;
+
+  for (let i = 0; i < periodCount; i++) {
+    const periodEntries = periodMap.get(i);
+
+    if (!periodEntries) continue; // Keine Entries für diese Periode
+
+    if (periodEntries.ist.length > 0) {
+      // IST-Daten vorhanden → Nur IST verwenden, PLAN ignorieren
+      entriesWithIstPriority.push(...periodEntries.ist);
+      planEntriesIgnored += periodEntries.plan.length;
+    } else {
+      // Keine IST-Daten → PLAN verwenden
+      entriesWithIstPriority.push(...periodEntries.plan);
+    }
+  }
+
+  console.log(`[IST-Vorrang] ${planEntriesIgnored} PLAN-Einträge ignoriert (IST-Daten vorhanden)`);
+
+  // Ab hier mit gefilterten Entries weiterarbeiten
+  const finalEntries = entriesWithIstPriority;
+
   // Initialisiere Perioden
   const periods: PeriodAggregation[] = [];
   const currentOpeningBalance = openingBalanceCents;
@@ -369,8 +418,8 @@ export async function aggregateLedgerEntries(
   let unklarCount = 0;
   let totalUnklarCents = BigInt(0);
 
-  // Verarbeite jeden Eintrag
-  for (const entry of entries) {
+  // Verarbeite jeden Eintrag (mit IST-Vorrang)
+  for (const entry of finalEntries) {
     const periodIndex = getPeriodIndex(entry.transactionDate, planStartDate, periodType);
 
     // Nur Einträge innerhalb des Planungszeitraums
@@ -529,7 +578,7 @@ export async function aggregateLedgerEntries(
   }
 
   const dataHash = calculateDataHash(
-    entries.map((e) => ({ id: e.id, amountCents: e.amountCents })),
+    finalEntries.map((e) => ({ id: e.id, amountCents: e.amountCents })),
     openingBalanceCents
   );
 

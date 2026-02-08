@@ -308,40 +308,59 @@ export default function CaseDashboardPage({
 
       {/* Breadcrumb and Controls */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex items-center text-sm text-[var(--muted)]">
-          <Link href="/admin/cases" className="hover:text-[var(--primary)]">
-            Fälle
-          </Link>
-          <svg
-            className="w-4 h-4 mx-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-          <Link href={`/admin/cases/${id}`} className="hover:text-[var(--primary)]">
-            {calculationData.caseInfo.debtorName}
-          </Link>
-          <svg
-            className="w-4 h-4 mx-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-          <span className="text-[var(--foreground)]">Dashboard</span>
+        <div className="flex items-center gap-4">
+          {/* Breadcrumb */}
+          <div className="flex items-center text-sm text-[var(--muted)]">
+            <Link href="/admin/cases" className="hover:text-[var(--primary)]">
+              Fälle
+            </Link>
+            <svg
+              className="w-4 h-4 mx-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+            <Link href={`/admin/cases/${id}`} className="hover:text-[var(--primary)]">
+              {calculationData.caseInfo.debtorName}
+            </Link>
+            <svg
+              className="w-4 h-4 mx-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9 5l7 7-7 7"
+              />
+            </svg>
+            <span className="text-[var(--foreground)]">Dashboard</span>
+          </div>
+
+          {/* Tab Switcher: Dashboard / Planung - PROMINENT oben links */}
+          <div className="flex items-center bg-blue-50 rounded-lg p-1 border border-blue-200">
+            <Link
+              href={`/admin/cases/${id}/dashboard`}
+              className="px-4 py-1.5 text-sm font-medium rounded-md transition-colors bg-white text-[var(--foreground)] shadow-sm"
+            >
+              📊 Dashboard
+            </Link>
+            <Link
+              href={`/admin/cases/${id}/planung`}
+              className="px-4 py-1.5 text-sm font-medium rounded-md transition-colors text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-white/50"
+            >
+              📋 Planung
+            </Link>
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

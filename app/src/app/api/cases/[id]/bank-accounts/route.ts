@@ -158,18 +158,6 @@ export async function GET(
       accountPeriods.set(account.id, periods);
     }
 
-    // WORKAROUND: Prisma gibt locationId nicht zurück, setze manuell basierend auf accountName
-    const getLocationByAccountName = (accountName: string) => {
-      if (accountName.toLowerCase().includes("velbert")) {
-        return { id: "loc-haevg-velbert", name: "Praxis Velbert" };
-      }
-      if (accountName.toLowerCase().includes("uckerath")) {
-        return { id: "loc-haevg-uckerath", name: "Praxis Uckerath" };
-      }
-      // HV PLUS eG und andere zentrale Konten
-      return null;
-    };
-
     // Response mit allen Details inkl. Perioden-Verläufe
     const result = accounts.map((acc) => {
       const balance = balanceData.balances.get(acc.id);
@@ -181,7 +169,7 @@ export async function GET(
         accountName: acc.accountName,
         iban: acc.iban,
         status: acc.status,
-        location: getLocationByAccountName(acc.accountName), // WORKAROUND
+        location: acc.location, // Verwendet echte DB-Relation
         openingBalanceCents: acc.openingBalanceCents.toString(),
         ledgerSumCents: balance?.ledgerSumCents.toString() ?? "0",
         currentBalanceCents:

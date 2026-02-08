@@ -87,18 +87,36 @@ export default function AdminDashboardPage() {
   return (
     <div className="space-y-6">
       {/* Breadcrumb */}
-      <div className="flex items-center text-sm text-[var(--muted)]">
-        <Link href="/admin/cases" className="hover:text-[var(--primary)]">Fälle</Link>
-        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <Link href={`/admin/cases/${caseId}`} className="hover:text-[var(--primary)]">
-          {data.case.debtorName}
-        </Link>
-        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <span className="text-[var(--foreground)]">Dashboard</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center text-sm text-[var(--muted)]">
+          <Link href="/admin/cases" className="hover:text-[var(--primary)]">Fälle</Link>
+          <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <Link href={`/admin/cases/${caseId}`} className="hover:text-[var(--primary)]">
+            {data.case.debtorName}
+          </Link>
+          <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+          <span className="text-[var(--foreground)]">Dashboard</span>
+        </div>
+
+        {/* Tab Switcher: Dashboard / Planung */}
+        <div className="flex items-center bg-blue-50 rounded-lg p-1 border-2 border-blue-300">
+          <Link
+            href={`/admin/cases/${caseId}/results`}
+            className="px-4 py-2 text-sm font-semibold rounded-md transition-colors bg-white text-[var(--foreground)] shadow-sm"
+          >
+            📊 Dashboard
+          </Link>
+          <Link
+            href={`/admin/cases/${caseId}/planung`}
+            className="px-4 py-2 text-sm font-semibold rounded-md transition-colors text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-white/50"
+          >
+            📋 Planung
+          </Link>
+        </div>
       </div>
 
       {/* Quick Actions */}
