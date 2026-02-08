@@ -4,6 +4,152 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-026: Service-Period-Extraktion über Datenbereinigung
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Bei der Klassifizierungsprüfung von 292 HZV-Entries wurde festgestellt, dass **ALLE** `servicePeriodStart` = NULL hatten. Dadurch konnte die Split-Engine die Alt/Neu-Masse-Regel nicht korrekt anwenden:
+
+- Alle 292 HZV-Entries hatten pauschal `estateRatio = 0.0968` (3/31 Neu)
+- Das ist nur für Oktober-HZV korrekt, aber NICHT für Q3-Nachzahlungen oder Q4-Abschläge
+- Q3-Nachzahlungen (Juli/Aug/Sep) müssten **100% ALTMASSE** sein
+- Die Service-Period stand IN der Beschreibung (`Q3/25`, `Q4/25`), aber nicht in den dedizierten Feldern
+
+### Entscheidung
+
+**Option 1: Service-Period aus Beschreibung extrahieren und Felder befüllen**
+
+Statt die Split-Engine anzupassen, bereinigen wir die Daten:
+1. Pattern-Matching für `Q1/YY`, `Q2/YY`, `Q3/YY`, `Q4/YY` in Beschreibung
+2. `servicePeriodStart` + `servicePeriodEnd` setzen
+3. Split-Engine NEU durchlaufen lassen mit korrekten Service-Periods
+4. Vollständiger Audit-Trail via `allocationSource` + `allocationNote`
+
+**Abgelehnte Alternativen:**
+- **Option 2:** Split-Engine anpassen, um aus Beschreibung zu lesen → Verletzt Immutability, technische Schuld
+- **Option 3:** Service-Period manuell setzen → Nicht skalierbar, fehleranfällig
+
+### Begründung
+
+**Warum Option 1?**
+1. **Data Quality First:** Datenbank-Felder sollten strukturiert und vollständig sein
+2. **Immutability der Split-Engine:** Keine Workarounds in Berechnungslogik
+3. **Revisionsfreundlich:** Audit-Trail dokumentiert Herkunft jeder Zahl
+4. **One-Time-Fix:** Behebt sofort alle 292 Entries, zukünftige Importe korrigieren wir über Pipeline
+
+**Warum nicht Option 2?**
+- Macht Split-Engine komplex (Fallback-Logik: erst Feld, dann Beschreibung parsen)
+- Verletzt "Single Source of Truth" (Felder vs. Beschreibung)
+- Technische Schuld, die uns dauerhaft verfolgt
+
+### Konsequenzen
+
+**Positiv:**
+- ✅ 292 HZV-Entries mit korrekten Service-Periods
+- ✅ Q3-Nachzahlungen → 100% ALTMASSE (korrekt!)
+- ✅ Q4-Abschläge → 1/3 Alt, 2/3 Neu
+- ✅ Split-Engine bleibt immutable und sauber
+- ✅ Audit-Trail vollständig nachvollziehbar
+
+**Negativ:**
+- ⚠️ Import-Pipeline muss verbessert werden (zukünftige HZV-Importe)
+- ⚠️ 58 Januar-Gutschriften basieren auf Annahme (siehe ADR-027)
+
+### Implementierung
+
+**Script:** `extract-service-periods-hzv.ts`
+```typescript
+// Pattern: Q3/25 → 2025-07-01 bis 2025-09-30
+// Pattern: Q4/25 → 2025-10-01 bis 2025-12-31
+// SONDERFALL: Januar 2026 HZV ABS ohne Quarter → Q4/25 (Zahlungslogik)
+```
+
+**Ergebnis:**
+- 234 Entries via Beschreibung extrahiert
+- 58 Entries via Zahlungslogik abgeleitet (siehe ADR-027)
+- 0 Entries ohne Service-Period
+
+---
+
+## ADR-027: Januar-HZV-Klassifikation als Q4/2025-Abschläge
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert (mit Vorbehalt)
+
+### Kontext
+
+Bei der Service-Period-Extraktion wurden 58 HZV-Gutschriften im Januar 2026 identifiziert, die **KEINE Quartalsangabe** in der Beschreibung haben:
+
+**Beispiel:**
+```
+GUTSCHRIFT ÜBERWEISUNG HAEVGID 132025 LANR 1445587 AOK NO HZV ABS
+```
+
+**Problem:** Keine explizite Quartalsangabe (`Q1/26`, `Q4/25`, etc.)
+
+**Summe:** 63.112,50 EUR (signifikant!)
+
+### Entscheidung
+
+**Januar-Gutschriften werden als Q4/2025-Abschläge klassifiziert** (Fortsetzung der November-Abschläge)
+
+**Service-Period:**
+- `servicePeriodStart`: 2025-10-01
+- `servicePeriodEnd`: 2025-12-31
+- `allocationSource`: `SERVICE_PERIOD_EXTRACTION_PAYMENT_LOGIC`
+- `allocationNote`: "Januar 2026 HZV ABS ohne Quartalsangabe → Q4/2025 abgeleitet aus Zahlungslogik-Analyse"
+
+### Begründung
+
+**Systematische Zahlungslogik-Analyse ergab:**
+
+| Zahlungsmonat | Leistungsquartal | Typ | Anzahl |
+|---------------|------------------|-----|--------|
+| Oktober 2025 | Q3/2025 | REST (Nachzahlung) | Alle KKs |
+| November 2025 | Q4/2025 | **ABS (Abschlag)** | **57 Entries** |
+| Januar 2026 | OHNE Angabe | **ABS (Abschlag)** | **58 Entries** |
+
+**Beweise für Q4/2025:**
+1. **Anzahl identisch:** 57 vs. 58 Entries (fast gleich!)
+2. **Alle markiert als "HZV ABS"** (Abschlag, nicht Nachzahlung)
+3. **Krankenkassen identisch:** AOK NO, TK, EK NO, BKK NO, etc.
+4. **Zeitliche Kontinuität:** November → Januar = laufende Q4-Abschläge
+5. **Kein Q1-Indikator:** Für Q1/2026 würde man `Q1/26` in Beschreibung erwarten
+
+**Abgelehnte Alternative Hypothese:**
+Januar-Gutschriften sind Q1/2026-Abschläge → UNWAHRSCHEINLICH, da:
+- Q1/2026 wäre ungewöhnlich früh (14.01. für Q1-Leistungen)
+- Alle bisherigen Abschläge hatten explizite Quartalsangabe
+- Würde etabliertes Muster brechen
+
+### Konsequenzen
+
+**Positiv:**
+- ✅ 100% Service-Period-Coverage (292/292 HZV-Entries)
+- ✅ Konsistente Alt/Neu-Aufteilung: Q4/2025 = 1/3 Alt, 2/3 Neu
+- ✅ Systematisch aus vorhandenen Daten abgeleitet (nicht geraten)
+
+**Negativ:**
+- ⚠️ **ANNAHME-BASIERT** – Erfordert Verifikation mit Hannes Rieger
+- ⚠️ Falls falsch: Service-Period manuell korrigieren + Split-Engine neu laufen lassen
+
+### Verifikation erforderlich
+
+**MIT HANNES KLÄREN (09.02.2026):**
+- [ ] Sind Januar-Gutschriften tatsächlich Q4/2025-Abschläge?
+- [ ] Oder doch Q1/2026-Abschläge?
+- [ ] Gibt es eine Systematik, warum die Quartalsangabe fehlt?
+
+**FALLS FALSCH:** Korrekturs cript vorbereitet, Split-Engine erneut ausführen
+
+**Quelle:** Zahlungslogik-Analyse (`analyze-hzv-payment-logic.ts`)
+**Betroffene Entries:** 58 von 292 HZV-Einnahmen (19.7%)
+
+---
+
 ## ADR-025: Turso-Sync-Strategie - PLAN behalten, IST ersetzen
 
 **Datum:** 08. Februar 2026

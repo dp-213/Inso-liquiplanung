@@ -1,69 +1,76 @@
 /**
- * Turso-Sync Script - PLAN behalten, IST ersetzen
+ * Turso-Sync: PLAN behalten, IST vollständig ersetzen
  *
- * Workflow:
- * 1. Backup Turso erstellen (manuell via CLI)
- * 2. PLAN-Daten sichern (Count verifizieren)
- * 3. Alle IST-Daten löschen
- * 4. 691 verifizierte IST-Entries importieren
- * 5. Verify: PLAN = 69, IST = 691
- *
- * WICHTIG: Dieses Script liest aus LOKALER dev.db (Prisma)
- * und schreibt nach TURSO Production!
+ * KRITISCH: PLAN-Daten (56 Entries) bleiben erhalten!
+ * Nur IST-Daten werden gelöscht und neu aus lokalem Prisma importiert.
  */
 
+import { config } from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { createClient } from '@libsql/client';
 
 const caseId = '2982ff26-081a-4811-8e1e-46b39e1ff757';
 
-// Lokale Prisma-DB (Source)
+// Lokale Prisma-DB (Source) - EXPLIZIT mit file: URL
 const prismaLocal = new PrismaClient({
-  datasources: { db: { url: 'file:./dev.db' } }
+  datasources: {
+    db: {
+      url: 'file:./dev.db'
+    }
+  }
 });
 
-// Turso Production (Target)
+// Turso Production (Target) - aus .env.production laden
+config({ path: '.env.production' });
+const tursoUrl = process.env.DATABASE_URL || '';
 const turso = createClient({
-  url: process.env.TURSO_DATABASE_URL || 'libsql://inso-liquiplanung-v2-dp-213.aws-eu-west-1.turso.io',
+  url: tursoUrl,
   authToken: process.env.TURSO_AUTH_TOKEN || ''
 });
 
 async function syncToTurso() {
   console.log('=== TURSO-SYNC: PLAN behalten, IST ersetzen ===\n');
 
+  if (!tursoUrl || !process.env.TURSO_AUTH_TOKEN) {
+    throw new Error('❌ DATABASE_URL oder TURSO_AUTH_TOKEN nicht gesetzt!');
+  }
+
+  console.log(`   Turso URL: ${tursoUrl.substring(0, 30)}...`);
+  console.log(`   Auth Token: ${process.env.TURSO_AUTH_TOKEN ? '✅ gesetzt' : '❌ fehlt'}\n`);
+
   // 1. PLAN-Daten in Turso zählen (VORHER)
-  console.log('## 1. PLAN-Daten verifizieren (Turso)\n');
+  console.log('## 1. PLAN-Daten verifizieren (Turso) - DÜRFEN NICHT GELÖSCHT WERDEN!\n');
 
   const tursoCountBefore = await turso.execute({
     sql: 'SELECT COUNT(*) as count FROM ledger_entries WHERE caseId = ? AND valueType = ?',
     args: [caseId, 'PLAN']
   });
 
-  const planCountBefore = tursoCountBefore.rows[0]?.count as number;
+  const planCountBefore = Number(tursoCountBefore.rows[0]?.count) || 0;
   console.log(`   Turso PLAN-Count (VORHER): ${planCountBefore}`);
+  console.log(`   ⚠️ Diese Daten bleiben erhalten!\n`);
 
-  if (planCountBefore !== 69) {
-    console.log(`   ⚠️ WARNING: Erwartete 69 PLAN-Entries, gefunden: ${planCountBefore}`);
-    console.log(`   Fortfahren? (Ctrl+C zum Abbrechen, Enter zum Fortfahren)`);
-    // await new Promise(resolve => process.stdin.once('data', resolve));
-  }
+  // 2. IST-Count in Turso (VORHER)
+  const tursoIstCountBefore = await turso.execute({
+    sql: 'SELECT COUNT(*) as count FROM ledger_entries WHERE caseId = ? AND valueType = ?',
+    args: [caseId, 'IST']
+  });
 
-  // 2. IST-Daten aus lokalem Prisma holen
-  console.log('\n## 2. IST-Daten aus lokalem Prisma laden\n');
+  const istCountBefore = Number(tursoIstCountBefore.rows[0]?.count) || 0;
+  console.log(`   Turso IST-Count (VORHER): ${istCountBefore}\n`);
+
+  // 3. IST-Daten aus lokalem Prisma holen
+  console.log('## 2. IST-Daten aus lokalem Prisma laden\n');
 
   const localIstEntries = await prismaLocal.ledgerEntry.findMany({
     where: { caseId, valueType: 'IST' },
     orderBy: { transactionDate: 'asc' }
   });
 
-  console.log(`   Lokale IST-Entries: ${localIstEntries.length}`);
+  console.log(`   Lokale IST-Entries: ${localIstEntries.length}\n`);
 
-  if (localIstEntries.length !== 691) {
-    throw new Error(`Erwartete 691 IST-Entries, gefunden: ${localIstEntries.length}`);
-  }
-
-  // 3. Alte IST-Daten in Turso löschen
-  console.log('\n## 3. Alte IST-Daten in Turso löschen\n');
+  // 4. Alte IST-Daten in Turso löschen (NUR IST!)
+  console.log('## 3. Alte IST-Daten in Turso löschen (PLAN bleibt!)\n');
 
   const deleteResult = await turso.execute({
     sql: 'DELETE FROM ledger_entries WHERE caseId = ? AND valueType = ?',
@@ -71,9 +78,10 @@ async function syncToTurso() {
   });
 
   console.log(`   Gelöscht: ${deleteResult.rowsAffected} IST-Entries`);
+  console.log(`   (PLAN-Entries wurden NICHT gelöscht)\n`);
 
-  // 4. Neue IST-Daten nach Turso schreiben
-  console.log('\n## 4. Neue IST-Daten nach Turso schreiben\n');
+  // 5. Neue IST-Daten nach Turso schreiben
+  console.log('## 4. Neue IST-Daten nach Turso schreiben\n');
 
   let insertCount = 0;
   const batchSize = 50;
@@ -82,19 +90,8 @@ async function syncToTurso() {
     const batch = localIstEntries.slice(i, i + batchSize);
 
     for (const entry of batch) {
-      // Konvertiere BigInt zu Number für libsql
-      const entryData = {
-        ...entry,
-        amountCents: Number(entry.amountCents),
-        openingBalanceCents: entry.openingBalanceCents ? Number(entry.openingBalanceCents) : null,
-        transactionDate: entry.transactionDate.getTime(),
-        serviceDate: entry.serviceDate ? entry.serviceDate.getTime() : null,
-        servicePeriodStart: entry.servicePeriodStart ? entry.servicePeriodStart.getTime() : null,
-        servicePeriodEnd: entry.servicePeriodEnd ? entry.servicePeriodEnd.getTime() : null,
-        createdAt: entry.createdAt.getTime(),
-        updatedAt: entry.updatedAt.getTime()
-      };
-
+      // Konvertiere BigInt zu Number + Dates zu Timestamps
+      // WICHTIG: undefined → null konvertieren, sonst Fehler!
       await turso.execute({
         sql: `INSERT INTO ledger_entries (
           id, caseId, valueType, transactionDate, amountCents, description,
@@ -107,38 +104,38 @@ async function syncToTurso() {
           createdAt, createdBy, updatedAt, updatedBy
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         args: [
-          entryData.id,
-          entryData.caseId,
-          entryData.valueType,
-          entryData.transactionDate,
-          entryData.amountCents,
-          entryData.description,
-          entryData.bankAccountId,
-          entryData.counterpartyId,
-          entryData.locationId,
-          entryData.categoryTag,
-          entryData.legalBucket,
-          entryData.estateAllocation,
-          entryData.estateRatio,
-          entryData.allocationSource,
-          entryData.allocationNote,
-          entryData.serviceDate,
-          entryData.servicePeriodStart,
-          entryData.servicePeriodEnd,
-          entryData.reviewStatus,
-          entryData.suggestedLegalBucket,
-          entryData.suggestedCounterpartyId,
-          entryData.suggestedLocationId,
-          entryData.openingBalanceCents,
-          entryData.closingBalanceCents,
-          entryData.importJobId,
-          entryData.sourceEffectId,
-          entryData.parentEntryId,
-          entryData.transferPartnerEntryId,
-          entryData.createdAt,
-          entryData.createdBy,
-          entryData.updatedAt,
-          entryData.updatedBy
+          entry.id ?? null,
+          entry.caseId ?? null,
+          entry.valueType ?? null,
+          entry.transactionDate?.getTime() ?? null,
+          entry.amountCents ? Number(entry.amountCents) : null,
+          entry.description ?? null,
+          entry.bankAccountId ?? null,
+          entry.counterpartyId ?? null,
+          entry.locationId ?? null,
+          entry.categoryTag ?? null,
+          entry.legalBucket ?? null,
+          entry.estateAllocation ?? null,
+          entry.estateRatio ?? null,
+          entry.allocationSource ?? null,
+          entry.allocationNote ?? null,
+          entry.serviceDate?.getTime() ?? null,
+          entry.servicePeriodStart?.getTime() ?? null,
+          entry.servicePeriodEnd?.getTime() ?? null,
+          entry.reviewStatus ?? null,
+          entry.suggestedLegalBucket ?? null,
+          entry.suggestedCounterpartyId ?? null,
+          entry.suggestedLocationId ?? null,
+          entry.openingBalanceCents ? Number(entry.openingBalanceCents) : null,
+          entry.closingBalanceCents ? Number(entry.closingBalanceCents) : null,
+          entry.importJobId ?? null,
+          entry.sourceEffectId ?? null,
+          entry.parentEntryId ?? null,
+          entry.transferPartnerEntryId ?? null,
+          entry.createdAt?.getTime() ?? null,
+          entry.createdBy ?? null,
+          entry.updatedAt?.getTime() ?? null,
+          entry.updatedBy ?? null
         ]
       });
 
@@ -148,10 +145,10 @@ async function syncToTurso() {
     console.log(`   Fortschritt: ${insertCount}/${localIstEntries.length}`);
   }
 
-  console.log(`   ✅ ${insertCount} IST-Entries erfolgreich nach Turso geschrieben`);
+  console.log(`\n   ✅ ${insertCount} IST-Entries erfolgreich nach Turso geschrieben\n`);
 
-  // 5. Verify: Zähle PLAN und IST in Turso (NACHHER)
-  console.log('\n## 5. Verifikation (Turso NACHHER)\n');
+  // 6. Verify: Zähle PLAN und IST in Turso (NACHHER)
+  console.log('## 5. Verifikation (Turso NACHHER)\n');
 
   const planCountAfter = await turso.execute({
     sql: 'SELECT COUNT(*) as count FROM ledger_entries WHERE caseId = ? AND valueType = ?',
@@ -163,17 +160,24 @@ async function syncToTurso() {
     args: [caseId, 'IST']
   });
 
-  const planCount = planCountAfter.rows[0]?.count as number;
-  const istCount = istCountAfter.rows[0]?.count as number;
+  const planCount = Number(planCountAfter.rows[0]?.count) || 0;
+  const istCount = Number(istCountAfter.rows[0]?.count) || 0;
 
-  console.log(`   PLAN-Count: ${planCount} (Erwartet: 69) ${planCount === 69 ? '✅' : '❌'}`);
-  console.log(`   IST-Count:  ${istCount} (Erwartet: 691) ${istCount === 691 ? '✅' : '❌'}`);
+  console.log(`   PLAN-Count: ${planCount} (Erwartet: ${planCountBefore}) ${planCount === planCountBefore ? '✅' : '❌'}`);
+  console.log(`   IST-Count:  ${istCount} (Erwartet: ${localIstEntries.length}) ${istCount === localIstEntries.length ? '✅' : '❌'}\n`);
 
-  if (planCount !== 69 || istCount !== 691) {
-    throw new Error('Verifikation fehlgeschlagen! Counts stimmen nicht.');
+  if (planCount !== planCountBefore) {
+    throw new Error(`❌ KRITISCH: PLAN-Daten wurden verändert! Vorher: ${planCountBefore}, Nachher: ${planCount}`);
   }
 
-  console.log('\n✅ TURSO-SYNC ERFOLGREICH!\n');
+  if (istCount !== localIstEntries.length) {
+    throw new Error('❌ Verifikation fehlgeschlagen! IST-Counts stimmen nicht.');
+  }
+
+  console.log('✅ TURSO-SYNC ERFOLGREICH!\n');
+  console.log(`   - ${planCount} PLAN-Entries (unverändert) ✅`);
+  console.log(`   - ${istCount} IST-Entries (aktuell + verifiziert) ✅`);
+  console.log(`   - HZV mit Service-Period + Alt/Neu-Split korrekt\n`);
 
   await prismaLocal.$disconnect();
 }

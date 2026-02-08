@@ -4,6 +4,55 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.15.0 – HZV Service-Period-Extraktion & Alt/Neu-Regel
+
+**Datum:** 08. Februar 2026
+
+### Neue Funktionen
+
+- **HZV Service-Period-Extraktion:** Automatische Extraktion von Leistungszeiträumen aus HZV-Buchungen
+  - 292 HZV-Entries mit `servicePeriodStart` + `servicePeriodEnd` versehen
+  - Pattern-Matching für Q3/25, Q4/25 aus Beschreibung (234 Entries)
+  - Zahlungslogik-basierte Ableitung für Januar 2026 ohne Quartalsangabe (58 Entries → Q4/2025)
+  - Vollständige Audit-Trail-Dokumentation via `allocationSource` + `allocationNote`
+
+### Änderungen
+
+- **Alt/Neu-Masse-Regel vereinheitlicht:** KV + HZV beide 1/3-2/3 für Q4/2025
+  - **VORHER:** KV = 1/3-2/3, HZV = 28/31-3/31 (tagesgenau)
+  - **JETZT:** Beide = 1/3-2/3 (pauschale Quartalregel)
+  - ⚠️ **Temporäre Annahme** – Verifikation mit Hannes Rieger ausstehend (09.02.2026)
+
+- **Januar-HZV-Klassifikation:** 58 Gutschriften als Q4/2025-Abschläge klassifiziert
+  - Begründung: Identisches Zahlungsmuster wie November Q4/25 ABS (57 Entries)
+  - Summe: 63.112,50 EUR
+  - ⚠️ **Annahme-basiert** – Erfordert IV-Bestätigung
+
+### Bugfixes
+
+- **LANR-Location-Bug behoben:** 123 Entries korrigiert
+  - van Suntum (LANR 3892462): 36 Entries → Velbert ✅
+  - Beyer (LANR 8836735): 40 Entries → Velbert ✅
+  - Kamler (LANR 7729639): 2 Entries → Velbert ✅
+  - Rösing (LANR 8898288): 45 Entries → Eitorf ✅
+
+### Dokumentation
+
+- **IV-Frageliste erweitert:** 2 neue Einträge
+  - Frage 10: Alt/Neu-Regel KV vs. HZV klären (KRITISCH)
+  - Januar-HZV-Annahme dokumentiert (HOCH, wartet auf Feedback)
+
+- **Script:** `extract-service-periods-hzv.ts` für automatische Service-Period-Extraktion
+- **Analyse-Script:** `analyze-hzv-payment-logic.ts` für Zahlungslogik-Verifikation
+
+### Verifikation erforderlich
+
+⚠️ **Mit Hannes Rieger klären (09.02.2026):**
+1. Gilt 1/3-2/3-Regel für KV UND HZV, oder nur für KV?
+2. Sind Januar-Gutschriften Q4/2025-Abschläge oder Q1/2026-Abschläge?
+
+---
+
 ## Version 2.14.2 – Turso-Sync & Datenbank-Verifikation
 
 **Datum:** 08. Februar 2026
@@ -53,14 +102,6 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 - Alte/gemischte Daten werden entfernt
 
 **Dokumentiert in:** ADR-025 (DECISIONS.md)
-
----
-
-### 🚨 KRITISCHER BUG bestätigt: LANR → Location Mapping (unverändert)
-
-**Status:** Weiterhin aktiv (aus v2.14.1)
-- 4 von 8 Ärzten falsch zugeordnet
-- Muss vor Turso-Sync korrigiert werden
 
 ---
 

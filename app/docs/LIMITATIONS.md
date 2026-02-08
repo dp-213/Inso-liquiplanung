@@ -38,6 +38,24 @@ Dieses Dokument listet bekannte Einschränkungen und bewusste Nicht-Implementier
 
 ## Funktionale Einschränkungen
 
+### Januar-HZV-Klassifikation basiert auf Annahme
+
+**Beschreibung:** 58 HZV-Gutschriften im Januar 2026 ohne Quartalsangabe wurden als Q4/2025-Abschläge klassifiziert.
+
+**Begründung:** Zahlungslogik-Analyse deutet auf Fortsetzung der November Q4/25-Abschläge hin (identisches Muster: 57 vs. 58 Entries, gleiche Krankenkassen, alle "HZV ABS").
+
+**Einschränkung:** Diese Klassifikation ist **annahme-basiert** und erfordert Verifikation mit Insolvenzverwalter.
+
+**Workaround:** Falls Annahme falsch, kann Service-Period korrigiert und Split-Engine neu ausgeführt werden.
+
+**Status:** Verifikation mit Hannes Rieger ausstehend (09.02.2026)
+
+**Betroffene Daten:** 58 von 292 HZV-Entries (19.7%), Summe 63.112,50 EUR
+
+**Dokumentiert in:** ADR-027 (DECISIONS.md), IV-Notiz auf Admin-Seite
+
+---
+
 ### Keine Währungsumrechnung
 
 **Beschreibung:** Alle Beträge sind in EUR. Keine Unterstützung für andere Währungen.
