@@ -51,6 +51,7 @@ model Case {
   ledgerEntries        LedgerEntry[]        // Transaction-level cash truth
   classificationRules  ClassificationRule[] // Rule Engine für Klassifikations-Vorschläge
   bankAgreements       BankAgreement[]      // Vereinbarungen mit Banken (Globalzession, etc.)
+  ivNotes              IVNote[]             // IV-Kommunikation (Notizen an Insolvenzverwalter)
 
   @@index([ownerId])
   @@map("cases")
@@ -914,6 +915,28 @@ model AggregationCache {
 
   @@index([caseId])
   @@map("aggregation_cache")
+}
+
+// =============================================================================
+// IV NOTES - Kommunikation mit Insolvenzverwalter
+// =============================================================================
+
+// IVNote - Notizen/Aufgaben für Kommunikation mit IV
+model IVNote {
+  id          String   @id @default(uuid())
+  caseId      String
+  content     String
+  status      String   @default("OFFEN")      // OFFEN, WARTET, ERLEDIGT
+  priority    String   @default("MITTEL")     // NIEDRIG, MITTEL, HOCH, KRITISCH
+  author      String   @default("Sonja Prinz") // Hardcoded - Sonja ist Haupt-Interface zu IV
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@index([caseId, status])
+  @@map("iv_notes")
 }
 
 // =============================================================================

@@ -2,16 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getSession } from "@/lib/auth";
 
-interface IVNote {
-  id: string;
-  content: string;
-  status: "OFFEN" | "WARTET" | "ERLEDIGT";
-  priority: "NIEDRIG" | "MITTEL" | "HOCH" | "KRITISCH";
-  createdAt: string;
-  updatedAt: string;
-  author: string;
-}
-
 /**
  * GET /api/cases/[id]/iv-notes
  * Lade alle IV-Notizen für einen Fall
@@ -28,7 +18,7 @@ export async function GET(
 
     const { id: caseId } = await params;
 
-    // Lade Case um zu prüfen ob es existiert
+    // Prüfe ob Case existiert
     const caseData = await prisma.case.findUnique({
       where: { id: caseId },
       select: { id: true },
@@ -38,28 +28,23 @@ export async function GET(
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
 
-    // Lade Notizen aus separater Tabelle (oder aus File-Storage)
-    // WORKAROUND: Nutze File-System da kein Schema vorhanden
-    const fs = await import("fs/promises");
-    const path = await import("path");
-    const notesDir = path.join(process.cwd(), ".data", "iv-notes");
-    const notesFile = path.join(notesDir, `${caseId}.json`);
+    // Lade Notizen aus Datenbank
+    const notes = await prisma.iVNote.findMany({
+      where: { caseId },
+      orderBy: { createdAt: "desc" },
+    });
 
-    let notes: IVNote[] = [];
-
-    try {
-      await fs.mkdir(notesDir, { recursive: true });
-      const content = await fs.readFile(notesFile, "utf-8");
-      notes = JSON.parse(content);
-    } catch (err) {
-      // Datei existiert noch nicht - leeres Array
-      notes = [];
-    }
-
-    // Sortiere nach Erstellungsdatum (neueste zuerst)
-    notes.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    return NextResponse.json({ notes });
+    return NextResponse.json({
+      notes: notes.map(n => ({
+        id: n.id,
+        content: n.content,
+        status: n.status,
+        priority: n.priority,
+        author: n.author,
+        createdAt: n.createdAt.toISOString(),
+        updatedAt: n.updatedAt.toISOString(),
+      }))
+    });
   } catch (error: any) {
     console.error("Error loading IV notes:", error);
     return NextResponse.json(
@@ -92,37 +77,28 @@ export async function POST(
       return NextResponse.json({ error: "Inhalt erforderlich" }, { status: 400 });
     }
 
-    // Erstelle neue Notiz
-    const newNote: IVNote = {
-      id: `note-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      content: content.trim(),
-      priority: priority || "MITTEL",
-      status: status || "OFFEN",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      author: "Sonja Prinz", // Hardcoded da Sonja einziges Interface zu IV
-    };
+    // Erstelle neue Notiz in DB
+    const newNote = await prisma.iVNote.create({
+      data: {
+        caseId,
+        content: content.trim(),
+        priority: priority || "MITTEL",
+        status: status || "OFFEN",
+        author: "Sonja Prinz", // Hardcoded - Sonja ist Interface zu IV
+      },
+    });
 
-    // Speichere in File
-    const fs = await import("fs/promises");
-    const path = await import("path");
-    const notesDir = path.join(process.cwd(), ".data", "iv-notes");
-    const notesFile = path.join(notesDir, `${caseId}.json`);
-
-    await fs.mkdir(notesDir, { recursive: true });
-
-    let notes: IVNote[] = [];
-    try {
-      const content = await fs.readFile(notesFile, "utf-8");
-      notes = JSON.parse(content);
-    } catch {
-      notes = [];
-    }
-
-    notes.push(newNote);
-    await fs.writeFile(notesFile, JSON.stringify(notes, null, 2), "utf-8");
-
-    return NextResponse.json({ note: newNote });
+    return NextResponse.json({
+      note: {
+        id: newNote.id,
+        content: newNote.content,
+        status: newNote.status,
+        priority: newNote.priority,
+        author: newNote.author,
+        createdAt: newNote.createdAt.toISOString(),
+        updatedAt: newNote.updatedAt.toISOString(),
+      }
+    });
   } catch (error: any) {
     console.error("Error creating IV note:", error);
     return NextResponse.json(
@@ -154,32 +130,28 @@ export async function PATCH(
       return NextResponse.json({ error: "noteId und status erforderlich" }, { status: 400 });
     }
 
-    // Lade Notizen
-    const fs = await import("fs/promises");
-    const path = await import("path");
-    const notesDir = path.join(process.cwd(), ".data", "iv-notes");
-    const notesFile = path.join(notesDir, `${caseId}.json`);
+    // Update Notiz
+    const updatedNote = await prisma.iVNote.update({
+      where: {
+        id: noteId,
+        caseId, // Sicherheit: Nur Notizen für diesen Case
+      },
+      data: {
+        status,
+      },
+    });
 
-    let notes: IVNote[] = [];
-    try {
-      const content = await fs.readFile(notesFile, "utf-8");
-      notes = JSON.parse(content);
-    } catch {
-      return NextResponse.json({ error: "Notizen nicht gefunden" }, { status: 404 });
-    }
-
-    // Finde und update Notiz
-    const noteIndex = notes.findIndex(n => n.id === noteId);
-    if (noteIndex === -1) {
-      return NextResponse.json({ error: "Notiz nicht gefunden" }, { status: 404 });
-    }
-
-    notes[noteIndex].status = status;
-    notes[noteIndex].updatedAt = new Date().toISOString();
-
-    await fs.writeFile(notesFile, JSON.stringify(notes, null, 2), "utf-8");
-
-    return NextResponse.json({ note: notes[noteIndex] });
+    return NextResponse.json({
+      note: {
+        id: updatedNote.id,
+        content: updatedNote.content,
+        status: updatedNote.status,
+        priority: updatedNote.priority,
+        author: updatedNote.author,
+        createdAt: updatedNote.createdAt.toISOString(),
+        updatedAt: updatedNote.updatedAt.toISOString(),
+      }
+    });
   } catch (error: any) {
     console.error("Error updating IV note:", error);
     return NextResponse.json(
@@ -211,28 +183,13 @@ export async function DELETE(
       return NextResponse.json({ error: "noteId erforderlich" }, { status: 400 });
     }
 
-    // Lade Notizen
-    const fs = await import("fs/promises");
-    const path = await import("path");
-    const notesDir = path.join(process.cwd(), ".data", "iv-notes");
-    const notesFile = path.join(notesDir, `${caseId}.json`);
-
-    let notes: IVNote[] = [];
-    try {
-      const content = await fs.readFile(notesFile, "utf-8");
-      notes = JSON.parse(content);
-    } catch {
-      return NextResponse.json({ error: "Notizen nicht gefunden" }, { status: 404 });
-    }
-
-    // Entferne Notiz
-    const filteredNotes = notes.filter(n => n.id !== noteId);
-
-    if (filteredNotes.length === notes.length) {
-      return NextResponse.json({ error: "Notiz nicht gefunden" }, { status: 404 });
-    }
-
-    await fs.writeFile(notesFile, JSON.stringify(filteredNotes, null, 2), "utf-8");
+    // Lösche Notiz (mit Sicherheits-Check auf caseId)
+    await prisma.iVNote.delete({
+      where: {
+        id: noteId,
+        caseId, // Sicherheit: Nur Notizen für diesen Case
+      },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
