@@ -1027,6 +1027,101 @@ Nach Analyse der bestehenden Aggregationsfunktionen:
 
 ---
 
+---
+
+## Version 2.9.0 – Production Deployment & Database Migration
+
+**Datum:** 07. Februar 2026
+
+### Neue Funktionen
+
+#### Location-Scope-Toggle im Dashboard
+- **Globaler Scope-State:** Dashboard-weiter Toggle für Standort-Sichten
+- **Drei Scopes:** Gesamt / Velbert / Uckerath+Eitorf
+- **API-Integration:** Dashboard-API (`/api/cases/[id]/dashboard`) akzeptiert `scope` Query-Parameter
+- **Filter vor Aggregation:** Scope-Filter wird VOR der Liquiditätsberechnung angewandt (echte Standort-Sicht)
+- **Scope-Hints:** UI zeigt Hinweis-Banner bei Standort-Scopes (z.B. "Zentrale Verfahrenskosten ausgeschlossen")
+
+#### steeringTag in Ledger-API
+- **Neues Response-Feld:** `steeringTag` in allen Ledger-API-Endpunkten exponiert
+- **Verwendung:** Freies Tag-Feld für Custom-Markierungen (z.B. `INTERNE_UMBUCHUNG`, `TOP_PAYER`)
+- **Filter-Option:** Einträge mit bestimmten steeringTags können ausgeblendet werden (z.B. Umbuchungen)
+
+### Kritische Bugfixes
+
+#### Turso Production Database Migration
+- **Problem:** Schema-Inkompatibilität zwischen Prisma Client (BIGINT/DATETIME) und Turso-DB (INTEGER/TEXT)
+- **Symptom:** Alle API-Calls lieferten 500-Fehler mit "Invalid URL" oder "no such column"
+- **Lösung:**
+  - Neue Turso-DB `inso-liquiplanung-v2` erstellt mit korrektem Schema
+  - Vollständige Datenmigration: 1.317 Ledger-Einträge, 5.402 Datensätze gesamt
+  - Vercel Environment Variables aktualisiert (DATABASE_URL, TURSO_AUTH_TOKEN)
+
+#### Environment Variable Newline-Bug
+- **Problem:** Vercel Environment Variables enthielten Newline-Zeichen (`\n`) am Ende
+- **Auswirkung:** DATABASE_URL war ungültig → Prisma konnte nicht verbinden
+- **Lösung:** Environment Variables mit `printf` (ohne Newline) neu gesetzt
+
+#### Build-Error: loadData Scope
+- **Problem:** `loadData` wurde in `useEffect` definiert, aber außerhalb referenziert (onClick-Handler)
+- **Lösung:** `loadData` als `const` außerhalb `useEffect` definiert
+- **Datei:** `src/app/admin/cases/[id]/dashboard/page.tsx:278`
+
+### Deployment-Verbesserungen
+
+#### Deployment-Prozess stabilisiert
+- **3 Production Deployments** mit iterativen Fixes
+- **Rollback-Fähigkeit getestet** (Previous Deployment Promote)
+- **Auto-Deploy aktiviert** via Vercel Git Integration
+
+#### Schema-Synchronisation
+- **Lokale DB:** SQLite mit BIGINT/DATETIME (Prisma-Standard)
+- **Turso Production:** libSQL mit BIGINT/DATETIME (synchron mit Prisma)
+- **Konsistenz:** Beide DBs verwenden jetzt identische Type-Definitionen
+
+### API-Änderungen
+
+#### GET /api/cases/[id]/dashboard
+- **Neuer Parameter:** `scope` (GLOBAL | LOCATION_VELBERT | LOCATION_UCKERATH_EITORF)
+- **Response erweitert:** `scope`, `scopeLabel`, `scopeHint`
+
+#### Alle Ledger-APIs
+- **Neues Response-Feld:** `steeringTag: string | null`
+- **Betroffen:**
+  - `/api/cases/[id]/ledger`
+  - `/api/cases/[id]/ledger/[entryId]`
+  - `/api/cases/[id]/ledger/period/[periodIndex]`
+  - `/api/cases/[id]/ledger/[entryId]/review`
+
+### Technische Details
+
+#### Turso Database v2
+- **Name:** `inso-liquiplanung-v2`
+- **URL:** `libsql://inso-liquiplanung-v2-dp-213.aws-eu-west-1.turso.io`
+- **Region:** AWS EU West 1 (Frankfurt)
+- **Schema:** Vollständig synchron mit Prisma (33 Tabellen)
+- **Größe:** 1.7 MB (nach Migration)
+
+#### Schema-Änderungen (Turso-spezifisch)
+```sql
+-- Alt (inkompatibel):
+bank_accounts.openingBalanceCents INTEGER
+cases.createdAt                   TEXT
+
+-- Neu (kompatibel):
+bank_accounts.openingBalanceCents BIGINT
+cases.createdAt                   DATETIME
+```
+
+### Dokumentation
+
+#### Neue Erkenntnisse
+- **Environment Variable Handling:** `echo` fügt automatisch Newline hinzu → `printf` verwenden
+- **Turso CLI:** Schema-Export funktioniert, aber manuelles Nacharbeiten nötig für Constraints
+- **Vercel Build Cache:** Umgebungsvariablen-Änderungen erfordern Force-Rebuild
+
+---
+
 ## Geplante Änderungen
 
 Keine ausstehenden Änderungen

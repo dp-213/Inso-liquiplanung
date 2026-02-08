@@ -257,12 +257,129 @@ cd app && npm run build
 
 ---
 
-## Deployment-Workflow
+## Standard-Entwicklungs-Workflow
 
-1. **Lokal testen:** `npm run build` muss durchlaufen
-2. **Bei Schema-Änderungen:** Turso-SQL zuerst ausführen
-3. **Deployen:** `vercel --prod`
-4. **Verifizieren:** Live-URL kurz prüfen (zumindest ob Seite lädt)
+**IMMER diesem Workflow folgen, um lokale und Production-Versionen synchron zu halten:**
+
+### Phase 1: Lokale Entwicklung
+
+```bash
+cd app
+npm run dev  # Start Dev-Server auf localhost:3000
+```
+
+- **Datenbank:** SQLite (`dev.db` in `/app`)
+- **Änderungen machen** und im Browser testen
+- **Sicherstellen, dass alles funktioniert** bevor du weitergehst
+
+### Phase 2: Build-Verifikation
+
+```bash
+npm run build
+```
+
+**Checkliste vor Commit:**
+- ✅ Build läuft FEHLERFREI durch
+- ✅ Keine TypeScript-Fehler
+- ✅ Keine unbenutzten Imports
+- ✅ Alle geänderten Features lokal getestet
+
+### Phase 3: Datenbank-Synchronisation (bei Schema-Änderungen)
+
+**Falls Prisma Schema geändert wurde:**
+
+1. **Lokal synchronisieren:**
+   ```bash
+   npx prisma db push
+   ```
+
+2. **Turso-Migration vorbereiten:**
+   ```bash
+   # Schema exportieren
+   npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > migration.sql
+
+   # Oder: Aus lokalem Schema extrahieren
+   sqlite3 dev.db .schema > schema.sql
+   ```
+
+3. **Turso-Migration VOR Deployment ausführen:**
+   ```bash
+   # Authentifizierung
+   turso auth login
+
+   # Datenbank auswählen (aktuell: inso-liquiplanung-v2)
+   turso db shell inso-liquiplanung-v2 < migration.sql
+
+   # Verifizieren
+   turso db shell inso-liquiplanung-v2 ".schema tablename"
+   ```
+
+**WICHTIG:** Turso-Migration MUSS VOR Code-Deployment erfolgen, sonst crasht Production!
+
+### Phase 4: Commit & Push
+
+```bash
+git add .
+git commit -m "feat: Beschreibung der Änderung
+
+- Detail 1
+- Detail 2
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+
+git push origin main
+```
+
+**Vercel deployt automatisch** nach Push zu `main`
+
+### Phase 5: Deployment-Verifikation
+
+1. **Deployment-Status überwachen:**
+   - Vercel Dashboard: https://vercel.com/davids-projects-86967062/app/deployments
+   - Oder: `vercel logs --follow`
+
+2. **Live-App testen:**
+   - URL: https://app-beige-kappa-43.vercel.app
+   - Admin Login testen
+   - Geänderte Features kurz durchklicken
+   - Browser DevTools Console auf Fehler prüfen
+
+3. **Bei Fehlern: Sofortiger Rollback**
+   ```bash
+   # Option 1: Vercel Dashboard → Previous Deployment → "Promote to Production"
+   # Option 2: Git Revert
+   git revert HEAD --no-edit
+   git push origin main
+   ```
+
+### Datenbank-Strategie
+
+| Umgebung | Datenbank | Connection | Zweck |
+|----------|-----------|------------|-------|
+| **Lokal** | SQLite | `file:./dev.db` | Entwicklung & Testing |
+| **Production** | Turso (libSQL) | `libsql://inso-liquiplanung-v2-...` | Live-Daten |
+
+**Code in `src/lib/db.ts` erkennt automatisch** anhand der `DATABASE_URL`, welche Datenbank verwendet wird.
+
+### Turso-Migration Checkliste
+
+**Bei jeder Schema-Änderung:**
+
+1. ✅ Lokal mit SQLite testen (`npx prisma db push`)
+2. ✅ Migration-SQL erstellen
+3. ✅ Turso-DB sichern (optional): `turso db shell inso-liquiplanung-v2 ".backup /tmp/backup-$(date +%Y%m%d).sql"`
+4. ✅ Migration auf Turso ausführen
+5. ✅ Schema verifizieren
+6. ✅ Erst dann Code deployen (git push)
+
+### Häufige Deployment-Fehler
+
+| Fehler | Ursache | Lösung |
+|--------|---------|--------|
+| "no such column: xyz" | Schema nicht synchronisiert | Turso-Migration vergessen, nachträglich ausführen + Rollback erwägen |
+| "Invalid URL" | Environment Variable mit `\n` | Ohne Newline setzen: `printf "value" \| vercel env add` |
+| Build fehlschlägt | TypeScript-Fehler | Lokal `npm run build` VOR push ausführen |
+| 500 Errors in Production | Daten fehlen in Turso | Daten von SQLite nach Turso migrieren |
 
 ---
 

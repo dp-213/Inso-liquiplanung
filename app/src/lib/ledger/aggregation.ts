@@ -23,6 +23,31 @@ import {
 import { createHash } from 'crypto';
 
 // =============================================================================
+// SCOPE TYPES & CONSTANTS
+// =============================================================================
+
+export type LiquidityScope = "GLOBAL" | "LOCATION_VELBERT" | "LOCATION_UCKERATH_EITORF";
+
+// Location-IDs für Standort-Scopes
+const SCOPE_LOCATION_IDS: Record<Exclude<LiquidityScope, "GLOBAL">, string[]> = {
+  LOCATION_VELBERT: ["loc-haevg-velbert"],
+  LOCATION_UCKERATH_EITORF: ["loc-haevg-uckerath", "loc-haevg-eitorf"],
+};
+
+// Patterns für zentrale Verfahrenskosten (ohne Standortbezug)
+const CENTRAL_PROCEDURE_COST_PATTERNS = [
+  /verfahrenskosten/i,
+  /insolvenzverwalter/i,
+  /gerichtskosten/i,
+  /gutachter/i,
+  /rechtsanwalt.*insolvenz/i,
+  /steuerberater.*verfahren/i,
+  /zentral.*beratung/i,
+  /unternehmensberater/i,
+  /fortführungsbeitrag/i,
+];
+
+// =============================================================================
 // PERIOD INDEX CALCULATION (runtime, not persisted)
 // =============================================================================
 
@@ -862,6 +887,10 @@ export interface RollingForecastResult {
 export interface RollingForecastOptions {
   /** Include UNREVIEWED entries (default: false = only CONFIRMED/ADJUSTED) */
   includeUnreviewed?: boolean;
+  /** Standortspezifische Filterung (Default: GLOBAL) */
+  scope?: LiquidityScope;
+  /** Filtere Einträge mit diesen steeringTags aus (z.B. ['INTERNE_UMBUCHUNG']) */
+  excludeSteeringTags?: string[];
 }
 
 export async function aggregateRollingForecast(
@@ -870,7 +899,11 @@ export async function aggregateRollingForecast(
   planId: string,
   options: RollingForecastOptions = {}
 ): Promise<RollingForecastResult> {
-  const { includeUnreviewed = false } = options;
+  const {
+    includeUnreviewed = false,
+    scope = "GLOBAL",
+    excludeSteeringTags = []
+  } = options;
 
   // 1. Load plan with latest version for opening balance
   const plan = await prisma.liquidityPlan.findUnique({
@@ -895,16 +928,48 @@ export async function aggregateRollingForecast(
   today.setHours(0, 0, 0, 0);
 
   // 2. Load LedgerEntries based on filter setting
-  const entries = await prisma.ledgerEntry.findMany({
+  const allEntries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
       ...(includeUnreviewed
         ? {} // All entries
         : { reviewStatus: { in: ['CONFIRMED', 'ADJUSTED'] } } // Only reviewed
       ),
+      ...(excludeSteeringTags.length
+        ? {
+            OR: [
+              { steeringTag: null },
+              { steeringTag: { notIn: excludeSteeringTags } },
+            ],
+          }
+        : {}),
+    },
+    include: {
+      location: { select: { id: true, name: true } },
     },
     orderBy: { transactionDate: 'asc' },
   });
+
+  // Scope-Filterung (WICHTIG: VOR der Aggregation!)
+  const entries = scope === "GLOBAL"
+    ? allEntries
+    : allEntries.filter((entry) => {
+        // Zentrale Verfahrenskosten in Standort-Scopes ausschließen
+        const isCentral =
+          !entry.location?.id &&
+          (entry.legalBucket === "ABSONDERUNG" ||
+            CENTRAL_PROCEDURE_COST_PATTERNS.some((p) => p.test(entry.description)));
+        if (isCentral) return false;
+
+        // Nur Entries des Standorts durchlassen
+        if (!entry.location?.id) return false;
+
+        const allowedLocationIds = SCOPE_LOCATION_IDS[scope as Exclude<LiquidityScope, "GLOBAL">];
+        return allowedLocationIds.includes(entry.location.id.toLowerCase());
+      });
+
+  // Debug-Logging
+  console.log(`[Rolling Forecast] Scope: ${scope}, All Entries: ${allEntries.length}, Filtered: ${entries.length}`);
 
   // Count unreviewed entries for statistics (even if not included)
   const unreviewedCount = includeUnreviewed

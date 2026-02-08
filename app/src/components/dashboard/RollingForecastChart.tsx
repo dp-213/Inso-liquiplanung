@@ -42,6 +42,7 @@ interface ForecastData {
 
 interface RollingForecastChartProps {
   caseId: string;
+  scope?: "GLOBAL" | "LOCATION_VELBERT" | "LOCATION_UCKERATH_EITORF";
 }
 
 // Format currency
@@ -150,6 +151,7 @@ interface ChartDataPoint {
 
 export default function RollingForecastChart({
   caseId,
+  scope = "GLOBAL",
 }: RollingForecastChartProps) {
   const [data, setData] = useState<ForecastData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -161,7 +163,7 @@ export default function RollingForecastChart({
       setError(null);
 
       try {
-        const res = await fetch(`/api/cases/${caseId}/ledger/rolling-forecast`);
+        const res = await fetch(`/api/cases/${caseId}/ledger/rolling-forecast?scope=${scope}`);
         if (res.ok) {
           const result = await res.json();
           setData(result);
@@ -177,7 +179,7 @@ export default function RollingForecastChart({
     }
 
     fetchData();
-  }, [caseId]);
+  }, [caseId, scope]);
 
   // Transform data for chart
   const chartData = useMemo((): ChartDataPoint[] => {

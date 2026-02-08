@@ -50,6 +50,10 @@ export async function GET(
     // Parse query parameters
     const { searchParams } = new URL(request.url);
     const includeUnreviewed = searchParams.get('includeUnreviewed') === 'true';
+    const scopeParam = searchParams.get('scope') || 'GLOBAL';
+    const scope = ['GLOBAL', 'LOCATION_VELBERT', 'LOCATION_UCKERATH_EITORF'].includes(scopeParam)
+      ? scopeParam as 'GLOBAL' | 'LOCATION_VELBERT' | 'LOCATION_UCKERATH_EITORF'
+      : 'GLOBAL';
 
     // Get active plan for case
     const plan = await prisma.liquidityPlan.findFirst({
@@ -67,6 +71,8 @@ export async function GET(
     // Aggregate rolling forecast with filter option
     const result = await aggregateRollingForecast(prisma, caseId, plan.id, {
       includeUnreviewed,
+      scope,
+      excludeSteeringTags: ['INTERNE_UMBUCHUNG'],  // Umbuchungen ausblenden
     });
 
     // Serialize BigInt values

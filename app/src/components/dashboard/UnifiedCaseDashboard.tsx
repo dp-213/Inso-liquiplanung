@@ -318,7 +318,7 @@ export default function UnifiedCaseDashboard({
             {caseId && (
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Rolling Forecast</h2>
-                <RollingForecastChart caseId={caseId} />
+                <RollingForecastChart caseId={caseId} scope={scope} />
               </div>
             )}
 

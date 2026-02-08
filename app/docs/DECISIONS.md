@@ -445,6 +445,68 @@ Die bestehende Liquiditätstabelle soll unverändert bleiben (gleiche Zeilen, Pe
 
 ---
 
+## ADR-015: Turso Production Database als Prisma-kompatible DB
+
+**Datum:** 07. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Die ursprüngliche Turso-DB (`inso-liquiplanung`) hatte Schema-Inkompatibilitäten:
+- `INTEGER` statt `BIGINT` für Cent-Beträge
+- `TEXT` statt `DATETIME` für Datumsfelder
+- Fehlende oder falsche Constraints
+
+Dies führte zu:
+- Prisma Client-Fehlern ("Invalid URL", "no such column")
+- 500-Fehler bei allen API-Calls
+- Deployment-Blockern
+
+### Entscheidung
+
+1. **Neue Production DB:** `inso-liquiplanung-v2` mit vollständig synchronem Schema
+2. **Vollständige Datenmigration:** Alle 1.317 Ledger-Einträge migriert
+3. **Schema-Export von lokaler SQLite:** Lokale Dev-DB als Schema-Source of Truth
+4. **Type-Mapping:**
+   - SQLite `BIGINT` → Turso `BIGINT` (nicht INTEGER)
+   - SQLite `DATETIME` → Turso `DATETIME` (nicht TEXT)
+
+### Begründung
+
+**Warum neue DB statt ALTER TABLE?**
+- Constraints (Primary Keys, Foreign Keys) können nicht nachträglich geändert werden
+- Risiko von Inkonsistenzen bei schrittweiser Migration
+- Sauberer Neustart mit garantiert korrektem Schema
+
+**Warum lokale DB als Source?**
+- Prisma generiert lokal korrekte SQLite-Schemas
+- `prisma db push` stellt sicher, dass Schema 100% mit Prisma-Modell übereinstimmt
+- Lokale Tests funktionieren → Production-Schema ist identisch
+
+**Warum Vollmigration statt inkrementell?**
+- Datenmenge überschaubar (< 2 MB)
+- Keine Downtime-Anforderung (kann kurz offline sein)
+- Garantierte Atomarität (alles oder nichts)
+
+### Konsequenzen
+
+**Positiv:**
+- Prisma Client funktioniert fehlerfrei
+- Konsistente Type-Definition lokal/production
+- Keine Schema-Drift mehr möglich
+
+**Negativ:**
+- Alte DB muss manuell gelöscht werden (oder als Backup behalten)
+- Environment Variables mussten neu gesetzt werden
+- Vercel-Deployment-Trigger nötig (kein Auto-Deploy)
+
+**Lessons Learned:**
+- Environment Variables mit `printf` setzen (nicht `echo` → Newline-Problem)
+- Turso-CLI-Schema-Export funktioniert, aber Constraints müssen manuell nachgearbeitet werden
+- Bei Schema-Änderungen: Immer Force-Rebuild auf Vercel (Prisma Client Cache)
+
+---
+
 ## ADR-014: Dashboard-Konsistenz via einheitliche Filter
 
 **Datum:** 24. Januar 2026
