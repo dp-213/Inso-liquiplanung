@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import Link from "next/link";
 import {
   CaseDashboardConfig,
@@ -105,8 +105,8 @@ export default function CaseDashboardPage({
     warnings: { type: string; severity: string; message: string; count: number; totalCents: string }[];
   } | null>(null);
 
-  // Load config and calculate - defined outside useEffect so it can be called from error button
-  const loadData = async () => {
+  // Load config and calculate - defined with useCallback so it properly reacts to scope changes
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -238,12 +238,12 @@ export default function CaseDashboardPage({
     } finally {
       setLoading(false);
     }
-  };
+  }, [id, scope]);
 
-  // Load config and calculate - runs whenever id or scope changes
+  // Load config and calculate - runs whenever loadData changes (which happens when id or scope changes)
   useEffect(() => {
     loadData();
-  }, [id, scope]);
+  }, [loadData]);
 
   if (loading) {
     return (
