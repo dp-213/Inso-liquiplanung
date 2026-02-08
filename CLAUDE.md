@@ -334,16 +334,34 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 git push origin main
 ```
 
-**Vercel deployt automatisch** nach Push zu `main`
+**WICHTIG:** GitHub Auto-Deploy ist DEAKTIVIERT. Deployment erfolgt manuell (siehe Phase 5).
 
-### Phase 5: Deployment-Verifikation
+### Phase 5: Manuelles Production Deployment
+
+**GitHub-Integration deaktiviert** - Deployment erfolgt IMMER manuell mit:
+
+```bash
+cd "/Users/david/Projekte/AI Terminal/Inso-Liquiplanung"
+vercel --prod --yes --cwd app
+```
+
+**Wichtig:** Der `--cwd app` Parameter ist KRITISCH! Ohne ihn baut Vercel vom falschen Verzeichnis.
+
+**Deployment-Checkliste:**
+1. ✅ Turso-Migration abgeschlossen (falls Schema geändert)
+2. ✅ `npm run build` erfolgreich lokal
+3. ✅ Git committed und gepushed
+4. ✅ Deployment-Command ausführen
+5. ✅ Warten auf "Aliased: https://cases.gradify.de"
+
+### Phase 6: Deployment-Verifikation
 
 1. **Deployment-Status überwachen:**
    - Vercel Dashboard: https://vercel.com/davids-projects-86967062/app/deployments
-   - Oder: `vercel logs --follow`
+   - Watch für "Aliased: https://cases.gradify.de" Message
 
 2. **Live-App testen:**
-   - URL: https://app-beige-kappa-43.vercel.app
+   - URL: https://cases.gradify.de (Production Alias)
    - Admin Login testen
    - Geänderte Features kurz durchklicken
    - Browser DevTools Console auf Fehler prüfen
@@ -351,10 +369,15 @@ git push origin main
 3. **Bei Fehlern: Sofortiger Rollback**
    ```bash
    # Option 1: Vercel Dashboard → Previous Deployment → "Promote to Production"
-   # Option 2: Git Revert
-   git revert HEAD --no-edit
-   git push origin main
+   # Option 2: Neues Deployment mit vorherigem Commit
+   git checkout <working-commit>
+   vercel --prod --yes --cwd app
    ```
+
+**Deployment-Log bei Fehlern:**
+```bash
+vercel logs <deployment-url> --output raw
+```
 
 ### Datenbank-Strategie
 

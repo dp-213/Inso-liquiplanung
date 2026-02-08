@@ -4,6 +4,124 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-022: Datenbank-First Architektur für Vercel Production
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Vercel Serverless Functions haben kein persistentes Filesystem. Jeder Request läuft in einem neuen Container ohne Zugriff auf lokale Dateien (außer im Build-Output).
+
+**Bisheriges Problem:** APIs versuchten, Case-Daten aus lokalem `Cases/` Ordner zu lesen:
+- `planung/route.ts`: `fs.readFile(..."/Cases/HVPlus/.../Planung.json")`
+- `iv-notes/route.ts`: `fs.readFile(...".data/iv-notes/*.json")`
+- `finanzierung/route.ts`: `fs.readFile(..."/Cases/.../VERTRAEGE/")`
+
+**Fehler in Production:** ENOENT (File not found)
+
+### Entscheidung
+
+**Alle persistenten Daten MÜSSEN in Turso-Datenbank gespeichert werden.**
+
+APIs dürfen NICHT auf lokale Dateien zugreifen (außer statische Assets im `/public` Ordner).
+
+**3 Kategorien von Daten:**
+
+1. **Strukturierte Case-Daten** → Turso DB (LedgerEntry, IVNote, etc.)
+2. **Feature noch nicht implementiert** → Stub-Response
+3. **Statische Dokumentation** → `/public` Ordner (falls nötig)
+
+### Begründung
+
+**Technisch:**
+- Vercel = Serverless = Kein Filesystem
+- Turso ist schnell genug für alle Queries (<100ms typisch)
+- Prisma ORM abstrahiert DB-Zugriff sauber
+
+**Fachlich:**
+- Datenbank ist Single Source of Truth
+- Audit-Trail durch DB-Logging
+- Concurrent-Access ohne File-Locking
+
+### Konsequenzen
+
+**Positiv:**
+- ✅ System vollständig Vercel-kompatibel
+- ✅ Keine ENOENT-Fehler mehr in Production
+- ✅ Skalierbar (Turso Edge Distribution)
+- ✅ Atomic Operations (DB Transactions)
+
+**Negativ:**
+- ⚠️ Migration von File-basierten Features nötig
+- ⚠️ Turso-Kosten steigen mit Datenmenge (aktuell: vernachlässigbar)
+
+**Noch zu migrieren:**
+- Finanzierungsdaten (Massekreditvertrag, Darlehen)
+- Zahlungsverifikation (SOLL vs. IST Analysen)
+
+**Implementiert:**
+- IVNote-Tabelle für IV-Kommunikation
+- Planung nutzt LedgerEntry.valueType=PLAN
+
+---
+
+## ADR-023: Manuelle Deployments statt GitHub Auto-Deploy
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Vercel kann automatisch bei jedem Git-Push deployen (GitHub-Integration).
+
+**Problem:** Auto-Deploy baute vom falschen Verzeichnis:
+- Git-Repo-Root: `/` (enthält auch `/Cases`, `/docs`)
+- Next.js-App: `/app` (enthält `package.json`, `next.config.ts`)
+- Auto-Deploy erwartete `package.json` im Root
+- Fehler: "No Next.js version detected"
+
+### Entscheidung
+
+**GitHub-Integration deaktiviert. Nur manuelle Deployments erlaubt.**
+
+**Deployment-Command:**
+```bash
+cd "/Users/david/Projekte/AI Terminal/Inso-Liquiplanung"
+vercel --prod --yes --cwd app
+```
+
+**Root Directory:** `app/` (explizit via `--cwd` Parameter)
+
+### Begründung
+
+**Technisch:**
+- Mono-Repo-Struktur: App ist in `/app` Subdirectory
+- Vercel Project Settings "Root Directory" wurde nicht richtig übernommen bei Auto-Deploy
+- Manueller Deploy mit `--cwd` Parameter funktioniert zuverlässig
+
+**Workflow:**
+- Pre-Deployment Checks möglich (Build, Tests lokal)
+- Bewusste Entscheidung vor jedem Deploy
+- Verhindert versehentliche Broken Deploys
+
+### Konsequenzen
+
+**Positiv:**
+- ✅ Deployments sind kontrolliert und reproduzierbar
+- ✅ Kein "removed 541 packages" Fehler mehr
+- ✅ Build-Logs zeigen korrektes Verzeichnis
+
+**Negativ:**
+- ⚠️ Kein automatisches Preview-Deployment bei PRs
+- ⚠️ Team muss manuell deployen (aktuell: kein Problem, 1 Developer)
+
+**Alternative (falls Auto-Deploy gewünscht):**
+- Vercel Project Settings → "Root Directory" auf `app` setzen
+- Dann würde auch Auto-Deploy funktionieren
+
+---
+
 ## ADR-020: estateRatio-Splitting in Liquiditätsmatrix
 
 **Datum:** 08. Februar 2026

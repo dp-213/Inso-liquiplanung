@@ -4,6 +4,98 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.14.0 – Vercel Production Deployment stabilisiert
+
+**Datum:** 08. Februar 2026
+
+### Kritischer Bugfix: Lokale Filesystem-Zugriffe für Vercel behoben
+
+**Problem:** 3 APIs crashten in Vercel Production mit ENOENT-Fehlern
+- `planung/route.ts`: Versuchte JSON-Files aus `Cases/` Ordner zu lesen
+- `iv-notes/route.ts`: Nutzte `.data/iv-notes/*.json` für CRUD-Operationen
+- `finanzierung/route.ts`: Las Kreditverträge aus `Cases/.../VERTRAEGE/`
+
+**Ursache:** Vercel Serverless hat kein persistentes Filesystem für lokale Dateien
+
+**Lösung:**
+1. **planung API:** Umstellung auf DB-Query (`LedgerEntry.valueType=PLAN`)
+2. **iv-notes API:** Migration zu echter DB-Tabelle (`IVNote` Model)
+3. **finanzierung API:** Stub-Implementation ("Feature folgt")
+4. **zahlungsverifikation API:** Stub-Implementation ("Feature folgt")
+
+**Architektur-Verbesserung:** System ist jetzt vollständig Vercel-kompatibel
+
+**Location:**
+- `/app/src/app/api/cases/[id]/planung/route.ts`
+- `/app/src/app/api/cases/[id]/iv-notes/route.ts`
+- `/app/src/app/api/cases/[id]/finanzierung/route.ts`
+- `/app/src/app/api/cases/[id]/zahlungsverifikation/route.ts`
+
+### Neue Funktionalität: IV-Notizen in Datenbank
+
+**Feature:** IV-Kommunikation jetzt persistent in Turso gespeichert
+
+**Neues Prisma Model:**
+```prisma
+model IVNote {
+  id        String   @id @default(uuid())
+  caseId    String
+  content   String
+  status    String   @default("OFFEN")      // OFFEN, WARTET, ERLEDIGT
+  priority  String   @default("MITTEL")     // NIEDRIG, MITTEL, HOCH, KRITISCH
+  author    String   @default("Sonja Prinz")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+```
+
+**API-Funktionalität:**
+- GET: Liste aller Notizen zu einem Fall
+- POST: Neue Notiz erstellen
+- PATCH: Status aktualisieren
+- DELETE: Notiz löschen
+
+**Location:**
+- Schema: `/app/prisma/schema.prisma`
+- API: `/app/src/app/api/cases/[id]/iv-notes/route.ts`
+
+### Änderung: Frontend-Seiten zu Stubs umgebaut
+
+**Betroffene Seiten:**
+- `/admin/cases/[id]/planung` → "Feature wird migriert"
+- `/admin/cases/[id]/finanzierung` → "Feature folgt"
+- `/admin/cases/[id]/zahlungsverifikation` → "Feature folgt"
+
+**Begründung:** Alte Seiten erwarteten komplexe JSON-Strukturen aus lokalen Files
+- Vollständige Migration der Frontend-Logik würde zu lange dauern
+- APIs funktionieren bereits (DB-basiert oder Stubs)
+- Placeholder verhindern 500-Fehler und kommunizieren klar den Status
+
+**UX:** Nutzer sehen saubere "in Entwicklung" Seiten mit Links zurück zum Dashboard
+
+**Location:** `/app/src/app/admin/cases/[id]/{planung,finanzierung,zahlungsverifikation}/page.tsx`
+
+### Deployment-Workflow: Manuell statt Auto-Deploy
+
+**Änderung:** Vercel GitHub-Integration deaktiviert
+
+**Vorher:** Jeder Git-Push triggerte Auto-Deploy (führte zu Fehlern wegen fehlendem Root Directory)
+
+**Jetzt:** Nur manuelle Deploys mit korrektem Root Directory:
+```bash
+cd "/Users/david/Projekte/AI Terminal/Inso-Liquiplanung"
+vercel --prod --yes --cwd app
+```
+
+**Begründung:**
+- Auto-Deploy baute vom falschen Verzeichnis (Repo-Root statt `/app`)
+- Manuelle Deploys ermöglichen Pre-Check (Build, Tests)
+- Verhindert fehlerhafte Production-Deployments
+
+**Dokumentiert in:** CLAUDE.md (Deployment-Sektion)
+
+---
+
 ## Version 2.13.0 – Alt/Neu-Masse estateRatio-Splitting in Liquiditätsmatrix
 
 **Datum:** 08. Februar 2026

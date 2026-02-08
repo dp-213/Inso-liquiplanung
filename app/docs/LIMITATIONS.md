@@ -98,6 +98,44 @@ await matchCounterpartyPatterns(prisma, caseId, entryIds);
 - Entries werden nach Periode gruppiert
 - Für Perioden mit IST-Daten werden PLAN-Entries ignoriert
 - Für Perioden ohne IST-Daten werden PLAN-Entries verwendet
+
+---
+
+## Frontend-Einschränkungen (Temporär)
+
+### Planung-Seite noch nicht migriert
+
+**Beschreibung:** `/admin/cases/[id]/planung` zeigt "Feature wird migriert" Placeholder
+
+**Begründung:** Alte Seite erwartete komplexe JSON-Struktur aus lokalem File-System. API liefert bereits PLAN-Daten aus Datenbank (`LedgerEntry.valueType=PLAN`), aber Frontend-Darstellung muss noch angepasst werden.
+
+**Workaround:** PLAN-Entries über `/admin/cases/[id]/ledger` einsehbar und editierbar
+
+**Status:** ⏳ Geplant für v2.15.0
+
+---
+
+### Finanzierung-Seite nicht implementiert
+
+**Beschreibung:** `/admin/cases/[id]/finanzierung` zeigt "Feature folgt" Placeholder
+
+**Begründung:** Massekreditvertrag und Darlehens-Details noch nicht in Datenbank importiert. Feature wurde bisher über lokale JSON-Files realisiert.
+
+**Workaround:** Manuelle Pflege in `case-context.json` und Massekredit-Seite
+
+**Status:** ⏳ Geplant für v2.16.0
+
+---
+
+### Zahlungsverifikation-Seite nicht implementiert
+
+**Beschreibung:** `/admin/cases/[id]/zahlungsverifikation` zeigt "Feature folgt" Placeholder
+
+**Begründung:** SOLL vs. IST Vergleich (erwartete vs. tatsächliche Zahlungen) noch nicht implementiert. Feature wurde bisher über manuelle JSON-Analyse realisiert.
+
+**Workaround:** Manuelle Analyse über Ledger-Ansicht und Excel-Export
+
+**Status:** ⏳ Geplant für v2.17.0
 - Logging: `[IST-Vorrang] X PLAN-Einträge ignoriert`
 
 **Ergebnis (HVPlus Case):**
