@@ -52,6 +52,7 @@ model Case {
   classificationRules  ClassificationRule[] // Rule Engine für Klassifikations-Vorschläge
   bankAgreements       BankAgreement[]      // Vereinbarungen mit Banken (Globalzession, etc.)
   ivNotes              IVNote[]             // IV-Kommunikation (Notizen an Insolvenzverwalter)
+  casePlanning         CasePlanning?        // Strukturierte Liquiditätsplanung (JSON)
 
   @@index([ownerId])
   @@map("cases")
@@ -984,4 +985,23 @@ model ClassificationRule {
 
   @@index([caseId, isActive])
   @@map("classification_rules")
+}
+
+// =============================================================================
+// CASE PLANNING - Strukturierte Liquiditätsplanung
+// =============================================================================
+
+// CasePlanning - Komplette Planungsstruktur als JSON-Blob
+// Enthält: Monate, Annahmen, Offene Fragen, Zusammenfassung, IV-Abweichungen
+model CasePlanning {
+  id            String   @id @default(uuid())
+  caseId        String   @unique
+  planningData  String   // JSON: komplette Planungsstruktur
+  version       String   // z.B. "Korrigiert 08.02.2026"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  
+  @@map("case_planning")
 }

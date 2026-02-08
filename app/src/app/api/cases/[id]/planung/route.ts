@@ -6,10 +6,7 @@ import { getCustomerSession, checkCaseAccess } from "@/lib/customer-auth";
 /**
  * GET /api/cases/[id]/planung
  *
- * Liefert Planungsdaten aus der Datenbank (LedgerEntries mit valueType=PLAN)
- *
- * TODO: Erweitern um strukturierte Planungs-Ansicht
- * Aktuell: Stub-Implementation, gibt leere Planung zurück
+ * Liefert strukturierte Planungsdaten aus der Datenbank (CasePlanning Tabelle)
  */
 export async function GET(
   request: NextRequest,
@@ -44,31 +41,24 @@ export async function GET(
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
 
-    // Lade PLAN-Entries aus LedgerEntries
-    const planEntries = await prisma.ledgerEntry.findMany({
-      where: {
-        caseId,
-        valueType: "PLAN"
-      },
-      orderBy: { transactionDate: "asc" },
-      take: 100 // Limit für Performance
+    // Lade Planungsdaten aus DB
+    const planning = await prisma.casePlanning.findUnique({
+      where: { caseId }
     });
+
+    if (!planning) {
+      return NextResponse.json({
+        error: "Noch keine Planung vorhanden",
+        hint: "Planung muss erst importiert werden"
+      }, { status: 404 });
+    }
+
+    // Parse JSON
+    const planningData = JSON.parse(planning.planningData);
 
     return NextResponse.json({
       success: true,
-      caseId,
-      caseName: caseData.debtorName,
-      planEntries: planEntries.map(e => ({
-        id: e.id,
-        date: e.transactionDate.toISOString(),
-        description: e.description,
-        amountCents: e.amountCents.toString(),
-        category: e.categoryTag || "Uncategorized",
-        legalBucket: e.legalBucket,
-        estateAllocation: e.estateAllocation
-      })),
-      total: planEntries.length,
-      note: "Planungs-Daten aus Datenbank - UI folgt in nächster Version"
+      data: planningData
     });
   } catch (error) {
     console.error("[Planung API] Fehler:", error);

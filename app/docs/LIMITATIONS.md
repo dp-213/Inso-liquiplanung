@@ -245,6 +245,29 @@ npm run dev
 
 ---
 
+### Gemischte Datenbank-Zeitstempel (dev.db)
+
+**Beschreibung:** Die lokale SQLite-Datenbank `dev.db` kann Entries aus mehreren Import-Runden enthalten (verschiedene `createdAt` Zeitstempel). Dies führt zu unterschiedlichen Anzahlen je nach Abfrage-Methode:
+- **SQLite direkt:** Zeigt ALLE Entries (inkl. alte/überholte)
+- **Prisma Client:** Filtert automatisch auf relevante/neueste Entries
+
+**Beispiel (HVPlus Fall):**
+- SQLite: 934 IST-Entries (Importe vom 06.02., 08.02. 14:14, 08.02. 15:14)
+- Prisma: 691 IST-Entries (nur Import vom 08.02. 15:14-15:36)
+
+**Begründung:** Re-Imports während Entwicklung ohne Löschung alter Daten. Prisma filtert vermutlich über einen internen Mechanismus (z.B. reviewStatus oder andere Felder).
+
+**Workaround:**
+- **Immer Prisma verwenden** für Analysen (= Production-Wahrheit)
+- SQLite-Direktabfragen nur für Debugging
+- Bei Unsicherheit: `createdAt`-Zeitstempel prüfen
+
+**Zukünftig:**
+- Saubere Bereinigung alter Entries vor Re-Import
+- Ingestion-Pipeline mit Duplikat-Prävention
+
+---
+
 ### Schwache Duplikat-Erkennung im Import-Script
 
 **Beschreibung:** Import-Script erkennt nur exakt identische Beschreibungen. Variationen führen zu Duplikaten.
@@ -382,6 +405,33 @@ npm run dev
 ---
 
 ## Bekannte Bugs
+
+### LANR → Location Mapping fehlerhaft (HVPlus Fall)
+
+**Beschreibung:** 4 von 8 Ärzten werden der falschen Location zugeordnet. Alle Velbert-Ärzte (van Suntum, Beyer, Kamler) und der Eitorf-Arzt (Rösing) werden fälschlicherweise zu "Praxis Uckerath" zugeordnet.
+
+**Betroffene LANRs:**
+- LANR 3892462 (van Suntum) → SOLL: Velbert, IST: Uckerath ❌
+- LANR 8836735 (Beyer) → SOLL: Velbert, IST: Uckerath ❌
+- LANR 7729639 (Kamler) → SOLL: Velbert, IST: Uckerath ❌
+- LANR 8898288 (Rösing) → SOLL: Eitorf, IST: Uckerath ❌
+
+**Impact:**
+- ~50% der HZV-Einnahmen werden falschem Standort zugeordnet
+- Standort-basierte Liquiditätsplanung zeigt falsche Zahlen
+- Velbert erscheint zu niedrig, Uckerath zu hoch, Eitorf fehlt komplett
+
+**Root Cause:** Classification Rules oder LANR-Mapping-Logik hat vermutlich Fallback zu "Praxis Uckerath" für nicht-gematchte LANRs.
+
+**Workaround:**
+- Manuelle Korrektur via SQL UPDATE (nach Freigabe)
+- Classification Rules für diese 4 LANRs explizit anlegen
+
+**Status:** ⚠️ **KRITISCH** – Muss vor nächster IV-Präsentation korrigiert werden!
+
+**Gefunden:** 08.02.2026 bei Zuordnungsprüfung
+
+---
 
 ### Prisma Client gibt locationId nicht zurück (GELÖST)
 

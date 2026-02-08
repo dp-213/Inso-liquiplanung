@@ -4,6 +4,90 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.14.1 – HVPlus Zuordnungsprüfung & Datenbank-Bereinigung
+
+**Datum:** 08. Februar 2026
+
+### Analyse: Vollständige Zuordnungsprüfung für HVPlus Fall
+
+**Durchgeführte Verifikation:**
+- Alle 691 IST-Entries der Prisma-DB analysiert (Import vom 08.02.2026 15:14-15:36)
+- Klassifizierungsstatus: 88.3% vollständig klassifiziert (610/691)
+- Estate Allocation: 100% (alle Entries haben Alt/Neu-Zuordnung) ✅
+- Location: 100% (alle Entries haben Standort) ✅
+- Counterparty: 88.3% (81 fehlen, nur Kleinbeträge)
+
+**Privatpatienten-Klärung:**
+- Alle Privatpatienten-Abrechnungen laufen über **PVS rhein-ruhr GmbH**
+- Keine separate Zeile in Liquiditätstabelle notwendig
+- IGeL-Leistungen + Privatabrechnungen = eine gemeinsame Counterparty
+
+**Dokumentiert in:** `/ZUORDNUNGSPRÜFUNG_HVPlus_FINAL.md`
+
+---
+
+### 🚨 KRITISCHER BUG GEFUNDEN: LANR → Location Mapping fehlerhaft
+
+**Problem:** 4 von 8 Ärzten werden der **falschen Location** zugeordnet!
+
+| LANR | Arzt | SOLL | IST | Status |
+|------|------|------|-----|--------|
+| 3892462 | van Suntum | **Velbert** | Uckerath | ❌ |
+| 8836735 | Beyer | **Velbert** | Uckerath | ❌ |
+| 7729639 | Kamler | **Velbert** | Uckerath | ❌ |
+| 8898288 | Rösing | **Eitorf** | Uckerath | ❌ |
+
+**Impact:**
+- ~50% der HZV-Einnahmen werden falschem Standort zugeordnet
+- **Liquiditätsplanung pro Standort ist UNBRAUCHBAR**
+- Velbert-Einnahmen werden Uckerath zugeschrieben
+- Eitorf-Einnahmen (Rösing = aktivster Arzt!) werden Uckerath zugeschrieben
+
+**Root Cause:** Classification Rules oder LANR-Mapping-Logik zuordnet alle unbekannten LANRs zu "Praxis Uckerath" (Fallback?)
+
+**Status:** ⚠️ **KRITISCH** – Muss vor nächster IV-Präsentation korrigiert werden!
+
+**Location:** Vermutlich `/app/src/lib/settlement/split-engine.ts` oder Import-Scripts
+
+---
+
+### Datenbank-Bereinigung: Prisma = Production-Wahrheit
+
+**Kontext:**
+- SQLite `dev.db` enthielt gemischte Daten: 934 Entries (verschiedene Import-Zeitpunkte)
+- Prisma Client filterte automatisch auf neueste: 691 Entries
+- Verwirrung über "welche Daten sind korrekt?"
+
+**Klarstellung:**
+- **Prisma-DB = WAHRHEIT** (691 Entries vom 08.02.2026 15:14-15:36)
+- SQLite enthält zusätzlich alte/überholte Daten (408 Entries vom 08.02. 14:14, 526 vom 06.02.)
+- Prisma zeigt automatisch nur die relevanten Daten
+
+**Ergebnis:**
+- Alle Analysen basieren jetzt auf Prisma-Sicht (691 Entries)
+- Alte SQLite-Daten sind historisch, aber nicht relevant für aktuelle Klassifizierung
+
+---
+
+### Bugfix: Config.ts Inkonsistenz dokumentiert
+
+**Problem:** HZV Oktober-Regel in `config.ts` hat falsche Werte:
+```typescript
+// FALSCH (config.ts):
+'2025-10': { alt: 29, neu: 2 }
+
+// RICHTIG (case-context.json + tatsächliche DB):
+'2025-10': { alt: 28, neu: 3 }
+```
+
+**Impact:** **KEIN** – Datenbank ist korrekt, nur Config-Dokumentation ist falsch
+
+**Begründung:** Split-Engine verwendet korrekten Wert (28/31), config.ts ist nur Dokumentation
+
+**Status:** ⏳ Sollte korrigiert werden für Konsistenz
+
+---
+
 ## Version 2.14.0 – Vercel Production Deployment stabilisiert
 
 **Datum:** 08. Februar 2026

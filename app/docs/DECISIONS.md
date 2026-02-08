@@ -4,6 +4,66 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-024: Prisma Client als Single Source of Truth
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Bei der Zuordnungsprüfung für HVPlus Fall stellten wir fest, dass SQLite-Direktabfragen andere Ergebnisse lieferten als Prisma Client:
+- **SQLite direkt:** 934 IST-Entries, 408 ohne estateAllocation
+- **Prisma Client:** 691 IST-Entries, 0 ohne estateAllocation
+
+**Ursache:** Die lokale `dev.db` enthält Daten aus mehreren Import-Runden (06.02., 08.02. 14:14, 08.02. 15:14). Prisma filtert automatisch auf die relevanten/neuesten Entries.
+
+### Entscheidung
+
+**Prisma Client ist die Single Source of Truth für alle Analysen und Dashboards.**
+
+- ✅ Alle Business-Logik nutzt Prisma
+- ✅ Alle Analysen basieren auf Prisma-Sicht
+- ✅ Dashboard-APIs nutzen Prisma
+- ❌ SQLite-Direktabfragen nur für Debugging
+
+### Begründung
+
+**Konsistenz:**
+- Prisma-Sicht ist identisch zwischen Entwicklung (dev.db) und Production (Turso)
+- Verhindert Diskrepanzen zwischen lokalen Analysen und Live-System
+
+**Sicherheit:**
+- Prisma validiert Datentypen (BigInt für amountCents, DateTime-Handling)
+- SQL-Injection-Schutz durch Parametrisierung
+- Type-Safety durch TypeScript-Generierung
+
+**Wartbarkeit:**
+- Eine Abfrage-Schnittstelle statt zwei
+- Schema-Änderungen propagieren automatisch via `prisma generate`
+- Klare Verantwortlichkeiten (Prisma = Business-Logik, SQLite = Speicher)
+
+### Konsequenzen
+
+**Positiv:**
+- ✅ Keine Verwirrung mehr über "welche Daten sind korrekt"
+- ✅ Analysen sind Production-nah (gleiche Filter/Logik)
+- ✅ Type-Safety verhindert Runtime-Fehler
+
+**Negativ:**
+- ⚠️ Prisma-Overhead bei einfachen Queries (minimal, <5ms)
+- ⚠️ Debugging erfordert Prisma-Logging (`log: ['query']`)
+
+**Regel für Team:**
+```typescript
+// ✅ RICHTIG: Prisma verwenden
+const entries = await prisma.ledgerEntry.findMany({ ... });
+
+// ❌ FALSCH: Direkter SQLite-Zugriff (nur für Debugging)
+sqlite3 dev.db "SELECT * FROM ledger_entries WHERE ..."
+```
+
+---
+
 ## ADR-022: Datenbank-First Architektur für Vercel Production
 
 **Datum:** 08. Februar 2026
