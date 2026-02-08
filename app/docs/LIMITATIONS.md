@@ -109,6 +109,23 @@ await matchCounterpartyPatterns(prisma, caseId, entryIds);
 
 ## Dashboard-Einschränkungen
 
+### Webpack Build-Cache-Korruption
+
+**Beschreibung:** Nach npm/Prisma-Operationen kann der `.next` Build-Cache korrupt werden, was zu "Cannot find module './XXXX.js'" Fehlern führt.
+
+**Begründung:** Webpack-Cache-Invalidierung funktioniert nicht immer zuverlässig bei Schema-Änderungen.
+
+**Workaround:**
+```bash
+rm -rf .next node_modules/.cache
+npm install
+npm run dev
+```
+
+**Häufigkeit:** Selten, hauptsächlich nach `npx prisma generate` oder größeren Dependency-Updates.
+
+---
+
 ### Eingeschränkte Standort-Ansicht
 
 **Beschreibung:** Bei Scope ≠ GLOBAL (z.B. "Velbert") werden Revenue- und Banks-Tabs ausgeblendet.

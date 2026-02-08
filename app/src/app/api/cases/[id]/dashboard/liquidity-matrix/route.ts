@@ -347,29 +347,107 @@ export async function GET(
         unreviewedCount++;
       }
 
-      // Find matching row
-      const matchedRow = findMatchingRow(
-        {
-          description: entry.description,
-          amountCents: amount,
-          counterpartyId: entry.counterpartyId,
-          counterpartyName: entry.counterparty?.name,
-          locationId: entry.locationId,
-          bankAccountId: entry.bankAccountId ? bankAccountMap.get(entry.bankAccountId) : undefined,
-          legalBucket: entry.legalBucket,
-          categoryTag: entry.categoryTag,
-        },
-        scopeRows,  // Match only against rows in current scope
-        flowType
-      );
+      // estateRatio-Splitting: Berechne Neu-Anteil und Alt-Anteil
+      const estateRatio = entry.estateRatio !== null ? Number(entry.estateRatio) : 1.0;
+      const estateAllocation = entry.estateAllocation || 'NEUMASSE';
 
-      if (matchedRow) {
-        const rowPeriods = rowAggregations.get(matchedRow.id);
-        if (!rowPeriods) continue;  // Skip if row not in scope
-        const periodData = rowPeriods.get(periodIdx);
-        if (!periodData) continue;  // Skip if period not initialized
-        periodData.amount += amount;
-        periodData.count++;
+      // Guard estateRatio to [0,1] range für Rundungssicherheit
+      const safeRatio = Math.min(Math.max(estateRatio, 0), 1);
+
+      // Berechne Anteile
+      let neuAnteilCents = BigInt(0);
+      let altAnteilCents = BigInt(0);
+
+      switch (estateAllocation) {
+        case 'NEUMASSE':
+          neuAnteilCents = amount;
+          break;
+        case 'ALTMASSE':
+          altAnteilCents = amount;
+          break;
+        case 'MIXED':
+          neuAnteilCents = BigInt(Math.round(Number(amount) * safeRatio));
+          altAnteilCents = amount - neuAnteilCents;
+          break;
+        case 'UNKLAR':
+          neuAnteilCents = amount; // Default: UNKLAR zählt als Neumasse
+          break;
+      }
+
+      // Track entry aggregation to ensure count++ only once per LedgerEntry
+      let entryWasAggregated = false;
+
+      // Match Neu-Anteil (independent)
+      if (neuAnteilCents !== BigInt(0)) {
+        const neuRow = findMatchingRow(
+          {
+            description: entry.description,
+            amountCents: neuAnteilCents,
+            counterpartyId: entry.counterpartyId,
+            counterpartyName: entry.counterparty?.name,
+            locationId: entry.locationId,
+            bankAccountId: entry.bankAccountId ? bankAccountMap.get(entry.bankAccountId) : undefined,
+            legalBucket: entry.legalBucket,
+            categoryTag: entry.categoryTag,
+          },
+          scopeRows,
+          flowType
+        );
+
+        if (neuRow) {
+          const rowPeriods = rowAggregations.get(neuRow.id);
+          if (rowPeriods) {
+            const periodData = rowPeriods.get(periodIdx);
+            if (periodData) {
+              periodData.amount += neuAnteilCents;
+              if (!entryWasAggregated) {
+                periodData.count++;
+                entryWasAggregated = true;
+              }
+            }
+          }
+        }
+      }
+
+      // Match Alt-Anteil (independent of neuRow!)
+      if (altAnteilCents !== BigInt(0)) {
+        // Find Alt-Zeile via categoryTag mapping
+        const altCategoryTag = getAltforderungCategoryTag(entry.categoryTag);
+
+        const altRow = findMatchingRow(
+          {
+            description: entry.description,
+            amountCents: altAnteilCents,
+            counterpartyId: entry.counterpartyId,
+            counterpartyName: entry.counterparty?.name,
+            locationId: entry.locationId,
+            bankAccountId: entry.bankAccountId ? bankAccountMap.get(entry.bankAccountId) : undefined,
+            legalBucket: entry.legalBucket,
+            categoryTag: altCategoryTag,
+          },
+          scopeRows,
+          flowType
+        );
+
+        if (!altRow) {
+          // Warnung: Alt-Match fehlgeschlagen
+          console.error(
+            `[ALT-MATCH FAILED] Entry ${entry.id}: ${Number(altAnteilCents) / 100}€ Alt-Anteil konnte nicht zugeordnet werden. ` +
+            `CategoryTag: ${entry.categoryTag}, Alt-Tag: ${altCategoryTag}`
+          );
+        } else {
+          const rowPeriods = rowAggregations.get(altRow.id);
+          if (rowPeriods) {
+            const periodData = rowPeriods.get(periodIdx);
+            if (periodData) {
+              periodData.amount += altAnteilCents;
+              if (!entryWasAggregated) {
+                periodData.count++;
+                entryWasAggregated = true;
+              }
+            }
+          }
+        }
       }
 
       // Also track by bank account for balance rows

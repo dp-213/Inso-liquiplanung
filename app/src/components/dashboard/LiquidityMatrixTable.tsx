@@ -146,6 +146,57 @@ function getValueTypeColor(valueType: string): { bg: string; text: string } {
   }
 }
 
+/**
+ * Prüft, ob eine Zeile im aktuellen estateFilter angezeigt werden soll.
+ * estateFilter wirkt NUR im Frontend (zeilen-ausblendung), Backend liefert IMMER GESAMT.
+ */
+function shouldShowRow(rowId: string, estateFilter: EstateFilter): boolean {
+  // GESAMT: Alle Zeilen anzeigen
+  if (estateFilter === 'GESAMT') return true;
+
+  // NEUMASSE: Neumasse-Einnahmen + ALLE Ausgaben + Balances
+  if (estateFilter === 'NEUMASSE') {
+    // Zeige alles AUSSER Altforderungs-Zeilen
+    return !rowId.includes('altforderung');
+  }
+
+  // ALTMASSE: Nur Altforderungs-Einnahmen + Balances + Summenzeilen
+  if (estateFilter === 'ALTMASSE') {
+    // Zeige: Balances, Cash-In-Total, Altforderungs-Zeilen
+    const altmasseRows = [
+      // Balances
+      'opening_balance_total',
+      'closing_balance_total',
+      // Bank-spezifische Balances
+      'opening_balance_isk_velbert',
+      'opening_balance_sparkasse_velbert',
+      'opening_balance_isk_uckerath',
+      'opening_balance_apobank_uckerath',
+      'opening_balance_apobank_hvplus',
+      'closing_balance_isk_velbert',
+      'closing_balance_sparkasse_velbert',
+      'closing_balance_isk_uckerath',
+      'closing_balance_apobank_uckerath',
+      'closing_balance_apobank_hvplus',
+      // Cash-In Summe
+      'cash_in_total',
+      // Altforderungs-Zeilen
+      'cash_in_altforderung_header',
+      'cash_in_altforderung_hzv',
+      'cash_in_altforderung_kv',
+      'cash_in_altforderung_pvs',
+    ];
+    return altmasseRows.includes(rowId);
+  }
+
+  // UNKLAR: Zeige nur Zeilen mit unklar-Anteil (aktuell nicht implementiert)
+  if (estateFilter === 'UNKLAR') {
+    return false;
+  }
+
+  return true;
+}
+
 // =============================================================================
 // COMPONENT
 // =============================================================================
@@ -209,7 +260,8 @@ export default function LiquidityMatrixTable({
 
     try {
       const params = new URLSearchParams({
-        estateFilter,
+        // KEIN estateFilter mehr! Backend liefert IMMER GESAMT.
+        // estateFilter wirkt nur im Frontend (zeilen-ausblendung).
         showDetails: showDetails.toString(),
         scope,
         includeUnreviewed: includeUnreviewed.toString(),
@@ -231,7 +283,7 @@ export default function LiquidityMatrixTable({
     } finally {
       setLoading(false);
     }
-  }, [caseId, estateFilter, showDetails, scope, includeUnreviewed]);
+  }, [caseId, showDetails, scope, includeUnreviewed]);  // estateFilter NICHT mehr hier!
 
   useEffect(() => {
     fetchData();
@@ -249,7 +301,7 @@ export default function LiquidityMatrixTable({
       setLocationLoading(true);
       try {
         const baseParams = new URLSearchParams({
-          estateFilter,
+          // KEIN estateFilter mehr - Backend liefert IMMER GESAMT
           showDetails: "true",
           includeUnreviewed: includeUnreviewed.toString(),
         });
@@ -274,7 +326,7 @@ export default function LiquidityMatrixTable({
 
     fetchLocations();
     return () => { cancelled = true; };
-  }, [showLocationBreakdown, scope, caseId, estateFilter, includeUnreviewed]);
+  }, [showLocationBreakdown, scope, caseId, includeUnreviewed]);  // estateFilter NICHT mehr hier!
 
   // Helper: Find row in location data
   function getLocationRow(locationKey: string, rowId: string): MatrixRow | null {
@@ -545,12 +597,41 @@ export default function LiquidityMatrixTable({
           <tbody>
             {data.blocks
               .filter((block) => block.rows.length > 0)  // Skip empty blocks
-              .map((block) => (
+              .map((block) => {
+                // Berechne gefilterte Block-Summe (nur sichtbare Zeilen)
+                const filteredBlockTotals = data.periods.map((_, periodIdx) => {
+                  let sum = BigInt(0);
+                  for (const row of block.rows) {
+                    // Skip section headers, summary rows, and filtered rows
+                    if (row.isSectionHeader || row.isSummary) continue;
+                    if (!shouldShowRow(row.id, estateFilter)) continue;
+                    const value = row.values.find(v => v.periodIndex === periodIdx);
+                    if (value) {
+                      sum += BigInt(value.amountCents);
+                    }
+                  }
+                  return sum;
+                });
+
+                return (
               <>
                 {/* Block rows */}
                 {block.rows.map((row) => {
-                  // Section headers: Visuelle Trennung ohne Werte
+                  // estateFilter: Zeile ausblenden, wenn sie nicht zum Filter passt
+                  if (!shouldShowRow(row.id, estateFilter) && !row.isSummary) {
+                    return null;
+                  }
+
+                  // Section headers: Nur anzeigen wenn mind. 1 Zeile darunter sichtbar ist
                   if (row.isSectionHeader) {
+                    // Prüfe, ob nachfolgende Zeilen sichtbar sind
+                    const hasVisibleChildren = block.rows.some(r =>
+                      !r.isSectionHeader &&
+                      r.order > row.order &&
+                      shouldShowRow(r.id, estateFilter)
+                    );
+                    if (!hasVisibleChildren) return null;
+
                     return (
                       <tr
                         key={row.id}
@@ -575,7 +656,12 @@ export default function LiquidityMatrixTable({
                     return null;
                   }
 
-                  const isNegative = BigInt(row.total) < BigInt(0);
+                  // Bei Summary-Zeilen: Verwende gefilterte Gesamt-Summe wenn estateFilter aktiv
+                  const rowTotal = row.isSummary && estateFilter !== 'GESAMT'
+                    ? filteredBlockTotals.reduce((sum, val) => sum + val, BigInt(0))
+                    : BigInt(row.total);
+
+                  const isNegative = rowTotal < BigInt(0);
                   const bgClass = row.isSummary ? getBlockColorClass(block.id) : "";
                   const showBreakdown = showLocationBreakdown && scope === "GLOBAL" && !row.isSummary && Object.keys(locationData).length > 0;
 
@@ -626,7 +712,11 @@ export default function LiquidityMatrixTable({
 
                         {/* Period Values */}
                         {row.values.map((value) => {
-                          const amount = BigInt(value.amountCents);
+                          // Bei Summary-Zeilen: Verwende gefilterte Summen wenn estateFilter aktiv
+                          const amount = row.isSummary && estateFilter !== 'GESAMT'
+                            ? filteredBlockTotals[value.periodIndex]
+                            : BigInt(value.amountCents);
+
                           const isValueNegative = amount < BigInt(0);
                           const isError = data.validation.errorPeriods.includes(value.periodIndex) && row.isSummary && block.id === "CLOSING_BALANCE";
                           const hasNoData = value.entryCount === -1;
@@ -638,7 +728,7 @@ export default function LiquidityMatrixTable({
                                 hasNoData ? "text-gray-300" : isValueNegative ? "text-red-600" : row.flowType === "INFLOW" ? "text-green-600" : ""
                               } ${isError ? "bg-red-100" : ""}`}
                             >
-                              {hasNoData ? "–" : formatCurrency(value.amountCents)}
+                              {hasNoData ? "–" : formatCurrency(amount.toString())}
                             </td>
                           );
                         })}
@@ -649,7 +739,7 @@ export default function LiquidityMatrixTable({
                             isNegative ? "text-red-600" : row.flowType === "INFLOW" ? "text-green-600" : ""
                           }`}
                         >
-                          {formatCurrency(row.total)}
+                          {formatCurrency(rowTotal.toString())}
                         </td>
                       </tr>
 
@@ -707,7 +797,8 @@ export default function LiquidityMatrixTable({
                   </tr>
                 )}
               </>
-            ))}
+            );
+              })}
           </tbody>
         </table>
       </div>

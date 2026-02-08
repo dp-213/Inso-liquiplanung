@@ -4,6 +4,42 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.12.1 – Business-Logic Admin-Seite wiederhergestellt
+
+**Datum:** 08. Februar 2026
+
+### Bugfix: Fehlende Admin-Seite
+
+**Problem:** `/admin/cases/[id]/business-logic` gab 404-Fehler
+- Seite wurde versehentlich in v2.10.0 (Commit `5379227`) gelöscht
+- Annahme war: "Dashboard-Tab ersetzt separate Seite"
+- Tatsächlich: Admin-Seite enthält deutlich mehr Details als Dashboard-Tab
+
+**Lösung:** Seite aus Git-Historie wiederhergestellt (Commit `22b0050`)
+- 4 Tabs: Grundkonzepte, Abrechnungslogik, Massekredit, Datenqualität
+- Fallspezifische Details (HVPlus): KVNO, HAVG, PVS Zahlungsstrukturen
+- Datenqualitäts-Matrix mit Zuverlässigkeits-Scores
+- Offene Fragen an IV mit Auswirkungsanalyse
+
+**Architektur-Korrektur:** ADR-015 aktualisiert
+- Business-Logik = Dashboard-Tab (Portal) + Admin-Seite (intern)
+- Beide Darstellungen erfüllen unterschiedliche Zwecke
+
+**Location:** `/app/src/app/admin/cases/[id]/business-logic/page.tsx` (699 Zeilen)
+
+### Technischer Fix: Build-Cache-Korruption
+
+**Problem:** Webpack-Fehler "Cannot find module './1331.js'" beim Dev-Server-Start
+
+**Lösung:**
+- `.next` Ordner und `node_modules/.cache` gelöscht
+- `npm install` neu ausgeführt
+- Dev-Server neu gestartet
+
+**Ursache:** Korrupter Build-Cache nach Prisma/npm-Operationen
+
+---
+
 ## Version 2.12.0 – Dashboard-Komponenten Scope-Aware + IST-basiert
 
 **Datum:** 08. Februar 2026

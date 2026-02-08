@@ -1263,34 +1263,47 @@ SELECT SUM(amountCents) / 100.0 FROM ledger_entries WHERE bankAccountId = 'xxx';
 ## ADR-015: Tab-basierte Business-Logik-Darstellung
 
 **Datum:** 08. Februar 2026
-**Status:** Akzeptiert
+**Status:** ~~Akzeptiert~~ → **KORRIGIERT** (08. Februar 2026)
 
 ### Kontext
 
 Insolvenzverwalter benötigen schnellen Zugriff auf fallspezifische Business-Logik (Zahlungsregeln, Vertragsdetails, Abrechnungswege). Diese Information muss sowohl im internen Admin-Dashboard als auch im externen Portal identisch verfügbar sein.
 
-### Entscheidung
+### Entscheidung (KORRIGIERT)
 
-Business-Logik wird als Tab im Unified Dashboard dargestellt, nicht als separate Route. Die Komponente `BusinessLogicContent.tsx` wird direkt im Dashboard gerendert.
+**Business-Logik hat ZWEI Darstellungen:**
+
+1. **Dashboard-Tab** (`BusinessLogicContent.tsx` im Unified Dashboard)
+   - Für IV-Portal und externe Share-Links
+   - Kompakte, übersichtliche Darstellung
+   - Integriert in Dashboard-Navigation
+
+2. **Separate Admin-Seite** (`/admin/cases/[id]/business-logic/page.tsx`)
+   - Nur für internes Admin-Dashboard
+   - Detaillierte, umfassende Dokumentation mit 4 Tabs:
+     - Grundkonzepte (Einnahmen vs. Einzahlungen, IST vs. PLAN, Alt/Neu-Masse)
+     - Abrechnungslogik (HZV, KV, PVS Zahlungsstrukturen mit Beispielen)
+     - Massekredit (Fortführungsbeitrag-Berechnung, Auswirkung auf Liquidität)
+     - Datenqualität (Status-Matrix, offene Fragen an IV)
 
 ### Begründung
 
-**Warum Tab statt separate Route:**
-- **Konsistenz:** Alle Fallansichten sind Tab-basiert strukturiert
-- **Navigation:** User bleibt im Dashboard-Kontext, keine Routing-Komplexität
-- **Shared Component:** Eine Komponente für Admin + Portal eliminiert Duplikate
-- **Performance:** Keine zusätzlichen Page-Loads, Hot Module Replacement funktioniert
+**Warum BEIDES notwendig ist:**
+- **Dashboard-Tab:** IV braucht schnellen Kontext während der Dashboard-Nutzung
+- **Admin-Seite:** Berater brauchen umfassende Dokumentation für Fall-Einarbeitung und IV-Kommunikation
+- **Nicht redundant:** Admin-Seite enthält deutlich mehr Details (Berechnungsbeispiele, Datenqualitäts-Matrix, offene Fragen)
 
-**Warum nicht separate Seite wie `/berechnungsgrundlagen`:**
-- Separate Seiten nur für öffentliche externe Links (ohne Dashboard-Shell)
-- Business-Logik ist Dashboard-integrierte Information, kein Standalone-Dokument
+**Fehler in ursprünglicher ADR:**
+- Admin-Seite wurde versehentlich in Commit `5379227` gelöscht
+- Annahme war falsch: "Tab ersetzt separate Seite vollständig"
+- Tatsächlich: Unterschiedliche Zielgruppen und Use-Cases
 
 ### Konsequenzen
 
-- **Positiv:** Wartbarkeit durch Single Component, einheitliche UX
-- **Positiv:** Schnelle Navigation zwischen Tabs
-- **Technisch:** Tab-Config in `dashboard.ts`, Case-Statement in `renderTabContent()`
-- **Standard:** Alle neuen Fallansichten sollten ebenfalls Tab-basiert sein
+- **Positiv:** IV-Portal bleibt schlank, Admin-Dashboard behält Detailtiefe
+- **Positiv:** `BusinessLogicContent.tsx` ist weiterhin shared component
+- **Wartung:** Admin-Seite muss bei Fall-spezifischen Änderungen aktualisiert werden
+- **Standard:** Business-Logik-Dokumentation = Dashboard-Tab (Portal) + Admin-Seite (intern)
 
 ---
 
