@@ -245,26 +245,26 @@ npm run dev
 
 ---
 
-### Gemischte Datenbank-Zeitstempel (dev.db)
+### Gemischte Datenbank-Zeitstempel (dev.db) - GELÖST
 
-**Beschreibung:** Die lokale SQLite-Datenbank `dev.db` kann Entries aus mehreren Import-Runden enthalten (verschiedene `createdAt` Zeitstempel). Dies führt zu unterschiedlichen Anzahlen je nach Abfrage-Methode:
-- **SQLite direkt:** Zeigt ALLE Entries (inkl. alte/überholte)
-- **Prisma Client:** Filtert automatisch auf relevante/neueste Entries
+**Beschreibung:** Die lokale SQLite-Datenbank `dev.db` enthielt Entries aus mehreren Import-Runden (verschiedene `createdAt` Zeitstempel).
 
-**Beispiel (HVPlus Fall):**
-- SQLite: 934 IST-Entries (Importe vom 06.02., 08.02. 14:14, 08.02. 15:14)
-- Prisma: 691 IST-Entries (nur Import vom 08.02. 15:14-15:36)
+**Status:** ✅ **GELÖST am 08.02.2026**
 
-**Begründung:** Re-Imports während Entwicklung ohne Löschung alter Daten. Prisma filtert vermutlich über einen internen Mechanismus (z.B. reviewStatus oder andere Felder).
+**Lösung:**
+- Prisma-Daten (691 IST-Entries) als Single Source of Truth bestätigt
+- 100% Verifikation gegen PDF-Kontoauszüge durchgeführt
+- Turso-Sync-Strategie definiert (ADR-025): PLAN behalten, IST ersetzen
 
-**Workaround:**
-- **Immer Prisma verwenden** für Analysen (= Production-Wahrheit)
-- SQLite-Direktabfragen nur für Debugging
-- Bei Unsicherheit: `createdAt`-Zeitstempel prüfen
+**Verifizierung:**
+- Alle 691 Entries gegen 9 PDF-Kontoauszüge abgeglichen
+- Alle Kontosalden Euro-genau korrekt
+- Alle Entry-Counts stimmen überein
 
-**Zukünftig:**
-- Saubere Bereinigung alter Entries vor Re-Import
-- Ingestion-Pipeline mit Duplikat-Prävention
+**Workflow für Zukunft:**
+- Bei Re-Import: Alte IST-Daten vorher löschen (DELETE WHERE valueType='IST')
+- PLAN-Daten immer behalten
+- Ingestion-Pipeline mit Duplikat-Prävention (geplant)
 
 ---
 
@@ -427,9 +427,10 @@ npm run dev
 - Manuelle Korrektur via SQL UPDATE (nach Freigabe)
 - Classification Rules für diese 4 LANRs explizit anlegen
 
-**Status:** ⚠️ **KRITISCH** – Muss vor nächster IV-Präsentation korrigiert werden!
+**Status:** ⚠️ **KRITISCH** – Muss VOR Turso-Sync korrigiert werden!
 
 **Gefunden:** 08.02.2026 bei Zuordnungsprüfung
+**Verifiziert:** 08.02.2026 bei PDF-Abgleich (691 Entries betroffen)
 
 ---
 

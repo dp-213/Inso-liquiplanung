@@ -4,6 +4,66 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.14.2 – Turso-Sync & Datenbank-Verifikation
+
+**Datum:** 08. Februar 2026
+
+### Kritische Verifikation: Prisma vs. PDF-Kontoauszüge
+
+**Durchgeführt:** Vollständiger Abgleich aller 691 IST-Entries gegen Original-PDF-Kontoauszüge
+
+**Ergebnis:** ✅ **100% MATCH**
+- Alle Entry-Counts stimmen überein (9 Konten × Monate)
+- Alle Summen Euro-genau identisch
+- Kontosalden vollständig verifiziert
+
+**Verifizierte Konten:**
+- Sparkasse Velbert (Okt+Nov 2025): 105 Entries
+- apoBank Uckerath (Okt+Nov 2025): 185 Entries
+- apoBank HV PLUS eG (Okt+Nov 2025): 39 Entries
+- ISK Uckerath (Nov 2025 - Jan 2026): 345 Entries
+- ISK Velbert (Dez 2025 - Jan 2026): 17 Entries
+
+**Kontostand-Verifikation:**
+
+| Konto | Letzter Monat | Endsaldo | PDF-Abgleich |
+|-------|---------------|----------|--------------|
+| Sparkasse Velbert | Nov 2025 | +23.047,77 € | ✅ |
+| apoBank HV PLUS eG | Nov 2025 | -301.004,19 € | ✅ |
+| apoBank Uckerath | Nov 2025 | +52.901,21 € | ✅ |
+| ISK Uckerath | Jan 2026 | +419.536,88 € | ✅ |
+| ISK Velbert | Jan 2026 | +103.680,64 € | ✅ |
+
+**Dokumentiert in:** `/ZUORDNUNGSPRÜFUNG_HVPlus_FINAL.md`
+
+---
+
+### Datenbank-Status geklärt: Prisma = Production-Wahrheit
+
+**Problem identifiziert:**
+- **Turso Production:** 934 IST-Entries (Stand: 06.02.2026 06:03) ❌ VERALTET
+- **SQLite lokal:** 934 Entries gemischt (06.02. + 08.02. Importe) ❌ CHAOS
+- **Prisma lokal:** 691 Entries (08.02.2026 15:14-15:36) ✅ AKTUELL + VERIFIZIERT
+
+**Root Cause:** Mehrere Import-Runden ohne Bereinigung alter Daten
+
+**Entscheidung:** Prisma-Daten nach Turso Production synchronisieren
+- PLAN-Daten bleiben erhalten (69 Entries)
+- IST-Daten werden vollständig ersetzt (691 Entries)
+- Alte/gemischte Daten werden entfernt
+
+**Dokumentiert in:** ADR-025 (DECISIONS.md)
+
+---
+
+### 🚨 KRITISCHER BUG bestätigt: LANR → Location Mapping (unverändert)
+
+**Status:** Weiterhin aktiv (aus v2.14.1)
+- 4 von 8 Ärzten falsch zugeordnet
+- Muss vor Turso-Sync korrigiert werden
+
+---
+
 ## Version 2.14.1 – HVPlus Zuordnungsprüfung & Datenbank-Bereinigung
 
 **Datum:** 08. Februar 2026

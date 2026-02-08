@@ -4,6 +4,89 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-025: Turso-Sync-Strategie - PLAN behalten, IST ersetzen
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Nach Verifikation der lokalen Datenbank stellte sich heraus:
+- **Prisma lokal:** 691 IST-Entries (08.02.2026 15:14-15:36) - ✅ 100% verifiziert gegen PDFs
+- **Turso Production:** 934 IST-Entries (06.02.2026 06:03) - ❌ Veraltet (2 Tage alt)
+- **SQLite direkt:** 934 Entries gemischt - ❌ Enthält Alt-Daten aus mehreren Import-Runden
+
+**Problem:** Wie synchronisieren wir die verifizierten 691 Entries nach Turso, ohne PLAN-Daten (69 Entries) zu verlieren?
+
+### Entscheidung
+
+**Selektiver Sync: PLAN behalten, IST vollständig ersetzen**
+
+```sql
+-- 1. PLAN-Daten sichern (behalten)
+-- 2. Alle IST-Daten löschen (valueType='IST')
+-- 3. Verifizierte 691 IST-Entries aus Prisma neu importieren
+-- 4. PLAN-Daten bleiben unangetastet
+```
+
+**Workflow:**
+1. Backup von Turso erstellen
+2. DELETE FROM ledger_entries WHERE caseId='...' AND valueType='IST'
+3. INSERT neue 691 IST-Entries aus Prisma
+4. Verify: PLAN-Count = 69 (unverändert), IST-Count = 691 (neu)
+
+### Begründung
+
+**Warum nicht alles löschen und neu importieren?**
+- PLAN-Daten (69 Entries) sind manuell erstellt und validiert
+- Keine Import-Scripts für PLAN-Daten vorhanden
+- Risiko von Datenverlust
+
+**Warum IST komplett ersetzen statt mergen?**
+- Alte IST-Daten (934) sind gemischt aus mehreren Import-Runden
+- Duplikat-Erkennung ist unsicher (nur Description-Match)
+- Sauberer Cut: Verifizierte 691 Entries sind Single Source of Truth
+- **100% PDF-verifiziert:** Alle Kontosalden stimmen Euro-genau
+
+**Warum nicht inkrementell updaten?**
+- Zu komplex (welche Entries sind veraltet? welche neu?)
+- Fehleranfällig bei mixed Timestamps
+- Full-Replace ist deterministisch und nachvollziehbar
+
+### Konsequenzen
+
+**Positiv:**
+- ✅ Production hat verifizierte, saubere Daten
+- ✅ PLAN-Daten bleiben erhalten
+- ✅ Kein Duplikat-Chaos mehr
+- ✅ Klare Datenherkunft (alle IST-Entries vom 08.02.2026 15:14-15:36)
+
+**Negativ:**
+- ⚠️ Historische Import-Zeitstempel gehen verloren (irrelevant für Business)
+- ⚠️ Alte IST-Daten (falls unterschiedlich) werden überschrieben (OK, da veraltet)
+
+**Risiko-Mitigation:**
+- Turso-Backup VOR Sync
+- Verify-Script NACH Sync (Count-Check, Summen-Check)
+- Rollback-Plan dokumentiert
+
+### Implementierung
+
+**Script:** `sync-to-turso.ts`
+```typescript
+// 1. Backup Turso
+// 2. DELETE IST für Case
+// 3. INSERT 691 verifizierte Entries
+// 4. Verify Counts
+```
+
+**Verifizierung:**
+- IST-Count: 691 (neu)
+- PLAN-Count: 69 (unverändert)
+- Kontosalden-Check gegen PDFs
+
+---
+
 ## ADR-024: Prisma Client als Single Source of Truth
 
 **Datum:** 08. Februar 2026
