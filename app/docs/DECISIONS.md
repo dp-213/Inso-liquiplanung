@@ -1128,3 +1128,63 @@ Business-Logik-Tab ist **fallspezifisch**, nicht generisch. Für HVPlus: Konkret
 
 [Was folgt aus dieser Entscheidung?]
 ```
+
+---
+
+## ADR-025: Scope-Konsistenz durch Tab-Filterung (Quick-Fix)
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert (Temporär, bis Proper Scope-Support implementiert)
+
+### Kontext
+
+Standort-Toggle (Scope: GLOBAL / LOCATION_VELBERT / LOCATION_UCKERATH_EITORF) wird in verschiedenen Dashboard-Tabs unterschiedlich unterstützt:
+- LiquidityMatrixTable: ✅ Scope-Support
+- RollingForecastChart: ✅ Scope-Support
+- RevenueTable: ❌ Zeigt immer globale Daten
+- BankAccountsTab: ❌ Zeigt immer alle Konten
+
+Dies führt zu Inkonsistenz: Nutzer sieht in Matrix nur Velbert-Zahlen, in Revenue aber globale Zahlen → Verwirrung.
+
+### Entscheidung
+
+Quick-Fix: Tabs ohne Scope-Support werden ausgeblendet, wenn Scope ≠ GLOBAL.
+
+```typescript
+const tabsWithoutScopeSupport = new Set(["revenue", "banks"]);
+
+if (scope !== "GLOBAL" && tabsWithoutScopeSupport.has(tab.id)) {
+  return false; // Tab ausblenden
+}
+```
+
+Nutzer sieht Banner: "Standort-Ansicht: Einnahmen/Banken-Tabs ausgeblendet (zeigen nur globale Daten)"
+
+### Begründung
+
+**Warum Quick-Fix statt Proper Scope-Support?**
+- ✅ Verhindert sofort inkonsistente Zahlen
+- ✅ System bleibt nutzbar und konsistent
+- ✅ Pragmatisch: 5 Min vs 45 Min
+- ✅ Kein Risiko falscher Interpretationen
+
+**Warum nicht einfach ignorieren?**
+- ❌ Verwirrung untergräbt Vertrauen in Zahlen
+- ❌ IV könnte falsche Schlüsse ziehen
+- ❌ Professionelles Tool darf keine inkonsistenten Daten zeigen
+
+### Konsequenzen
+
+**Kurzfristig:**
+- Weniger Features in Standort-Ansicht (nur Matrix + Forecast)
+- Aber: Alle sichtbaren Zahlen sind konsistent
+
+**Nächster Schritt:**
+- Proper Scope-Support für RevenueTable + BankAccountsTab implementieren (siehe TODO.md)
+- API-Routes erweitern: `?scope=...` Parameter
+- Komponenten erweitern: `scope` Prop
+- Quick-Fix entfernen
+
+**Dateien betroffen:**
+- `/app/src/components/dashboard/UnifiedCaseDashboard.tsx` (Tab-Filter-Logik)
+- `/app/docs/TODO.md` (Proper Scope-Support dokumentiert)

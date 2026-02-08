@@ -48,6 +48,41 @@ Dieses Dokument listet bekannte Einschränkungen und bewusste Nicht-Implementier
 
 ---
 
+## Daten-Aggregation Einschränkungen
+
+### Kein IST-Vorrang bei parallelen IST/PLAN-Daten
+
+**Beschreibung:** Wenn für dieselbe Periode sowohl IST- als auch PLAN-Buchungen existieren, werden beide summiert. Dies führt zu Überdeckung/Doppelzählung.
+
+**Begründung:** IST-Vorrang-Logik erfordert komplexe Gruppierung und Architektur-Entscheidungen:
+- Was definiert "dieselbe Buchung"? (periodIndex + categoryKey + bankAccountId?)
+- Wie wird IST-Vorrang transparent dokumentiert?
+- Performance-Impact bei großen Datenmengen?
+
+Aktuell zu komplex für Schnellfix → als Feature-Ticket dokumentiert (siehe TODO.md).
+
+**Workaround:** Workflow soll sicherstellen, dass PLAN-Daten gelöscht/deaktiviert werden, wenn IST-Daten importiert werden.
+
+**Status:** TODO für v2.11.0 (siehe `/app/docs/TODO.md`)
+
+---
+
+## Dashboard-Einschränkungen
+
+### Eingeschränkte Standort-Ansicht
+
+**Beschreibung:** Bei Scope ≠ GLOBAL (z.B. "Velbert") werden Revenue- und Banks-Tabs ausgeblendet.
+
+**Begründung:** Diese Tabs unterstützen aktuell keinen Scope-Filter und würden inkonsistente (globale) Zahlen zeigen.
+
+**Workaround:**
+- Für Standort-Analyse: Liquiditätsmatrix + Rolling Forecast nutzen
+- Für Revenue/Banks: Scope auf GLOBAL setzen
+
+**Status:** Quick-Fix implementiert, proper Scope-Support geplant (siehe `/app/docs/TODO.md`)
+
+---
+
 ### Keine Prognosen/Forecasts
 
 **Beschreibung:** Keine automatische Extrapolation oder Trendberechnung.

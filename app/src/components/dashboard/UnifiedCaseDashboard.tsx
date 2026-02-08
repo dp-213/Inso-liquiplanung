@@ -293,11 +293,22 @@ export default function UnifiedCaseDashboard({
     "business-logik",
   ]);
 
+  // Tabs die Scope NICHT unterstützen (zeigen immer global)
+  const tabsWithoutScopeSupport = new Set([
+    "revenue",  // RevenueTable ignoriert Scope
+    "banks",    // BankAccountsTab ignoriert Scope
+  ]);
+
   // Get visible tabs
   const visibleTabs = useMemo(() => {
     return config.tabs.filter((tab) => {
       // Für externe Ansicht: Tabs mit API-Abhängigkeiten ausblenden
       if (accessMode === "external" && tabsRequiringInternalApi.has(tab.id)) {
+        return false;
+      }
+
+      // Für Standort-Ansicht: Tabs ohne Scope-Support ausblenden
+      if (scope !== "GLOBAL" && tabsWithoutScopeSupport.has(tab.id)) {
         return false;
       }
 
@@ -310,7 +321,7 @@ export default function UnifiedCaseDashboard({
       }
       return true;
     });
-  }, [config.tabs, data.insolvencyEffects, data.assumptions, accessMode]);
+  }, [config.tabs, data.insolvencyEffects, data.assumptions, accessMode, scope]);
 
   // Legacy data adapters for components expecting 'weeks'
   const weeksData = useMemo(() => {
@@ -868,7 +879,7 @@ export default function UnifiedCaseDashboard({
                 <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span>Zentrale Verfahrenskosten sind in dieser Sicht nicht enthalten</span>
+                <span>Standort-Ansicht: Zentrale Verfahrenskosten nicht enthalten • Einnahmen/Banken-Tabs ausgeblendet (zeigen nur globale Daten)</span>
               </div>
             )}
           </div>

@@ -4,6 +4,70 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.10.0 – Dashboard-Stabilität + Datenqualität
+
+**Datum:** 08. Februar 2026
+
+### Neue Funktionen
+
+#### Datenqualitäts-Indikatoren
+- **UNKLAR-Risiko Banner:** Prominentes Banner oberhalb Navigation zeigt Anzahl + Volumen unklassifizierter Buchungen
+  - Click führt zu Ledger-Filter `?estateAllocation=UNKLAR`
+  - Nur sichtbar wenn `unklarCount > 0`
+- **DataSourceLegend:** Neues Panel in Overview-Tab
+  - IST/PLAN-Verteilung als Progress Bar
+  - Anzahl ungeprüfter Buchungen (`unreviewedCount`)
+  - Qualitätsindikator: "Hohe Datenqualität" / "Prüfung erforderlich"
+  - Unterscheidet LEDGER vs LEGACY Datenquelle
+
+#### Verbesserte KPIs
+- **Aktueller Bank-Bestand:** Neue KPI zeigt IST-Salden aller Bankkonten (grün, Bank-Icon)
+- **Plan-Startsaldo:** Umbenannt von "Aktueller Bestand" (lila, Dokument-Icon)
+  - Klare Trennung zwischen echtem Bank-Cash und Planungswerten
+- **4-Spalten-Grid:** Wenn Bank-Daten vorhanden, sonst 3 Spalten
+
+### Bugfixes
+
+#### Kritische API-Shape-Fehler
+- **Admin-Dashboard:** Fix `dashboardData.result` → `calculation`
+- **Admin-Dashboard:** Fix `dashboardData.caseInfo` → `case`
+- **Admin-Dashboard:** Fix `totalNetCashflowsCents` → `totalNetCashflowCents` (Typo)
+  - Betroffen: `/admin/cases/[id]/dashboard/page.tsx` (Zeilen 134, 157, 167)
+
+#### Insolvenzeffekte Periodenlabels
+- **Fix:** Labels basieren jetzt auf `planStartDate` statt `new Date()` (heute)
+- **API erweitert:** `/api/cases/[id]/plan/insolvency-effects` liefert `planStartDate`
+- **Effekt:** Periodenlabels werden korrekt relativ zum Planungsstart berechnet
+
+#### Bankkonto-Verläufe
+- **Fix:** `getPeriodDates()` verwendet jetzt exklusiven Endpunkt
+  - WEEKLY: `end = start + 7 Tage` (statt +6)
+  - MONTHLY: `end = erster Tag nächster Monat`
+- **Effekt:** Transaktionen am letzten Periodentag werden nicht mehr ausgeschlossen
+- **Betroffen:** `/lib/ledger-aggregation.ts`
+
+### Änderungen
+
+#### Externe Ansicht stabilisiert
+- **Tabs ohne Session-Auth ausgeblendet** für `accessMode="external"`:
+  - liquidity-matrix, banks, revenue, security, locations, compare, business-logik
+- **Overview-Tab:** RollingForecast-Komponenten nur für angemeldete Nutzer
+- **Effekt:** Externe IV-Ansicht (`/view/[token]`) lädt ohne 401-Fehler
+
+#### Scope-Konsistenz (Quick-Fix)
+- **Tabs ohne Scope-Support ausgeblendet** wenn Scope ≠ GLOBAL:
+  - Revenue-Tab (zeigt nur globale Daten)
+  - Banks-Tab (zeigt nur globale Daten)
+- **Hinweis:** Banner informiert über ausgeblendete Tabs
+- **Nächster Schritt:** Proper Scope-Support implementieren (siehe TODO.md)
+
+### Technische Änderungen
+- Neue Komponenten: `UnklarRiskBanner.tsx`, `DataSourceLegend.tsx`
+- Erweiterte Typen: `EstateAllocationData` in `dashboard.ts`
+- Neue Datei: `/app/docs/TODO.md` mit P0/P1 Priorisierung
+
+---
+
 ## Version 2.9.0 – Business-Logik-Dashboard für IV
 
 **Datum:** 08. Februar 2026
