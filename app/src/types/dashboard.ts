@@ -149,6 +149,23 @@ export interface LedgerStats {
   absonderungCount: number;
 }
 
+export interface EstateAllocationData {
+  totalAltmasseInflowsCents: string;
+  totalAltmasseOutflowsCents: string;
+  totalNeumasseInflowsCents: string;
+  totalNeumasseOutflowsCents: string;
+  totalUnklarInflowsCents: string;
+  totalUnklarOutflowsCents: string;
+  unklarCount: number;
+  warnings: {
+    type: string;
+    severity: string;
+    message: string;
+    count: number;
+    totalCents: string;
+  }[];
+}
+
 // =============================================================================
 // Dashboard Data Structure
 // =============================================================================
@@ -162,6 +179,7 @@ export interface CaseDashboardData {
   assumptions?: AssumptionInfo[];
   insolvencyEffects?: InsolvencyEffectsData;
   ledgerStats?: LedgerStats;
+  estateAllocation?: EstateAllocationData;
 }
 
 // =============================================================================
@@ -351,6 +369,12 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
         { type: "ist-plan-compare", visible: true, order: 1 },
         { type: "version-info", visible: true, order: 2 },
       ],
+    },
+    {
+      id: "business-logik",
+      label: "Business-Logik",
+      icon: "lightbulb",
+      panels: [],
     },
   ],
 };

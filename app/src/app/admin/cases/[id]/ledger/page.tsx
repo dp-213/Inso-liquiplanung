@@ -2538,7 +2538,7 @@ export default function CaseLedgerPage({
                           )}
                           {e.locationId && (
                             <li>
-                              <strong>Standort-P&L</strong>: Wird dem Standort "{locationsMap.get(e.locationId) || e.locationId}" zugerechnet
+                              <strong>Standort-P&L</strong>: Wird dem Standort &quot;{locationsMap.get(e.locationId) || e.locationId}&quot; zugerechnet
                             </li>
                           )}
                         </ul>
@@ -2547,7 +2547,7 @@ export default function CaseLedgerPage({
                           <div className="mt-3 p-2 bg-amber-100 rounded text-amber-800 text-xs">
                             <strong>Hinweis:</strong> Dieser Eintrag ist noch nicht geprüft.
                             Ungeprüfte Einträge werden standardmäßig NICHT in Berechnungen einbezogen,
-                            es sei denn der Toggle "Ungeprüfte einbeziehen" ist aktiv.
+                            es sei denn der Toggle &quot;Ungeprüfte einbeziehen&quot; ist aktiv.
                           </div>
                         )}
                       </div>

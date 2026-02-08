@@ -35,6 +35,9 @@ import LocationView from "@/components/dashboard/iv-views/LocationView";
 import LiquidityMatrixTable, { LiquidityScope, SCOPE_LABELS } from "@/components/dashboard/LiquidityMatrixTable";
 import IstPlanComparisonTable from "@/components/dashboard/IstPlanComparisonTable";
 import BankAccountsTab from "@/components/dashboard/BankAccountsTab";
+import BusinessLogicContent from "@/components/business-logic/BusinessLogicContent";
+import UnklarRiskBanner from "@/components/dashboard/UnklarRiskBanner";
+import DataSourceLegend from "@/components/dashboard/DataSourceLegend";
 import Link from "next/link";
 
 // =============================================================================
@@ -108,6 +111,12 @@ function TabIcon({ icon }: { icon: string }) {
       return (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+      );
+    case "lightbulb":
+      return (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
         </svg>
       );
     default:
@@ -273,9 +282,25 @@ export default function UnifiedCaseDashboard({
     };
   }, [data.bankAccounts]);
 
+  // Tabs die interne APIs mit Session-Auth benötigen
+  const tabsRequiringInternalApi = new Set([
+    "liquidity-matrix",
+    "banks",
+    "revenue", // RevenueTable braucht API
+    "security",
+    "locations",
+    "compare",
+    "business-logik",
+  ]);
+
   // Get visible tabs
   const visibleTabs = useMemo(() => {
     return config.tabs.filter((tab) => {
+      // Für externe Ansicht: Tabs mit API-Abhängigkeiten ausblenden
+      if (accessMode === "external" && tabsRequiringInternalApi.has(tab.id)) {
+        return false;
+      }
+
       // Filter out tabs based on data availability
       if (tab.id === "insolvency" && (!data.insolvencyEffects || data.insolvencyEffects.effects.length === 0)) {
         // Still show but with placeholder
@@ -285,7 +310,7 @@ export default function UnifiedCaseDashboard({
       }
       return true;
     });
-  }, [config.tabs, data.insolvencyEffects, data.assumptions]);
+  }, [config.tabs, data.insolvencyEffects, data.assumptions, accessMode]);
 
   // Legacy data adapters for components expecting 'weeks'
   const weeksData = useMemo(() => {
@@ -313,18 +338,22 @@ export default function UnifiedCaseDashboard({
               formatCurrency={(cents: bigint) => formatCurrencyFn(cents)}
               periodType={data.calculation.periodType || data.plan.periodType}
               periodCount={data.calculation.periodCount || data.plan.periodCount}
+              bankBalanceCents={data.bankAccounts ? BigInt(data.bankAccounts.summary.totalBalanceCents) : null}
             />
 
-            {/* Rolling Forecast Chart - IST (Vergangenheit) + PLAN (Zukunft) */}
-            {caseId && (
+            {/* Datenherkunft und Qualität */}
+            {data.ledgerStats && <DataSourceLegend ledgerStats={data.ledgerStats} />}
+
+            {/* Rolling Forecast Chart - IST (Vergangenheit) + PLAN (Zukunft) - NUR für angemeldete Nutzer */}
+            {accessMode !== "external" && caseId && (
               <div className="admin-card p-6">
                 <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Rolling Forecast</h2>
                 <RollingForecastChart caseId={caseId} scope={scope} />
               </div>
             )}
 
-            {/* Rolling Forecast Tabelle - zeigt IST/PLAN pro Periode */}
-            {caseId && (
+            {/* Rolling Forecast Tabelle - zeigt IST/PLAN pro Periode - NUR für angemeldete Nutzer */}
+            {accessMode !== "external" && caseId && (
               <div className="admin-card">
                 <div className="px-6 py-4 border-b border-[var(--border)]">
                   <h2 className="text-lg font-semibold text-[var(--foreground)]">Liquiditätsübersicht</h2>
@@ -774,6 +803,9 @@ export default function UnifiedCaseDashboard({
           </div>
         );
 
+      case "business-logik":
+        return <BusinessLogicContent insolvencyDate={data.case.openingDate || undefined} />;
+
       default:
         return null;
     }
@@ -802,6 +834,11 @@ export default function UnifiedCaseDashboard({
             </div>
             {headerContent}
           </div>
+        )}
+
+        {/* UNKLAR-Risiko Banner - prominent oberhalb der Navigation */}
+        {data.estateAllocation && caseId && (
+          <UnklarRiskBanner caseId={caseId} estateAllocation={data.estateAllocation} />
         )}
 
         {/* Sticky Navigation: Scope Toggle + Tabs */}

@@ -668,6 +668,442 @@ UPDATE bank_accounts SET openingBalanceCents = balanceCents;
 
 ---
 
+## ADR-017: Prisma locationId-Workaround (Temporär)
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert (Temporäre Lösung)
+
+### Kontext
+
+Nach der Schema-Erweiterung von `BankAccount` um `locationId` sollte Prisma Client diese Spalte automatisch lesen. Trotz mehrfacher Versuche gab Prisma `locationId: null` zurück:
+
+**Durchgeführte Maßnahmen (alle erfolglos):**
+- `npx prisma generate` (mehrfach)
+- Cache-Löschen: `.next`, `.turso`, `node_modules/.prisma`
+- Vollständiges Neuerstellen des Prisma Clients
+- Kill aller Node-Prozesse
+- Server-Neustart
+
+**Verifikation der Datenbank:**
+```sql
+SELECT accountName, locationId FROM bank_accounts;
+-- ISK Velbert|loc-haevg-velbert  ✓ Daten sind vorhanden
+-- ISK Uckerath|loc-haevg-uckerath ✓
+```
+
+**Prisma-Abfrage:**
+```typescript
+const accounts = await prisma.bankAccount.findMany({
+  include: { location: true }
+});
+// accounts[0].locationId === null  ✗ Trotz korrekter Daten!
+```
+
+### Entscheidung
+
+**Temporärer Workaround:** Manuelle Location-Erkennung basierend auf `accountName`-Pattern:
+
+```typescript
+const getLocationByAccountName = (accountName: string) => {
+  if (accountName.toLowerCase().includes("velbert")) {
+    return { id: "loc-haevg-velbert", name: "Praxis Velbert" };
+  }
+  if (accountName.toLowerCase().includes("uckerath")) {
+    return { id: "loc-haevg-uckerath", name: "Praxis Uckerath" };
+  }
+  return null; // Zentrale Konten
+};
+```
+
+**Anwendung:** In `/api/cases/[id]/bank-accounts/route.ts` Zeilen 162-171
+
+### Begründung
+
+**Warum Workaround statt weitere Debugging-Versuche?**
+- User-Feedback: "ne man. das kann doch nciht schwer sein!!" (Frustration)
+- Zeitbudget vs. Nutzen: Feature-Funktionalität ist wichtiger als perfekte Technik
+- Lokaler Scope: Problem betrifft nur HVPlus-Fall (5 Konten, eindeutige Namen)
+- Revisionssprache: Zuordnung ist nachvollziehbar und dokumentiert
+
+**Warum nicht Schema-Änderung?**
+- Schema ist nachweislich korrekt (DB zeigt Daten)
+- Problem liegt im Prisma Client Layer (Modul-Caching?)
+
+### Konsequenzen
+
+**Positiv:**
+- Feature funktioniert sofort
+- User kann weiterarbeiten
+- Eindeutige Zuordnung für HVPlus-Fall
+
+**Negativ:**
+- Nicht skalierbar (neue Fälle mit ähnlichen Namen würden fehlschlagen)
+- Hardcoded Business-Logik in API-Layer (nicht ideal)
+- Prisma-Bug bleibt ungelöst
+
+**Nächste Schritte:**
+1. Bei nächstem Prisma-Major-Update erneut testen
+2. Issue bei Prisma melden mit Reproduktions-Case
+3. Bei neuen Fällen: Prüfen ob Problem weiterhin besteht
+
+**Rollback-Plan:**
+- Wenn Prisma-Fix verfügbar: Workaround entfernen, `acc.location` direkt verwenden
+- Code-Marker: `// WORKAROUND: Prisma gibt locationId nicht zurück`
+
+---
+
+## ADR-018: ISK-Konten gehören in Liquiditätsplanung
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Frage vom User: "ist es üblich, dass IV konten (bw konten in unserem fall) in eine IV liqui planung gehören?"
+
+**ISK (Insolvenz-Sonderkonto):**
+- BW-Bank-Konten speziell für Insolvenzverfahren
+- Werden nach Insolvenz-Eröffnung angelegt
+- Alle verfahrensbezogenen Zahlungen laufen hierüber
+
+**HVPlus-Fall konkret:**
+- ISK Velbert: Neu seit Dezember 2025, erhält alle KV/HZV/PVS-Zahlungen für Velbert
+- ISK Uckerath: Neu seit November 2025, erhält ALLE HZV-Zahlungen (inkl. Velbert!)
+- Alte Konten: Sparkasse Velbert (Massekredit), apoBank (teils gesperrt)
+
+**Rechtliche Unsicherheit:**
+- Gehören ISK-Konten überhaupt zur Insolvenzmasse?
+- Oder sind sie nur "Durchlaufposten" ohne Bilanzrelevanz?
+
+### Entscheidung
+
+**JA, ISK-Konten gehören in die Liquiditätsplanung.**
+
+Alle 5 Bankkonten des HVPlus-Falls werden einzeln im Dashboard dargestellt:
+1. ISK Velbert (BW-Bank)
+2. ISK Uckerath (BW-Bank)
+3. Geschäftskonto MVZ Velbert (Sparkasse HRV)
+4. MVZ Uckerath (apoBank)
+5. HV PLUS eG (apoBank, zentral)
+
+### Begründung
+
+**Rechtliche Grundlage (BGH-Rechtsprechung):**
+- ISK ist **Teil der Insolvenzmasse** (nicht Anderkonto des Verwalters)
+- BGH: Insolvenzverwalter darf nur ISK nutzen, nicht eigenes Anderkonto
+- Alle auf dem ISK befindlichen Mittel gehören zur Masse
+- Verwendung ist durch InsO geregelt
+
+**Fachliche Gründe:**
+- **Vollständige Liquiditätssicht:** IV muss ALLE verfügbaren Mittel kennen
+- **Massekredit-Berechnung:** ISK-Guthaben fließen in Headroom-Berechnung ein
+- **Transparenz für Gericht/Gläubiger:** Alle Konten müssen nachvollziehbar sein
+- **Zahlungsverkehr läuft hierüber:** ISK ist nicht "neutral", sondern operativ relevant
+
+**Praktische Argumentation:**
+- ISK Uckerath hat 658 Transaktionen (höchste Aktivität aller Konten!)
+- Über ISK laufen die meisten Einnahmen (KV, HZV, PVS)
+- Ohne ISK-Konten wäre Liquiditätsplanung unvollständig
+
+### Konsequenzen
+
+**Positiv:**
+- IV hat vollständige Übersicht über alle Mittel
+- Liquiditätsplanung ist vollständig und prüfungssicher
+- Massekredit-Headroom korrekt berechnet
+- Keine "versteckten" Guthaben
+
+**Negativ:**
+- Mehr Konten in der Darstellung (5 statt 3)
+- UI muss Konten aufklappbar machen (zu viele Zeilen)
+
+**Umsetzung:**
+- Bankkonto-Tab zeigt alle 5 Konten einzeln
+- Liquiditätsmatrix erhält 5 Bank-spezifische Zeilen (aufklappbar)
+- Kontext-Informationen erklären ISK-Besonderheiten
+
+**Dokumentation:**
+- `ACCOUNT_CONTEXT` in BankAccountsTab.tsx dokumentiert Verwendungszweck
+- Case-Notes für Sonja erklären rechtliche Grundlage
+
+---
+
+## ADR-019: Incident Response für Datenqualitätsprobleme
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Am 08.02.2026 entdeckte der User ein katastrophales Datenqualitätsproblem:
+- ISK Uckerath Liquiditätstabelle: 802K EUR
+- ISK Uckerath Bankkonto-Sicht: 930K EUR
+- PDF Kontoauszug (Januar Endsaldo): 419K EUR
+
+**User-Reaktion:** "WHAT THE FUCK !!? das nimmt mir legliche konfidenz in irgendwas was du hier gemacht hast!"
+
+**Root Cause:** 658 LedgerEntries in Datenbank, aber nur 303 einzigartige Buchungen. 355 Duplikate durch doppelten Import aus unterschiedlich benannten JSON-Dateien.
+
+### Entscheidung
+
+**Strukturierter Incident-Response-Prozess** mit strengen Regeln:
+
+1. **SOFORT-STOPP:** Keine weiteren Änderungen an Daten
+2. **Vollständige Dokumentation VOR jeder Aktion:**
+   - `DATA_QUALITY_INCIDENT_[Datum].md` mit Executive Summary
+   - `IMPORT_PIPELINE_ANALYSIS_[Datum].md` für Root Cause
+   - `CLEANUP_PLAN_[Datum].md` für Bereinigungsstrategie
+3. **Backup VOR jeder Löschung:**
+   - SQLite `.backup` Befehl
+   - Backup-Pfad dokumentieren
+   - Rollback-Anleitung bereitstellen
+4. **Schrittweise Bereinigung mit User-Freigabe:**
+   - Jede Löschung als separate Stufe dokumentieren
+   - User muss EXPLIZIT zustimmen ("du löscht nichts ohne mein einverständnis")
+   - Nach jeder Stufe: Verifikation gegen Original-Quellen (PDFs)
+5. **Vollständige Traceability:**
+   - Jede gelöschte Zeile ist nachvollziehbar
+   - SQL-Statements in Doku festhalten
+   - Before/After-Zahlen dokumentieren
+6. **Post-Incident Documentation:**
+   - CHANGELOG.md Update
+   - LIMITATIONS.md Update (schwache Duplikat-Erkennung)
+   - Lessons Learned dokumentieren
+
+### Begründung
+
+**Warum so strenge Prozesse?**
+- **Vertrauensverlust:** User hat explizit Vertrauen in System verloren
+- **Rechtliche Konsequenzen:** Falsche Liquiditätszahlen können Insolvenzverfahren gefährden
+- **Revisionssprache:** Jede Aktion muss nachvollziehbar und begründet sein
+- **Keine Experimente:** Bei Datenverlust-Risiko nur dokumentierte, geprüfte Schritte
+
+**Warum Backup vor JEDER Löschung?**
+- SQL-Fehler können katastrophale Folgen haben (677 Entries gelöscht statt 18!)
+- Rollback muss in < 1 Minute möglich sein
+- SQLite `.backup` ist schnell (7.4 MB in Sekunden)
+
+**Warum User-Freigabe für jeden Schritt?**
+- User trägt letztendlich Verantwortung
+- Transparenz schafft Vertrauen zurück
+- Keine "überraschenden" Datenänderungen
+
+### Konsequenzen
+
+**Positiv:**
+- Incident wurde erfolgreich behoben (303 saubere Entries, 0 Duplikate)
+- User-Vertrauen durch Transparenz teilweise wiederhergestellt
+- Dokumentation dient als Vorlage für zukünftige Incidents
+- Rollback-Capability wurde demonstriert (fehlerhafte Löschung erfolgreich rückgängig gemacht)
+
+**Negativ:**
+- Zeitaufwändig: 4 Dokumentationsdateien + 4 Bereinigungsstufen
+- Manuelle Prozesse: Keine automatische Duplikat-Erkennung
+- Vertrauensschaden: User wird zukünftig skeptischer sein
+
+**Lessons Learned:**
+1. **Import-Pipeline-Schwächen:**
+   - Keine File-Hash-Prüfung
+   - Kein `ingestion_jobs` Tracking
+   - Schwache Description-based Duplikat-Erkennung
+   - Ad-hoc-Scripts statt offizieller Pipeline
+
+2. **Verifikation MUSS vor Freigabe:**
+   - Niemals Daten als "fertig" markieren ohne Abgleich mit Original-Quelle (PDF)
+   - Duplikat-Check gehört in Standard-Verifikation
+   - Summenbildung über alle Perioden prüfen
+
+3. **DELETE-Statements IMMER mit WHERE-Clause auf äußerster Ebene:**
+   - `DELETE FROM ledger_entries WHERE id NOT IN (...)` ist gefährlich
+   - Korrekt: `DELETE FROM ledger_entries WHERE bankAccountId = X AND id NOT IN (...)`
+   - Vor Ausführung: DRY-RUN mit `SELECT COUNT(*)` simulieren
+
+4. **Dokumentation ist keine Zeitverschwendung:**
+   - User-Vertrauen hängt von Transparenz ab
+   - Dokumentation ermöglichte erfolgreiche Bereinigung
+   - Incident-Reports sind Revisionsnachweis
+
+**Zukünftige Verbesserungen:**
+- Robuste Duplikat-Erkennung über `(bankAccountId, transactionDate, amountCents)` Triple
+- File-Hash-Tracking in `ingestion_jobs`
+- Automatische Verifikation gegen Summen aus JSON-Metadaten
+- Pre-Import Dry-Run mit Duplikat-Warnung
+
+---
+
+## ADR-020: Clean Slate Re-Import als Standard-Bereinigungsstrategie
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Nach dem ISK Uckerath Duplikate-Incident wurden zwei Bereinigungsstrategien getestet:
+
+**V1-Versuch: Selektive Duplikat-Bereinigung**
+- Cross-File Duplikate löschen (November V2, Dezember V1 Duplikate, Januar V1)
+- File-internal Duplikates löschen (gleicher Tag + Betrag innerhalb derselben Datei)
+- **Ergebnis:** 18 legitime Transaktionen verloren (303 statt 321 Entries)
+- **Grund:** Transaktionen mit gleichem Datum + Betrag sind nicht zwingend Duplikate
+
+**V2-Versuch: Clean Slate Re-Import**
+- DELETE alle Entries für betroffenes Bankkonto
+- Re-Import aus VERIFIED JSONs (differenceCents: 0)
+- **Ergebnis:** 345 Entries, exakt wie in JSONs, Closing Balance korrekt
+
+### Entscheidung
+
+**Bei VERIFIED Datenquellen: Clean Slate Re-Import statt selektive Bereinigung.**
+
+1. **DELETE:** Alle betroffenen Entries löschen
+2. **Re-Import:** Aus verifizierten Quelldateien neu importieren
+3. **Verifikation:** Anzahl + Closing Balance gegen Original-Quelle prüfen
+
+### Begründung
+
+**Warum Clean Slate besser ist:**
+- **Garantierte Korrektheit:** JSON-Metadaten definieren erwartetes Ergebnis (transactionCount, closingBalance)
+- **Keine verlorenen Transaktionen:** Alle Daten kommen aus verifizierter Quelle
+- **Einfacher:** Kein komplexes Duplikat-Matching nötig
+- **Auditierbar:** Klare Quelle für jeden Entry (importSource)
+
+**Warum selektive Bereinigung riskant ist:**
+- **Falsche Annahmen:** Gleicher Tag + Betrag ≠ Duplikat (z.B. HZV-Abrechnungen)
+- **Komplexe Logik:** Matching-Regeln können fehlschlagen
+- **Nicht deterministisch:** Welcher Entry wird behalten, welcher gelöscht?
+- **Schwer zu verifizieren:** Woher wissen wir, dass wir nichts verloren haben?
+
+**Warum nur bei VERIFIED Quellen:**
+- VERIFIED bedeutet: `differenceCents: 0` und `status: PASS`
+- Diese JSONs wurden gegen PDF-Kontoauszüge geprüft
+- Opening + Transaktionen = Closing (verifiziert)
+- JSONs sind "Single Source of Truth"
+
+### Konsequenzen
+
+**Positiv:**
+- Null-Fehler-Risiko bei Bereinigung
+- User-Vertrauen durch Transparenz
+- Klare Verifikationskriterien (Anzahl + Summe)
+- Wiederholbar und deterministisch
+
+**Negativ:**
+- Alle Entries verlieren ihre IDs (neue IDs bei Re-Import)
+- Bestehende Klassifikationen gehen verloren (reviewStatus, categoryTag, etc.)
+- Bei nicht-VERIFIED Quellen nicht anwendbar
+
+**Mitigation für Klassifikations-Verlust:**
+- Re-Import nur für UNREVIEWED Daten (ISK Uckerath war noch nicht klassifiziert)
+- Bei klassifizierten Daten: Klassifikation exportieren, Re-Import, Klassifikation re-applizieren
+
+### Workflow-Vorlage
+
+```bash
+# 1. Backup ZUERST
+sqlite3 dev.db ".backup '/tmp/backup-$(date +%Y%m%d-%H%M%S).db'"
+
+# 2. Verifikation: Prüfe JSON-Metadaten
+jq '.verification' source.json
+# Erwartung: differenceCents: 0, status: PASS
+
+# 3. DELETE betroffene Entries
+DELETE FROM ledger_entries WHERE bankAccountId = 'xxx';
+
+# 4. Re-Import aus VERIFIED JSON
+# (Import-Mechanismus je nach Fall)
+
+# 5. Verifikation gegen JSON
+SELECT COUNT(*) FROM ledger_entries WHERE bankAccountId = 'xxx';
+-- Erwartung: transactionCount aus JSON
+
+SELECT SUM(amountCents) / 100.0 FROM ledger_entries WHERE bankAccountId = 'xxx';
+-- Erwartung: closingBalanceFromPDF aus JSON
+```
+
+### Anwendungsfälle
+
+**Wann Clean Slate verwenden:**
+- ✅ VERIFIED JSONs vorhanden (differenceCents: 0)
+- ✅ Daten sind UNREVIEWED (keine Klassifikation verloren)
+- ✅ Duplikate-Problem bei einem abgrenzbaren Bereich (z.B. ein BankAccount, ein Monat)
+- ✅ User fordert Null-Fehler-Toleranz
+
+**Wann NICHT Clean Slate verwenden:**
+- ❌ Keine VERIFIED Quelle verfügbar
+- ❌ Daten sind bereits klassifiziert (CONFIRMED/ADJUSTED)
+- ❌ Problem betrifft viele Bereiche gleichzeitig
+- ❌ Quelle hat bekannte Fehler (differenceCents ≠ 0)
+
+---
+
+## ADR-015: Tab-basierte Business-Logik-Darstellung
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Insolvenzverwalter benötigen schnellen Zugriff auf fallspezifische Business-Logik (Zahlungsregeln, Vertragsdetails, Abrechnungswege). Diese Information muss sowohl im internen Admin-Dashboard als auch im externen Portal identisch verfügbar sein.
+
+### Entscheidung
+
+Business-Logik wird als Tab im Unified Dashboard dargestellt, nicht als separate Route. Die Komponente `BusinessLogicContent.tsx` wird direkt im Dashboard gerendert.
+
+### Begründung
+
+**Warum Tab statt separate Route:**
+- **Konsistenz:** Alle Fallansichten sind Tab-basiert strukturiert
+- **Navigation:** User bleibt im Dashboard-Kontext, keine Routing-Komplexität
+- **Shared Component:** Eine Komponente für Admin + Portal eliminiert Duplikate
+- **Performance:** Keine zusätzlichen Page-Loads, Hot Module Replacement funktioniert
+
+**Warum nicht separate Seite wie `/berechnungsgrundlagen`:**
+- Separate Seiten nur für öffentliche externe Links (ohne Dashboard-Shell)
+- Business-Logik ist Dashboard-integrierte Information, kein Standalone-Dokument
+
+### Konsequenzen
+
+- **Positiv:** Wartbarkeit durch Single Component, einheitliche UX
+- **Positiv:** Schnelle Navigation zwischen Tabs
+- **Technisch:** Tab-Config in `dashboard.ts`, Case-Statement in `renderTabContent()`
+- **Standard:** Alle neuen Fallansichten sollten ebenfalls Tab-basiert sein
+
+---
+
+## ADR-016: HVPlus-spezifische vs. generische Business-Logik
+
+**Datum:** 08. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Business-Logik-Tab sollte IV bei Verständnis der Zahlungslogik helfen. Frage: Generische InsO-Erklärungen oder fallspezifische Details?
+
+### Entscheidung
+
+Business-Logik-Tab ist **fallspezifisch**, nicht generisch. Für HVPlus: Konkrete Abrechnungsstellen (KVNO, HAVG, PVS), echte Banken (Sparkasse HRV, apoBank), Massekreditvertrag §1(2) Details.
+
+### Begründung
+
+- **Zielgruppe:** Erfahrene Insolvenzverwalter kennen InsO-Grundlagen
+- **Vertrauensbildung:** Konkrete Vertragsreferenzen wirken professioneller als allgemeine Erklärungen
+- **Actionable:** IV kann direkt mit echten Kontakten/Verträgen arbeiten
+- **Kein Marketing:** Faktisch, konservativ, ohne Versprechungen
+
+**Abgelehnte Alternative:** Generische Erklärungen wie "Was ist Altmasse/Neumasse" wären:
+- Beleidigend für erfahrene IV ("brauchen wir BWLer sicher keinem alten Inso-Rechtsanwalt erklären")
+- Weniger vertrauenserweckend
+- Nicht direkt nutzbar
+
+### Konsequenzen
+
+- **Pro Fall:** Jeder Fall braucht eigene Business-Logik-Komponente
+- **Template-Ansatz:** `BusinessLogicContent.tsx` kann als Template für andere Fälle dienen
+- **Wartung:** Updates bei Vertragsänderungen nötig
+- **Qualität:** Höhere Qualität durch Fallspezifität
+
+---
+
 ## Template für neue Entscheidungen
 
 ```markdown

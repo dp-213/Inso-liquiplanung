@@ -594,6 +594,30 @@ for (const entry of entries) {
 | **Liquiditätstabelle** | ✅ Ja | Zeigt aktuelle Realität |
 | **Rolling Forecast** | ✅ Ja | IST für Vergangenheit, PLAN für Zukunft |
 | **IST/PLAN-Vergleich** | ❌ Nein | Zeigt beide Werte nebeneinander |
+| **Business-Logik** | ➖ N/A | Fallspezifische Vertragsregeln, Zahlungslogik |
+
+#### Business-Logik-Tab
+
+**Zweck:** Fallspezifische Business-Logik für Insolvenzverwalter visualisieren
+
+**Komponente:** `/components/business-logic/BusinessLogicContent.tsx`
+
+**Integration:** Tab im Unified Dashboard (Admin + Portal)
+
+**Inhalt (am Beispiel HVPlus):**
+- Patientenarten & Abrechnungswege (GKV: KV+HZV, PKV: PVS)
+- Abrechnungszyklen mit Timelines (KV: Leistung → Abschlag 80% → Rest 20%)
+- Alt/Neu-Regeln mit visuellen Split-Balken (Q4/2025: 1/3 Alt, 2/3 Neu)
+- Zahlungsströme zu ISK-Konten (Velbert vs. Uckerath)
+- LANR-Übersicht (Ärzte mit HZV-Volumina)
+- Bankverbindungen & Massekredit-Status
+- Offene Punkte mit Priorisierung
+
+**Design-Prinzipien:**
+- Konservativ, faktisch, vertrauenserweckend (kein Marketing-Stil)
+- Fallspezifisch (keine generischen InsO-Erklärungen)
+- Vertragsbezüge für Auditierbarkeit (z.B. "Massekreditvertrag §1(2)a")
+- Dezente Visualisierungen (Timeline, Flow, Split-Balken)
 
 ### IST/PLAN-Vergleich (separater Tab)
 

@@ -130,8 +130,8 @@ export default function CaseDashboardPage({
       }
       const dashboardData = await dashboardRes.json();
 
-      // Use dashboard result as calcData (it has the same structure)
-      const calcData = dashboardData.result || {};
+      // Use dashboard calculation as calcData (correct API shape)
+      const calcData = dashboardData.calculation || {};
 
       // Set estate allocation
       if (dashboardData.estateAllocation) {
@@ -154,17 +154,17 @@ export default function CaseDashboardPage({
       const transformed: DashboardCalculationData = {
         caseInfo: {
           caseId: id,
-          caseNumber: dashboardData.caseInfo?.caseNumber || "",
-          debtorName: dashboardData.caseInfo?.debtorName || "",
-          courtName: dashboardData.caseInfo?.courtName || "",
-          planStartDate: dashboardData.caseInfo?.planStartDate || new Date().toISOString(),
+          caseNumber: dashboardData.case?.caseNumber || "",
+          debtorName: dashboardData.case?.debtorName || "",
+          courtName: dashboardData.case?.courtName || "",
+          planStartDate: dashboardData.plan?.planStartDate || new Date().toISOString(),
         },
         kpis: {
           openingBalanceCents: BigInt(calcData.openingBalanceCents || "0"),
           closingBalanceCents: BigInt(calcData.finalClosingBalanceCents || "0"),
           totalInflowsCents: BigInt(calcData.totalInflowsCents || "0"),
           totalOutflowsCents: BigInt(calcData.totalOutflowsCents || "0"),
-          netChangeCents: BigInt(calcData.totalNetCashflowsCents || "0"),
+          netChangeCents: BigInt(calcData.totalNetCashflowCents || "0"),
           minBalanceCents: minBalance,
           minBalanceWeek: minBalanceWeek,
           negativeWeeksCount: periods.filter(

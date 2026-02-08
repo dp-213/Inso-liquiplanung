@@ -110,7 +110,11 @@ npx prisma db push   # Sync database schema
    - `docs/DECISIONS.md` – why decisions were made
    - `docs/LIMITATIONS.md` – known constraints
 3. **Calculation engine is immutable** – presentation layer never modifies calculation logic
-4. **13-week horizon** – fixed industry standard, not configurable
+4. **🚨 KRITISCH: Planungsperioden sind FALLSPEZIFISCH 🚨**
+   - **NIEMALS "13 Wochen" als Standard annehmen!**
+   - System unterstützt: `WEEKLY` (z.B. 13 Wochen) ODER `MONTHLY` (z.B. 11 Monate)
+   - **HVPlus Fall:** `periodType=MONTHLY`, `periodCount=11` (11 Monate)
+   - Immer aus `LiquidityPlan.periodType` + `periodCount` lesen!
 
 ## WICHTIG: Deutsche Umlaute
 

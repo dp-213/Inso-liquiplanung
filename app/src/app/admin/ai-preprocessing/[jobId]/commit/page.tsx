@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
-import { AI_JOB_STATUS_LABELS, AiJobStatus } from "@/lib/ai-preprocessing/types";
+import { AiJobStatus } from "@/lib/ai-preprocessing/types";
 
 interface JobDetails {
   id: string;
@@ -35,7 +35,6 @@ interface JobDetails {
 
 export default function AiPreprocessingCommitPage() {
   const params = useParams();
-  const router = useRouter();
   const jobId = params.jobId as string;
 
   const [job, setJob] = useState<JobDetails | null>(null);

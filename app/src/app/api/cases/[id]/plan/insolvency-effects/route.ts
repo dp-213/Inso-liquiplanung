@@ -81,6 +81,7 @@ export async function GET(
       planId: activePlan.id,
       periodType: activePlan.periodType,
       periodCount: activePlan.periodCount,
+      planStartDate: activePlan.planStartDate,
       effects: Object.values(effectsByName),
       rawEffects: activePlan.insolvencyEffects.map((e) => ({
         ...e,

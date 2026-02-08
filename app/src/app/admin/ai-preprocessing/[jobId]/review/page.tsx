@@ -15,6 +15,7 @@ import {
   type CategoryAggregation,
   type InflowCategory,
   type OutflowCategory,
+  type UncertaintyLevel,
 } from "@/lib/ai-preprocessing/insolvency-categories";
 import {
   DOCUMENT_TYPE_LABELS,
@@ -851,7 +852,7 @@ function CategoryRow({
                       {row.aiSuggestion.categoryUncertainty && (
                         <span
                           className={`text-xs px-1.5 py-0.5 rounded ${getUncertaintyClasses(
-                            row.aiSuggestion.categoryUncertainty as any
+                            row.aiSuggestion.categoryUncertainty as UncertaintyLevel
                           )}`}
                         >
                           {UNCERTAINTY_LABELS[row.aiSuggestion.categoryUncertainty as keyof typeof UNCERTAINTY_LABELS] ||

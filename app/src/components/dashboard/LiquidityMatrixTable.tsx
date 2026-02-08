@@ -180,6 +180,23 @@ export default function LiquidityMatrixTable({
   const [locationData, setLocationData] = useState<Record<string, LiquidityMatrixData>>({});
   const [locationLoading, setLocationLoading] = useState(false);
 
+  // Collapsible Bank Rows - standardmäßig eingeklappt
+  const [collapsedBankBlocks, setCollapsedBankBlocks] = useState<Set<string>>(
+    new Set(["OPENING_BALANCE", "CLOSING_BALANCE"])
+  );
+
+  const toggleBankBlock = (blockId: string) => {
+    setCollapsedBankBlocks((prev) => {
+      const next = new Set(prev);
+      if (next.has(blockId)) {
+        next.delete(blockId);
+      } else {
+        next.add(blockId);
+      }
+      return next;
+    });
+  };
+
   // Use controlled scope if provided, otherwise use local state
   const isControlled = controlledScope !== undefined;
   const scope = isControlled ? controlledScope : localScope;
@@ -549,16 +566,30 @@ export default function LiquidityMatrixTable({
                     );
                   }
 
+                  // Skip bank account sub-rows wenn Block collapsed ist
+                  const isBankRow = (block.id === "OPENING_BALANCE" || block.id === "CLOSING_BALANCE") &&
+                                    row.isSubRow &&
+                                    row.id.includes("balance_");
+
+                  if (isBankRow && collapsedBankBlocks.has(block.id)) {
+                    return null;
+                  }
+
                   const isNegative = BigInt(row.total) < BigInt(0);
                   const bgClass = row.isSummary ? getBlockColorClass(block.id) : "";
                   const showBreakdown = showLocationBreakdown && scope === "GLOBAL" && !row.isSummary && Object.keys(locationData).length > 0;
+
+                  // Bank Block Total Row ist clickable zum Expand/Collapse
+                  const isBankBlockTotal = row.isSummary && (block.id === "OPENING_BALANCE" || block.id === "CLOSING_BALANCE");
+                  const isExpanded = !collapsedBankBlocks.has(block.id);
 
                   return (
                     <Fragment key={row.id}>
                       <tr
                         className={`border-b border-gray-100 ${bgClass} ${
                           row.isSummary ? "font-semibold" : ""
-                        } hover:bg-gray-50`}
+                        } ${isBankBlockTotal ? "cursor-pointer hover:bg-gray-100" : "hover:bg-gray-50"}`}
+                        onClick={isBankBlockTotal ? () => toggleBankBlock(block.id) : undefined}
                       >
                         {/* Row Label */}
                         <td
@@ -566,7 +597,31 @@ export default function LiquidityMatrixTable({
                             row.isSubRow ? "pl-8 text-gray-600" : "text-gray-900"
                           }`}
                         >
-                          {row.label}
+                          <div className="flex items-center gap-2">
+                            {isBankBlockTotal && (
+                              <svg
+                                className={`w-4 h-4 text-gray-500 transition-transform ${
+                                  isExpanded ? "rotate-90" : ""
+                                }`}
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M9 5l7 7-7 7"
+                                />
+                              </svg>
+                            )}
+                            <span>{row.label}</span>
+                            {isBankBlockTotal && (
+                              <span className="text-xs text-gray-400 font-normal">
+                                ({isExpanded ? "aufgeklappt" : "eingeklappt"})
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Period Values */}

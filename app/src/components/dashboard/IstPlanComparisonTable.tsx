@@ -33,8 +33,8 @@ function DeviationBadge({ value, type }: { value: string; type: "inflow" | "outf
   // Für Einnahmen: positiv = gut (grün), negativ = schlecht (rot)
   // Für Ausgaben: positiv = schlecht (mehr Ausgaben), negativ = gut (weniger Ausgaben)
   // Für Netto: positiv = gut (mehr Gewinn), negativ = schlecht
-  let isPositive = cents > BigInt(0);
-  let isGood = type === "outflow" ? !isPositive : isPositive;
+  const isPositive = cents > BigInt(0);
+  const isGood = type === "outflow" ? !isPositive : isPositive;
 
   return (
     <span

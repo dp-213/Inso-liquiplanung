@@ -7,6 +7,7 @@ interface KPICardsProps {
   formatCurrency: (cents: bigint) => string;
   periodType?: "WEEKLY" | "MONTHLY";
   periodCount?: number;
+  bankBalanceCents?: bigint | null; // Optionaler aktueller Bank-Bestand
 }
 
 export default function KPICards({
@@ -16,9 +17,12 @@ export default function KPICards({
   formatCurrency,
   periodType = "WEEKLY",
   periodCount = 13,
+  bankBalanceCents,
 }: KPICardsProps) {
   const isNegativeMinCash = minCash < BigInt(0);
   const isNegativeCurrentCash = currentCash < BigInt(0);
+  const hasBankBalance = bankBalanceCents !== undefined && bankBalanceCents !== null;
+  const isNegativeBankBalance = hasBankBalance && bankBalanceCents < BigInt(0);
 
   // Dynamische Beschriftung basierend auf Periodentyp
   const getFullPeriodLabel = (): string => {
@@ -28,20 +32,45 @@ export default function KPICards({
     return `${periodCount}+ Wochen`;
   };
 
+  // Grid-Klassen je nachdem ob Bank-Balance vorhanden ist
+  const gridClass = hasBankBalance
+    ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4"
+    : "grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4";
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-      {/* Current Cash */}
+    <div className={gridClass}>
+      {/* Aktueller Bank-Bestand - NUR wenn vorhanden, dann ZUERST */}
+      {hasBankBalance && (
+        <div className="admin-card p-4 sm:p-5">
+          <div className="flex items-start justify-between">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs sm:text-sm font-medium text-[var(--secondary)]">Aktueller Bank-Bestand</p>
+              <p className={`mt-1 sm:mt-2 text-xl sm:text-2xl font-bold truncate ${isNegativeBankBalance ? "text-[var(--danger)]" : "text-green-600"}`}>
+                {formatCurrency(bankBalanceCents)}
+              </p>
+            </div>
+            <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ml-3 ${isNegativeBankBalance ? "bg-red-100" : "bg-green-100"}`}>
+              <svg className={`w-4 h-4 sm:w-5 sm:h-5 ${isNegativeBankBalance ? "text-red-600" : "text-green-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+          </div>
+          <p className="mt-2 sm:mt-3 text-xs text-[var(--muted)]">IST-Salden aller Bankkonten</p>
+        </div>
+      )}
+
+      {/* Plan-Startsaldo */}
       <div className="admin-card p-4 sm:p-5">
         <div className="flex items-start justify-between">
           <div className="min-w-0 flex-1">
-            <p className="text-xs sm:text-sm font-medium text-[var(--secondary)]">Aktueller Bestand</p>
+            <p className="text-xs sm:text-sm font-medium text-[var(--secondary)]">Plan-Startsaldo</p>
             <p className={`mt-1 sm:mt-2 text-xl sm:text-2xl font-bold truncate ${isNegativeCurrentCash ? "text-[var(--danger)]" : "text-[var(--foreground)]"}`}>
               {formatCurrency(currentCash)}
             </p>
           </div>
-          <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ml-3 ${isNegativeCurrentCash ? "bg-red-100" : "bg-blue-100"}`}>
-            <svg className={`w-4 h-4 sm:w-5 sm:h-5 ${isNegativeCurrentCash ? "text-red-600" : "text-blue-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ml-3 ${isNegativeCurrentCash ? "bg-red-100" : "bg-purple-100"}`}>
+            <svg className={`w-4 h-4 sm:w-5 sm:h-5 ${isNegativeCurrentCash ? "text-red-600" : "text-purple-600"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
         </div>

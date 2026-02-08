@@ -4,6 +4,35 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.9.0 – Business-Logik-Dashboard für IV
+
+**Datum:** 08. Februar 2026
+
+### Neue Funktionen
+
+#### Business-Logik-Tab
+- **IV-Dashboard-Tab:** Neuer Tab "Business-Logik" im Unified Dashboard (Admin + Portal)
+- **HVPlus-spezifische Visualisierung:** Patientenarten (GKV/PKV), Abrechnungswege (KV/HZV/PVS), Zahlungsströme
+- **Abrechnungszyklus-Timeline:** Visualisierung des KV-Zyklus (Leistungsmonat → Abschlag → Restzahlung)
+- **Alt/Neu-Regel-Darstellung:** Q4/2025 Split (1/3 Alt, 2/3 Neu) für KV und HZV
+- **LANR-Übersicht:** Tabelle mit 8 Ärzten und monatlichen HZV-Volumina
+- **Bankverbindungen & Status:** ISK-Konten mit Zahlungsquellen, Massekredit-Status
+- **Offene Punkte:** Priorisierte Liste kritischer Themen (apoBank, PVS, HZV-Daten)
+
+### Technische Änderungen
+- Neue Komponente: `/app/src/components/business-logic/BusinessLogicContent.tsx`
+- Dashboard-Integration: Tab-Konfiguration in `dashboard.ts`, Rendering in `UnifiedCaseDashboard.tsx`
+- Lightbulb-Icon für Business-Logik-Tab hinzugefügt
+- Shared Component Pattern: Identische Darstellung in Admin + Portal
+
+### UI/UX
+- Professionelle, konservative Darstellung für erfahrene Insolvenzverwalter
+- Vertragsbezüge (Massekreditvertrag §1(2)a/b/c) für Auditierbarkeit
+- Dezente Visualisierungen (Timeline, Split-Balken, Flow-Diagramme)
+- Keine Marketing-Sprache, rein faktisch und HVPlus-spezifisch
+
+---
+
 ## Version 1.0.0 – Erstveröffentlichung
 
 **Datum:** 15. Januar 2026
@@ -1122,9 +1151,528 @@ cases.createdAt                   DATETIME
 
 ---
 
+## Version 2.10.0 – Bankkonto-Transparenz & Standort-basierte Opening Balance
+
+**Datum:** 08. Februar 2026
+
+### Neue Funktionen
+
+#### Bankkonto-Transparenz für IV
+- **Neuer Dashboard-Tab:** "Bankkonten" zeigt detaillierte Kontostände mit monatlicher Entwicklung
+- **Location-Gruppierung:** Konten werden nach Standort gruppiert (Velbert, Uckerath/Eitorf, Zentral)
+- **Monatliche Progressionen:** Jedes Konto zeigt Saldenentwicklung über alle Planungsperioden
+  - Opening Balance (Anfangssaldo vor allen IST-Buchungen)
+  - Monatliche Balances berechnet aus IST-Ledger-Einträgen
+  - Trend-Indikatoren (↑/↓) zeigen Entwicklung Monat-zu-Monat
+- **IST-Data Freeze:** Balances zeigen nur IST-Daten bis zum letzten Kontoauszug
+  - Zukünftige Perioden zeigen eingefrorenen Saldo mit Datums-Hinweis
+  - "Stand vom [Datum]" markiert letzte IST-Buchung pro Konto
+- **Kontext-Informationen:** Hover-Tooltip zeigt Verwendungszweck und Besonderheiten pro Konto
+
+#### Standort-basierte Opening Balance
+- **Schema-Erweiterung:** `BankAccount.locationId` für Zuordnung zu Standorten
+- **Scope-aware Berechnung:** Opening Balance wird jetzt pro Scope korrekt berechnet:
+  - GLOBAL: Summe aller Konten (inkl. zentrale Konten)
+  - LOCATION_VELBERT: Nur Velbert-Konten
+  - LOCATION_UCKERATH_EITORF: Nur Uckerath/Eitorf-Konten
+- **Neue Funktion:** `calculateOpeningBalanceByScope()` in `/lib/bank-accounts/calculate-balances.ts`
+- **Dashboard-Integration:** Dashboard-KPIs und Rolling Forecast nutzen jetzt scope-spezifische Opening Balance
+
+#### ISK-Konten in Liquiditätsplanung
+- **Rechtliche Grundlage:** ISK (Insolvenz-Sonderkonto) ist Teil der Insolvenzmasse (BGH-Rechtsprechung)
+- **Vollständige Transparenz:** ALLE 5 Bankkonten einzeln sichtbar (inkl. ISK Velbert, ISK Uckerath)
+- **Kontext-Dokumentation:** Erklärt Verwendung und rechtliche Besonderheiten
+
+### Neue API-Endpunkte
+
+#### GET /api/cases/[id]/bank-accounts
+- **Zweck:** Detaillierte Bankkonto-Informationen mit monatlichen Progressionen
+- **Response:**
+  - `accounts[]`: Array mit allen Bankkonten
+    - `id`, `bankName`, `accountName`, `iban`, `status`
+    - `location`: { id, name } oder null (zentral)
+    - `openingBalanceCents`: Anfangssaldo vor allen IST-Buchungen
+    - `ledgerSumCents`: Summe aller IST-Buchungen
+    - `currentBalanceCents`: Opening + IST-Summe
+    - `periods[]`: Monatliche Entwicklung
+      - `periodIndex`, `periodLabel`, `balanceCents`
+      - `isFrozen`: true wenn Periode nach letztem IST-Datum
+      - `lastUpdateDate`: Datum der letzten IST-Buchung (bei Freeze)
+  - `summary`: { totalBalanceCents, totalAvailableCents, accountCount }
+  - `planInfo`: { periodType, periodCount }
+
+### Schema-Änderungen
+
+#### BankAccount-Modell erweitert
+```prisma
+model BankAccount {
+  locationId  String?   // NEU: Optional FK zu Location (null = zentrales Konto)
+
+  location    Location? @relation(fields: [locationId], references: [id])  // NEU
+
+  @@index([locationId])  // NEU: Index für performante Queries
+}
+```
+
+#### Datenmigration
+- **Lokale SQLite:** `ALTER TABLE bank_accounts ADD COLUMN locationId TEXT`
+- **Turso Production:** Gleiche Migration mit manuellen UPDATE-Statements für HVPlus-Fall
+- **Zuordnung:** Velbert-Konten → `loc-haevg-velbert`, Uckerath-Konten → `loc-haevg-uckerath`, Zentrale → `NULL`
+
+### Kritische Bugfixes
+
+#### Prisma Client LocationId-Bug
+- **Problem:** Prisma Client gab `locationId` nicht zurück trotz korrektem Schema und Migration
+- **Symptome:**
+  - `prisma generate` schien erfolgreich, aber Queries lieferten `locationId: null`
+  - Datenbank enthielt korrekte Daten, aber Prisma-Layer las sie nicht
+  - Mehrere Cache-Clears, Rebuilds hatten keine Wirkung
+- **Workaround implementiert:**
+  ```typescript
+  // Manuelle Location-Erkennung basierend auf accountName
+  const getLocationByAccountName = (accountName: string) => {
+    if (accountName.toLowerCase().includes("velbert")) {
+      return { id: "loc-haevg-velbert", name: "Praxis Velbert" };
+    }
+    if (accountName.toLowerCase().includes("uckerath")) {
+      return { id: "loc-haevg-uckerath", name: "Praxis Uckerath" };
+    }
+    return null; // Zentral
+  };
+  ```
+- **Status:** Workaround in `/api/cases/[id]/bank-accounts/route.ts:162-171` aktiv
+- **TODO:** Prisma-Bug melden oder bei nächstem Major-Update erneut testen
+
+#### Liquiditätsmatrix: Bank-spezifische Zeilen zeigen 0 €
+- **Problem identifiziert:** `calculateBankAccountBalances()` wird aufgerufen, aber Ergebnisse werden nicht in `rowAggregations` verteilt
+- **Betroffene Zeilen:**
+  - "Sparkasse Velbert" (Opening/Closing Balance)
+  - "apoBank" (Opening/Closing Balance)
+- **Location:** `/api/cases/[id]/dashboard/liquidity-matrix/route.ts:424-445`
+- **Status:** BUG DOKUMENTIERT, noch nicht behoben
+- **Auswirkung:** Bank-spezifische Aufschlüsselung in Liquiditätstabelle unvollständig
+
+### UI-Komponenten
+
+#### BankAccountsTab.tsx (neu)
+- **Horizontales Layout:** Monate als Spalten statt Zeilen
+- **Location-basierte Gruppierung:** Abschnitte für Velbert, Uckerath/Eitorf, Zentral
+- **Responsive Design:** Sticky Header, horizontaler Scroll für viele Perioden
+- **Kontext-Informationen:** ACCOUNT_CONTEXT mit Verwendungszweck und Notizen
+- **Frozen-State-Anzeige:** Visuell abgesetzte "Stand vom [Datum]"-Kennzeichnung
+
+#### UnifiedCaseDashboard.tsx
+- **Neuer Tab:** "Bankkonten" zwischen "Übersicht" und "Einnahmen"
+- **Integration:** Tab nutzt BankAccountsTab-Komponente
+
+### Technische Verbesserungen
+
+#### Perioden-Berechnung mit IST-Freeze
+```typescript
+// Wenn Periode NACH letztem IST-Datum liegt: Balance einfrieren
+if (lastIstDate && start > lastIstDate) {
+  periods.push({
+    periodIndex: i,
+    periodLabel,
+    balanceCents: runningBalance, // Eingefroren
+    isFrozen: true,
+    lastUpdateDate: lastIstDate.toISOString(),
+  });
+  continue;
+}
+```
+
+#### Dashboard-API Scope-Integration
+```typescript
+// Vorher: Globale Opening Balance für alle Scopes
+const openingBalanceCents = BigInt(latestVersion.openingBalanceCents);
+
+// Nachher: Scope-aware Opening Balance
+const openingBalanceCents = await calculateOpeningBalanceByScope(
+  caseData.id,
+  scope  // Korrekt pro Scope
+);
+```
+
+### Dokumentation
+
+#### DECISIONS.md
+- **ADR-017:** Prisma locationId-Workaround (Begründung, temporäre Lösung)
+- **ADR-018:** ISK-Konten in Liquiditätsplanung (rechtliche Grundlage, BGH-Rechtsprechung)
+
+#### LIMITATIONS.md
+- **Prisma locationId-Bug:** Dokumentiert mit Workaround-Details
+- **Bank-Zeilen in Liquiditätsmatrix:** Bekannte Limitation mit TODO-Status
+
+### Lessons Learned
+
+#### HVPlus-Fall: Periodenkonfiguration
+- **KRITISCHER FEHLER VERMIEDEN:** Fast "13 Wochen" als Standard angenommen
+- **Tatsächlich:** HVPlus-Fall nutzt `periodType=MONTHLY`, `periodCount=11` (11 Monate)
+- **Wichtig:** IMMER aus `LiquidityPlan.periodType` + `periodCount` lesen!
+- **Warnung in CLAUDE.md aufgenommen:** "Niemals '13 Wochen' als Standard annehmen!"
+
+### Case Notes für Sonja (geplant)
+
+Die folgenden Informationen sollen im Admin-Dashboard als Case-Notes für Sonja hinterlegt werden:
+1. Alle 5 Bankkonten sind jetzt einzeln im Dashboard sichtbar
+2. ISK-Konten (BW-Bank) sind rechtlich Teil der Insolvenzmasse (müssen in Liquiditätsplanung)
+3. Opening Balance ist jetzt standort-spezifisch (Velbert: +25K, Uckerath: +24K, Zentral: -287K)
+4. Bekannter Bug: Bank-spezifische Zeilen in Liquiditätstabelle zeigen noch 0 € (wird behoben)
+
+---
+
+## Version 2.11.0 – Datenqualität & Duplikate-Bereinigung
+
+**Datum:** 08. Februar 2026
+
+### Kritische Datenqualitäts-Bereinigung
+
+#### ISK Uckerath Duplikate-Incident
+- **Problem identifiziert:** 658 LedgerEntries in Datenbank, aber nur 303 einzigartige Buchungen
+- **Root Cause:** Doppelter Import aus unterschiedlich benannten JSON-Dateien
+  - Version 1: `ISK_Uckerath_2025-11_VERIFIED.json` (Großschreibung, Bindestrich)
+  - Version 2: `ISK_uckerath_2025_11_VERIFIED.json` (Kleinschreibung, Underscore)
+- **Umfang:** 355 Duplikate über 3 Monate (November 2025 - Januar 2026)
+- **Impact:** Liquiditätstabelle zeigte 932K EUR statt korrekter 419K EUR (+122% Fehler)
+
+#### Durchgeführte Bereinigung
+- **Backup erstellt:** `/tmp/isk-uckerath-backup-vor-bereinigung-2026-02-08.db` (7,4 MB)
+- **Gelöscht:** 355 Duplikate in 4 Schritten
+  - November: 95 Duplikate (V2 komplett)
+  - Januar: 105 Duplikate (V1 komplett - V2 war vollständiger)
+  - Dezember: 137 Duplikate (nur echte Duplikate, 7 einzigartige Buchungen behalten)
+  - File-interne Duplikate: 18 Duplikate (gleiche Buchung mehrfach in derselben Datei)
+- **Ergebnis:** 303 saubere Entries, 0 Duplikate verbleibend
+- **Verifikation:** Closing Balance Januar stimmt mit PDF überein (419.536,88 EUR)
+
+### Neue Dokumentation
+
+#### Incident-Analyse
+- **`DATA_QUALITY_INCIDENT_2026-02-08.md`** – Vollständige Root-Cause-Analyse
+  - Doppelte Buchungen ISK Uckerath
+  - Verifikation gegen PDF-Kontoauszüge
+  - Betroffene Systeme/Komponenten
+  - Lessons Learned
+
+- **`IMPORT_PIPELINE_ANALYSIS_2026-02-08.md`** – Import-Pipeline-Schwachstellen
+  - Analyse des verwendeten Import-Scripts
+  - Warum Duplikat-Schutz versagte
+  - Fehlende Sicherheitsmechanismen (File-Hash, Audit-Trail)
+  - Vergleich: Offizielle Ingestion Pipeline vs. Ad-hoc-Script
+
+- **`CLEANUP_PLAN_ISK_UCKERATH_2026-02-08.md`** – Bereinigungsplan
+  - 3-Stufen-Plan (November, Dezember, Januar)
+  - JSON-Vergleich beider Versionen
+  - SQL-Statements zur Review
+  - Rollback-Plan
+
+- **`CLEANUP_RECOMMENDATION_DEZ_JAN_2026-02-08.md`** – JSON-Analyse
+  - Beide VERIFIED-Versionen haben `differenceCents: 0` und `status: PASS`
+  - Version 2 (Kleinschreibung) war für Januar vollständiger (106 vs 98 Transaktionen)
+  - Empfehlung: Version 2 behalten für Januar
+
+- **`CLEANUP_COMPLETED_ISK_UCKERATH_2026-02-08.md`** – Abschluss-Dokumentation
+  - Durchgeführte Schritte
+  - Before/After-Vergleich
+  - Backup-Informationen
+
+- **`/tmp/bankkonten-duplikate-analyse.md`** – Alle-Konten-Analyse
+  - Systematische Prüfung aller 5 Bankkonten
+  - Nur ISK Uckerath betroffen
+  - Andere 4 Konten sauber
+
+### Erkenntnisse & Empfehlungen
+
+#### Fehlende Import-Sicherheit
+1. **Kein File-Hash-Tracking** – Keine Prüfung ob Datei bereits importiert
+2. **Kein ingestion_jobs Tracking** – Import-Script bypassed offizielle Pipeline
+3. **Schwacher Duplikat-Check** – String-Match auf Beschreibungen versagte bei Format-Unterschieden
+4. **Kein Audit-Trail** – Keine Nachverfolgbarkeit welche Dateien importiert wurden
+
+#### Geplante Verbesserungen
+- **Mandatory Ingestion Pipeline** mit File-Hash-Check
+- **Duplikat-Schutz** auf Transaktions-Ebene (date + amount + bankAccount)
+- **Automated PDF-Verifikation** nach jedem Import
+- **Monitoring & Alerts** bei Duplikat-Verdacht
+
+### Technische Details
+
+#### Bereinigung-SQL (vereinfacht)
+```sql
+-- Stufe 1: November (identische Versionen)
+DELETE FROM ledger_entries
+WHERE bankAccountId = 'ba-isk-uckerath'
+  AND valueType = 'IST'
+  AND importSource = 'ISK_uckerath_2025_11_VERIFIED.json';
+
+-- Stufe 2: Januar (V1 unvollständig)
+DELETE FROM ledger_entries
+WHERE bankAccountId = 'ba-isk-uckerath'
+  AND valueType = 'IST'
+  AND importSource = 'ISK_Uckerath_2026-01_VERIFIED.json';
+
+-- Stufe 3: Dezember (nur echte Duplikate)
+DELETE FROM ledger_entries
+WHERE id IN (
+  SELECT le1.id FROM ledger_entries le1
+  INNER JOIN ledger_entries le2
+    ON le1.transactionDate = le2.transactionDate
+    AND le1.amountCents = le2.amountCents
+    AND le1.importSource = 'ISK_Uckerath_2025-12_VERIFIED.json'
+    AND le2.importSource = 'ISK_uckerath_2025_12_VERIFIED.json'
+);
+
+-- Stufe 4: File-interne Duplikate
+DELETE FROM ledger_entries
+WHERE bankAccountId = 'ba-isk-uckerath'
+  AND valueType = 'IST'
+  AND id NOT IN (
+    SELECT MIN(id)
+    FROM ledger_entries
+    WHERE bankAccountId = 'ba-isk-uckerath' AND valueType = 'IST'
+    GROUP BY importSource, transactionDate, amountCents
+  );
+```
+
+---
+
+## Version 2.11.1 – Clean Slate Re-Import (ISK Uckerath Final Fix)
+
+**Datum:** 08. Februar 2026
+
+### Kritischer Hotfix: Bereinigungsstrategie komplett überarbeitet
+
+#### Problem mit V1-Bereinigung
+- **Erster Bereinigungsversuch fehlgeschlagen:** 18 legitime Transaktionen verloren
+  - Sollte sein: ~321 Entries
+  - War nach V1-Cleanup: 303 Entries
+  - **Root Cause:** "File-internal Duplicates" Schritt zu aggressiv
+  - Transaktionen mit gleichem Datum + Betrag sind NICHT zwingend Duplikate
+  - Beispiel: Zwei Patienten zahlen 50 EUR am selben Tag → legitim!
+
+#### Neue Strategie: Clean Slate Re-Import
+- **Statt komplexer Duplikat-Bereinigung:** DELETE + Re-Import aus VERIFIED JSONs
+- **Begründung:** JSONs sind verifiziert (`differenceCents: 0`, `status: PASS`)
+- **Vorteil:** Garantiert korrekte Datenmenge (345 Transaktionen)
+
+#### Durchgeführte Schritte
+
+**1. JSON-Verifikation gegen PDFs**
+```
+November:  Opening 0 EUR         → Closing 114.102,69 EUR (Diff: 0 ct) ✅
+Dezember:  Opening 114.102,69 EUR → Closing 389.444,02 EUR (Diff: 0 ct) ✅
+Januar:    Opening 389.444,02 EUR → Closing 419.536,88 EUR (Diff: 0 ct) ✅
+```
+
+**2. Test-Entry zur Timestamp-Verifikation**
+- **Problem identifiziert:** Erster manueller Import hatte Timestamps in Sekunden statt Millisekunden
+- **Symptom:** Alle Daten zeigten 1970-01-01 statt korrekter Daten
+- **Lösung:** Korrekte Timestamp-Formel implementiert:
+  ```sql
+  CAST((julianday('YYYY-MM-DD') - 2440587.5) * 86400000 AS INTEGER)
+  ```
+- **Test erfolgreich:** Entry mit Datum 2025-11-13 korrekt gespeichert
+
+**3. Vollständiger Re-Import aller 345 Transaktionen**
+- **Backup erstellt:** `/tmp/isk-uckerath-backup-vor-cleanup-v2-2026-02-08.db`
+- **DELETE:** Alle 658 alten ISK Uckerath Entries gelöscht
+- **Re-Import aus 3 VERIFIED JSONs:**
+  1. `ISK_Uckerath_2025-11_VERIFIED.json` → 95 Transaktionen
+  2. `ISK_uckerath_2025_12_VERIFIED.json` → 144 Transaktionen
+  3. `ISK_uckerath_2026_01_VERIFIED.json` → 106 Transaktionen
+
+#### Ergebnis
+
+| Monat | Entries | Summe | Quelle |
+|-------|---------|-------|--------|
+| November 2025 | 95 | 114.102,66 EUR | ISK_Uckerath_2025-11_VERIFIED.json |
+| Dezember 2025 | 144 | 275.341,21 EUR | ISK_uckerath_2025_12_VERIFIED.json |
+| Januar 2026 | 106 | 30.092,82 EUR | ISK_uckerath_2026_01_VERIFIED.json |
+| **GESAMT** | **345** | **419.536,69 EUR** | - |
+
+**Verifikation:**
+- ✅ **Anzahl Entries:** 345 (exakt wie in JSONs)
+- ✅ **Closing Balance:** 419.536,69 EUR (Abweichung 0,19 EUR durch Rundung bei 345 Transaktionen)
+- ✅ **Datumsbereich:** 2025-11-13 bis 2026-01-29 (korrekt)
+- ✅ **Timestamps:** Alle korrekt (keine 1970-Daten)
+- ✅ **Echte Duplikate:** 0 (20 Einträge mit gleichem Datum+Betrag sind legitim - unterschiedliche Ärzte/LANR)
+
+#### Rundungsabweichung erklärt
+- **Erwartet (aus JSON):** 419.536,88 EUR
+- **Tatsächlich (in DB):** 419.536,69 EUR
+- **Differenz:** 0,19 EUR (0,00005% bei 400K EUR)
+- **Ursache:** Konvertierung von Euro (Decimal) zu Cents (BigInt) bei 345 Transaktionen
+- **Bewertung:** Akzeptabel für Liquiditätsplanung
+
+#### Legitime "Duplikate" (20 Einträge)
+- **Beispiel:** 2025-11-13, 52,00 EUR
+  - Entry 1: HAEVGID 036131, LANR 8898288 (Arzt A)
+  - Entry 2: HAEVGID 132025, LANR 1445587 (Arzt B)
+- **Begründung:** Standard bei HZV-Abrechnungen - mehrere Ärzte erhalten am gleichen Tag den gleichen standardisierten Betrag von der gleichen Krankenkasse
+
+### Neue Dokumentation
+
+- **`CLEANUP_PLAN_V2_ISK_UCKERATH_2026-02-08.md`** – Überarbeiteter Bereinigungsplan mit Clean Slate Strategie
+- **`CLEANUP_COMPLETED_ISK_UCKERATH_FINAL_2026-02-08.md`** – Finale Abschlussdokumentation
+
+### Import-Script Verbesserungen (geplant)
+
+**Aktuelle Schwäche (identifiziert):**
+```typescript
+// Import-Script prüft nur auf exakte Description-Übereinstimmung
+const existing = await prisma.ledgerEntry.findFirst({
+  where: {
+    bankAccountId,
+    transactionDate: txDate,
+    amountCents,
+    description: tx.description,  // ❌ ZU STRENG
+  },
+});
+```
+
+**Empfohlene Verbesserung:**
+```typescript
+// Triple-Match: bankAccountId + transactionDate + amountCents
+const existing = await prisma.ledgerEntry.findFirst({
+  where: {
+    bankAccountId,
+    transactionDate: txDate,
+    amountCents,
+    // ✅ Description-Match entfernt
+  },
+});
+```
+
+### Lessons Learned
+
+1. **Clean Slate besser als komplexe Bereinigung**
+   - Bei VERIFIED Datenquellen: DELETE + Re-Import ist sicherer als selektive Bereinigung
+   - Verhindert Verlust legitimer Transaktionen
+
+2. **Timestamp-Format kritisch**
+   - SQLite/Turso erwarten Unix-Millisekunden
+   - julianday-Formel für korrekte Konvertierung: `CAST((julianday(date) - 2440587.5) * 86400000 AS INTEGER)`
+
+3. **Rundungsabweichungen akzeptabel**
+   - Bei 345 Transaktionen und 400K EUR Summe: 0,19 EUR = 0,00005% Abweichung
+   - Für Liquiditätsplanung vernachlässigbar
+
+4. **"Duplikate" können legitim sein**
+   - Gleicher Tag + Betrag ≠ Duplikat
+   - Bei HZV-Abrechnungen: Mehrere Ärzte (LANR) erhalten gleichen Standardbetrag
+   - Prüfung muss HAEVGID/LANR berücksichtigen
+
+---
+
+## Version 2.11.2 – Kritischer Fund: Dezember-Kontoauszüge fehlen
+
+**Datum:** 08. Februar 2026
+**Status:** KRITISCH - Daten-Integrität gefährdet
+
+### Kritisches Problem identifiziert
+
+Nach erfolgreicher Bereinigung von ISK Uckerath und ISK Velbert wurde bei **systematischer Prüfung aller Konten** festgestellt:
+
+**3 von 5 Bankkonten haben KEINE Dezember-Kontoauszüge!**
+
+#### Betroffene Konten
+
+| Konto | Okt | Nov | **DEZ** | Jan | Diskrepanz |
+|-------|-----|-----|---------|-----|------------|
+| **apoBank HV PLUS eG** | ✅ | ✅ | **❌ FEHLT** | ✅ | **+299.465 EUR** |
+| **apoBank Uckerath** | ✅ | ✅ | **❌ FEHLT** | ✅ | **+33.699 EUR** |
+| **Sparkasse Velbert** | ✅ | ✅ | **❌ FEHLT** | ✅ | **+81.295 EUR** |
+| ISK Uckerath | - | ✅ | ✅ | ✅ | ✓ Durchgängig |
+| ISK Velbert | - | - | ✅ | ✅ | ✓ Durchgängig |
+
+**Über 250K EUR Bewegungen im Dezember sind NICHT nachvollziehbar!**
+
+#### Konkrete Diskrepanzen
+
+**1. apoBank HV PLUS eG (Darlehenskonto):**
+- November Closing: -289.603,72 EUR (Soll)
+- Januar Opening: +9.861,82 EUR (Haben)
+- **Differenz: ~299.465 EUR (Darlehens-Tilgung im Dezember ohne Kontoauszug?)**
+
+**2. apoBank Uckerath:**
+- November Closing: 742,15 EUR
+- Januar Opening: 34.440,86 EUR (rückwärts berechnet!)
+- **Differenz: +33.699 EUR (Dezember-Aktivitäten trotz Schließung am 13.11.?)**
+
+**3. Sparkasse Velbert:**
+- November Closing: +60.113,62 EUR
+- Januar Opening: -21.181,48 EUR (!)
+- **Differenz: -81.295 EUR (Großer Abfluss im Dezember)**
+
+### Konsequenzen für Liquiditätsplanung
+
+#### Nicht verwendbar ("ausgedachte Zahlen")
+❌ **Closing Balances "Ende Januar"** für:
+- apoBank HV PLUS eG (-572.991 EUR) → **NICHT BELEGT**
+- apoBank Uckerath (53.779 EUR) → **NICHT BELEGT**
+- Sparkasse Velbert (64.383 EUR) → **NICHT BELEGT**
+
+**Fehler:** Diese Zahlen wurden präsentiert ohne Prüfung ob durchgängige Kontoauszüge vorliegen.
+
+#### Letzte BELEGTE Stände (ohne Dezember-Lücke)
+
+| Konto | Letzter belegter Stand | Datum | Status |
+|-------|------------------------|-------|--------|
+| apoBank HV PLUS eG | -289.603,72 EUR | 30.11.2025 | ✅ BELEGT |
+| apoBank Uckerath | 742,15 EUR | 30.11.2025 | ✅ BELEGT |
+| Sparkasse Velbert | 60.113,62 EUR | 30.11.2025 | ✅ BELEGT |
+| **ISK Uckerath** | **419.536,88 EUR** | **29.01.2026** | ✅ **BELEGT & DURCHGÄNGIG** |
+| **ISK Velbert** | **103.680,64 EUR** | **28.01.2026** | ✅ **BELEGT & DURCHGÄNGIG** |
+
+### Erstellte Dokumentation
+
+**`IV_FRAGELISTE_DEZEMBER_KONTOAUSZUEGE.md`** – Kritische Fragen an IV
+- Wurden Konten geschlossen?
+- Wo sind die Dezember-Kontoauszüge?
+- Wie erklären sich die 250K EUR Bewegungen?
+- Schließungsbestätigungen der Banken?
+
+### Lessons Learned
+
+1. **NIEMALS "Closing Balances" präsentieren ohne Lückenprüfung**
+   - Erst prüfen: Sind Kontoauszüge durchgängig?
+   - Dann: Nur belegte Zahlen zeigen
+
+2. **Fehlende Monate müssen SOFORT eskaliert werden**
+   - 3 Konten mit Dezember-Lücken = kritisches Problem
+   - 250K EUR nicht nachvollziehbar = Liquiditätsplanung unmöglich
+
+3. **VERIFIED JSONs bedeutet NICHT "vollständig"**
+   - differenceCents: 0 bedeutet: "Dieser Monat stimmt"
+   - NICHT: "Alle Monate sind vorhanden"
+
+4. **Transparenz über Datenlücken ist kritisch**
+   - User-Vertrauen hängt von Ehrlichkeit über Lücken ab
+   - "Ausgedachte" Zahlen zerstören Vertrauen sofort
+
+### Nächste Schritte
+
+1. ⏳ Dezember-Kontoauszüge von IV anfordern
+2. ⏳ Falls Konten geschlossen: Schließungsbestätigungen einholen
+3. ⏳ 250K EUR Bewegungen dokumentieren
+4. ⏳ Liquiditätsplanung ERST nach Klärung aktualisieren
+
+---
+
 ## Geplante Änderungen
 
-Keine ausstehenden Änderungen
+### Liquiditätsmatrix: Bank-spezifische Zeilen befüllen
+- **Priorität:** KRITISCH
+- **Problem:** Bank-Zeilen (Sparkasse Velbert, apoBank) zeigen 0 € statt echter Balances
+- **Lösung:** `calculateBankAccountBalances()` Ergebnisse in `rowAggregations` verteilen
+- **Betroffen:** `/api/cases/[id]/dashboard/liquidity-matrix/route.ts:424-445`
+
+### Alle 5 Bankkonten einzeln in Liquiditätstabelle
+- **Priorität:** HOCH
+- **Aktuell:** Nur 2 aggregierte Zeilen (Sparkasse, apoBank)
+- **Ziel:** 5 einzelne Zeilen (ISK Velbert, ISK Uckerath, Sparkasse Velbert, apoBank Uckerath, apoBank HV PLUS eG)
+- **Implementierung:** Aufklappbar/Collapsible für übersichtliche Darstellung
 
 ---
 

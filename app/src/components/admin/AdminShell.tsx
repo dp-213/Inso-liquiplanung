@@ -66,7 +66,10 @@ export default function AdminShell({ username, children }: AdminShellProps) {
 
   // Close sidebar on route change
   useEffect(() => {
-    setSidebarOpen(false);
+    if (sidebarOpen) {
+      setSidebarOpen(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   // Close sidebar on escape key

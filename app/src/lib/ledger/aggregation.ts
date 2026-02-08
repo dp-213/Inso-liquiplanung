@@ -234,9 +234,9 @@ export async function syncPeriodValues(
   userId: string
 ): Promise<SyncResult> {
   const errors: string[] = [];
-  let created = 0;
-  let updated = 0;
-  let deleted = 0;
+  const created = 0;
+  const updated = 0;
+  const deleted = 0;
 
   try {
     // Get aggregation result

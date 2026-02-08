@@ -19,6 +19,7 @@ interface InsolvencyEffect {
 interface PlanInfo {
   periodType: "WEEKLY" | "MONTHLY";
   periodCount: number;
+  planStartDate: string;
 }
 
 const EFFECT_GROUPS = [
@@ -48,7 +49,11 @@ export default function InsolvencyEffectsPage() {
   const caseId = params.id as string;
 
   const [effects, setEffects] = useState<InsolvencyEffect[]>([]);
-  const [planInfo, setPlanInfo] = useState<PlanInfo>({ periodType: "WEEKLY", periodCount: 13 });
+  const [planInfo, setPlanInfo] = useState<PlanInfo>({
+    periodType: "WEEKLY",
+    periodCount: 13,
+    planStartDate: new Date().toISOString(),
+  });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [transferring, setTransferring] = useState(false);
@@ -92,6 +97,7 @@ export default function InsolvencyEffectsPage() {
         setPlanInfo({
           periodType: data.periodType || "WEEKLY",
           periodCount: data.periodCount || 13,
+          planStartDate: data.planStartDate || new Date().toISOString(),
         });
         // Transfer-Status laden
         const effectIds = rawEffects.map((e: InsolvencyEffect) => e.id);
@@ -110,13 +116,17 @@ export default function InsolvencyEffectsPage() {
 
   function generatePeriodLabels(): string[] {
     const labels: string[] = [];
-    const now = new Date();
+    const planStart = new Date(planInfo.planStartDate);
     for (let i = 0; i < planInfo.periodCount; i++) {
       if (planInfo.periodType === "MONTHLY") {
-        const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        const date = new Date(planStart.getFullYear(), planStart.getMonth() + i, 1);
         labels.push(date.toLocaleDateString("de-DE", { month: "short", year: "2-digit" }));
       } else {
-        labels.push(`KW ${String(i + 1).padStart(2, "0")}`);
+        // Für wöchentlich: Berechne Start + i Wochen
+        const weekDate = new Date(planStart);
+        weekDate.setDate(weekDate.getDate() + i * 7);
+        const weekNumber = Math.ceil((weekDate.getTime() - new Date(weekDate.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
+        labels.push(`KW ${String(weekNumber).padStart(2, "0")}`);
       }
     }
     return labels;
@@ -249,7 +259,7 @@ export default function InsolvencyEffectsPage() {
     });
   }
 
-  function useStandardEffect(standardEffect: typeof STANDARD_EFFECTS[0]) {
+  function applyStandardEffect(standardEffect: typeof STANDARD_EFFECTS[0]) {
     setFormData({
       ...formData,
       name: standardEffect.name,
@@ -368,7 +378,9 @@ export default function InsolvencyEffectsPage() {
           {STANDARD_EFFECTS.map((effect) => (
             <button
               key={effect.name}
-              onClick={() => useStandardEffect(effect)}
+              onClick={() => {
+                applyStandardEffect(effect);
+              }}
               className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
                 effect.type === "INFLOW"
                   ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"

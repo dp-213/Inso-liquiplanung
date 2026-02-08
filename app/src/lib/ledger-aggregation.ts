@@ -171,7 +171,7 @@ function getISOWeek(date: Date): number {
 /**
  * Generiere Perioden-Label
  */
-function generatePeriodLabel(
+export function generatePeriodLabel(
   periodType: PeriodType,
   periodIndex: number,
   startDate: Date
@@ -192,7 +192,7 @@ function generatePeriodLabel(
 /**
  * Berechne Perioden-Datumsbereich
  */
-function getPeriodDates(
+export function getPeriodDates(
   periodType: PeriodType,
   periodIndex: number,
   planStartDate: Date
@@ -201,15 +201,14 @@ function getPeriodDates(
     const start = new Date(planStartDate);
     start.setDate(start.getDate() + periodIndex * 7);
     const end = new Date(start);
-    end.setDate(end.getDate() + 6);
+    end.setDate(end.getDate() + 7);  // ← +7 statt +6: exklusiver Endpunkt (erster Tag nächste Woche)
     return { start, end };
   } else {
     const start = new Date(planStartDate);
     start.setMonth(start.getMonth() + periodIndex);
     start.setDate(1);
     const end = new Date(start);
-    end.setMonth(end.getMonth() + 1);
-    end.setDate(0);
+    end.setMonth(end.getMonth() + 1);  // ← Erster Tag des NÄCHSTEN Monats (exklusiv)
     return { start, end };
   }
 }
@@ -325,7 +324,7 @@ export async function aggregateLedgerEntries(
 
   // Initialisiere Perioden
   const periods: PeriodAggregation[] = [];
-  let currentOpeningBalance = openingBalanceCents;
+  const currentOpeningBalance = openingBalanceCents;
 
   for (let i = 0; i < periodCount; i++) {
     const { start, end } = getPeriodDates(periodType, i, planStartDate);

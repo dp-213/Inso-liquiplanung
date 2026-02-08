@@ -1,5 +1,4 @@
 import { PrismaClient } from "@prisma/client";
-import { PrismaLibSQL } from "@prisma/adapter-libsql";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -17,6 +16,11 @@ function createPrismaClient(): PrismaClient {
   try {
     if (databaseUrl.startsWith("libsql://") && authToken) {
       console.log("[db] Using Turso/libSQL adapter");
+
+      // Dynamischer Import für libsql (nur Server-Side)
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { PrismaLibSQL } = require("@prisma/adapter-libsql");
+
       const adapter = new PrismaLibSQL({
         url: databaseUrl,
         authToken: authToken,

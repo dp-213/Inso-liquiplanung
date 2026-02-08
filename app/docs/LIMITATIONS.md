@@ -115,13 +115,26 @@ Dieses Dokument listet bekannte Einschränkungen und bewusste Nicht-Implementier
 
 ---
 
-### Keine Duplikat-Erkennung
+### Schwache Duplikat-Erkennung im Import-Script
 
-**Beschreibung:** Wiederholter Import derselben Datei erstellt Duplikate.
+**Beschreibung:** Import-Script erkennt nur exakt identische Beschreibungen. Variationen führen zu Duplikaten.
 
-**Begründung:** Nicht implementiert in aktueller Version.
+**Root Cause:** Das Script `import-hvplus-kontoauszuege-verified.ts` prüft nur auf exakte String-Übereinstimmung bei `description`. Wenn zwei JSON-Dateien dieselbe Transaktion mit leicht unterschiedlichen Beschreibungen enthalten, werden beide importiert.
 
-**Zukünftig:** Hash-basierte Duplikat-Prüfung geplant.
+**Beispiel (ISK Uckerath 2026-02-08):**
+- Version 1: "GUTSCHRIFT ÜBERWEISUNG HAEVGID 132064..."
+- Version 2: "HAEVGID 132064... HAVG Hausarztliche Vertragsgemeinschaft..."
+- String-Mismatch → beide importiert → 355 Duplikate
+
+**Workaround:**
+- Vor Import: Prüfe, ob JSON bereits importiert wurde (über `ingestion_jobs` Tracking)
+- Nach Import: Manuelle Duplikat-Analyse über `GROUP BY transactionDate, amountCents`
+- Bereinigung: SQL DELETE mit Backup
+
+**Zukünftig:**
+- Robuste Duplikat-Prüfung über `(bankAccountId + transactionDate + amountCents)` statt nur Description
+- File-Hash-Tracking in `ingestion_jobs` Tabelle
+- Offizielle Ingestion-Pipeline für alle Importe (statt Ad-hoc-Scripts)
 
 ---
 
@@ -209,9 +222,96 @@ Dieses Dokument listet bekannte Einschränkungen und bewusste Nicht-Implementier
 
 ---
 
+## Daten-Integrität
+
+### Fehlende Dezember 2025 Kontoauszüge (HVPlus Fall)
+
+**Beschreibung:** 3 von 5 Bankkonten haben KEINE Dezember-Kontoauszüge.
+
+**Betroffene Konten:**
+1. **apoBank HV PLUS eG:** Nov → (Lücke) → Jan (+299K EUR Diskrepanz)
+2. **apoBank Uckerath:** Nov → (Lücke) → Jan (+33,7K EUR Diskrepanz)
+3. **Sparkasse Velbert:** Nov → (Lücke) → Jan (-81,3K EUR Diskrepanz)
+
+**Konsequenz:**
+- **Closing Balances "Ende Januar" sind NICHT BELEGT** für diese 3 Konten
+- Über 250K EUR Bewegungen im Dezember NICHT nachvollziehbar
+- Liquiditätsplanung für Dez/Jan unvollständig
+
+**Letzte belegte Stände:**
+- apoBank HV PLUS eG: -289.603,72 EUR (30.11.2025)
+- apoBank Uckerath: 742,15 EUR (30.11.2025)
+- Sparkasse Velbert: 60.113,62 EUR (30.11.2025)
+
+**Workaround:**
+- IV muss Dezember-Kontoauszüge nachliefern
+- Falls Konten geschlossen: Schließungsbestätigungen der Banken einholen
+
+**Status:** ⏳ Offene Datenanforderung an IV (siehe `IV_FRAGELISTE_DEZEMBER_KONTOAUSZUEGE.md`)
+
+---
+
 ## Bekannte Bugs
 
-*Derzeit keine bekannten Bugs.*
+### Prisma Client gibt locationId nicht zurück
+
+**Beschreibung:** Trotz korrektem Schema und Datenmigration liefert Prisma Client `locationId: null` für BankAccounts, obwohl die Datenbank korrekte Werte enthält.
+
+**Symptome:**
+```typescript
+const accounts = await prisma.bankAccount.findMany({
+  include: { location: true }
+});
+// accounts[0].locationId === null (aber DB zeigt loc-haevg-velbert)
+```
+
+**Begründung:** Wahrscheinlich Prisma Client Module-Caching-Problem. Mehrfache `prisma generate` und Cache-Clears hatten keine Wirkung.
+
+**Workaround:**
+```typescript
+// In /api/cases/[id]/bank-accounts/route.ts
+const getLocationByAccountName = (accountName: string) => {
+  if (accountName.toLowerCase().includes("velbert")) {
+    return { id: "loc-haevg-velbert", name: "Praxis Velbert" };
+  }
+  if (accountName.toLowerCase().includes("uckerath")) {
+    return { id: "loc-haevg-uckerath", name: "Praxis Uckerath" };
+  }
+  return null;
+};
+```
+
+**Zukünftig:** Bei nächstem Prisma-Major-Update erneut testen. Issue bei Prisma melden.
+
+---
+
+### Bank-spezifische Zeilen in Liquiditätsmatrix zeigen 0 €
+
+**Beschreibung:** Die Zeilen "Sparkasse Velbert" und "apoBank" in der Liquiditätstabelle (Block: Opening/Closing Balance) zeigen 0 € statt der tatsächlichen Kontostände.
+
+**Root Cause:** `calculateBankAccountBalances()` wird aufgerufen und liefert korrekte Werte, aber die Ergebnisse werden nicht in die individuellen Bank-Zeilen von `rowAggregations` verteilt.
+
+**Location:** `/api/cases/[id]/dashboard/liquidity-matrix/route.ts:424-445`
+
+**Betroffene Zeilen:**
+- `opening_balance_sparkasse` (ID: sparkasse)
+- `opening_balance_apobank` (ID: apobank)
+- `closing_balance_sparkasse`
+- `closing_balance_apobank`
+
+**Begründung:** `rowAggregations` wird nur mit LedgerEntries befüllt. Bank-Balances aus `calculateBankAccountBalances()` werden nie in die Bank-spezifischen Zeilen kopiert.
+
+**Workaround:** Nutze den neuen "Bankkonten"-Tab im Dashboard für detaillierte Kontostände.
+
+**Zukünftig:** Verteile `bankBalances.balances` Map auf die entsprechenden `rowAggregations[bankRowId]`-Zeilen.
+
+**TODO-Kommentar im Code:**
+```typescript
+// TODO: KRITISCH - Populate Bank-spezifische Opening/Closing Balance Zeilen
+// Die Zeilen "Sparkasse Velbert" und "apoBank" müssen mit den echten Kontoständen befüllt werden
+```
+
+**Priorität:** KRITISCH – IV benötigt diese Information für Massekredit-Tracking
 
 ---
 
