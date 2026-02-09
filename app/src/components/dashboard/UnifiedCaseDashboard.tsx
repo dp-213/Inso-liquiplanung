@@ -21,7 +21,6 @@ import KPICards from "@/components/external/KPICards";
 import LiquidityTable from "@/components/external/LiquidityTable";
 import BalanceChart, { ChartMarker } from "@/components/external/BalanceChart";
 import PDFExportButton from "@/components/external/PDFExportButton";
-import RevenueChart from "@/components/external/RevenueChart";
 import EstateComparisonChart from "@/components/external/EstateComparisonChart";
 import PlanningAssumptions from "@/components/external/PlanningAssumptions";
 import InsolvencyEffectsTable from "@/components/external/InsolvencyEffectsTable";
@@ -247,12 +246,6 @@ export default function UnifiedCaseDashboard({
     return markers;
   }, [periods, data.calculation.periodType, data.plan.periodType]);
 
-  // Category calculations
-  const { inflowCategories, outflowCategories } = useMemo(() => ({
-    inflowCategories: data.calculation.categories.filter((c) => c.flowType === "INFLOW" && BigInt(c.totalCents) > BigInt(0)),
-    outflowCategories: data.calculation.categories.filter((c) => c.flowType === "OUTFLOW" && BigInt(c.totalCents) > BigInt(0)),
-  }), [data.calculation.categories]);
-
   // Load estate allocation data from API (IST LedgerEntries, not PLAN categories)
   useEffect(() => {
     if (!caseId) return;
@@ -281,16 +274,6 @@ export default function UnifiedCaseDashboard({
 
     fetchEstateData();
   }, [caseId, scope]);
-
-  // Revenue totals
-  const { grandTotal, sourceTotals } = useMemo(() => ({
-    grandTotal: inflowCategories.reduce((sum, c) => sum + BigInt(c.totalCents), BigInt(0)),
-    sourceTotals: inflowCategories.map((cat) => ({
-      name: cat.categoryName,
-      total: BigInt(cat.totalCents),
-      weeklyTotals: (cat.weeklyTotals || cat.periodTotals).map((t) => BigInt(t)),
-    })),
-  }), [inflowCategories]);
 
   // Bank account totals
   const bankAccountData = useMemo(() => {
@@ -479,44 +462,16 @@ export default function UnifiedCaseDashboard({
       case "revenue":
         return (
           <div className="space-y-6">
-            {/* Datengetriebene Einnahmen-Übersicht aus Zahlungsregister */}
+            {/* IST-Einnahmen aus Zahlungsregister */}
             {caseId && (
               <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen nach Quelle</h2>
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen (IST)</h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  Zeigt tatsächliche Zahlungseingänge aus dem Zahlungsregister. Sortiert nach Quelle und Monat.
+                </p>
                 <RevenueTable caseId={caseId} months={6} showSummary={true} scope={scope} />
               </div>
             )}
-
-            {/* Zusätzlich: Einnahmen aus Plankategorien (falls vorhanden) */}
-            {sourceTotals.length > 0 && (
-              <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen nach Plankategorie</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                  {sourceTotals.map((source, idx) => (
-                    <div key={source.name} className="p-4 rounded-lg border border-[var(--border)] bg-gray-50">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-[var(--secondary)]">{source.name}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: `${PAYMENT_SOURCES[idx % PAYMENT_SOURCES.length].color}20`, color: PAYMENT_SOURCES[idx % PAYMENT_SOURCES.length].color }}>
-                          {grandTotal > BigInt(0) ? `${((Number(source.total) / Number(grandTotal)) * 100).toFixed(0)}%` : "0%"}
-                        </span>
-                      </div>
-                      <div className="text-2xl font-bold text-[var(--foreground)]">{formatCurrencyFn(source.total)}</div>
-                    </div>
-                  ))}
-                </div>
-                <div className="p-4 rounded-lg bg-[var(--primary)] text-white">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">Gesamteinnahmen (Plan)</span>
-                    <span className="text-2xl font-bold">{formatCurrencyFn(grandTotal)}</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="admin-card p-6">
-              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen-Verlauf</h2>
-              <RevenueChart weeks={weeksData} categories={inflowCategories} />
-            </div>
           </div>
         );
 

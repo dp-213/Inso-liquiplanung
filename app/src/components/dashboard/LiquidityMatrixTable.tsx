@@ -222,9 +222,9 @@ export default function LiquidityMatrixTable({
   const [locationData, setLocationData] = useState<Record<string, LiquidityMatrixData>>({});
   const [locationLoading, setLocationLoading] = useState(false);
 
-  // Collapsible Bank Rows - standardmäßig eingeklappt
+  // Collapsible Bank Rows - standardmäßig AUSgeklappt (für IV-Meeting Übersichtlichkeit)
   const [collapsedBankBlocks, setCollapsedBankBlocks] = useState<Set<string>>(
-    new Set(["OPENING_BALANCE", "CLOSING_BALANCE"])
+    new Set([])
   );
 
   const toggleBankBlock = (blockId: string) => {
