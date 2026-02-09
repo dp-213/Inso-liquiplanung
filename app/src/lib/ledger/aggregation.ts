@@ -680,7 +680,10 @@ export interface RevenueBySource {
   locationName: string;
   periodIndex: number;
   periodLabel: string;
-  amountCents: bigint;
+  amountCents: bigint; // Gesamtbetrag (wie gebucht)
+  neumasseAmountCents: bigint; // Nur Neumasse-Anteil
+  altmasseAmountCents: bigint; // Nur Altmasse-Anteil
+  estateRatio: number; // 0.0 = 100% Alt, 1.0 = 100% Neu
   transactionDate: Date;
   description: string;
 }
@@ -756,11 +759,12 @@ export async function aggregateByCounterparty(
 
     const periodLabel = formatPeriodLabel(periodStart, plan.periodType as 'WEEKLY' | 'MONTHLY');
 
-    // Apply estate allocation: Only count Neumasse-portion
-    // estateRatio: 0.0 = 100% Alt, 1.0 = 100% Neu
-    // For MIXED entries (e.g. KV Q4 with 2/3 Neu), only count the Neu-portion
+    // Calculate estate allocation breakdown
+    // estateRatio: 0.0 = 100% Alt, 1.0 = 100% Neu, 0.67 = 67% Neu + 33% Alt
     const estateRatio = entry.estateRatio !== null ? Number(entry.estateRatio) : 1.0; // Default to 1.0 (Neumasse) if not set
-    const neumasseAmountCents = BigInt(Math.round(Number(entry.amountCents) * estateRatio));
+    const totalAmount = entry.amountCents;
+    const neumasseAmountCents = BigInt(Math.round(Number(totalAmount) * estateRatio));
+    const altmasseAmountCents = totalAmount - neumasseAmountCents;
 
     return {
       counterpartyId: entry.counterpartyId,
@@ -769,7 +773,10 @@ export async function aggregateByCounterparty(
       locationName: entry.location?.name || 'Ohne Standort',
       periodIndex,
       periodLabel,
-      amountCents: neumasseAmountCents, // Nur Neumasse-Anteil
+      amountCents: totalAmount, // Gesamtbetrag (wie gebucht)
+      neumasseAmountCents, // Neumasse-Anteil
+      altmasseAmountCents, // Altmasse-Anteil
+      estateRatio,
       transactionDate: entry.transactionDate,
       description: entry.description,
     };
@@ -792,6 +799,8 @@ export async function summarizeByCounterparty(
   counterpartyId: string | null;
   counterpartyName: string;
   totalCents: bigint;
+  neumasseTotal: bigint;
+  altmasseTotal: bigint;
   entryCount: number;
 }>> {
   const entries = await aggregateByCounterparty(prisma, caseId, planId, {
@@ -803,6 +812,8 @@ export async function summarizeByCounterparty(
     counterpartyId: string | null;
     counterpartyName: string;
     totalCents: bigint;
+    neumasseTotal: bigint;
+    altmasseTotal: bigint;
     entryCount: number;
   }>();
 
@@ -814,12 +825,16 @@ export async function summarizeByCounterparty(
         counterpartyId: entry.counterpartyId,
         counterpartyName: entry.counterpartyName,
         totalCents: BigInt(0),
+        neumasseTotal: BigInt(0),
+        altmasseTotal: BigInt(0),
         entryCount: 0,
       });
     }
 
     const summary = byCounterparty.get(key)!;
     summary.totalCents += entry.amountCents;
+    summary.neumasseTotal += entry.neumasseAmountCents;
+    summary.altmasseTotal += entry.altmasseAmountCents;
     summary.entryCount++;
   }
 

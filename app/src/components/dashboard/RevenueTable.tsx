@@ -11,6 +11,9 @@ interface RevenueEntry {
   periodIndex: number;
   periodLabel: string;
   amountCents: string;
+  neumasseAmountCents: string;
+  altmasseAmountCents: string;
+  estateRatio: number;
   transactionDate: string;
   description: string;
 }
@@ -19,6 +22,8 @@ interface RevenueSummary {
   counterpartyId: string | null;
   counterpartyName: string;
   totalCents: string;
+  neumasseTotal: string;
+  altmasseTotal: string;
   entryCount: number;
 }
 
@@ -102,10 +107,12 @@ export default function RevenueTable({
     return grouped;
   }, [entries]);
 
-  // Calculate grand total
-  const grandTotal = useMemo(() => {
-    return summary.reduce((sum, s) => sum + BigInt(s.totalCents), BigInt(0));
-  }, [summary]);
+  // Calculate grand totals
+  const { grandTotal, grandNeumasseTotal, grandAltmasseTotal } = useMemo(() => ({
+    grandTotal: summary.reduce((sum, s) => sum + BigInt(s.totalCents), BigInt(0)),
+    grandNeumasseTotal: summary.reduce((sum, s) => sum + BigInt(s.neumasseTotal), BigInt(0)),
+    grandAltmasseTotal: summary.reduce((sum, s) => sum + BigInt(s.altmasseTotal), BigInt(0)),
+  }), [summary]);
 
   if (loading) {
     return (
@@ -198,7 +205,17 @@ export default function RevenueTable({
                 <div className="text-2xl font-bold text-[var(--foreground)]">
                   {formatCurrency(source.totalCents)}
                 </div>
-                <div className="text-xs text-[var(--secondary)] mt-1">
+                <div className="text-xs text-[var(--secondary)] mt-2 space-y-0.5">
+                  <div className="flex items-center justify-between">
+                    <span>davon Neumasse:</span>
+                    <span className="font-medium text-green-600">{formatCurrency(source.neumasseTotal)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>davon Altmasse:</span>
+                    <span className="font-medium text-amber-600">{formatCurrency(source.altmasseTotal)}</span>
+                  </div>
+                </div>
+                <div className="text-xs text-[var(--secondary)] mt-2 pt-2 border-t border-gray-200">
                   {source.entryCount} Buchung{source.entryCount !== 1 ? "en" : ""}
                 </div>
               </div>
@@ -206,10 +223,18 @@ export default function RevenueTable({
           </div>
 
           {/* Grand Total */}
-          <div className="p-4 rounded-lg bg-[var(--primary)] text-white">
+          <div className="p-4 rounded-lg bg-[var(--primary)] text-white space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-medium">Gesamteinnahmen ({months} Monate)</span>
               <span className="text-2xl font-bold">{formatCurrency(grandTotal)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm opacity-90 pt-2 border-t border-white/20">
+              <span>davon Neumasse:</span>
+              <span className="font-semibold">{formatCurrency(grandNeumasseTotal)}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm opacity-90">
+              <span>davon Altmasse:</span>
+              <span className="font-semibold">{formatCurrency(grandAltmasseTotal)}</span>
             </div>
           </div>
         </div>
@@ -224,6 +249,7 @@ export default function RevenueTable({
                 <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Standort</th>
                 <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Beschreibung</th>
                 <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">Betrag</th>
+                <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">Alt/Neu</th>
               </tr>
             </thead>
             <tbody>
@@ -231,7 +257,7 @@ export default function RevenueTable({
                 <>
                   {/* Month Header */}
                   <tr key={`header-${month}`} className="bg-gray-50">
-                    <td colSpan={5} className="py-2 px-4 font-semibold text-[var(--foreground)]">
+                    <td colSpan={6} className="py-2 px-4 font-semibold text-[var(--foreground)]">
                       {month}
                     </td>
                   </tr>
@@ -256,6 +282,23 @@ export default function RevenueTable({
                       <td className="py-3 px-4 text-right font-medium text-green-600">
                         {formatCurrency(entry.amountCents)}
                       </td>
+                      <td className="py-3 px-4 text-right text-xs">
+                        <div className="space-y-0.5">
+                          {BigInt(entry.altmasseAmountCents) > BigInt(0) && (
+                            <div className="text-amber-600">
+                              Alt: {formatCurrency(entry.altmasseAmountCents)}
+                            </div>
+                          )}
+                          {BigInt(entry.neumasseAmountCents) > BigInt(0) && (
+                            <div className="text-green-600">
+                              Neu: {formatCurrency(entry.neumasseAmountCents)}
+                            </div>
+                          )}
+                          {BigInt(entry.altmasseAmountCents) === BigInt(0) && BigInt(entry.neumasseAmountCents) === BigInt(0) && (
+                            <div className="text-gray-400">-</div>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </>
@@ -266,6 +309,10 @@ export default function RevenueTable({
                 <td colSpan={4} className="py-3 px-4 font-medium">Gesamt</td>
                 <td className="py-3 px-4 text-right font-bold">
                   {formatCurrency(grandTotal)}
+                </td>
+                <td className="py-3 px-4 text-right text-xs space-y-0.5">
+                  <div>Alt: {formatCurrency(grandAltmasseTotal)}</div>
+                  <div>Neu: {formatCurrency(grandNeumasseTotal)}</div>
                 </td>
               </tr>
             </tfoot>

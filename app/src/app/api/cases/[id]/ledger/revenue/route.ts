@@ -100,6 +100,8 @@ export async function GET(
         counterpartyId: s.counterpartyId,
         counterpartyName: s.counterpartyName,
         totalCents: s.totalCents.toString(),
+        neumasseTotal: s.neumasseTotal.toString(),
+        altmasseTotal: s.altmasseTotal.toString(),
         entryCount: s.entryCount,
       }));
 
@@ -126,6 +128,9 @@ export async function GET(
         periodIndex: e.periodIndex,
         periodLabel: e.periodLabel,
         amountCents: e.amountCents.toString(),
+        neumasseAmountCents: e.neumasseAmountCents.toString(),
+        altmasseAmountCents: e.altmasseAmountCents.toString(),
+        estateRatio: e.estateRatio,
         transactionDate: e.transactionDate.toISOString(),
         description: e.description,
       }));
