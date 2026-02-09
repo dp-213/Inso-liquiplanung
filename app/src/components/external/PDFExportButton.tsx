@@ -591,7 +591,7 @@ export default function PDFExportButton({ data, pdfTexts }: PDFExportButtonProps
       doc.setTextColor(71, 85, 105);
 
       const findings = [
-        `• Anfangsbestand: ${formatCurrencyForPDF(openingBalance)} zum ${planStartDate.toLocaleDateString("de-DE")}`,
+        `• Liquidity-Plan startet bei: ${formatCurrencyForPDF(openingBalance)} (Cashflow-basierte Planung; reale Kontostände siehe Bankenspiegel)`,
         `• Operative Einzahlungen: ${formatCurrencyForPDF(totalInflows)} (Summe Planungszeitraum)`,
         `• Operative Auszahlungen: ${formatCurrencyForPDF(totalOutflows)} (Summe Planungszeitraum)`,
         `• Operativer Cash-Flow: ${formatCurrencyForPDF(data.calculation.totalNetCashflowCents)}`,

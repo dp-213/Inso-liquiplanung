@@ -4,6 +4,69 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-029: Liquiditätsplanung startet bei 0 EUR (keine Opening Balance)
+
+**Datum:** 09. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Liquiditätsplanung für Insolvenzverfahren muss Zahlungsfähigkeit über Planungszeitraum prognostizieren.
+
+**Problem:**
+- System berechnete Opening Balance aus BankAccount-Daten
+- Fachlich inkorrekt: Liquiditätsplanung ist Cashflow-Prognose, keine Vermögensaufstellung
+- Oktober 2025 (HVPlus): ISK-Konten existierten noch nicht, Buchungen auf Schuldner-Konten
+- Verwirrung: "Warum zeigt Dashboard andere Zahlen als Bankenspiegel?"
+
+**Verworfene Lösung:**
+- Virtuelles BankAccount "Insolvenzmasse (Pre-ISK)" mit temporaler Logik (`isVirtual`, `validFrom`, `validUntil`)
+- Nach externer Architektur-Review als overengineered und konzeptionell falsch verworfen
+- Grund: Vermischung von "Kontensicht" (Bank-Realität) mit "Liquiditätsplanung" (Cashflow-Berechnung)
+
+### Entscheidung
+
+**Dashboard zeigt reine Cashflow-Planung, startet immer bei 0 EUR:**
+
+1. **Backend:** `openingBalanceCents = BigInt(0)` hart-kodiert in Dashboard-API
+2. **Frontend:** Automatische Anzeige "Anfangsbestand: 0 €" (keine Code-Änderung nötig)
+3. **PDF-Export:** Erklärender Text "Liquidity-Plan startet bei: 0 € (Cashflow-basierte Planung)"
+4. **BankAccountsTab:** Bleibt unverändert, zeigt reale Opening Balances der Konten
+
+### Begründung
+
+**Fachliche Korrektheit:**
+- Liquiditätsplanung dient der Steuerung zukünftiger Zahlungsfähigkeit
+- Muss unabhängig von historischen Kontoständen sein
+- Reale Kontostände sind Informationsobjekte, keine Planungsparameter
+- Oktober-IST-Buchungen werden als Cashflows der ersten Periode erfasst
+
+**Separation of Concerns:**
+- **Dashboard/LiquidityTable:** Reine Cashflow-Planung (IST + PLAN), startet bei 0 EUR
+- **BankAccountsTab (Bankenspiegel):** Separate Sicht auf Bank-Realität mit echten Opening Balances
+
+**Architektonische Vorteile:**
+- Keine Schema-Änderungen nötig (kein `isVirtual`, `validFrom`, `validUntil`)
+- Keine virtuellen BankAccount-Entities
+- Keine Migration-Scripts
+- Ermöglicht zukünftige Features (Szenarien, Plan-Versionen, Sensitivitäten)
+
+### Konsequenzen
+
+**Geänderte Dateien:**
+- `/app/src/app/api/cases/[id]/dashboard/route.ts` (Zeile 110-115)
+- `/app/src/components/external/PDFExportButton.tsx` (Zeile 594)
+
+**Keine Änderungen:**
+- Prisma Schema (keine neuen Felder)
+- BankAccountsTab (bleibt unverändert)
+- LiquidityTable Component (funktioniert out-of-the-box mit 0 EUR)
+
+**Archiv:**
+- `ARCHITECTURE_BANK_ACCOUNTS.md`, `IMPACT_VIRTUAL_ACCOUNT.md`, `PLAN_VIRTUAL_ACCOUNT.md` bleiben als Dokumentation des verworfenen Ansatzes erhalten
+
+---
+
 ## ADR-028: Bulk-Classification mit Audit-Trail statt manueller Einzelprüfung
 
 **Datum:** 09. Februar 2026

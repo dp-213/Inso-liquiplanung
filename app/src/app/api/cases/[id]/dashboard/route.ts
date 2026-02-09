@@ -107,11 +107,12 @@ export async function GET(
     // Get latest version for metadata (versionNumber, snapshotDate)
     const latestVersion = plan.versions[0];
 
-    // Get opening balance BY SCOPE (scope-aware)
-    const openingBalanceCents = await calculateOpeningBalanceByScope(
-      caseData.id,
-      scope
-    );
+    // WICHTIG: Liquiditätsplanung beginnt immer bei 0 EUR.
+    // Es existiert im Dashboard KEINE echte Opening Balance.
+    // Alle Anfangswerte ergeben sich ausschließlich aus
+    // den Cashflows (IST/PLAN) der ersten Periode.
+    // Reale Kontostände werden im Bankenspiegel (BankAccountsTab) angezeigt.
+    const openingBalanceCents = BigInt(0);
 
     // Get period type and count from plan
     const periodType = (plan.periodType as PeriodType) || "WEEKLY";
