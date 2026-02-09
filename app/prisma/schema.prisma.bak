@@ -29,7 +29,7 @@ model Case {
   createdAt   DateTime  @default(now())
   createdBy   String
   updatedAt   DateTime  @updatedAt
-  updatedBy   String?
+  updatedBy   String
 
   // === INSOLVENCY-SPECIFIC ===
   cutoffDate           DateTime? // Stichtag: Datum des Insolvenzantrags (z.B. 29.10.2025)
@@ -71,7 +71,7 @@ model LiquidityPlan {
   createdAt     DateTime @default(now())
   createdBy     String
   updatedAt     DateTime @updatedAt
-  updatedBy     String?
+  updatedBy     String
 
   case        Case                   @relation(fields: [caseId], references: [id])
   versions    LiquidityPlanVersion[]
@@ -129,7 +129,7 @@ model CashflowLine {
   createdAt    DateTime @default(now())
   createdBy    String
   updatedAt    DateTime @updatedAt
-  updatedBy    String?
+  updatedBy    String
 
   category     CashflowCategory @relation(fields: [categoryId], references: [id])
   periodValues PeriodValue[]
@@ -149,7 +149,7 @@ model PeriodValue {
   createdAt   DateTime @default(now())
   createdBy   String
   updatedAt   DateTime @updatedAt
-  updatedBy   String?
+  updatedBy   String
 
   line CashflowLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
 
@@ -293,7 +293,7 @@ model MappingConfiguration {
   createdAt        DateTime  @default(now())
   createdBy        String
   updatedAt        DateTime  @updatedAt
-  updatedBy        String?
+  updatedBy        String
 
   @@index([projectId])
   @@index([caseId])
@@ -319,7 +319,7 @@ model MappingTemplate {
   createdAt        DateTime @default(now())
   createdBy        String
   updatedAt        DateTime @updatedAt
-  updatedBy        String?
+  updatedBy        String
 
   @@index([projectId])
   @@index([sourceType])
@@ -339,7 +339,7 @@ model CaseConfiguration {
   createdAt         DateTime @default(now())
   createdBy         String
   updatedAt         DateTime @updatedAt
-  updatedBy         String?
+  updatedBy         String
 
   case Case @relation(fields: [caseId], references: [id])
 
@@ -398,7 +398,7 @@ model CustomerUser {
   createdAt         DateTime  @default(now())
   createdBy         String    // Admin who created the account
   updatedAt         DateTime  @updatedAt
-  updatedBy         String?
+  updatedBy         String
 
   ownedCases        Case[]               @relation("OwnedCases") // Cases owned by this customer
   caseAccess        CustomerCaseAccess[] // Additional access to other customers' cases
@@ -590,7 +590,7 @@ model PlanningAssumption {
   createdAt     DateTime @default(now())
   createdBy     String
   updatedAt     DateTime @updatedAt
-  updatedBy     String?
+  updatedBy     String
 
   plan LiquidityPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
@@ -621,7 +621,7 @@ model InsolvencyEffect {
   createdAt     DateTime @default(now())
   createdBy     String
   updatedAt     DateTime @updatedAt
-  updatedBy     String?
+  updatedBy     String
 
   plan LiquidityPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
@@ -650,7 +650,7 @@ model BankAccount {
   createdAt       DateTime @default(now())
   createdBy       String
   updatedAt       DateTime @updatedAt
-  updatedBy       String?
+  updatedBy       String
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
   location Location? @relation(fields: [locationId], references: [id])
@@ -979,7 +979,7 @@ model ClassificationRule {
   createdAt       DateTime @default(now())
   createdBy       String
   updatedAt       DateTime @updatedAt
-  updatedBy       String?
+  updatedBy       String
 
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
 

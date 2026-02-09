@@ -482,6 +482,59 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
       { type: 'DESCRIPTION_PATTERN', value: '(Miete|Strom|Gas|Energie|Telefon|Software|Versicherung|Material|Praxisbedarf|EDV|IT|Wartung|Nebenkosten|Raumkosten)' },
     ],
   },
+
+  // --- Auszahlungen Altverbindlichkeiten ---
+  {
+    id: 'cash_out_altverbindlichkeit_header',
+    label: 'Auszahlungen Altverbindlichkeiten',
+    block: 'CASH_OUT_OPERATIVE',
+    order: 50,
+    isSubRow: false,
+    isSummary: false,
+    isSectionHeader: true,
+    matches: [],
+    flowType: 'OUTFLOW',
+  },
+  {
+    id: 'cash_out_altverbindlichkeit_personal',
+    label: 'Personalaufwand (Altmasse)',
+    labelShort: 'Personal (Alt)',
+    block: 'CASH_OUT_OPERATIVE',
+    order: 51,
+    isSubRow: true,
+    isSummary: false,
+    flowType: 'OUTFLOW',
+    matches: [
+      { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_PERSONAL' },
+    ],
+  },
+  {
+    id: 'cash_out_altverbindlichkeit_sozialabgaben',
+    label: 'Sozialabgaben (Altmasse)',
+    labelShort: 'Sozialabg. (Alt)',
+    block: 'CASH_OUT_OPERATIVE',
+    order: 52,
+    isSubRow: true,
+    isSummary: false,
+    flowType: 'OUTFLOW',
+    matches: [
+      { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_SOZIALABGABEN' },
+    ],
+  },
+  {
+    id: 'cash_out_altverbindlichkeit_betriebskosten',
+    label: 'Betriebskosten (Altmasse)',
+    labelShort: 'Betriebsk. (Alt)',
+    block: 'CASH_OUT_OPERATIVE',
+    order: 53,
+    isSubRow: true,
+    isSummary: false,
+    flowType: 'OUTFLOW',
+    matches: [
+      { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN' },
+    ],
+  },
+
   {
     id: 'cash_out_operative_sonstige',
     label: 'Sonstige Auszahlungen',
@@ -929,21 +982,38 @@ export function getScopeHintText(scope: LiquidityScope): string | null {
 }
 
 /**
- * Mappt einen Neumasse-categoryTag auf den entsprechenden Altforderungs-categoryTag.
+ * Mappt einen Neumasse-categoryTag auf den entsprechenden Alt-categoryTag.
  *
- * Beispiel: 'HZV' → 'ALTFORDERUNG_HZV'
+ * EINNAHMEN: 'HZV' → 'ALTFORDERUNG_HZV' (Altforderungen = vor Insolvenz erbrachte Leistungen)
+ * AUSGABEN: 'PERSONAL' → 'ALTVERBINDLICHKEIT_PERSONAL' (Altverbindlichkeiten = vor Insolvenz entstandene Verbindlichkeiten)
  *
  * Wird verwendet für estateRatio-Splitting:
  * - Neu-Anteil → Original categoryTag
- * - Alt-Anteil → Altforderungs-categoryTag
+ * - Alt-Anteil → Alt-categoryTag (Altforderung oder Altverbindlichkeit)
  */
 export function getAltforderungCategoryTag(neumasseTag: string | null): string | null {
   if (!neumasseTag) return null;
 
   const mapping: Record<string, string> = {
+    // ─── EINNAHMEN (Altforderungen) ───
     'HZV': 'ALTFORDERUNG_HZV',
     'KV': 'ALTFORDERUNG_KV',
     'PVS': 'ALTFORDERUNG_PVS',
+
+    // ─── AUSGABEN (Altverbindlichkeiten) ───
+    'PERSONAL': 'ALTVERBINDLICHKEIT_PERSONAL',
+    'SOZIALABGABEN': 'ALTVERBINDLICHKEIT_SOZIALABGABEN',
+    'BETRIEBSKOSTEN': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
+
+    // Detail-Tags Betriebskosten (falls einzeln gematched)
+    'MIETE': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
+    'STROM': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
+    'KOMMUNIKATION': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
+    'LEASING': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
+    'VERSICHERUNG_BETRIEBLICH': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
+    'RUNDFUNK': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
+    'BANKGEBUEHREN': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
+    'BUERO_IT': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
   };
 
   return mapping[neumasseTag] || null;
