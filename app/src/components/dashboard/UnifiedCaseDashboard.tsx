@@ -377,6 +377,26 @@ export default function UnifiedCaseDashboard({
             {/* Datenherkunft und Qualität */}
             {data.ledgerStats && <DataSourceLegend ledgerStats={data.ledgerStats} />}
 
+            {/* Wasserfall-Darstellung */}
+            <div className="admin-card p-6">
+              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Wasserfall-Darstellung</h2>
+              <p className="text-sm text-[var(--secondary)] mb-6">
+                Die Wasserfall-Darstellung zeigt die Zusammensetzung der Cashflows pro Periode.
+                Einzahlungen (grün) und Auszahlungen (rot) ergeben den Endbestand (blaue Linie).
+              </p>
+              <WaterfallChart
+                data={periods.map((period) => ({
+                  periodLabel: period.periodLabel || period.weekLabel || "",
+                  openingBalance: Number(BigInt(period.openingBalanceCents)) / 100,
+                  inflows: Number(BigInt(period.totalInflowsCents)) / 100,
+                  outflows: Number(BigInt(period.totalOutflowsCents)) / 100,
+                  insolvencyEffects: 0,
+                  closingBalance: Number(BigInt(period.closingBalanceCents)) / 100,
+                }))}
+                showInsolvencyEffects={false}
+              />
+            </div>
+
             {/* Rolling Forecast Chart - IST (Vergangenheit) + PLAN (Zukunft) - NUR für angemeldete Nutzer */}
             {accessMode !== "external" && caseId && (
               <div className="admin-card p-6">
@@ -675,30 +695,6 @@ export default function UnifiedCaseDashboard({
                 Case-ID nicht verfügbar
               </div>
             )}
-          </div>
-        );
-
-      case "waterfall":
-        return (
-          <div className="space-y-6">
-            <div className="admin-card p-6">
-              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Wasserfall-Darstellung</h2>
-              <p className="text-sm text-[var(--secondary)] mb-6">
-                Die Wasserfall-Darstellung zeigt die Zusammensetzung der Cashflows pro Periode.
-                Einzahlungen (grün) und Auszahlungen (rot) ergeben den Endbestand (blaue Linie).
-              </p>
-              <WaterfallChart
-                data={periods.map((period) => ({
-                  periodLabel: period.periodLabel || period.weekLabel || "",
-                  openingBalance: Number(BigInt(period.openingBalanceCents)) / 100,
-                  inflows: Number(BigInt(period.totalInflowsCents)) / 100,
-                  outflows: Number(BigInt(period.totalOutflowsCents)) / 100,
-                  insolvencyEffects: 0,
-                  closingBalance: Number(BigInt(period.closingBalanceCents)) / 100,
-                }))}
-                showInsolvencyEffects={false}
-              />
-            </div>
           </div>
         );
 

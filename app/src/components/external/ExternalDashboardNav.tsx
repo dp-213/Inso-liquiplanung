@@ -8,7 +8,6 @@ interface ExternalDashboardNavProps {
 const navItems = [
   { id: "overview", label: "Übersicht", icon: "chart" },
   { id: "revenue", label: "Einnahmen", icon: "money" },
-  { id: "waterfall", label: "Wasserfall", icon: "waterfall" },
   { id: "insolvency", label: "Insolvenzeffekte", icon: "scales" },
   { id: "assumptions", label: "Prämissen", icon: "document" },
   { id: "security", label: "Sicherungsrechte", icon: "shield" },
@@ -47,12 +46,6 @@ export default function ExternalDashboardNav({ activeTab, onTabChange }: Externa
         return (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        );
-      case "waterfall":
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21V8h4v13H3zM10 21v-9h4v9h-4zM17 21V4h4v17h-4z" />
           </svg>
         );
       case "scales":

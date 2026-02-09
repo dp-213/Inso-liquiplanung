@@ -338,14 +338,6 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
       panels: [],
     },
     {
-      id: "waterfall",
-      label: "Wasserfall",
-      icon: "waterfall",
-      panels: [
-        { type: "waterfall", visible: true, order: 1 },
-      ],
-    },
-    {
       id: "insolvency",
       label: "Insolvenzeffekte",
       icon: "alert",
