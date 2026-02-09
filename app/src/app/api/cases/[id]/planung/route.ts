@@ -54,6 +54,20 @@ export async function GET(
       }, { status: 500 });
     }
 
+    // Transformiere abweichungen_zur_iv_planung in erwartetes Format
+    if (planungData.abweichungen_zur_iv_planung) {
+      planungData.abweichungen_zur_iv_planung = planungData.abweichungen_zur_iv_planung.map((abw: any) => ({
+        position: abw.position,
+        iv: abw.iv_wert || abw.iv || 0,
+        korrigiert: abw.dashboard_wert || abw.korrigiert || 0,
+        differenz: abw.differenz || 0,
+        prozent: abw.iv_wert !== 0
+          ? ((abw.differenz || 0) / Math.abs(abw.iv_wert || 1)) * 100
+          : 0,
+        begruendung: abw.begründung || abw.begruendung || "",
+      }));
+    }
+
     return NextResponse.json({ data: planungData });
   } catch (error) {
     console.error("Fehler beim Laden der Planung:", error);
