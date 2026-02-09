@@ -206,7 +206,7 @@ export async function GET(request: NextRequest) {
           targetId: periodValue.id,
           targetType: "PeriodValue",
         },
-        actor: periodValue.updatedBy,
+        actor: periodValue.updatedBy || periodValue.createdBy,
         action: "Aktualisiert",
       });
     }

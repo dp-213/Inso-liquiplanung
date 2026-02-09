@@ -1,55 +1,43 @@
 import prisma from './app/src/lib/db';
 
 async function check() {
-  const case1 = await prisma.case.findFirst({
-    where: { debtorName: { contains: 'Hausärztliche' } },
-  });
+  const caseId = "2982ff26-081a-4811-8e1e-46b39e1ff757";
   
-  if (!case1) {
-    console.log("Case nicht gefunden");
-    return;
-  }
+  // Zeitraum wie im API (6 Monate zurück)
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setMonth(startDate.getMonth() - 6);
+  
+  console.log(`Zeitraum: ${startDate.toISOString().split('T')[0]} bis ${endDate.toISOString().split('T')[0]}`);
 
-  console.log(`Case: ${case1.debtorName} (${case1.id})`);
-
-  const total = await prisma.ledgerEntry.count({
-    where: { caseId: case1.id }
+  const istInflows = await prisma.ledgerEntry.count({
+    where: {
+      caseId,
+      valueType: 'IST',
+      amountCents: { gt: 0 },
+      transactionDate: { gte: startDate, lte: endDate },
+    }
   });
 
-  const ist = await prisma.ledgerEntry.count({
-    where: { caseId: case1.id, valueType: 'IST' }
-  });
+  console.log(`IST-Einnahmen im Zeitraum: ${istInflows}`);
 
-  const plan = await prisma.ledgerEntry.count({
-    where: { caseId: case1.id, valueType: 'PLAN' }
-  });
-
-  const nullType = await prisma.ledgerEntry.count({
-    where: { caseId: case1.id, valueType: null }
-  });
-
-  console.log(`\nGesamt: ${total}`);
-  console.log(`IST: ${ist}`);
-  console.log(`PLAN: ${plan}`);
-  console.log(`null: ${nullType}`);
-
+  // Zeige die neuesten IST-Einnahmen
   const examples = await prisma.ledgerEntry.findMany({
-    where: { caseId: case1.id, amountCents: { gt: 0 } },
-    select: {
-      valueType: true,
-      amountCents: true,
-      transactionDate: true,
-      description: true,
+    where: { 
+      caseId, 
+      valueType: 'IST', 
+      amountCents: { gt: 0 },
     },
+    select: { valueType: true, amountCents: true, transactionDate: true, description: true },
     orderBy: { transactionDate: 'desc' },
-    take: 5,
+    take: 10,
   });
 
-  console.log(`\nNeueste Einnahmen:`);
+  console.log(`\nNeueste IST-Einnahmen:`);
   examples.forEach(e => {
     const date = e.transactionDate.toISOString().split('T')[0];
-    const desc = e.description?.substring(0, 40) || 'N/A';
-    console.log(`${date} | ${e.valueType || 'NULL'} | ${e.amountCents} | ${desc}`);
+    const amt = (Number(e.amountCents) / 100).toLocaleString('de-DE');
+    console.log(`${date} | ${amt} € | ${e.description?.substring(0, 50)}`);
   });
 }
 

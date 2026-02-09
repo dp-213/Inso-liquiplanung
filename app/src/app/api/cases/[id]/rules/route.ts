@@ -39,7 +39,7 @@ function serializeRule(rule: ClassificationRule): ClassificationRuleResponse {
     createdAt: rule.createdAt.toISOString(),
     createdBy: rule.createdBy,
     updatedAt: rule.updatedAt.toISOString(),
-    updatedBy: rule.updatedBy,
+    updatedBy: rule.updatedBy || rule.createdBy,
   };
 }
 
