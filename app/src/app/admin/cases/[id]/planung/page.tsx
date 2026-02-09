@@ -74,7 +74,9 @@ export default function PlanungPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const response = await fetch(`/api/cases/${caseId}/planung`);
+        const response = await fetch(`/api/cases/${caseId}/planung`, {
+          credentials: 'include',
+        });
         if (!response.ok) {
           setError("Planung konnte nicht geladen werden");
           return;
