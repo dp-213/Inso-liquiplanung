@@ -53,14 +53,19 @@ Liquiditätsplanung für Insolvenzverfahren muss Zahlungsfähigkeit über Planun
 
 ### Konsequenzen
 
-**Geänderte Dateien:**
-- `/app/src/app/api/cases/[id]/dashboard/route.ts` (Zeile 110-115)
-- `/app/src/components/external/PDFExportButton.tsx` (Zeile 594)
+**Geänderte Dateien (Planning APIs):**
+- `/app/src/app/api/cases/[id]/dashboard/route.ts` (Zeile 110-115) - Admin Dashboard
+- `/app/src/app/api/cases/[id]/dashboard/liquidity-matrix/route.ts` (Zeile 541) - Liquidity Matrix (aufgeklappt)
+- `/app/src/app/api/cases/[id]/ledger/rolling-forecast/route.ts` (Zeile 88) - Rolling Forecast
+- `/app/src/app/api/customer/cases/[id]/route.ts` (Zeile 131) - Customer Portal Dashboard
+- `/app/src/app/api/share/[token]/route.ts` (Zeile 141) - Share-Link Dashboard
+- `/app/src/components/external/PDFExportButton.tsx` (Zeile 594) - PDF-Export-Text
 
 **Keine Änderungen:**
 - Prisma Schema (keine neuen Felder)
-- BankAccountsTab (bleibt unverändert)
+- BankAccountsTab (bleibt unverändert - zeigt echte Kontostände)
 - LiquidityTable Component (funktioniert out-of-the-box mit 0 EUR)
+- `/app/src/app/api/cases/[id]/bank-accounts/route.ts` (bleibt bei `account.openingBalanceCents`)
 
 **Archiv:**
 - `ARCHITECTURE_BANK_ACCOUNTS.md`, `IMPACT_VIRTUAL_ACCOUNT.md`, `PLAN_VIRTUAL_ACCOUNT.md` bleiben als Dokumentation des verworfenen Ansatzes erhalten

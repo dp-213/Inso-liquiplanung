@@ -87,6 +87,11 @@ export async function GET(
       excludeSteeringTags: ['INTERNE_UMBUCHUNG'],  // Umbuchungen ausblenden
     });
 
+    // DESIGN RULE: Planning code must never use BankAccount opening balances
+    // Liquiditätsplanung ist cashflow-basiert und startet immer bei 0 EUR.
+    // Reale Kontostände werden separat im Bankenspiegel angezeigt.
+    result.openingBalanceCents = BigInt(0);
+
     // Serialize BigInt values
     const serialized = {
       caseId: result.caseId,

@@ -538,7 +538,11 @@ export async function GET(
     console.log('[Liquidity Matrix] Befülle Bank-Zeilen...');
     for (const account of existingCase.bankAccounts) {
       const accountId = account.id;
-      let runningBalance = account.openingBalanceCents;
+
+      // DESIGN RULE: Planning code must never read BankAccount.openingBalanceCents
+      // Liquiditätsplanung ist cashflow-basiert und startet immer bei 0 EUR.
+      // Reale Kontostände werden separat im Bankenspiegel (BankAccountsTab) angezeigt.
+      let runningBalance = BigInt(0);
 
       // Opening Balance Zeile-ID basierend auf accountId
       // WICHTIG: Alle Minuszeichen durch Underscores ersetzen (Config verwendet Underscores!)

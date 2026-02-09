@@ -133,12 +133,16 @@ export async function GET(
     if (ledgerEntryCount > 0) {
       // NEW: Use LedgerEntry aggregation
       useLedgerAggregation = true;
+
+      // DESIGN RULE: Planning code must never use BankAccount opening balances
+      // Liquiditätsplanung ist cashflow-basiert und startet immer bei 0 EUR.
+      // Reale Kontostände werden separat im Bankenspiegel angezeigt.
       const aggregation = await aggregateLedgerEntries(
         caseData.id,
         new Date(plan.planStartDate),
         periodType,
         periodCount,
-        openingBalanceCents
+        BigInt(0)  // Planning startet immer bei 0
       );
       const legacyFormat = convertToLegacyFormat(aggregation);
 
