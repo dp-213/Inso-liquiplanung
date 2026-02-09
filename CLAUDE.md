@@ -183,6 +183,7 @@ Alle Dokumentation liegt in `/app/docs/`:
 | `ARCHITECTURE.md` | System-Architektur | Bei strukturellen Änderungen |
 | `DECISIONS.md` | Architektur-Entscheidungen | Bei wichtigen Design-Entscheidungen |
 | `LIMITATIONS.md` | Bekannte Einschränkungen | Bei neuen Einschränkungen |
+| `TODO_REFACTORING.md` | 🔴 Refactoring-Plan für später | Nach inhaltlichen Änderungen |
 
 ### Claude-spezifische Dateien
 
