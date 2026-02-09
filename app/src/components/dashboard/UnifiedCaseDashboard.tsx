@@ -38,6 +38,7 @@ import BankAccountsTab from "@/components/dashboard/BankAccountsTab";
 import BusinessLogicContent from "@/components/business-logic/BusinessLogicContent";
 import UnklarRiskBanner from "@/components/dashboard/UnklarRiskBanner";
 import DataSourceLegend from "@/components/dashboard/DataSourceLegend";
+import ExecutiveSummary from "@/components/dashboard/ExecutiveSummary";
 import Link from "next/link";
 
 // =============================================================================
@@ -364,18 +365,28 @@ export default function UnifiedCaseDashboard({
       case "overview":
         return (
           <div className="space-y-6">
-            <KPICards
+            {/* Executive Summary - Neue kompakte Übersicht */}
+            <ExecutiveSummary
               currentCash={currentCash}
               minCash={minCash}
-              runwayWeek={runwayPeriod >= 0 ? (periods[runwayPeriod]?.periodLabel || periods[runwayPeriod]?.weekLabel || null) : null}
+              periods={periods}
+              bankAccountData={bankAccountData}
               formatCurrency={(cents: bigint) => formatCurrencyFn(cents)}
-              periodType={data.calculation.periodType || data.plan.periodType}
-              periodCount={data.calculation.periodCount || data.plan.periodCount}
               bankBalanceCents={data.bankAccounts ? BigInt(data.bankAccounts.summary.totalBalanceCents) : null}
             />
 
             {/* Datenherkunft und Qualität */}
             {data.ledgerStats && <DataSourceLegend ledgerStats={data.ledgerStats} />}
+
+            {/* Rolling Forecast Chart - PROMINENT, GROSS - IST (Vergangenheit) + PLAN (Zukunft) - NUR für angemeldete Nutzer */}
+            {accessMode !== "external" && caseId && (
+              <div className="admin-card p-8">
+                <h2 className="text-xl font-bold text-[var(--foreground)] mb-6">Liquiditätsentwicklung</h2>
+                <div className="h-[500px]">
+                  <RollingForecastChart caseId={caseId} scope={scope} />
+                </div>
+              </div>
+            )}
 
             {/* Wasserfall-Darstellung */}
             <div className="admin-card p-6">
@@ -396,14 +407,6 @@ export default function UnifiedCaseDashboard({
                 showInsolvencyEffects={false}
               />
             </div>
-
-            {/* Rolling Forecast Chart - IST (Vergangenheit) + PLAN (Zukunft) - NUR für angemeldete Nutzer */}
-            {accessMode !== "external" && caseId && (
-              <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Rolling Forecast</h2>
-                <RollingForecastChart caseId={caseId} scope={scope} />
-              </div>
-            )}
 
             {/* Rolling Forecast Tabelle - zeigt IST/PLAN pro Periode - NUR für angemeldete Nutzer */}
             {accessMode !== "external" && caseId && (

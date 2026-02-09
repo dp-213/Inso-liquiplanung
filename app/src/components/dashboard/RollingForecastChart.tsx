@@ -315,33 +315,29 @@ export default function RollingForecastChart({
               />
             )}
 
-            {/* Single line showing the combined balance with color based on source */}
+            {/* IST Line - solid green */}
             <Line
               type="monotone"
-              dataKey="balance"
-              stroke="#1e40af"
+              dataKey="istBalance"
+              stroke="#10b981"
               strokeWidth={3}
-              dot={(props) => {
-                const { cx, cy, payload } = props;
-                if (!payload) return null;
-                const color =
-                  payload.source === "IST"
-                    ? "#10b981"
-                    : payload.source === "PLAN"
-                      ? "#8b5cf6"
-                      : "#f59e0b";
-                return (
-                  <circle
-                    cx={cx}
-                    cy={cy}
-                    r={5}
-                    fill={color}
-                    stroke="white"
-                    strokeWidth={2}
-                  />
-                );
-              }}
+              dot={{ fill: "#10b981", strokeWidth: 2, stroke: "white", r: 5 }}
               activeDot={{ r: 7, strokeWidth: 0 }}
+              connectNulls={false}
+              name="IST"
+            />
+
+            {/* PLAN Line - dashed purple */}
+            <Line
+              type="monotone"
+              dataKey="planBalance"
+              stroke="#8b5cf6"
+              strokeWidth={3}
+              strokeDasharray="8 4"
+              dot={{ fill: "#8b5cf6", strokeWidth: 2, stroke: "white", r: 5 }}
+              activeDot={{ r: 7, strokeWidth: 0 }}
+              connectNulls={false}
+              name="PLAN"
             />
 
             <Legend
