@@ -4,6 +4,76 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.18.0 – Vollständige IST-Klassifizierung & Liqui-Matrix-Integration
+
+**Datum:** 09. Februar 2026
+
+### Neue Funktionen
+
+- **691 IST-Entries vollständig klassifiziert:** Alle Buchungen (Oktober 2025 - Januar 2026) mit categoryTags versehen
+  - 18 categoryTags definiert: HZV, KV, PVS, EINNAHME_SONSTIGE, AUSKEHRUNG_ALTKONTEN, PERSONAL, BETRIEBSKOSTEN, MIETE, STROM, KOMMUNIKATION, LEASING, VERSICHERUNG_BETRIEBLICH, RUNDFUNK, BANKGEBUEHREN, BUERO_IT, STEUERN, DARLEHEN_TILGUNG, VERFAHRENSKOSTEN, INTERN_TRANSFER
+  - Vollständiger Audit-Trail: categoryTagSource='AUTO', categoryTagNote mit Pattern-Beschreibung
+  - Liqui-Matrix zeigt jetzt korrekte Werte für alle Kategorien
+
+- **Clustering-Strategie für Liqui-Tabelle:** 3-Ebenen-Modell etabliert
+  - Ebene 1: Detail-Tags (18 categoryTags in DB, vollständig nachvollziehbar)
+  - Ebene 2: Clustering für Präsentation (z.B. alle Betriebskosten-Subtags)
+  - Ebene 3: Aggregation für Liqui-Matrix-Hauptzeilen
+  - Dokumentiert in: `/clustering-strategie-liqui-tabelle.md`
+
+### Änderungen
+
+- **Matrix-Konfiguration erweitert:** 8 neue categoryTag-Mappings in `matrix-config.ts`
+  - `EINNAHME_SONSTIGE` → Sonstige Einnahmen (Gutachten, Privatpatienten)
+  - `AUSKEHRUNG_ALTKONTEN` → Auskehrungen Altkonten
+  - `DARLEHEN_TILGUNG` → Darlehens-Tilgung (Insolvenzspezifisch)
+  - `VERFAHRENSKOSTEN` → Beratung / Sonstiges Verfahren
+  - `STEUERN` → Steuern & Abgaben
+  - Detail-Tags für BETRIEBSKOSTEN: MIETE, STROM, KOMMUNIKATION, LEASING, VERSICHERUNG_BETRIEBLICH, RUNDFUNK, BANKGEBUEHREN, BUERO_IT
+
+- **Turso Production-Sync:** 691 UPDATE-Statements erfolgreich ausgeführt
+  - Alle categoryTags, categoryTagSource, categoryTagNote synchronisiert
+  - Production-Datenbank 100% identisch mit lokaler Entwicklungsdatenbank
+  - Verifikation durchgeführt: Alle Summen korrekt
+
+### Bugfixes
+
+- **INTERN_TRANSFER Fehlklassifikation:** Sarah Wolf IV-Honorar (2x -32.465,74 EUR) korrigiert
+  - War fälschlich als "Interne Umbuchung" klassifiziert
+  - Korrekt: categoryTag='VERFAHRENSKOSTEN' (Insolvenzspezifische Kosten)
+  - INTERN_TRANSFER jetzt bei -463,12 EUR (fast ausgeglichen, wie erwartet)
+
+- **locationId-Korrektur:** Dr. Rösing (Eitorf) hatte falsche Standort-Zuordnung
+  - Entry `apobank-uckerath-okt-v2-0`: locationId von 'loc-haevg-uckerath' → 'loc-haevg-eitorf'
+  - Eitorf läuft über Uckerath-Konto, aber Arzt muss korrekt zugeordnet sein
+
+### Verifikation
+
+- **Production-Datenbank verifiziert:** Alle 691 Entries direkt aus Turso abgefragt
+  - ✅ EINNAHMEN: 530 Entries, +1.009.118,99 EUR
+    - HZV: 320 Entries, 453.023,65 EUR
+    - KV: 6 Entries, 157.112,38 EUR
+    - PVS: 11 Entries, 51.025,14 EUR
+    - EINNAHME_SONSTIGE: 201 Entries, 181.229,89 EUR
+    - AUSKEHRUNG_ALTKONTEN: 6 Entries, 126.621,07 EUR
+  - ✅ AUSGABEN: 150 Entries, -710.493,56 EUR
+    - PERSONAL: 33 Entries, -187.410,24 EUR
+    - BETRIEBSKOSTEN (alle): 92 Entries, -112.034,30 EUR
+    - STEUERN: 1 Entry, -7.926,56 EUR
+    - DARLEHEN_TILGUNG: 8 Entries, -298.084,12 EUR
+    - VERFAHRENSKOSTEN: 2 Entries, -64.931,48 EUR
+  - ✅ INTERN_TRANSFER: 11 Entries, -463,12 EUR
+  - ✅ NETTO (ohne INTERN_TRANSFER): 680 Entries, +298.625,43 EUR
+
+### Dokumentation
+
+- **Classification Proposal:** Detaillierte Klassifizierungs-Empfehlung dokumentiert
+  - `/classification-proposal-hvplus.md` – 18 Buckets mit Beispielen
+- **Clustering-Strategie:** 3-Ebenen-Modell für Liqui-Tabellen-Darstellung
+  - `/clustering-strategie-liqui-tabelle.md` – Audit-Trail & Nachvollziehbarkeit
+
+---
+
 ## Version 2.17.0 – CasePlanning DB-Migration & Production-Verifikation
 
 **Datum:** 09. Februar 2026

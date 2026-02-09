@@ -4,6 +4,78 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-028: Bulk-Classification mit Audit-Trail statt manueller Einzelprüfung
+
+**Datum:** 09. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Version 2.16.0 identifizierte ein kritisches Problem:
+- **Alle 691 IST-Entries hatten categoryTag = NULL**
+- Liqui-Matrix zeigte 0 für Altforderungen (Daten waren da: 184.963,96 EUR)
+- Classification Engine wurde nie auf manuell importierte Daten angewandt
+
+Zwei Ansätze standen zur Wahl:
+1. **Manuelle Einzelprüfung:** Jeden Eintrag einzeln klassifizieren und bestätigen
+2. **Bulk-Classification:** Pattern-basierte Klassifizierung mit anschließender Stichprobenprüfung
+
+### Entscheidung
+
+**Pattern-basierte Bulk-Classification mit vollständigem Audit-Trail:**
+
+1. **Bucket-Analyse:** Entries nach Description-Patterns gruppieren
+2. **18 categoryTags definieren:** HZV, KV, PVS, EINNAHME_SONSTIGE, etc.
+3. **SQL-Bulk-Updates:** Pro categoryTag alle matchenden Entries auf einmal klassifizieren
+4. **Audit-Trail sicherstellen:** Jeder Entry erhält:
+   - `categoryTag` – Die zugewiesene Kategorie
+   - `categoryTagSource = 'AUTO'` – Kennzeichnung als automatisch klassifiziert
+   - `categoryTagNote` – Pattern-Beschreibung (z.B. "Klassifiziert via Pattern: TK/AOK/BARMER/...")
+5. **Stichprobenprüfung:** User prüft erste 20 Entries, dann Buckets
+
+### Begründung
+
+**Warum Bulk-Classification?**
+- **Effizienz:** 691 Entries statt Wochen in 2 Stunden klassifiziert
+- **Konsistenz:** Identische Patterns erhalten identische Klassifikation
+- **Nachvollziehbarkeit:** categoryTagNote dokumentiert WARUM klassifiziert wurde
+- **Revidierbarkeit:** categoryTagSource='AUTO' kennzeichnet automatische Klassifikation
+- **Skalierbarkeit:** Bei zukünftigen Importen können dieselben Patterns wiederverwendet werden
+
+**Warum nicht manuell?**
+- 691 Einzelprüfungen nicht praktikabel
+- Inkonsistenzen durch Ermüdung wahrscheinlich
+- Keine systematische Dokumentation der Klassifizierungslogik
+- Nicht wiederholbar bei Daten-Korrektur
+
+**Warum vollständiger Audit-Trail?**
+- Insolvenzverfahren erfordern vollständige Nachvollziehbarkeit
+- Bei Prüfung durch Gericht/Gläubiger muss jede Zahl herleitbar sein
+- Fehlersuche: Falsche Klassifikation kann auf Pattern zurückverfolgt werden
+
+### Konsequenzen
+
+**Positiv:**
+- 691 Entries in 2 Stunden klassifiziert (statt Wochen)
+- 100% Audit-Trail: Jede Klassifikation ist nachvollziehbar
+- Liqui-Matrix zeigt jetzt korrekte Werte für alle Kategorien
+- Pattern-Library für zukünftige Imports etabliert
+- Fehler-Identifikation (Sarah Wolf INTERN_TRANSFER) durch systematische Analyse
+
+**Negativ:**
+- Initiale Bucket-Analyse erfordert Domain-Wissen
+- Pattern-Matching kann Edge-Cases übersehen (→ Stichprobenprüfung erforderlich)
+
+**Lessons Learned:**
+- **INTERN_TRANSFER Abweichung:** -65.395 EUR statt ~0 EUR führte zur Entdeckung von Sarah Wolf IV-Honorar-Fehlklassifikation
+- **3-Ebenen-Clustering:** Detail-Tags (DB) → Clustering (Präsentation) → Aggregation (Matrix) etabliert
+
+**Zukünftige Verbesserung:**
+- Classification Rules in DB speichern für automatische Klassifikation bei Import
+- Pattern-Matching-Engine als wiederverwendbare Komponente
+
+---
+
 ## ADR-027: Deployment-Strategie - Code vs. Daten vs. Dokumentation
 
 **Datum:** 09. Februar 2026
