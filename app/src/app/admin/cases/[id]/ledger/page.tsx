@@ -33,6 +33,7 @@ const COLUMN_DEFINITIONS: ColumnConfig[] = [
   { id: "transactionDate", label: "Datum", defaultVisible: true, defaultWidth: 100, minWidth: 80 },
   { id: "description", label: "Beschreibung", defaultVisible: true, defaultWidth: 250, minWidth: 150 },
   { id: "amountCents", label: "Betrag", defaultVisible: true, defaultWidth: 110, minWidth: 90 },
+  { id: "import", label: "Quelle", defaultVisible: true, defaultWidth: 180, minWidth: 120 }, // Moved after amountCents, renamed to "Quelle", wider
   { id: "valueType", label: "Typ", defaultVisible: true, defaultWidth: 70, minWidth: 60 },
   { id: "estateAllocation", label: "Alt/Neu", defaultVisible: true, defaultWidth: 90, minWidth: 70 },
   { id: "legalBucket", label: "Rechtsstatus", defaultVisible: true, defaultWidth: 100, minWidth: 80 },
@@ -43,7 +44,6 @@ const COLUMN_DEFINITIONS: ColumnConfig[] = [
   { id: "location", label: "Standort", defaultVisible: true, defaultWidth: 120, minWidth: 80 },
   { id: "bankAccount", label: "Bankkonto", defaultVisible: true, defaultWidth: 150, minWidth: 100 },
   { id: "categoryTag", label: "Matrix-Kat.", defaultVisible: true, defaultWidth: 120, minWidth: 80 },
-  { id: "import", label: "Import", defaultVisible: true, defaultWidth: 100, minWidth: 80 },
   { id: "actions", label: "Aktionen", defaultVisible: true, defaultWidth: 130, minWidth: 100 },
 ];
 
@@ -840,6 +840,20 @@ export default function CaseLedgerPage({
     return sortOrder === "asc" ? comparison : -comparison;
   });
 
+  // Calculate selection summary
+  const selectedEntriesData = entries.filter(e => selectedEntries.has(e.id));
+  const selectionSummary = {
+    count: selectedEntriesData.length,
+    totalInflows: selectedEntriesData
+      .filter(e => parseInt(e.amountCents) >= 0)
+      .reduce((sum, e) => sum + BigInt(e.amountCents), BigInt(0)),
+    totalOutflows: selectedEntriesData
+      .filter(e => parseInt(e.amountCents) < 0)
+      .reduce((sum, e) => sum + BigInt(e.amountCents), BigInt(0)),
+    netAmount: selectedEntriesData
+      .reduce((sum, e) => sum + BigInt(e.amountCents), BigInt(0)),
+  };
+
   // Sort header component
   const SortHeader = ({ field, label, className = "" }: { field: SortField; label: string; className?: string }) => (
     <div
@@ -989,6 +1003,38 @@ export default function CaseLedgerPage({
           </Link>
         </div>
       </div>
+
+      {/* Sticky Total Summary - always visible at top */}
+      {activeTab !== "rules" && activeTab !== "sources" && stats && (
+        <div className="sticky top-0 z-20 bg-white shadow-sm border-b border-[var(--border)] py-3">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 px-2">
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-[var(--muted)] font-medium">Anzahl Einträge</p>
+              <p className="text-xl font-bold text-[var(--foreground)]">{stats.totalCount}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-[var(--muted)] font-medium">Einzahlungen</p>
+              <p className="text-xl font-bold text-[var(--success)]">
+                {formatCurrency(stats.totalInflows)}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-[var(--muted)] font-medium">Auszahlungen</p>
+              <p className="text-xl font-bold text-[var(--danger)]">
+                {formatCurrency(stats.totalOutflows)}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3">
+              <p className="text-xs text-[var(--muted)] font-medium">Netto</p>
+              <p className={`text-xl font-bold ${
+                parseInt(stats.netAmount) >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"
+              }`}>
+                {formatCurrency(stats.netAmount)}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="admin-card p-1">
@@ -1317,36 +1363,6 @@ export default function CaseLedgerPage({
                 </div>
               );
             })()}
-          </div>
-        </div>
-      )}
-
-      {/* Stats Cards - only show for non-rules/sources tabs */}
-      {activeTab !== "rules" && activeTab !== "sources" && stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="admin-card p-4">
-            <p className="text-sm text-[var(--muted)]">Anzahl Einträge</p>
-            <p className="text-2xl font-bold text-[var(--foreground)]">{stats.totalCount}</p>
-          </div>
-          <div className="admin-card p-4">
-            <p className="text-sm text-[var(--muted)]">Einzahlungen</p>
-            <p className="text-2xl font-bold text-[var(--success)]">
-              {formatCurrency(stats.totalInflows)}
-            </p>
-          </div>
-          <div className="admin-card p-4">
-            <p className="text-sm text-[var(--muted)]">Auszahlungen</p>
-            <p className="text-2xl font-bold text-[var(--danger)]">
-              {formatCurrency(stats.totalOutflows)}
-            </p>
-          </div>
-          <div className="admin-card p-4">
-            <p className="text-sm text-[var(--muted)]">Netto</p>
-            <p className={`text-2xl font-bold ${
-              parseInt(stats.netAmount) >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"
-            }`}>
-              {formatCurrency(stats.netAmount)}
-            </p>
           </div>
         </div>
       )}
@@ -1897,8 +1913,18 @@ export default function CaseLedgerPage({
             <table ref={tableRef} className="admin-table" style={{ tableLayout: "fixed" }}>
               <thead>
                 <tr>
-                  {/* Checkbox column */}
-                  <th style={{ width: columnWidths.checkbox }} className="relative">
+                  {/* Checkbox column - STICKY */}
+                  <th
+                    style={{
+                      width: columnWidths.checkbox,
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 10,
+                      backgroundColor: 'white',
+                      boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
+                    }}
+                    className="relative"
+                  >
                     <input
                       type="checkbox"
                       checked={selectedEntries.size === entries.length && entries.length > 0}
@@ -1906,9 +1932,19 @@ export default function CaseLedgerPage({
                       className="rounded border-gray-300"
                     />
                   </th>
-                  {/* Datum */}
+                  {/* Datum - STICKY */}
                   {columnVisibility.transactionDate && (
-                    <th style={{ width: columnWidths.transactionDate }} className="relative group cursor-pointer">
+                    <th
+                      style={{
+                        width: columnWidths.transactionDate,
+                        position: 'sticky',
+                        left: columnWidths.checkbox,
+                        zIndex: 10,
+                        backgroundColor: 'white',
+                        boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
+                      }}
+                      className="relative group cursor-pointer"
+                    >
                       <SortHeader field="transactionDate" label="Datum" />
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
@@ -1916,9 +1952,19 @@ export default function CaseLedgerPage({
                       />
                     </th>
                   )}
-                  {/* Beschreibung */}
+                  {/* Beschreibung - STICKY */}
                   {columnVisibility.description && (
-                    <th style={{ width: columnWidths.description }} className="relative group cursor-pointer">
+                    <th
+                      style={{
+                        width: columnWidths.description,
+                        position: 'sticky',
+                        left: columnWidths.checkbox + columnWidths.transactionDate,
+                        zIndex: 10,
+                        backgroundColor: 'white',
+                        boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
+                      }}
+                      className="relative group cursor-pointer"
+                    >
                       <SortHeader field="description" label="Beschreibung" />
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
@@ -1926,13 +1972,43 @@ export default function CaseLedgerPage({
                       />
                     </th>
                   )}
-                  {/* Betrag */}
+                  {/* Betrag - STICKY */}
                   {columnVisibility.amountCents && (
-                    <th style={{ width: columnWidths.amountCents }} className="relative group text-right cursor-pointer">
+                    <th
+                      style={{
+                        width: columnWidths.amountCents,
+                        position: 'sticky',
+                        left: columnWidths.checkbox + columnWidths.transactionDate + columnWidths.description,
+                        zIndex: 10,
+                        backgroundColor: 'white',
+                        boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
+                      }}
+                      className="relative group text-right cursor-pointer"
+                    >
                       <SortHeader field="amountCents" label="Betrag" className="text-right" />
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
                         onMouseDown={(e) => handleResizeStart(e, "amountCents")}
+                      />
+                    </th>
+                  )}
+                  {/* Quelle/Import - STICKY */}
+                  {columnVisibility.import && (
+                    <th
+                      style={{
+                        width: columnWidths.import,
+                        position: 'sticky',
+                        left: columnWidths.checkbox + columnWidths.transactionDate + columnWidths.description + columnWidths.amountCents,
+                        zIndex: 10,
+                        backgroundColor: 'white',
+                        boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
+                      }}
+                      className="relative group"
+                    >
+                      Quelle
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "import")}
                       />
                     </th>
                   )}
@@ -2036,16 +2112,6 @@ export default function CaseLedgerPage({
                       />
                     </th>
                   )}
-                  {/* Import */}
-                  {columnVisibility.import && (
-                    <th style={{ width: columnWidths.import }} className="relative group">
-                      Import
-                      <div
-                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
-                        onMouseDown={(e) => handleResizeStart(e, "import")}
-                      />
-                    </th>
-                  )}
                   {/* Aktionen */}
                   <th style={{ width: columnWidths.actions }}>Aktionen</th>
                 </tr>
@@ -2075,7 +2141,16 @@ export default function CaseLedgerPage({
 
                   return (
                     <tr key={entry.id} className={`${selectedEntries.has(entry.id) ? "bg-blue-50" : isTransfer ? "bg-gray-50 text-gray-500" : ""}`}>
-                      <td>
+                      {/* Checkbox - STICKY */}
+                      <td
+                        style={{
+                          position: 'sticky',
+                          left: 0,
+                          zIndex: 9,
+                          backgroundColor: selectedEntries.has(entry.id) ? '#eff6ff' : isTransfer ? '#f9fafb' : 'white',
+                          boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
+                        }}
+                      >
                         <input
                           type="checkbox"
                           checked={selectedEntries.has(entry.id)}
@@ -2083,13 +2158,32 @@ export default function CaseLedgerPage({
                           className="rounded border-gray-300"
                         />
                       </td>
+                      {/* Datum - STICKY */}
                       {columnVisibility.transactionDate && (
-                        <td className="whitespace-nowrap">
+                        <td
+                          className="whitespace-nowrap"
+                          style={{
+                            position: 'sticky',
+                            left: columnWidths.checkbox,
+                            zIndex: 9,
+                            backgroundColor: selectedEntries.has(entry.id) ? '#eff6ff' : isTransfer ? '#f9fafb' : 'white',
+                            boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
+                          }}
+                        >
                           {formatDate(entry.transactionDate)}
                         </td>
                       )}
+                      {/* Beschreibung - STICKY */}
                       {columnVisibility.description && (
-                        <td>
+                        <td
+                          style={{
+                            position: 'sticky',
+                            left: columnWidths.checkbox + columnWidths.transactionDate,
+                            zIndex: 9,
+                            backgroundColor: selectedEntries.has(entry.id) ? '#eff6ff' : isTransfer ? '#f9fafb' : 'white',
+                            boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
+                          }}
+                        >
                           <div className="truncate" style={{ maxWidth: columnWidths.description - 16 }}>
                             <div className="font-medium text-[var(--foreground)] truncate">
                               {isTransfer && (
@@ -2107,11 +2201,47 @@ export default function CaseLedgerPage({
                           </div>
                         </td>
                       )}
+                      {/* Betrag - STICKY */}
                       {columnVisibility.amountCents && (
-                        <td className={`text-right font-mono whitespace-nowrap ${
-                          isInflow ? "text-[var(--success)]" : "text-[var(--danger)]"
-                        }`}>
+                        <td
+                          className={`text-right font-mono whitespace-nowrap ${
+                            isInflow ? "text-[var(--success)]" : "text-[var(--danger)]"
+                          }`}
+                          style={{
+                            position: 'sticky',
+                            left: columnWidths.checkbox + columnWidths.transactionDate + columnWidths.description,
+                            zIndex: 9,
+                            backgroundColor: selectedEntries.has(entry.id) ? '#eff6ff' : isTransfer ? '#f9fafb' : 'white',
+                            boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
+                          }}
+                        >
                           {formatCurrency(entry.amountCents)}
+                        </td>
+                      )}
+                      {/* Quelle - STICKY */}
+                      {columnVisibility.import && (
+                        <td
+                          className="text-xs truncate"
+                          style={{
+                            maxWidth: columnWidths.import,
+                            position: 'sticky',
+                            left: columnWidths.checkbox + columnWidths.transactionDate + columnWidths.description + columnWidths.amountCents,
+                            zIndex: 9,
+                            backgroundColor: selectedEntries.has(entry.id) ? '#eff6ff' : isTransfer ? '#f9fafb' : 'white',
+                            boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
+                          }}
+                        >
+                          {entryWithExtras.importSource ? (
+                            <span
+                              className="cursor-pointer hover:text-[var(--primary)] hover:underline truncate block"
+                              onClick={() => setFilterImportJobId(entryWithExtras.importJobId || "")}
+                              title={`${entryWithExtras.importSource}\nKlicken zum Filtern`}
+                            >
+                              {entryWithExtras.importSource}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--muted)]">Manuell</span>
+                          )}
                         </td>
                       )}
                       {columnVisibility.valueType && (
@@ -2268,21 +2398,6 @@ export default function CaseLedgerPage({
 
                             return <span className="text-[var(--muted)]">&ndash;</span>;
                           })()}
-                        </td>
-                      )}
-                      {columnVisibility.import && (
-                        <td className="text-xs">
-                          {entryWithExtras.importSource ? (
-                            <span
-                              className="cursor-pointer hover:text-[var(--primary)] truncate block"
-                              onClick={() => setFilterImportJobId(entryWithExtras.importJobId || "")}
-                              title={`Klicken zum Filtern nach diesem Import`}
-                            >
-                              {entryWithExtras.importSource}
-                            </span>
-                          ) : (
-                            <span className="text-[var(--muted)]">-</span>
-                          )}
                         </td>
                       )}
                       <td>
@@ -2751,6 +2866,56 @@ export default function CaseLedgerPage({
                 ) : (
                   `Alle ${serviceDatePreviewEntries.length} übernehmen`
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Selection Summary Bar - appears when entries are selected */}
+      {selectedEntries.size > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-blue-600 text-white shadow-2xl border-t-4 border-blue-700">
+          <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  <span className="font-semibold text-lg">{selectionSummary.count} Einträge ausgewählt</span>
+                </div>
+                <div className="h-8 w-px bg-blue-400"></div>
+                <div className="flex items-center gap-6">
+                  <div>
+                    <p className="text-xs text-blue-200">Einzahlungen</p>
+                    <p className="text-lg font-bold">
+                      {formatCurrency(selectionSummary.totalInflows.toString())}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-blue-200">Auszahlungen</p>
+                    <p className="text-lg font-bold">
+                      {formatCurrency(selectionSummary.totalOutflows.toString())}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-blue-200">Netto</p>
+                    <p className={`text-lg font-bold ${
+                      selectionSummary.netAmount >= BigInt(0) ? "text-green-300" : "text-red-300"
+                    }`}>
+                      {formatCurrency(selectionSummary.netAmount.toString())}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedEntries(new Set())}
+                className="px-4 py-2 bg-white text-blue-600 rounded-md font-medium hover:bg-blue-50 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Auswahl aufheben
               </button>
             </div>
           </div>
