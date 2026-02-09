@@ -9,7 +9,7 @@ import { PrismaClient } from "@prisma/client";
 const localPrisma = new PrismaClient({
   datasources: {
     db: {
-      url: "file:./dev.db"
+      url: "file:/Users/david/Projekte/AI Terminal/Inso-Liquiplanung/app/prisma/dev.db"
     }
   }
 });

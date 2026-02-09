@@ -15,6 +15,7 @@ import {
   CATEGORY_TAG_OPTIONS,
   CATEGORY_TAG_SOURCE_LABELS,
 } from "@/lib/ledger";
+import { formatAllocationSource, formatCategoryTagSource } from "@/lib/ledger/format-helpers";
 
 type TabType = "all" | "review" | "rules" | "sources";
 
@@ -2125,7 +2126,7 @@ export default function CaseLedgerPage({
                           {entryWithExtras.estateAllocation ? (
                             <span
                               className={`badge text-xs ${getEstateAllocationBadgeClass(entryWithExtras.estateAllocation)}`}
-                              title={entryWithExtras.allocationNote || entryWithExtras.allocationSource || ''}
+                              title={`${formatAllocationSource(entryWithExtras.allocationSource)}: ${entryWithExtras.allocationNote || '-'}`}
                             >
                               {ESTATE_ALLOCATION_LABELS[entryWithExtras.estateAllocation] || entryWithExtras.estateAllocation}
                             </span>
@@ -2448,7 +2449,7 @@ export default function CaseLedgerPage({
                           {e.allocationSource && (
                             <div>
                               <dt className="text-gray-500">Zuordnungslogik</dt>
-                              <dd className="font-mono text-xs bg-gray-50 p-2 rounded">{e.allocationSource}</dd>
+                              <dd className="text-sm bg-gray-50 p-2 rounded">{formatAllocationSource(e.allocationSource)}</dd>
                             </div>
                           )}
                           {e.allocationNote && (

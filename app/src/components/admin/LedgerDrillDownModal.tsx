@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { LedgerEntryResponse, ValueType, LegalBucket } from "@/lib/ledger";
+import { formatAllocationSource, formatCategoryTagSource } from "@/lib/ledger/format-helpers";
 
 const VALUE_TYPE_LABELS: Record<ValueType, string> = {
   IST: "IST",
@@ -222,7 +223,7 @@ export default function LedgerDrillDownModal({
                         {entry.categoryTag ? (
                           <span
                             className="badge badge-info text-xs cursor-help"
-                            title={`${entry.categoryTagSource || 'UNKNOWN'}: ${entry.categoryTagNote || '-'}`}
+                            title={`${formatCategoryTagSource(entry.categoryTagSource)}: ${entry.categoryTagNote || '-'}`}
                           >
                             {entry.categoryTag}
                           </span>
@@ -239,7 +240,7 @@ export default function LedgerDrillDownModal({
                               entry.estateAllocation === 'MIXED' ? 'badge-info' :
                               'badge-neutral'
                             }`}
-                            title={`${entry.allocationSource || 'UNKNOWN'}: ${entry.allocationNote || '-'}`}
+                            title={`${formatAllocationSource(entry.allocationSource)}: ${entry.allocationNote || '-'}`}
                           >
                             {entry.estateAllocation}
                             {entry.estateRatio && entry.estateAllocation === 'MIXED' && (
