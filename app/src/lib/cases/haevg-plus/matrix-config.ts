@@ -170,69 +170,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSummary: true,
     matches: [],
   },
-  // Velbert-Konten (nur in GLOBAL + LOCATION_VELBERT sichtbar)
-  {
-    id: 'opening_balance_isk_velbert',
-    label: 'ISK Velbert (BW-Bank)',
-    labelShort: 'ISK Velbert',
-    block: 'OPENING_BALANCE',
-    order: 2,
-    isSubRow: true,
-    isSummary: false,
-    matches: [{ type: 'BANK_ACCOUNT_ID', value: 'ba-isk-velbert' }],
-    bankAccountId: 'ba-isk-velbert',
-    visibleInScopes: ['GLOBAL', 'LOCATION_VELBERT'],
-  },
-  {
-    id: 'opening_balance_sparkasse_velbert',
-    label: 'Geschäftskonto MVZ Velbert (Sparkasse)',
-    labelShort: 'Sparkasse Velbert',
-    block: 'OPENING_BALANCE',
-    order: 3,
-    isSubRow: true,
-    isSummary: false,
-    matches: [{ type: 'BANK_ACCOUNT_ID', value: 'ba-sparkasse-velbert' }],
-    bankAccountId: 'ba-sparkasse-velbert',
-    visibleInScopes: ['GLOBAL', 'LOCATION_VELBERT'],
-  },
-  // Uckerath-Konten (nur in GLOBAL + LOCATION_UCKERATH_EITORF sichtbar)
-  {
-    id: 'opening_balance_isk_uckerath',
-    label: 'ISK Uckerath (BW-Bank)',
-    labelShort: 'ISK Uckerath',
-    block: 'OPENING_BALANCE',
-    order: 4,
-    isSubRow: true,
-    isSummary: false,
-    matches: [{ type: 'BANK_ACCOUNT_ID', value: 'ba-isk-uckerath' }],
-    bankAccountId: 'ba-isk-uckerath',
-    visibleInScopes: ['GLOBAL', 'LOCATION_UCKERATH_EITORF'],
-  },
-  {
-    id: 'opening_balance_apobank_uckerath',
-    label: 'MVZ Uckerath (apoBank)',
-    labelShort: 'apoBank Uckerath',
-    block: 'OPENING_BALANCE',
-    order: 5,
-    isSubRow: true,
-    isSummary: false,
-    matches: [{ type: 'BANK_ACCOUNT_ID', value: 'ba-apobank-uckerath' }],
-    bankAccountId: 'ba-apobank-uckerath',
-    visibleInScopes: ['GLOBAL', 'LOCATION_UCKERATH_EITORF'],
-  },
-  // Zentrale Konten (nur in GLOBAL sichtbar)
-  {
-    id: 'opening_balance_apobank_hvplus',
-    label: 'HV PLUS eG (apoBank, zentral)',
-    labelShort: 'HV PLUS eG',
-    block: 'OPENING_BALANCE',
-    order: 6,
-    isSubRow: true,
-    isSummary: false,
-    matches: [{ type: 'BANK_ACCOUNT_ID', value: 'ba-apobank-hvplus' }],
-    bankAccountId: 'ba-apobank-hvplus',
-    visibleInScopes: ['GLOBAL'],
-  },
+  // Bankkonten-Detail-Zeilen entfernt (2026-02-09)
+  // Begründung: Redundant zu BankAccountsTab, nicht verknüpft mit Kategorien
+  // Liqui-Tabelle zeigt nur Cashflow-Kategorien, keine einzelnen Konten
 
   // ─── BLOCK B: EINZAHLUNGEN ──────────────────────────────────────────
   // Reihenfolge: Umsatz (HZV/KV/PVS), dann Altforderungen, dann Inso, dann Sonstige
@@ -724,69 +664,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSummary: true,
     matches: [],
   },
-  // Velbert-Konten (nur in GLOBAL + LOCATION_VELBERT sichtbar)
-  {
-    id: 'closing_balance_isk_velbert',
-    label: 'ISK Velbert (BW-Bank)',
-    labelShort: 'ISK Velbert',
-    block: 'CLOSING_BALANCE',
-    order: 2,
-    isSubRow: true,
-    isSummary: false,
-    matches: [{ type: 'BANK_ACCOUNT_ID', value: 'ba-isk-velbert' }],
-    bankAccountId: 'ba-isk-velbert',
-    visibleInScopes: ['GLOBAL', 'LOCATION_VELBERT'],
-  },
-  {
-    id: 'closing_balance_sparkasse_velbert',
-    label: 'Geschäftskonto MVZ Velbert (Sparkasse)',
-    labelShort: 'Sparkasse Velbert',
-    block: 'CLOSING_BALANCE',
-    order: 3,
-    isSubRow: true,
-    isSummary: false,
-    matches: [{ type: 'BANK_ACCOUNT_ID', value: 'ba-sparkasse-velbert' }],
-    bankAccountId: 'ba-sparkasse-velbert',
-    visibleInScopes: ['GLOBAL', 'LOCATION_VELBERT'],
-  },
-  // Uckerath-Konten (nur in GLOBAL + LOCATION_UCKERATH_EITORF sichtbar)
-  {
-    id: 'closing_balance_isk_uckerath',
-    label: 'ISK Uckerath (BW-Bank)',
-    labelShort: 'ISK Uckerath',
-    block: 'CLOSING_BALANCE',
-    order: 4,
-    isSubRow: true,
-    isSummary: false,
-    matches: [{ type: 'BANK_ACCOUNT_ID', value: 'ba-isk-uckerath' }],
-    bankAccountId: 'ba-isk-uckerath',
-    visibleInScopes: ['GLOBAL', 'LOCATION_UCKERATH_EITORF'],
-  },
-  {
-    id: 'closing_balance_apobank_uckerath',
-    label: 'MVZ Uckerath (apoBank)',
-    labelShort: 'apoBank Uckerath',
-    block: 'CLOSING_BALANCE',
-    order: 5,
-    isSubRow: true,
-    isSummary: false,
-    matches: [{ type: 'BANK_ACCOUNT_ID', value: 'ba-apobank-uckerath' }],
-    bankAccountId: 'ba-apobank-uckerath',
-    visibleInScopes: ['GLOBAL', 'LOCATION_UCKERATH_EITORF'],
-  },
-  // Zentrale Konten (nur in GLOBAL sichtbar)
-  {
-    id: 'closing_balance_apobank_hvplus',
-    label: 'HV PLUS eG (apoBank, zentral)',
-    labelShort: 'HV PLUS eG',
-    block: 'CLOSING_BALANCE',
-    order: 6,
-    isSubRow: true,
-    isSummary: false,
-    matches: [{ type: 'BANK_ACCOUNT_ID', value: 'ba-apobank-hvplus' }],
-    bankAccountId: 'ba-apobank-hvplus',
-    visibleInScopes: ['GLOBAL'],
-  },
+  // Bankkonten-Detail-Zeilen entfernt (2026-02-09)
+  // Begründung: Redundant zu BankAccountsTab, nicht verknüpft mit Kategorien
+  // Liqui-Tabelle zeigt nur Cashflow-Kategorien, keine einzelnen Konten
 ];
 
 // =============================================================================

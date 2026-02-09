@@ -519,143 +519,20 @@ export async function GET(
     // WICHTIG: Bank-Balances sind immer GLOBAL (nicht scope-gefiltert),
     // aber die Sichtbarkeit der Zeilen wird über visibleInScopes gesteuert
 
-    // Lade ALLE IST-Ledger-Entries für Bank-Balance-Berechnung (nicht scope-gefiltert!)
-    const allBankLedgerEntries = await prisma.ledgerEntry.findMany({
-      where: {
-        caseId,
-        valueType: 'IST',
-        bankAccountId: { not: null },
-      },
-      select: {
-        bankAccountId: true,
-        amountCents: true,
-        transactionDate: true,
-      },
-      orderBy: { transactionDate: 'asc' },
-    });
+    // 10c. Calculate Opening/Closing Balance Totals
+    // Bankkonten-Details entfernt (2026-02-09) - nur noch Totals aus Cashflows
+    // Einzelne Konten werden im Bankenspiegel (BankAccountsTab) angezeigt
+    console.log('[Liquidity Matrix] Berechne Balance-Totals aus Cashflows...');
 
-    // Berechne running balance pro Bankkonto und Periode
-    console.log('[Liquidity Matrix] Befülle Bank-Zeilen...');
-    for (const account of existingCase.bankAccounts) {
-      const accountId = account.id;
-
-      // DESIGN RULE: Planning code must never read BankAccount.openingBalanceCents
-      // Liquiditätsplanung ist cashflow-basiert und startet immer bei 0 EUR.
-      // Reale Kontostände werden separat im Bankenspiegel (BankAccountsTab) angezeigt.
-      let runningBalance = BigInt(0);
-
-      // Opening Balance Zeile-ID basierend auf accountId
-      // WICHTIG: Alle Minuszeichen durch Underscores ersetzen (Config verwendet Underscores!)
-      const openingRowId = `opening_balance_${accountId.replace('ba-', '').replace(/-/g, '_')}`;
-      const closingRowId = `closing_balance_${accountId.replace('ba-', '').replace(/-/g, '_')}`;
-
-      // Ermittle die letzte Periode mit IST-Daten für dieses Konto
-      let lastPeriodWithData = -1;
-      for (let i = 0; i < periodCount; i++) {
-        const { start, end } = getPeriodDates(i, startDate, periodType);
-        const hasData = allBankLedgerEntries.some((e) => {
-          if (e.bankAccountId !== accountId) return false;
-          const entryDate = new Date(e.transactionDate);
-          return entryDate >= start && entryDate < end;
-        });
-        if (hasData) {
-          lastPeriodWithData = i;
-        }
-      }
-
-      console.log(`[Bank] Account: ${accountId}, Opening Row ID: ${openingRowId}, exists in rowAggregations: ${rowAggregations.has(openingRowId)}, Balance: ${Number(runningBalance)/100}€, Letzte Periode mit Daten: ${lastPeriodWithData}`);
-
-      // Initialisiere rowAggregations für diese Bank-Zeilen falls nicht vorhanden
-      if (!rowAggregations.has(openingRowId)) {
-        const openingMap = new Map<number, { amount: bigint; count: number }>();
-        for (let i = 0; i < periodCount; i++) {
-          openingMap.set(i, { amount: BigInt(0), count: 0 });
-        }
-        rowAggregations.set(openingRowId, openingMap);
-      }
-
-      if (!rowAggregations.has(closingRowId)) {
-        const closingMap = new Map<number, { amount: bigint; count: number }>();
-        for (let i = 0; i < periodCount; i++) {
-          closingMap.set(i, { amount: BigInt(0), count: 0 });
-        }
-        rowAggregations.set(closingRowId, closingMap);
-      }
-
-      const openingRow = rowAggregations.get(openingRowId)!;
-      const closingRow = rowAggregations.get(closingRowId)!;
-
-      // Berechne Balance pro Periode - aber nur bis lastPeriodWithData
-      for (let i = 0; i < periodCount; i++) {
-        const { start, end } = getPeriodDates(i, startDate, periodType);
-
-        // Wenn keine Daten mehr: Zeilen leer lassen (count = -1 als Marker)
-        if (i > lastPeriodWithData && lastPeriodWithData >= 0) {
-          openingRow.set(i, { amount: BigInt(0), count: -1 });
-          closingRow.set(i, { amount: BigInt(0), count: -1 });
-          continue;
-        }
-
-        // Opening Balance für diese Periode
-        openingRow.set(i, { amount: runningBalance, count: 0 });
-
-        // Summiere Entries für dieses Konto in dieser Periode
-        const periodSum = allBankLedgerEntries
-          .filter((e) => {
-            if (e.bankAccountId !== accountId) return false;
-            const entryDate = new Date(e.transactionDate);
-            return entryDate >= start && entryDate < end;
-          })
-          .reduce((sum, e) => sum + e.amountCents, BigInt(0));
-
-        runningBalance += periodSum;
-
-        // Closing Balance für diese Periode
-        closingRow.set(i, { amount: runningBalance, count: 0 });
-      }
-    }
-
-    // 10c. Calculate Opening/Closing Balance Totals (scope-aware!)
-    // Die Total-Zeilen müssen die Summe der SICHTBAREN Bank-Zeilen sein
-    // WICHTIG: Nur für Period 0 aus Bank-Rows summieren, danach fortschreiben!
     const openingBalances: bigint[] = [];
     const closingBalances: bigint[] = [];
 
-    // Hole alle Bank-Rows die im aktuellen Scope sichtbar sind
-    const visibleBankRows = HVPLUS_MATRIX_ROWS.filter(
-      (row) =>
-        row.block === 'OPENING_BALANCE' &&
-        row.bankAccountId &&
-        (!row.visibleInScopes || row.visibleInScopes.includes(scope))
-    );
-
-    console.log(
-      `[Balance Total] Scope: ${scope}, Visible Bank Rows: ${visibleBankRows.length} (${visibleBankRows.map((r) => r.id).join(', ')})`
-    );
-
     for (let i = 0; i < periodCount; i++) {
-      let periodOpening: bigint;
-
-      if (i === 0) {
-        // Period 0: Summe aller sichtbaren Bank-Opening-Balances
-        periodOpening = BigInt(0);
-        for (const row of visibleBankRows) {
-          const rowData = rowAggregations.get(row.id);
-          if (rowData) {
-            const periodData = rowData.get(i);
-            if (periodData) {
-              periodOpening += periodData.amount;
-            }
-          }
-        }
-      } else {
-        // Period i > 0: Opening = Closing der vorherigen Periode
-        periodOpening = closingBalances[i - 1];
-      }
-
+      // Opening Balance: Periode 0 startet bei 0, danach = Closing der Vorperiode
+      const periodOpening = i === 0 ? BigInt(0) : closingBalances[i - 1];
       openingBalances.push(periodOpening);
 
-      // Closing Balance = Opening Balance + Cash In + Cash Out
+      // Closing Balance = Opening + Cash In + Cash Out
       const cashIn = blockTotals.get('CASH_IN')![i];
       const cashOutTotal = blockTotals.get('CASH_OUT_TOTAL')![i];
       const closing = periodOpening + cashIn + cashOutTotal;

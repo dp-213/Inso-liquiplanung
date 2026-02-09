@@ -4,6 +4,57 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-030: Bankkonten-Details aus Liquidity Matrix entfernt
+
+**Datum:** 09. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Liquidity Matrix zeigte einzelne Bankkonten-Zeilen (ISK Velbert, Sparkasse, apoBank, etc.) aufgeklappt unter "Zahlungsmittelbestand".
+
+**Problem:**
+- Redundanz: BankAccountsTab zeigt bereits alle Konten mit Details
+- Keine fachliche Verknüpfung: Einzelne Konten hängen nicht an Cashflow-Kategorien
+- Verwirrend: Zwei Stellen zeigen Kontostände (Matrix + Bankenspiegel)
+- Unnötige Komplexität: ~150 Zeilen Code für Bank-Schleife und Balance-Berechnung
+
+### Entscheidung
+
+**Einzelne Bankkonten-Zeilen komplett aus Liquidity Matrix entfernt:**
+
+1. **Config:** 10 Detail-Zeilen entfernt (5 Opening Balance + 5 Closing Balance)
+2. **Route:** Bank-Schleife und Bank-spezifische Balance-Berechnung entfernt
+3. **Behalten:** Summary-Zeilen (Anfangsbestand gesamt, Endbestand gesamt)
+4. **Balance-Berechnung:** Vereinfacht zu `Opening + Cash In + Cash Out`
+
+### Begründung
+
+**Separation of Concerns:**
+- **Liquidity Matrix:** Cashflow-Kategorien (HZV, KV, PVS, Personalkosten, etc.)
+- **BankAccountsTab:** Kontenstände und -entwicklung
+
+**Vorteile:**
+- Klarere Darstellung (nur Kategorien)
+- Weniger Code (~150 Zeilen entfernt)
+- Keine Redundanz mehr
+- Einfachere Wartung
+
+### Konsequenzen
+
+**Geänderte Dateien:**
+- `/app/src/lib/cases/haevg-plus/matrix-config.ts` (10 Zeilen entfernt, 2 Kommentare)
+- `/app/src/app/api/cases/[id]/dashboard/liquidity-matrix/route.ts` (~150 Zeilen vereinfacht)
+
+**Entfernte DB-Abfrage:**
+- `allBankLedgerEntries` Query nicht mehr nötig (nur für Detail-Zeilen verwendet)
+
+**Frontend-Änderung:**
+- Liquidity Matrix zeigt keine aufgeklappten Konten mehr
+- Nur noch "Zahlungsmittelbestand am Anfang/Ende" als Summe
+
+---
+
 ## ADR-029: Liquiditätsplanung startet bei 0 EUR (keine Opening Balance)
 
 **Datum:** 09. Februar 2026
