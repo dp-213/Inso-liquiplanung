@@ -447,6 +447,20 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     ],
   },
   {
+    id: 'cash_out_personal_sozialabgaben',
+    label: 'Sozialabgaben (Arbeitgeber-Anteil)',
+    labelShort: 'Sozialabg.',
+    block: 'CASH_OUT_OPERATIVE',
+    order: 3,
+    isSubRow: true,
+    isSummary: false,
+    flowType: 'OUTFLOW',
+    visibleInScopes: ['GLOBAL'],
+    matches: [
+      { type: 'CATEGORY_TAG', value: 'SOZIALABGABEN' },
+    ],
+  },
+  {
     id: 'cash_out_betriebskosten',
     label: 'Betriebskosten',
     labelShort: 'Betriebsk.',

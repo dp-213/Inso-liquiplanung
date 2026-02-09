@@ -176,6 +176,8 @@ export default function LedgerDrillDownModal({
                   <th className="text-right">Betrag</th>
                   <th>Typ</th>
                   <th>Status</th>
+                  <th>Category Tag</th>
+                  <th>Alt/Neu</th>
                   <th>Quelle</th>
                 </tr>
               </thead>
@@ -215,6 +217,38 @@ export default function LedgerDrillDownModal({
                         <span className={`badge text-xs ${getBucketBadgeClass(entry.legalBucket)}`}>
                           {LEGAL_BUCKET_LABELS[entry.legalBucket]}
                         </span>
+                      </td>
+                      <td>
+                        {entry.categoryTag ? (
+                          <span
+                            className="badge badge-info text-xs cursor-help"
+                            title={`${entry.categoryTagSource || 'UNKNOWN'}: ${entry.categoryTagNote || '-'}`}
+                          >
+                            {entry.categoryTag}
+                          </span>
+                        ) : (
+                          <span className="text-[var(--muted)] text-xs">-</span>
+                        )}
+                      </td>
+                      <td>
+                        {entry.estateAllocation ? (
+                          <span
+                            className={`badge text-xs cursor-help ${
+                              entry.estateAllocation === 'ALTMASSE' ? 'badge-warning' :
+                              entry.estateAllocation === 'NEUMASSE' ? 'badge-success' :
+                              entry.estateAllocation === 'MIXED' ? 'badge-info' :
+                              'badge-neutral'
+                            }`}
+                            title={`${entry.allocationSource || 'UNKNOWN'}: ${entry.allocationNote || '-'}`}
+                          >
+                            {entry.estateAllocation}
+                            {entry.estateRatio && entry.estateAllocation === 'MIXED' && (
+                              <span className="ml-1">({(parseFloat(entry.estateRatio) * 100).toFixed(1)}%)</span>
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-[var(--muted)] text-xs">-</span>
+                        )}
                       </td>
                       <td className="text-sm text-[var(--muted)]">
                         {entry.bookingSource || "-"}
