@@ -258,6 +258,9 @@ cd app && npm run build
 | Route 404 | API-Route existiert? Datei am richtigen Ort? |
 | "Fälle konnten nicht geladen werden" | `credentials: 'include'` in ALLEN fetch-Aufrufen! |
 | 401 Unauthorized im Frontend | `credentials: 'include'` fehlt bei fetch() |
+| Build-Fehler "Cannot find module X" | Script in `/app` statt Root → nach Root verschieben |
+| TypeScript-Fehler bei Analyse-Scripts | Scripts gehören nicht in `/app` (werden mit-kompiliert) |
+| "Internal Server Error" Localhost | Mehrere Next.js Dev-Server parallel → alle killen, neu starten |
 
 ---
 
@@ -336,9 +339,37 @@ git push origin main
 
 **WICHTIG:** GitHub Auto-Deploy ist DEAKTIVIERT. Deployment erfolgt manuell (siehe Phase 5).
 
-### Phase 5: Manuelles Production Deployment
+### Phase 5: Deployment-Entscheidung (Code vs. Daten vs. Doku)
 
-**GitHub-Integration deaktiviert** - Deployment erfolgt IMMER manuell mit:
+**WICHTIG: Nicht jeder Push erfordert Vercel-Deploy!**
+
+#### Schritt 1: Prüfe Art der Änderung
+
+```bash
+# Welche Dateien wurden geändert?
+git diff --name-status HEAD~1..HEAD | grep -E "\.(ts|tsx)$"
+```
+
+**Entscheidungsmatrix:**
+
+| Änderung | Beispiel | Git Push? | Vercel Deploy? | Turso-Migration? |
+|----------|----------|-----------|----------------|------------------|
+| **Nur Doku** | `docs/*.md` | ✅ Ja | ❌ Nein | ❌ Nein |
+| **Nur lokale Daten** | 100 neue LedgerEntries lokal | Optional | ❌ Nein | ✅ Ja (sync) |
+| **Code** | `src/lib/*.ts`, `src/app/**` | ✅ Ja | ✅ JA | ❌ Nein |
+| **Schema** | `prisma/schema.prisma` | ✅ Ja | ✅ JA | ✅ VOR Deploy! |
+| **Scripts (Root)** | `analyze-*.ts` im Root | Optional | ❌ Nein | ❌ Nein |
+
+#### Schritt 2a: Nur Git Push (bei reiner Doku)
+
+```bash
+git push origin main
+# FERTIG - kein Vercel Deploy nötig!
+```
+
+#### Schritt 2b: Vercel Deploy (bei Code-Änderungen)
+
+**GitHub-Integration deaktiviert** - Deployment erfolgt IMMER manuell:
 
 ```bash
 cd "/Users/david/Projekte/AI Terminal/Inso-Liquiplanung"

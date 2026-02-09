@@ -4,6 +4,68 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-027: Deployment-Strategie - Code vs. Daten vs. Dokumentation
+
+**Datum:** 09. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Bei der Vorbereitung des Deployments von Version 2.15.0 wurde festgestellt:
+- **Dokumentation** (CHANGELOG, DECISIONS, LIMITATIONS) hatte lokale Änderungen
+- **Daten** (Service Periods, LANR-Korrekturen) waren BEREITS in Turso synchronisiert
+- **Code** (src/lib, src/app, src/components) war UNVERÄNDERT
+
+Frage: Soll ein vollständiger Vercel-Deploy gemacht werden, obwohl nur Dokumentation geändert wurde?
+
+### Entscheidung
+
+**Gestaffelte Deployment-Strategie** basierend auf Art der Änderung:
+
+| Art der Änderung | Git Push | Vercel Deploy | Turso-Migration |
+|------------------|----------|---------------|-----------------|
+| **Nur Dokumentation** | ✅ Ja | ❌ Nein | ❌ Nein |
+| **Nur Daten (lokal)** | Optional | ❌ Nein | ✅ Ja |
+| **Code-Änderungen** | ✅ Ja | ✅ Ja | Bei Schema-Änderung |
+| **Schema-Änderungen** | ✅ Ja | ✅ Ja | ✅ VOR Deploy |
+
+**Vercel Deploy erfolgt NUR bei:**
+- Änderungen in `src/app`, `src/lib`, `src/components`
+- Änderungen in `prisma/schema.prisma`
+- Änderungen in `package.json` Dependencies
+- Änderungen in `next.config.ts`
+
+### Begründung
+
+**Warum gestaffelt?**
+1. **Effizienz:** Unnötige Rebuilds vermeiden (spart Zeit + Ressourcen)
+2. **Stabilität:** Weniger Deployments = weniger Downtime-Risiko
+3. **Klarheit:** Explizite Entscheidung, was deployed werden muss
+4. **Kosten:** Vercel Build-Minuten sparen
+
+**Warum nicht immer deployen?**
+- Dokumentation ist nur für Repository/GitHub relevant
+- Production läuft bereits mit aktuellem Code
+- Rebuild dauert 2+ Minuten + Downtime
+- Kein funktionaler Mehrwert für User
+
+### Konsequenzen
+
+**Positiv:**
+- Schnellere Doku-Updates (nur Git Push statt 2 Min Deploy)
+- Klarere Trennung zwischen Code und Daten
+- Weniger unnötige Production-Deployments
+
+**Negativ:**
+- Vercel-deployed Code und GitHub-Dokumentation können kurzzeitig auseinanderlaufen
+- Erfordert bewusste Entscheidung vor jedem Push
+
+**Monitoring:**
+- Git Diff prüfen: `git diff --name-only | grep -E "^src/|^prisma/schema"`
+- Bei Unsicherheit: Lieber deployen als riskieren
+
+---
+
 ## ADR-026: Service-Period-Extraktion über Datenbereinigung
 
 **Datum:** 08. Februar 2026
@@ -1937,3 +1999,84 @@ Nutzer sieht Banner: "Standort-Ansicht: Einnahmen/Banken-Tabs ausgeblendet (zeig
 **Dateien betroffen:**
 - `/app/src/components/dashboard/UnifiedCaseDashboard.tsx` (Tab-Filter-Logik)
 - `/app/docs/TODO.md` (Proper Scope-Support dokumentiert)
+
+---
+
+## ADR-028: Classification MUSS bei jedem Import erfolgen
+
+**Datum:** 09. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Nach erfolgreichem Turso-Sync (691 IST-Entries) wurde festgestellt:
+- **Alle categoryTags sind NULL** → Liqui-Matrix zeigt 0 für Altforderungen
+- **ALTMASSE-Daten sind vorhanden:** 184.963,96 EUR (119 HZV + 4 PVS + 127 Sonstige)
+- **Ursache:** Classification Engine wurde nie ausgeführt
+
+**Wie konnte das passieren?**
+- Daten wurden "manuell" importiert (Code im Sparring, nicht via Import-Engine)
+- Annahme war: "Import = Done"
+- **FALSCH:** Import allein reicht nicht!
+
+**Das System IST gut designed:**
+```
+1. Classification Engine → Erstellt suggestedCategoryTag
+2. Bulk-Review API → Übernimmt Vorschläge
+3. Audit-Trail → Dokumentiert Änderungen
+```
+
+**Aber:** Engine wurde nie getriggert!
+
+### Entscheidung
+
+**PFLICHT-REGEL: Import OHNE Classification ist unvollständig!**
+
+**Neuer Standard-Workflow (egal wie importiert wird):**
+```
+1. Import (CSV/Excel/Code) → Schreibt LedgerEntries
+2. Classification → Erstellt suggested* Felder  ⭐ PFLICHT
+3. Review → Admin akzeptiert/korrigiert
+4. Commit → Übernimmt in finale Felder
+```
+
+**Konkret für HVPlus (Nacharbeit erforderlich):**
+- Alle 691 IST-Entries müssen klassifiziert werden
+- Bulk-Review mit Preview
+- categoryTags übernehmen
+- Audit-Trail vollständig dokumentieren
+
+### Begründung
+
+**Warum ist Classification kritisch?**
+1. **Liqui-Matrix funktioniert nicht:** Filtert nach categoryTag → zeigt 0 statt echte Daten
+2. **Alt/Neu-Trennung unklar:** Ohne Tags keine saubere Trennung in Matrix
+3. **Datenqualität:** Unklassifizierte Daten = unbrauchbare Daten
+
+**Warum IMMER, egal wie importiert?**
+- Import-Engine, manueller Code, Excel-Upload - egal!
+- Classification ist TEIL des Imports, nicht optional
+- Verhindert zukünftige "categoryTag = NULL"-Probleme
+
+### Konsequenzen
+
+**Sofort:**
+- HVPlus: 691 Entries klassifizieren (Interactive Review mit User)
+- Classification Rules erweitern basierend auf Learnings
+
+**Langfristig:**
+- **Import-Hooks:** Auto-Classify bei `ledgerEntry.create()`
+- **Admin-UI:** "Klassifikation & Bulk-Accept" Seite
+- **Dokumentation:** Import-Checkliste mit Classification als Pflichtschritt
+
+**Audit-Trail:**
+- Jede Classification muss nachvollziehbar sein
+- `categoryTagSource`: IMPORT | AUTO | MANUELL
+- `categoryTagNote`: Begründung (z.B. "Übernommen: HZV (COUNTERPARTY_PATTERN)")
+- Alle Änderungen in `ledger_audit_logs`
+
+### Relevante Dateien
+
+- `/lib/classification/engine.ts` - Classification Logic
+- `/api/cases/[id]/ledger/bulk-review/route.ts` - Bulk-Accept API
+- `/app/docs/ARCHITECTURE.md` - Import-Workflow aktualisieren

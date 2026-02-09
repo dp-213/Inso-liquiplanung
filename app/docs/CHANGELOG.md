@@ -4,6 +4,102 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.17.0 – CasePlanning DB-Migration & Production-Verifikation
+
+**Datum:** 09. Februar 2026
+
+### Neue Funktionen
+
+- **CasePlanning-Daten in Turso:** JSON-basierte Liquiditätsplanung vollständig migriert
+  - Tabelle `case_planning` mit 8596 bytes Planning-JSON für HVPlus
+  - API `/api/cases/[id]/planung` lädt nun aus DB statt Filesystem
+  - Keine Vercel-Filesystem-Abhängigkeiten mehr
+  - Planning-Seite funktioniert in Production: https://cases.gradify.de/admin/cases/.../planung
+
+### Änderungen
+
+- **Build-Scripts bereinigt:** 17 Analyse-/Utility-Scripts aus `/app` nach Root verschoben
+  - Verhindert TypeScript-Build-Fehler (Scripts werden nicht mehr kompiliert)
+  - Scripts bleiben voll funktionsfähig für lokale Entwicklung
+  - Verschoben: `analyze-*.ts`, `verify-*.ts`, `sync-to-turso.ts`, etc.
+
+- **Deployment-Strategie etabliert:** Code vs. Daten getrennt behandeln
+  - **Code-Änderungen** → Vercel Deploy erforderlich (`vercel --prod --yes --cwd app`)
+  - **Nur Daten** → Nur Turso-Sync erforderlich
+  - **Nur Doku** → Nur Git Push erforderlich
+
+### Verifikation
+
+- **Frontend Production vs Localhost:** Vollständiger Vergleich durchgeführt
+  - ✅ Production funktioniert einwandfrei (alle Assets, CSS, JS)
+  - ⚠️ Localhost hatte Server-Fehler (mehrere Next.js-Prozesse parallel)
+  - ✅ Production ist goldener Standard
+
+- **Daten-Synchronisation verifiziert:** Lokal = Turso v2 = Production
+  - 747 LedgerEntries identisch
+  - 292 Service Periods identisch
+  - 58 Januar-HZV identisch
+  - **→ Alle Features aus v2.15.0 bereits in Production aktiv**
+
+### Dokumentation
+
+- **Deployment-Workflow dokumentiert:** Git Push ohne Vercel-Deploy bei reinen Doku-Änderungen
+- **Analyse-Scripts katalogisiert:** 17 lokale Tools für Datenbereinigung und Verifikation
+
+---
+
+## Version 2.16.0 – Production-Sync & Datenbereinigung
+
+**Datum:** 09. Februar 2026
+
+### Änderungen
+
+- **Turso Production-Sync erfolgreich:** Lokale Daten (heilige Kuh) vollständig nach Turso synchronisiert
+  - 691 IST-Entries synchronisiert (inkl. aller HZV Service-Periods)
+  - 56 PLAN-Entries synchronisiert
+  - 13 veraltete PLAN-Entries aus Turso entfernt (vom 06.01.2026)
+  - 4 neue Counterparties nach Turso kopiert
+  - Checksummen verifiziert: 298.162,31 EUR (IST), 575.966,32 EUR (PLAN)
+
+- **Oktober-Regel korrigiert:** 8 Entries von tagesgenauer (0.0968) auf pauschale Q4-Regel (0.6667)
+  - Betroffen: Darlehensrückzahlungen, Pega-Software
+  - Begründung: Vereinheitlichung auf 1/3-2/3 für ALLE Q4-Entries
+  - `allocationSource`: `MASSEKREDITVERTRAG` → `Q4_2025_RULE_1_3_2_3`
+
+- **Prisma Schema bereinigt:** `updatedBy` aus 12 Tabellen entfernt
+  - Lokales SQLite aktualisiert (`npx prisma db push`)
+  - Turso-Schema bereits korrekt (veraltet)
+  - Sync-Scripts angepasst
+
+- **Lokales Datenchaos behoben:**
+  - `./dev.db` im Root → `dev.db.DEPRECATED-20260209` umbenannt
+  - Nur noch `prisma/dev.db` als Single Source of Truth
+  - Prisma interpretiert `file:./dev.db` RELATIV zum `prisma/`-Ordner
+
+### Bugfixes
+
+- **Foreign Key Constraints:** 4 fehlende Counterparties verhinderten Turso-Sync
+  - `cp-privatpatienten` ⭐ (Hauptursache)
+  - `cp-bw-bank-isk-auskehrung`
+  - `cp-sammelueberweisung`
+  - `cp-sonstige-betriebsausgaben`
+
+### Identifizierte Probleme
+
+⚠️ **categoryTags fehlen komplett:**
+- Alle 691 IST-Entries haben `categoryTag = NULL`
+- Liqui-Matrix zeigt 0 für Altforderungen (Daten sind da: 184.963,96 EUR)
+- **Ursache:** Classification Engine wurde nie auf importierte Daten angewandt
+- **Impact:** ALTMASSE-Daten (119 HZV + 4 PVS + 127 Sonstige) nicht in Matrix sichtbar
+
+### Dokumentation
+
+- **Backup-Strategie:** Vor allen kritischen Änderungen automatische Backups
+  - `prisma/dev.db.SAFE-BEFORE-CLEANUP-20260209-064807`
+  - `turso-backup-20260209-062532.sql` (4.2MB)
+
+---
+
 ## Version 2.15.0 – HZV Service-Period-Extraktion & Alt/Neu-Regel
 
 **Datum:** 08. Februar 2026

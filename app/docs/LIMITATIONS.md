@@ -36,6 +36,40 @@ Dieses Dokument listet bekannte Einschränkungen und bewusste Nicht-Implementier
 
 ---
 
+## Entwicklungs-Einschränkungen
+
+### Localhost Dev-Server instabil bei parallelen Prozessen
+
+**Beschreibung:** Wenn mehrere `npm run dev` Prozesse gleichzeitig laufen (z.B. nach mehrfachem Start ohne Stop), zeigt Localhost "Internal Server Error" und rendert nur 22 bytes HTML statt vollständige Seiten.
+
+**Begründung:** Next.js Dev-Server verwaltet Ports und Build-Cache - mehrere Instanzen interferieren miteinander.
+
+**Workaround:**
+```bash
+# Alle Next.js Prozesse killen
+pkill -f "next dev"
+# Dev-Server neu starten
+cd app && npm run dev
+```
+
+**Monitoring:** `ps aux | grep "next dev"` zeigt alle laufenden Instanzen.
+
+---
+
+### Analyse-Scripts dürfen nicht in /app liegen
+
+**Beschreibung:** TypeScript-Dateien im `/app`-Root-Verzeichnis werden bei `npm run build` mit-kompiliert und können Build-Fehler verursachen (z.B. fehlende Dependencies wie `better-sqlite3`).
+
+**Begründung:** Next.js kompiliert ALLE `.ts/.tsx` Dateien im `/app`-Verzeichnis, auch wenn sie nicht Teil der Anwendung sind.
+
+**Workaround:** Alle Utility-/Analyse-Scripts im **Repository-Root** (eine Ebene höher) ablegen:
+- ✅ `/analyze-hzv-payment-logic.ts` (OK)
+- ❌ `/app/analyze-hzv-payment-logic.ts` (FEHLER beim Build)
+
+**Betroffene Scripts:** `analyze-*.ts`, `verify-*.ts`, `sync-to-turso.ts`, `cleanup-*.ts`, etc.
+
+---
+
 ## Funktionale Einschränkungen
 
 ### Januar-HZV-Klassifikation basiert auf Annahme
@@ -501,6 +535,31 @@ const accounts = await prisma.bankAccount.findMany({
 ```
 
 **Priorität:** KRITISCH – IV benötigt diese Information für Massekredit-Tracking
+
+---
+
+### categoryTags fehlen nach manuellem Import
+
+**Beschreibung:** Nach Import von 691 IST-Entries (HVPlus, Feb 2026) haben ALLE Entries `categoryTag = NULL`. Liqui-Matrix zeigt deshalb 0 für Altforderungen, obwohl 184.963,96 EUR ALTMASSE-Daten vorhanden sind.
+
+**Begründung:** Classification Engine wurde nie ausgeführt. Beim "manuellen" Import (Code im Sparring) wurde nur Import durchgeführt, aber Classification vergessen.
+
+**Das System:** Classification Engine + Bulk-Review API sind vorhanden und funktionieren. Sie wurden nur nicht getriggert.
+
+**Workaround:** Nachträgliche Klassifikation über:
+1. Classification Engine auf alle Entries anwenden
+2. Bulk-Review mit Preview
+3. Accept → categoryTags übernehmen
+4. Audit-Trail vollständig dokumentieren
+
+**Zukünftig:** **PFLICHT-REGEL eingeführt (ADR-028):**
+- Import OHNE Classification ist unvollständig
+- Classification MUSS bei jedem Import erfolgen (egal wie: Engine, Code, Excel)
+- Alle Klassifikationen MÜSSEN nachvollziehbar sein (Audit-Trail)
+
+**Status:** ⚠️ Wird aktuell für HVPlus nachgeholt (Interactive Review)
+
+**Priorität:** KRITISCH – Ohne categoryTags ist Liqui-Matrix nicht nutzbar
 
 ---
 
