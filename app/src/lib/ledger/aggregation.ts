@@ -1233,7 +1233,17 @@ export async function aggregateRollingForecast(
       // Use IST values
       period.inflowsCents = period.istInflowsCents;
       period.outflowsCents = period.istOutflowsCents;
-      period.source = period.planCount > 0 ? 'MIXED' : 'IST';
+
+      // MIXED nur wenn:
+      // 1. Sowohl IST als auch PLAN Buchungen vorhanden sind UND
+      // 2. Die Periode ist NICHT vollständig in der Vergangenheit
+      // Rationale: Vergangene Perioden mit IST-Daten sind vollständig erfasst,
+      // auch wenn noch alte PLAN-Buchungen existieren (die ignoriert werden)
+      if (period.planCount > 0 && !period.isPast) {
+        period.source = 'MIXED';
+      } else {
+        period.source = 'IST';
+      }
       totalIstPeriods++;
     } else {
       // Use PLAN values

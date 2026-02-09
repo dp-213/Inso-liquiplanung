@@ -373,10 +373,9 @@ export default function UnifiedCaseDashboard({
 
             {/* Wasserfall-Darstellung */}
             <div className="admin-card p-6">
-              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Wasserfall-Darstellung</h2>
-              <p className="text-sm text-[var(--secondary)] mb-6">
-                Die Wasserfall-Darstellung zeigt die Zusammensetzung der Cashflows pro Periode.
-                Einzahlungen (grün) und Auszahlungen (rot) ergeben den Endbestand (blaue Linie).
+              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">Wasserfall-Darstellung</h2>
+              <p className="text-sm text-[var(--secondary)] mb-4">
+                Zeigt die Zusammensetzung der Cashflows pro Periode: Einzahlungen (grün), Auszahlungen (rot) und Endbestand (blaue Linie).
               </p>
               <WaterfallChart
                 data={periods.map((period) => ({
