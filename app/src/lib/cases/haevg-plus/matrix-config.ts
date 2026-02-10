@@ -103,28 +103,28 @@ export interface LiquidityMatrixConfig {
 export const HVPLUS_MATRIX_BLOCKS: MatrixBlockConfig[] = [
   {
     id: 'OPENING_BALANCE',
-    label: 'I. Finanzmittelbestand Periodenanfang',
+    label: 'Finanzmittelbestand',
     order: 1,
     summaryRowId: 'opening_balance_total',
     cssClass: 'bg-gray-50',
   },
   {
     id: 'CASH_IN',
-    label: 'II. Einzahlungen',
+    label: 'Zahlungseingänge',
     order: 2,
     summaryRowId: 'cash_in_total',
     cssClass: 'bg-green-50',
   },
   {
     id: 'CASH_OUT',
-    label: 'III. Auszahlungen',
+    label: 'Zahlungsausgänge',
     order: 3,
     summaryRowId: 'cash_out_total',
     cssClass: 'bg-red-50',
   },
   {
     id: 'LIQUIDITY_DEVELOPMENT',
-    label: 'IV. Liquiditätsentwicklung',
+    label: 'Liquiditätsentwicklung',
     order: 4,
     summaryRowId: 'coverage_after_reserves',
     cssClass: 'bg-blue-50',
@@ -487,6 +487,17 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
 
   // --- Betriebliche Auszahlungen ---
   {
+    id: 'cash_out_betrieblich_header',
+    label: 'Betriebliche Auszahlungen',
+    block: 'CASH_OUT',
+    order: 5,
+    isSubRow: false,
+    isSummary: false,
+    isSectionHeader: true,
+    matches: [],
+    flowType: 'OUTFLOW',
+  },
+  {
     id: 'cash_out_personal',
     label: 'Personalaufwand',
     labelShort: 'Personal',
@@ -734,7 +745,7 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     id: 'cash_out_total',
     label: 'Summe Auszahlungen',
     block: 'CASH_OUT',
-    order: 99,
+    order: 2,
     isSubRow: false,
     isSummary: true,
     matches: [],

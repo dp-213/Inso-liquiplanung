@@ -4,6 +4,64 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.21.0 – Bestell- & Zahlfreigabe-Modul
+
+**Datum:** 10. Februar 2026
+
+### Neue Funktionen
+
+- **Bestell- & Zahlfreigabe-Modul:** Vollständiges Freigabe-System für Insolvenzverwalter
+  - **Zwei Freigabetypen:** Bestellfreigabe (vor Kauf, Budget-Genehmigung) und Zahlungsfreigabe (Rechnung liegt vor)
+  - **Externes Einreichungsformular:** Token-basierter Zugang unter `/submit/[token]` – Buchhaltung/Unternehmen können ohne Login Anfragen einreichen
+  - **Typ-Auswahl:** Ansprechendes Kachel-Design (Bestellfreigabe / Zahlungsfreigabe) mit dynamischen Labels
+  - **Echter Datei-Upload:** PDF, JPG, PNG bis 10MB als Base64 in der Datenbank gespeichert
+  - **Admin-Freigabe-Dashboard:** Filter nach Typ (Bestellung/Zahlung), sortierbare Spalten (Datum/Betrag/Gläubiger)
+  - **Genehmigung mit optionalem Betrag:** IV kann anderen Betrag als angefragt genehmigen (ApprovalModal)
+  - **Ablehnungs-Workflow:** RejectionModal mit Pflicht-Begründung, dokumentiert im System
+  - **Automatische LedgerEntry-Erstellung:** Genehmigte Anfragen erzeugen PLAN-LedgerEntry (legalBucket=MASSE, estateAllocation=NEUMASSE)
+  - **Beleg-Download:** Dokumente über API als Binary-Download abrufbar (`/api/cases/[id]/orders/[orderId]/document`)
+  - **Navigation-Badge:** Freigaben-Button auf Fall-Übersichtsseite zeigt Anzahl offener Anfragen
+  - **Token-Verwaltung:** CompanyTokenManager zur Erstellung/Deaktivierung von Zugangs-Tokens
+
+### Neue Dateien
+
+- `app/src/app/submit/[token]/OrderSubmissionForm.tsx` – Externes Einreichungsformular
+- `app/src/app/submit/[token]/StatusSteps.tsx` – Status-Schritte-Anzeige
+- `app/src/app/submit/[token]/page.tsx` – Submit-Seite
+- `app/src/app/admin/cases/[id]/orders/page.tsx` – Admin-Freigaben-Seite
+- `app/src/app/admin/cases/[id]/orders/OrderList.tsx` – Freigabeliste mit Filter/Sort
+- `app/src/app/admin/cases/[id]/orders/ApprovalModal.tsx` – Genehmigungs-Modal mit optionalem Betrag
+- `app/src/app/admin/cases/[id]/orders/RejectionModal.tsx` – Ablehnungs-Modal mit Begründung
+- `app/src/app/admin/cases/[id]/orders/CompanyTokenManager.tsx` – Token-Verwaltung
+- `app/src/app/api/company/orders/route.ts` – Submission-API (Token-Auth)
+- `app/src/app/api/cases/[id]/orders/[orderId]/document/route.ts` – Beleg-Download-API
+- `app/src/app/api/cases/[id]/orders/[orderId]/approve/route.ts` – Genehmigungs-API
+- `app/src/app/api/cases/[id]/orders/[orderId]/reject/route.ts` – Ablehnungs-API
+- `app/src/app/api/cases/[id]/tokens/route.ts` – Token-Verwaltungs-API
+- `app/src/app/portal/cases/[id]/orders/page.tsx` – Portal-Freigaben-Seite (nicht in Navigation verlinkt)
+- `app/migration-orders.sql` – Turso-Migration für Orders & CompanyTokens
+
+### Sicherheits-Fixes (aus Code-Review)
+
+- **legalBucket "NEUMASSE" → "MASSE":** Ungültiger legalBucket-Wert in Approval-API korrigiert
+- **Content-Disposition Header Injection:** Dateinamen-Sanitisierung bei Beleg-Download
+- **NaN-Schutz:** Client- und serverseitige Validierung von Beträgen und Daten
+- **Try/Catch für req.json():** Reject-API crashte bei leerem Body
+- **Betrags-Negation:** Schutz gegen negative Eingabe-Werte (immer Absolutwert nehmen)
+- **Deutsche Fehlermeldungen:** Alle API-Responses auf Deutsch
+
+### Performance
+
+- **documentContent aus Listen-Queries ausgeschlossen:** Base64-Dokumente (bis 10MB) werden nur bei explizitem Download geladen
+
+### Datenbank
+
+- **Neue Tabellen:** `orders` (21 Spalten), `company_tokens` (6 Spalten)
+- **Turso-Migration:** `migration-orders.sql` mit CREATE TABLE IF NOT EXISTS (idempotent)
+- **5 Indizes:** caseId, caseId+status, ledgerEntryId (unique), token (unique)
+
+---
+
 ## Version 2.20.0 – Ledger UX-Overhaul & Dokumentations-Aufräumung
 
 **Datum:** 09.-10. Februar 2026

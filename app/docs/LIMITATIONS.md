@@ -82,6 +82,35 @@ Keine automatische Extrapolation oder Trendberechnung. Determinismus-Prinzip: Pr
 3 von 5 Bankkonten ohne Dezember-Daten. Über 250K EUR Bewegungen nicht nachvollziehbar.
 **Status:** Offene Datenanforderung an IV.
 
+## Freigabe-Modul (Orders)
+
+### Base64-Dokumentenspeicherung begrenzt skalierbar
+
+Belege werden als Base64 direkt in der Datenbank gespeichert. Bei vielen großen Dokumenten kann dies die DB-Größe erheblich erhöhen.
+**Limit:** ~10MB pro Dokument, Turso-Limits beachten.
+**Langfristig:** Bei >500 Dokumenten pro Fall auf S3/R2 migrieren.
+
+### Kein Rate-Limiting auf Submit-API
+
+Das externe Einreichungsformular (`/api/company/orders`) hat kein Rate-Limiting. Theoretisch können unbegrenzt Anfragen eingereicht werden.
+**Workaround:** Token deaktivieren bei Missbrauch.
+
+### Keine Email-Benachrichtigungen
+
+Weder der IV noch die einreichende Partei werden über Statusänderungen benachrichtigt.
+**Phase 2:** Resend-Integration für Benachrichtigungen.
+
+### Kein Multi-File-Upload
+
+Pro Anfrage kann nur ein Beleg hochgeladen werden.
+**Phase 2:** Mehrere Belege pro Anfrage.
+
+### Portal-Seite nicht verlinkt
+
+Die Freigaben-Seite existiert im Kundenportal (`/portal/cases/[id]/orders`), ist aber nicht in der Navigation verlinkt (bewusste Entscheidung für Phase 1, admin-only).
+
+---
+
 ## Frontend-Einschränkungen
 
 ### Planung-Seite noch nicht migriert
@@ -183,4 +212,4 @@ Bankkonten-Details bewusst aus Liquidity Matrix entfernt (ADR-030). Bankkonten-T
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-10
+**Letzte Aktualisierung:** 2026-02-10 (v2.21.0)

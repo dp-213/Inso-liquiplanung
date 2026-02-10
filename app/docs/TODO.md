@@ -78,6 +78,19 @@ Legacy-Ordner aufgelöst: 4 unique Dateien nach `01-raw/` verschoben, 2 ältere 
 
 ---
 
+### Freigabe-Modul: Phase 2
+
+**Status:** Phase 1 implementiert (v2.21.0), Phase 2 geplant
+
+**Offene Erweiterungen:**
+1. **Email-Benachrichtigungen:** Resend-Integration – IV bei neuer Anfrage, Einreicher bei Genehmigung/Ablehnung benachrichtigen
+2. **Multi-File-Upload:** Mehrere Belege pro Anfrage
+3. **Portal-Navigation aktivieren:** Freigaben-Link im Kundenportal einschalten (aktuell admin-only)
+4. **Rate-Limiting:** Submit-API gegen Missbrauch absichern
+5. **Bestellstatus-Tracking:** Nach Genehmigung: "Bestellt" → "Geliefert" → "Bezahlt"
+
+---
+
 ## P2 - Nice-to-have
 
 ### Planung-Seite migrieren
@@ -94,5 +107,5 @@ Legacy-Ordner aufgelöst: 4 unique Dateien nach `01-raw/` verschoben, 2 ältere 
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-10
+**Letzte Aktualisierung:** 2026-02-10 (v2.21.0)
 

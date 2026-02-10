@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.20.0
+**Version:** 2.21.0
 **Stand:** 10. Februar 2026
 
 ---
@@ -11,9 +11,9 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         ADMIN DASHBOARD                              │
 │                         /admin/*                                     │
-│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐           │
-│   │  Fälle   │  │  Ledger  │  │  Rules   │  │Stammdaten│           │
-│   └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘           │
+│   ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌────────┐│
+│   │  Fälle   │  │  Ledger  │  │  Rules   │  │Stammdaten│  │Freigab.││
+│   └────┬─────┘  └────┬─────┘  └────┬─────┘  └────┬─────┘  └───┬────┘│
 └────────┼─────────────┼─────────────┼─────────────┼──────────────────┘
          │             │             │             │
          v             v             v             v
@@ -60,8 +60,10 @@
 │                     EXTERNE ANSICHT                                  │
 │                     /view/[token]                                    │
 │                     /portal/*                                        │
+│                     /submit/[token] (Freigabe-Formular)             │
 │                                                                      │
 │   Read-Only Dashboards für Insolvenzverwalter                       │
+│   + Einreichungsformular für Bestell-/Zahlfreigaben                 │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 

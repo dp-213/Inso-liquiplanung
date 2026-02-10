@@ -23,6 +23,7 @@
    - [4.9 Steuerungsdimensionen](#49-steuerungsdimensionen-ledgerentry)
    - [4.10 Planungsart (Horizont)](#410-planungsart-horizont)
    - [4.11 Externe Ansicht](#411-externe-ansicht)
+   - [4.12 Freigaben (Orders)](#412-freigaben-orders)
 5. [Datenmodell-Diagramm](#5-datenmodell-diagramm)
 6. [Datenfluss: Import bis Anzeige](#6-datenfluss-import-bis-anzeige)
 
@@ -59,6 +60,8 @@ Case (Insolvenzverfahren)
     ├── BankAccount (Bankenspiegel)
     ├── IngestionJob (Import-Vorgänge)
     ├── ShareLink (Externe Links)
+    ├── Order (Bestell-/Zahlfreigaben)
+    ├── CompanyToken (Externe Zugangs-Tokens)
     └── CaseConfiguration (Dashboard-Konfiguration)
 ```
 
@@ -189,7 +192,7 @@ Das Dashboard zeigt alle Funktionen für einen Fall:
 ┌─────────────────────────────────────────────────────────────┐
 │  [Bearbeiten] [Konfiguration] [Datenimport] [Dashboard]    │
 │  [Prämissen] [Insolvenzeffekte] [Bankenspiegel]            │
-│  [Zahlungsregister] [Externe Ansicht]                       │
+│  [Zahlungsregister] [Freigaben (Badge)] [Externe Ansicht]   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -788,6 +791,107 @@ model ShareLink {
 
 ---
 
+### 4.12 Freigaben (Orders)
+
+**Pfad:** `/admin/cases/[id]/orders`
+
+#### Funktion
+Bestell- und Zahlfreigabe für laufende Insolvenzverfahren. Externes Personal (Buchhaltung, Unternehmen) reicht Anfragen ein, IV prüft und genehmigt/lehnt ab.
+
+#### Zwei Freigabetypen
+
+| Typ | Zeitpunkt | Beleg | Ergebnis bei Genehmigung |
+|-----|-----------|-------|--------------------------|
+| **BESTELLUNG** | Vor dem Kauf | Angebot/KVA (optional) | PLAN-LedgerEntry (erwartete Auszahlung) |
+| **ZAHLUNG** | Rechnung liegt vor | Rechnung (empfohlen) | PLAN-LedgerEntry (freigegebene Zahlung) |
+
+#### Workflow
+
+```
+Buchhaltung/Unternehmen          System              IV (Insolvenzverwalter)
+        |                           |                        |
+        |-- /submit/[token] ------->|                        |
+        |   Anfrage + Beleg         |                        |
+        |                           |-- Badge (Zähler) ----->|
+        |                           |                        |
+        |                           |<-- Prüft Beleg --------|
+        |                           |<-- Genehmigt/Ablehnt --|
+        |                           |                        |
+        |                           |-- PLAN LedgerEntry --->|
+        |                           |   (Liquiditätsplanung) |
+```
+
+#### Datenmodell
+
+```prisma
+model Order {
+  id                  String    @id @default(uuid())
+  caseId              String
+  type                String    @default("ZAHLUNG")  // BESTELLUNG | ZAHLUNG
+  requestDate         DateTime  @default(now())
+  invoiceDate         DateTime
+  amountCents         BigInt
+  creditor            String
+  description         String
+  notes               String?
+  documentName        String?
+  documentMimeType    String?
+  documentSizeBytes   BigInt?
+  documentContent     String?   // Base64-encoded
+  status              String    @default("PENDING")  // PENDING | APPROVED | REJECTED
+  approvedAmountCents BigInt?   // Wenn IV anderen Betrag genehmigt
+  approvedAt          DateTime?
+  approvedBy          String?
+  rejectedAt          DateTime?
+  rejectionReason     String?
+  ledgerEntryId       String?   @unique
+  createdAt           DateTime  @default(now())
+
+  case        Case         @relation(...)
+  ledgerEntry LedgerEntry? @relation(...)
+  @@index([caseId])
+  @@index([caseId, status])
+}
+
+model CompanyToken {
+  id        String   @id @default(uuid())
+  caseId    String
+  token     String   @unique
+  label     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  case Case @relation(...)
+  @@index([caseId])
+}
+```
+
+#### UI-Komponenten
+
+| Komponente | Pfad | Funktion |
+|------------|------|----------|
+| **OrderList** | `admin/cases/[id]/orders/OrderList.tsx` | Freigabeliste mit Filter (Typ) und Sort (Datum/Betrag/Gläubiger) |
+| **ApprovalModal** | `admin/cases/[id]/orders/ApprovalModal.tsx` | Genehmigung mit optionalem abweichendem Betrag |
+| **RejectionModal** | `admin/cases/[id]/orders/RejectionModal.tsx` | Ablehnung mit Pflicht-Begründung |
+| **CompanyTokenManager** | `admin/cases/[id]/orders/CompanyTokenManager.tsx` | Token erstellen/deaktivieren |
+| **OrderSubmissionForm** | `submit/[token]/OrderSubmissionForm.tsx` | Externes Einreichungsformular |
+
+#### Bei Genehmigung: LedgerEntry-Erstellung
+
+```typescript
+// Automatisch erstellter PLAN-LedgerEntry:
+{
+  valueType: "PLAN",
+  legalBucket: "MASSE",
+  estateAllocation: "NEUMASSE",
+  amountCents: -absAmount,  // Immer negativ (Auszahlung)
+  description: `Freigabe: ${order.creditor} – ${order.description}`,
+  transactionDate: order.invoiceDate,
+}
+```
+
+---
+
 ## 5. Datenmodell-Diagramm
 
 ```
@@ -978,6 +1082,15 @@ Zusätzlich am Plan hängend:
   - Parameter: `rowId`, `periodIndex`, `scope`, `includeUnreviewed`
   - Response: 4-Ebenen-Erklärung (Zusammenfassung, Zuordnungsregeln, Rechenweg, Einzelbuchungen)
   - Nutzt dieselbe Aggregationslogik wie die Matrix-API (`lib/liquidity-matrix/aggregate.ts`)
+
+### Freigaben (Orders)
+- `POST /api/company/orders` - Anfrage einreichen (Token-Auth, FormData mit Datei-Upload)
+- `GET /api/cases/[id]/orders/[orderId]/document` - Beleg herunterladen (Admin/Customer)
+- `POST /api/cases/[id]/orders/[orderId]/approve` - Genehmigen mit optionalem Betrag (Admin/Customer)
+- `POST /api/cases/[id]/orders/[orderId]/reject` - Ablehnen mit Begründung (Admin/Customer)
+- `GET /api/cases/[id]/tokens` - Token-Liste
+- `POST /api/cases/[id]/tokens` - Token erstellen
+- `DELETE /api/cases/[id]/tokens/[tokenId]` - Token deaktivieren
 
 ### Share-Links
 - `GET /api/cases/[id]/share-links` - Alle Links

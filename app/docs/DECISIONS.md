@@ -4,6 +4,58 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-032: Bestell- & Zahlfreigabe-Modul
+
+**Datum:** 10. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Insolvenzverwalter verwenden aktuell Excel-Bestelllisten, um Bestellungen und Zahlungen während des laufenden Verfahrens freizugeben. Bei größeren Fällen mit Warengeschäft ist die Nachvollziehbarkeit problematisch (Feedback IV Hannes Rieger, 09.02.2026).
+
+### Entscheidung
+
+**A: Zwei Freigabetypen**
+- **BESTELLUNG:** Vor dem Kauf – Budget-Genehmigung. Erzeugt PLAN-LedgerEntry mit erwartetem Zahlungsdatum.
+- **ZAHLUNG:** Rechnung liegt vor – Zahlungsfreigabe. Erzeugt PLAN-LedgerEntry mit Rechnungsdatum.
+
+**B: Token-basierter externer Zugang**
+- CompanyToken-Modell für unauthentifizierten Zugang zum Einreichungsformular (`/submit/[token]`)
+- Kein Login nötig für Buchhaltung/Unternehmen – nur den Link teilen
+- Token kann vom Admin deaktiviert werden
+
+**C: Base64-Dokumentenspeicherung**
+- Belege (PDF, JPG, PNG bis 10MB) werden als Base64 in der `orders`-Tabelle gespeichert
+- Kein externer Speicher (S3, etc.) nötig – alles in einer Datenbank
+- Trade-off: Einfachheit vs. Skalierbarkeit (für <100 Dokumente pro Fall ausreichend)
+
+**D: Automatische LedgerEntry-Erstellung**
+- Genehmigte Anfragen erzeugen automatisch einen PLAN-LedgerEntry
+- `legalBucket: "MASSE"` (Masseverbindlichkeit)
+- `estateAllocation: "NEUMASSE"` (im laufenden Verfahren = Neumasse)
+- `amountCents`: Immer negativ (Auszahlung), Absolutwert des genehmigten Betrags
+- IV kann optional einen abweichenden Betrag genehmigen
+
+**E: Admin-only Sichtbarkeit (Phase 1)**
+- Portal-Seite existiert, ist aber NICHT in der Kunden-Navigation verlinkt
+- Erst wenn Feature stabil: Navigation im Kundenportal einschalten
+
+### Begründung
+
+- **Nachvollziehbarkeit:** Jede Anfrage dokumentiert mit Zeitstempel, Beleg, Genehmiger
+- **Integration:** Freigegebene Beträge fließen automatisch in die Liquiditätsplanung
+- **Einfachheit:** Kein Login für externe Nutzer, Token-Link reicht
+- **Base64 statt S3:** Turso/SQLite kann Base64 speichern, kein Cloud-Setup nötig
+
+### Konsequenzen
+
+- Dokumentenspeicherung begrenzt (~10MB pro Beleg, Turso-Limits beachten)
+- Keine Email-Benachrichtigungen (Phase 2 mit Resend)
+- Kein Multi-File-Upload (Phase 2)
+- Portal-Integration muss manuell aktiviert werden (Navigation-Link einschalten)
+
+---
+
 ## ADR-031: Selbstbeschreibende Matching-Regeln (A+B+C)
 
 **Datum:** 10. Februar 2026

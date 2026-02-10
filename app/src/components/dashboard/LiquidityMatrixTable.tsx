@@ -647,6 +647,15 @@ export default function LiquidityMatrixTable({
 
                 return (
                   <Fragment key={block.id}>
+                    {/* Block Header */}
+                    <tr className={`${block.id === "LIQUIDITY_DEVELOPMENT" ? "bg-blue-100/80" : "bg-gray-200/80"}`}>
+                      <td
+                        colSpan={data.periods.length + 2}
+                        className="px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-gray-700"
+                      >
+                        {block.label}
+                      </td>
+                    </tr>
                     {block.rows.map((row) => {
                       // Estate filter: hide non-matching rows
                       if (!shouldShowRow(row.id, estateFilter) && !row.isSummary && !row.isSubtotal) {
@@ -672,7 +681,7 @@ export default function LiquidityMatrixTable({
                           <tr key={row.id} className="border-b border-gray-200">
                             <td
                               colSpan={data.periods.length + 2}
-                              className="px-4 py-1.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50/70 sticky left-0 z-10"
+                              className="px-4 py-2 text-left text-sm font-medium text-gray-600 bg-gray-50/50 border-b border-gray-200 sticky left-0 z-10"
                             >
                               {row.label}
                             </td>
@@ -710,8 +719,8 @@ export default function LiquidityMatrixTable({
                       return (
                         <Fragment key={row.id}>
                           <tr
-                            className={`border-b ${row.isSubtotal ? "border-t-2 border-gray-300" : "border-gray-100"} ${bgClass} ${
-                              row.isSummary || row.isSubtotal ? "font-semibold" : ""
+                            className={`border-b ${row.isSubtotal ? "border-t-2 border-gray-300" : row.isSummary ? "border-gray-300" : "border-gray-100"} ${bgClass} ${
+                              row.isSummary ? "font-bold" : row.isSubtotal ? "font-semibold" : ""
                             } ${hasChildren ? "cursor-pointer" : ""} ${
                               isLiqDevRow && !row.isSummary ? "" : ""
                             } hover:bg-gray-50`}
@@ -720,7 +729,7 @@ export default function LiquidityMatrixTable({
                             {/* Row Label */}
                             <td
                               className={`px-4 py-2 text-left sticky left-0 z-10 ${bgClass || "bg-white"} ${
-                                isChild ? "pl-12 text-gray-400 italic text-xs" :
+                                isChild ? "pl-12 text-gray-500 text-xs" :
                                 row.isSubRow && !row.isSummary ? "pl-8 text-gray-600" :
                                 "text-gray-900"
                               }`}
@@ -731,7 +740,7 @@ export default function LiquidityMatrixTable({
                                     &#9654;
                                   </span>
                                 )}
-                                <span>{row.label}</span>
+                                <span>{isChild ? `davon ${row.label}` : row.label}</span>
                                 {/* Tooltip for credit line */}
                                 {row.id === "credit_line_available" && data.liquidityDevelopment.creditLineNote && (
                                   <span className="text-xs text-gray-400 font-normal" title={data.liquidityDevelopment.creditLineNote}>
@@ -826,7 +835,7 @@ export default function LiquidityMatrixTable({
 
                     {/* Block spacing */}
                     {block.order < data.blocks.length && (
-                      <tr className="h-2 bg-white">
+                      <tr className="h-4 bg-white">
                         <td colSpan={data.periods.length + 2}></td>
                       </tr>
                     )}
