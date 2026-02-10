@@ -128,15 +128,25 @@ export async function GET(
       );
     }
 
-    // 2. Load LedgerEntries
+    // 2. Load LedgerEntries (nur liquidity-relevante Konten + PLAN-Entries)
     const reviewStatusFilter = includeUnreviewed
       ? { not: 'REJECTED' }
       : { in: ['CONFIRMED', 'ADJUSTED'] };
+
+    // ISK-Only-Filter: Konsistent mit Matrix-API
+    const liquidityAccountIds = existingCase.bankAccounts
+      .filter(a => a.isLiquidityRelevant)
+      .map(a => a.id);
 
     const allEntries = await prisma.ledgerEntry.findMany({
       where: {
         caseId,
         reviewStatus: reviewStatusFilter,
+        OR: [
+          { bankAccountId: { in: liquidityAccountIds } },
+          { bankAccountId: null },
+          { valueType: 'PLAN' },
+        ],
       },
       include: {
         counterparty: { select: { id: true, name: true } },

@@ -781,6 +781,107 @@ export default function CaseRulesPage({
         )}
       </div>
 
+      {/* Systemregeln: Estate-Zuordnungsregeln (Read-Only) */}
+      <div className="admin-card">
+        <div className="p-4 border-b border-[var(--border)]">
+          <h2 className="text-lg font-medium text-[var(--foreground)]">
+            Estate-Zuordnungsregeln (Systemkonfiguration)
+          </h2>
+          <p className="text-sm text-[var(--muted)] mt-1">
+            Systemregeln f&uuml;r die Alt/Neu-Masse-Zuordnung. In Code konfiguriert, nicht &uuml;ber UI editierbar.
+          </p>
+        </div>
+
+        <div className="p-4 space-y-6">
+          {/* KV-Regeln */}
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--foreground)] mb-2">
+              KV-Regeln (Kassen&auml;rztliche Vereinigung)
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left px-3 py-2 font-medium text-[var(--muted)]">Periode</th>
+                    <th className="text-right px-3 py-2 font-medium text-[var(--muted)]">Alt-Anteil</th>
+                    <th className="text-right px-3 py-2 font-medium text-[var(--muted)]">Neu-Anteil</th>
+                    <th className="text-left px-3 py-2 font-medium text-[var(--muted)]">Quelle</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-t border-[var(--border)]">
+                    <td className="px-3 py-2">Q3/2025 und fr&uuml;her</td>
+                    <td className="px-3 py-2 text-right font-mono text-red-700">100%</td>
+                    <td className="px-3 py-2 text-right font-mono text-green-700">0%</td>
+                    <td className="px-3 py-2 text-[var(--muted)]">Zeitliche Zuordnung</td>
+                  </tr>
+                  <tr className="border-t border-[var(--border)] bg-amber-50">
+                    <td className="px-3 py-2 font-medium">Q4/2025</td>
+                    <td className="px-3 py-2 text-right font-mono text-red-700 font-medium">1/3 (33,3%)</td>
+                    <td className="px-3 py-2 text-right font-mono text-green-700 font-medium">2/3 (66,7%)</td>
+                    <td className="px-3 py-2 text-[var(--muted)]">Massekreditvertrag &sect;1(2)a</td>
+                  </tr>
+                  <tr className="border-t border-[var(--border)]">
+                    <td className="px-3 py-2">Q1/2026+</td>
+                    <td className="px-3 py-2 text-right font-mono text-red-700">0%</td>
+                    <td className="px-3 py-2 text-right font-mono text-green-700">100%</td>
+                    <td className="px-3 py-2 text-[var(--muted)]">Zeitliche Zuordnung</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* HZV-Regeln */}
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--foreground)] mb-2">
+              HZV-Regeln (Hausarztzentrierte Versorgung)
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left px-3 py-2 font-medium text-[var(--muted)]">Periode</th>
+                    <th className="text-right px-3 py-2 font-medium text-[var(--muted)]">Alt-Anteil</th>
+                    <th className="text-right px-3 py-2 font-medium text-[var(--muted)]">Neu-Anteil</th>
+                    <th className="text-left px-3 py-2 font-medium text-[var(--muted)]">Quelle</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-t border-[var(--border)] bg-amber-50">
+                    <td className="px-3 py-2 font-medium">Okt 2025</td>
+                    <td className="px-3 py-2 text-right font-mono text-red-700 font-medium">29/31 (93,5%)</td>
+                    <td className="px-3 py-2 text-right font-mono text-green-700 font-medium">2/31 (6,5%)</td>
+                    <td className="px-3 py-2 text-[var(--muted)]">Zeitanteilig (Stichtag 29.10.)</td>
+                  </tr>
+                  <tr className="border-t border-[var(--border)]">
+                    <td className="px-3 py-2">Nov 2025+</td>
+                    <td className="px-3 py-2 text-right font-mono text-red-700">0%</td>
+                    <td className="px-3 py-2 text-right font-mono text-green-700">100%</td>
+                    <td className="px-3 py-2 text-[var(--muted)]">Leistung nach Er&ouml;ffnung</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-[var(--muted)] mt-2">
+              HZV-Logik: Zahlung im Monat M bezieht sich auf Leistung im Monat M-1 (Vormonat-Regel).
+            </p>
+          </div>
+
+          {/* Fallback */}
+          <div className="p-3 bg-gray-50 rounded-lg border border-[var(--border)]">
+            <p className="text-sm text-[var(--muted)]">
+              <span className="font-medium text-[var(--foreground)]">Fallback:</span>{" "}
+              Wenn keine Regel greift, wird die Zuordnung als <span className="font-mono font-medium text-amber-700">UNKLAR</span> markiert und muss manuell gepr&uuml;ft werden.
+            </p>
+          </div>
+
+          <p className="text-xs text-[var(--muted)] italic">
+            Systemregel &mdash; in Code konfiguriert (haevg-plus/config.ts), nicht &uuml;ber UI editierbar.
+          </p>
+        </div>
+      </div>
+
       {/* Quick-Start Examples */}
       {rules.length === 0 && !showForm && (
         <div className="admin-card p-6">

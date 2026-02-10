@@ -214,15 +214,25 @@ export async function GET(
       (sum, e) => sum + (e.amountCents < 0 ? -e.amountCents : e.amountCents), BigInt(0)
     );
 
-    // 4. Load LedgerEntries
+    // 4. Load LedgerEntries (nur liquidity-relevante Konten + PLAN-Entries)
     const reviewStatusFilter = includeUnreviewed
       ? { not: 'REJECTED' }
       : { in: ['CONFIRMED', 'ADJUSTED'] };
+
+    // ISK-Only-Filter: Nur operative Massekonten in der Matrix
+    const liquidityAccountIds = existingCase.bankAccounts
+      .filter(a => a.isLiquidityRelevant)
+      .map(a => a.id);
 
     const allEntries = await prisma.ledgerEntry.findMany({
       where: {
         caseId,
         reviewStatus: reviewStatusFilter,
+        OR: [
+          { bankAccountId: { in: liquidityAccountIds } },
+          { bankAccountId: null },
+          { valueType: 'PLAN' },
+        ],
       },
       include: {
         counterparty: { select: { id: true, name: true } },
