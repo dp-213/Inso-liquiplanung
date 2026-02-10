@@ -1,22 +1,23 @@
 "use client";
 
 /**
- * LiquidityMatrixTable – IV-konforme Liquiditätstabelle
+ * LiquidityMatrixTable – IDW S11-konforme Liquiditätstabelle
  *
- * Zeigt die Liquiditätsentwicklung in IV-üblicher Struktur:
- * - Anfangsbestand (mit Banksplit)
- * - Cash-In (KV, HZV, PVS, etc.)
- * - Cash-Out (Operativ, Steuern, Insolvenz)
- * - Endbestand (mit Banksplit)
+ * 4-Block-Struktur:
+ * I.  Finanzmittelbestand Periodenanfang
+ * II. Einzahlungen (mit Standort-Aufgliederung via Collapse)
+ * III. Auszahlungen (Personal, Betriebskosten, Steuern, Insolvenz)
+ * IV. Liquiditätsentwicklung (Veränderung, Kreditlinie, Rückstellungen)
  *
  * Features:
- * - Toggle: Gesamt / Altmasse / Neumasse / Unklar
- * - Toggle: Nur Summen / Mit Detailzeilen
- * - Validierungs-Warnungen (Rechenfehler, Negativsaldo, Unklar-Anteil)
+ * - Collapse/Expand für Detail-Zeilen (parentRowId-basiert)
+ * - Standort-Aufgliederung per lazy-load bei Expand
+ * - Alt/Neu-Filter (zeilen-basiert im Frontend)
  * - IST/PLAN-Badge pro Periode
+ * - Cell-Explanation Modal (Drill-Down)
  */
 
-import { useState, useEffect, useCallback, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, Fragment } from "react";
 import CellExplanationModal from "@/components/admin/CellExplanationModal";
 
 // =============================================================================
@@ -47,6 +48,9 @@ interface MatrixRow {
   isSubRow: boolean;
   isSummary: boolean;
   isSectionHeader?: boolean;
+  isSubtotal?: boolean;
+  parentRowId?: string;
+  defaultExpanded?: boolean;
   flowType?: "INFLOW" | "OUTFLOW";
   values: MatrixRowValue[];
   total: string;
@@ -60,6 +64,18 @@ interface MatrixBlock {
   totals: string[];
 }
 
+interface LiquidityDevelopmentData {
+  creditLineCents: string;
+  creditLineStatus: string;
+  creditLineNote: string | null;
+  reservesTotalCents: string;
+  reserveDetails: Array<{
+    name: string;
+    amountCents: string;
+    effectGroup: string;
+  }>;
+}
+
 interface LiquidityMatrixData {
   caseId: string;
   caseName: string;
@@ -68,6 +84,7 @@ interface LiquidityMatrixData {
   scopeHint: string | null;
   periods: MatrixPeriod[];
   blocks: MatrixBlock[];
+  liquidityDevelopment: LiquidityDevelopmentData;
   validation: {
     hasBalanceError: boolean;
     hasNegativeBalance: boolean;
@@ -88,7 +105,6 @@ interface LiquidityMatrixData {
 
 type EstateFilter = "GESAMT" | "ALTMASSE" | "NEUMASSE" | "UNKLAR";
 
-// Exported for use in parent components
 export type LiquidityScope = "GLOBAL" | "LOCATION_VELBERT" | "LOCATION_UCKERATH_EITORF";
 
 export const SCOPE_LABELS: Record<LiquidityScope, string> = {
@@ -121,15 +137,9 @@ function getBlockColorClass(blockId: string): string {
       return "bg-gray-50";
     case "CASH_IN":
       return "bg-green-50";
-    case "CASH_OUT_OPERATIVE":
+    case "CASH_OUT":
       return "bg-red-50";
-    case "CASH_OUT_TAX":
-      return "bg-orange-50";
-    case "CASH_OUT_INSOLVENCY":
-      return "bg-purple-50";
-    case "CASH_OUT_TOTAL":
-      return "bg-red-100";
-    case "CLOSING_BALANCE":
+    case "LIQUIDITY_DEVELOPMENT":
       return "bg-blue-50";
     default:
       return "bg-white";
@@ -149,40 +159,32 @@ function getValueTypeColor(valueType: string): { bg: string; text: string } {
 
 /**
  * Prüft, ob eine Zeile im aktuellen estateFilter angezeigt werden soll.
- * estateFilter wirkt NUR im Frontend (zeilen-ausblendung), Backend liefert IMMER GESAMT.
- *
- * WICHTIG: estateFilter filtert nur EINNAHMEN nach Alt/Neu.
- * Balances und Ausgaben werden IMMER angezeigt (unabhängig vom Filter).
  */
 function shouldShowRow(rowId: string, estateFilter: EstateFilter): boolean {
-  // GESAMT: Alle Zeilen anzeigen
-  if (estateFilter === 'GESAMT') return true;
+  if (estateFilter === "GESAMT") return true;
 
-  // Balances und Ausgaben immer anzeigen (unabhängig vom Filter)
+  // Balances, Ausgaben, Liquiditätsentwicklung immer anzeigen
   const alwaysShow =
-    rowId.startsWith('opening_balance_') ||
-    rowId.startsWith('closing_balance_') ||
-    rowId.startsWith('cash_out_') ||
-    rowId === 'cash_in_total';  // Summenzeile immer zeigen
+    rowId.startsWith("opening_balance_") ||
+    rowId.startsWith("closing_balance_") ||
+    rowId.startsWith("cash_out_") ||
+    rowId.startsWith("liquidity_") ||
+    rowId.startsWith("credit_line") ||
+    rowId.startsWith("coverage_") ||
+    rowId.startsWith("reserves_") ||
+    rowId === "cash_in_total";
 
   if (alwaysShow) return true;
 
-  // Jetzt nur noch EINNAHMEN-Zeilen filtern:
-
-  // NEUMASSE: Zeige Neumasse-Einnahmen (Umsatz + Sonstige)
-  if (estateFilter === 'NEUMASSE') {
-    // Blende nur Altforderungs-Zeilen aus
-    return !rowId.includes('altforderung');
+  if (estateFilter === "NEUMASSE") {
+    return !rowId.includes("altforderung");
   }
 
-  // ALTMASSE: Zeige nur Altforderungs-Einnahmen
-  if (estateFilter === 'ALTMASSE') {
-    // Zeige nur Altforderungs-Zeilen
-    return rowId.includes('altforderung');
+  if (estateFilter === "ALTMASSE") {
+    return rowId.includes("altforderung");
   }
 
-  // UNKLAR: Zeige nur Zeilen mit unklar-Anteil (aktuell nicht implementiert)
-  if (estateFilter === 'UNKLAR') {
+  if (estateFilter === "UNKLAR") {
     return false;
   }
 
@@ -196,10 +198,8 @@ function shouldShowRow(rowId: string, estateFilter: EstateFilter): boolean {
 interface LiquidityMatrixTableProps {
   caseId: string;
   className?: string;
-  /** Controlled scope (from parent) - if provided, hides local scope toggle */
   scope?: LiquidityScope;
   onScopeChange?: (scope: LiquidityScope) => void;
-  /** If true, hides the scope toggle (useful when parent shows global scope toggle) */
   hideScopeToggle?: boolean;
 }
 
@@ -219,44 +219,71 @@ export default function LiquidityMatrixTable({
   const [showDetails, setShowDetails] = useState(true);
   const [localScope, setLocalScope] = useState<LiquidityScope>("GLOBAL");
   const [includeUnreviewed, setIncludeUnreviewed] = useState(false);
-  const [showLocationBreakdown, setShowLocationBreakdown] = useState(false);
-  const [locationData, setLocationData] = useState<Record<string, LiquidityMatrixData>>({});
-  const [locationLoading, setLocationLoading] = useState(false);
 
   // Cell Explanation Modal
   const [selectedCell, setSelectedCell] = useState<{ rowId: string; periodIndex: number } | null>(null);
 
-  // Collapsible Bank Rows - standardmäßig AUSgeklappt (für IV-Meeting Übersichtlichkeit)
-  const [collapsedBankBlocks, setCollapsedBankBlocks] = useState<Set<string>>(
-    new Set([])
-  );
+  // Collapse/Expand State (parentRowId-basiert)
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
-  const toggleBankBlock = (blockId: string) => {
-    setCollapsedBankBlocks((prev) => {
-      const next = new Set(prev);
-      if (next.has(blockId)) {
-        next.delete(blockId);
-      } else {
-        next.add(blockId);
-      }
-      return next;
-    });
-  };
+  // Location breakdown data (lazy-loaded for Standort-Kinder)
+  const [locationData, setLocationData] = useState<Record<string, LiquidityMatrixData>>({});
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationLoaded, setLocationLoaded] = useState(false);
 
-  // Use controlled scope if provided, otherwise use local state
   const isControlled = controlledScope !== undefined;
   const scope = isControlled ? controlledScope : localScope;
   const setScope = isControlled && onScopeChange ? onScopeChange : setLocalScope;
 
-  // Fetch data
+  // Initialize expandedRows from config when data loads
+  useEffect(() => {
+    if (!data) return;
+    const initial = new Set<string>();
+    for (const block of data.blocks) {
+      for (const row of block.rows) {
+        // Rows with children that have defaultExpanded !== false → expanded
+        const hasChildren = block.rows.some(r => r.parentRowId === row.id);
+        if (hasChildren && row.defaultExpanded !== false) {
+          initial.add(row.id);
+        }
+      }
+    }
+    setExpandedRows(initial);
+  }, [data]);
+
+  // Build set of parent row IDs for quick lookup
+  const parentRowIds = useMemo(() => {
+    if (!data) return new Set<string>();
+    const ids = new Set<string>();
+    for (const block of data.blocks) {
+      for (const row of block.rows) {
+        if (row.parentRowId) {
+          ids.add(row.parentRowId);
+        }
+      }
+    }
+    return ids;
+  }, [data]);
+
+  const toggleRow = useCallback((rowId: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(rowId)) {
+        next.delete(rowId);
+      } else {
+        next.add(rowId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Fetch main data
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
       const params = new URLSearchParams({
-        // KEIN estateFilter mehr! Backend liefert IMMER GESAMT.
-        // estateFilter wirkt nur im Frontend (zeilen-ausblendung).
         showDetails: showDetails.toString(),
         scope,
         includeUnreviewed: includeUnreviewed.toString(),
@@ -278,58 +305,91 @@ export default function LiquidityMatrixTable({
     } finally {
       setLoading(false);
     }
-  }, [caseId, showDetails, scope, includeUnreviewed]);  // estateFilter NICHT mehr hier!
+  }, [caseId, showDetails, scope, includeUnreviewed]);
 
   useEffect(() => {
     fetchData();
+    // Reset location data when scope changes
+    setLocationData({});
+    setLocationLoaded(false);
   }, [fetchData]);
 
-  // Fetch location breakdown data (parallel fetch for Velbert + Uckerath/Eitorf)
-  useEffect(() => {
-    if (!showLocationBreakdown || scope !== "GLOBAL") {
-      setLocationData({});
-      return;
+  // Lazy-load location data when a Standort-Kind row is expanded
+  const loadLocationData = useCallback(async () => {
+    if (locationLoaded || locationLoading || scope !== "GLOBAL") return;
+
+    setLocationLoading(true);
+    try {
+      const baseParams = new URLSearchParams({
+        showDetails: "true",
+        includeUnreviewed: includeUnreviewed.toString(),
+      });
+
+      const [velbert, uckerath] = await Promise.all([
+        fetch(`/api/cases/${caseId}/dashboard/liquidity-matrix?${baseParams}&scope=LOCATION_VELBERT`, { credentials: "include" }).then(r => r.json()),
+        fetch(`/api/cases/${caseId}/dashboard/liquidity-matrix?${baseParams}&scope=LOCATION_UCKERATH_EITORF`, { credentials: "include" }).then(r => r.json()),
+      ]);
+
+      setLocationData({
+        LOCATION_VELBERT: velbert,
+        LOCATION_UCKERATH_EITORF: uckerath,
+      });
+      setLocationLoaded(true);
+    } catch (err) {
+      console.error("Standort-Aufgliederung Fehler:", err);
+    } finally {
+      setLocationLoading(false);
     }
+  }, [locationLoaded, locationLoading, scope, caseId, includeUnreviewed]);
 
-    let cancelled = false;
-    const fetchLocations = async () => {
-      setLocationLoading(true);
-      try {
-        const baseParams = new URLSearchParams({
-          // KEIN estateFilter mehr - Backend liefert IMMER GESAMT
-          showDetails: "true",
-          includeUnreviewed: includeUnreviewed.toString(),
-        });
+  // Trigger location load when expanding a row that has Standort children
+  const handleToggleRow = useCallback((rowId: string) => {
+    toggleRow(rowId);
 
-        const [velbert, uckerath] = await Promise.all([
-          fetch(`/api/cases/${caseId}/dashboard/liquidity-matrix?${baseParams}&scope=LOCATION_VELBERT`, { credentials: "include" }).then(r => r.json()),
-          fetch(`/api/cases/${caseId}/dashboard/liquidity-matrix?${baseParams}&scope=LOCATION_UCKERATH_EITORF`, { credentials: "include" }).then(r => r.json()),
-        ]);
-
-        if (!cancelled) {
-          setLocationData({
-            LOCATION_VELBERT: velbert,
-            LOCATION_UCKERATH_EITORF: uckerath,
-          });
+    // Check if this row has location-children (ending in _velbert or _uckerath)
+    if (!locationLoaded && data) {
+      for (const block of data.blocks) {
+        const hasLocChildren = block.rows.some(r =>
+          r.parentRowId === rowId && (r.id.endsWith("_velbert") || r.id.endsWith("_uckerath"))
+        );
+        if (hasLocChildren) {
+          loadLocationData();
+          break;
         }
-      } catch (err) {
-        console.error("Standort-Aufgliederung Fehler:", err);
-      } finally {
-        if (!cancelled) setLocationLoading(false);
       }
-    };
+    }
+  }, [toggleRow, locationLoaded, data, loadLocationData]);
 
-    fetchLocations();
-    return () => { cancelled = true; };
-  }, [showLocationBreakdown, scope, caseId, includeUnreviewed]);  // estateFilter NICHT mehr hier!
-
-  // Helper: Find row in location data
-  function getLocationRow(locationKey: string, rowId: string): MatrixRow | null {
+  // Helper: Find row values in location data for Standort-Kinder
+  function getLocationRowValues(locationKey: string, sourceRowId: string): MatrixRowValue[] | null {
     const locData = locationData[locationKey];
     if (!locData) return null;
     for (const block of locData.blocks) {
-      const row = block.rows.find(r => r.id === rowId);
-      if (row) return row;
+      const row = block.rows.find(r => r.id === sourceRowId);
+      if (row) return row.values;
+    }
+    return null;
+  }
+
+  function getLocationRowTotal(locationKey: string, sourceRowId: string): string | null {
+    const locData = locationData[locationKey];
+    if (!locData) return null;
+    for (const block of locData.blocks) {
+      const row = block.rows.find(r => r.id === sourceRowId);
+      if (row) return row.total;
+    }
+    return null;
+  }
+
+  // Map Standort-Kind row IDs to their source (parent) row ID and location key
+  function getStandortMapping(childRowId: string): { sourceRowId: string; locationKey: string } | null {
+    if (childRowId.endsWith("_velbert")) {
+      const sourceRowId = childRowId.replace(/_velbert$/, "");
+      return { sourceRowId, locationKey: "LOCATION_VELBERT" };
+    }
+    if (childRowId.endsWith("_uckerath")) {
+      const sourceRowId = childRowId.replace(/_uckerath$/, "");
+      return { sourceRowId, locationKey: "LOCATION_UCKERATH_EITORF" };
     }
     return null;
   }
@@ -346,7 +406,6 @@ export default function LiquidityMatrixTable({
     );
   }
 
-  // Error state
   if (error) {
     return (
       <div className={`admin-card p-6 ${className}`}>
@@ -358,10 +417,7 @@ export default function LiquidityMatrixTable({
             <span className="text-red-800 font-medium">Fehler beim Laden</span>
           </div>
           <p className="text-red-700 text-sm mt-1">{error}</p>
-          <button
-            onClick={fetchData}
-            className="mt-3 text-sm text-red-600 hover:text-red-800 underline"
-          >
+          <button onClick={fetchData} className="mt-3 text-sm text-red-600 hover:text-red-800 underline">
             Erneut versuchen
           </button>
         </div>
@@ -369,7 +425,6 @@ export default function LiquidityMatrixTable({
     );
   }
 
-  // No data
   if (!data) {
     return (
       <div className={`admin-card p-6 ${className}`}>
@@ -391,7 +446,7 @@ export default function LiquidityMatrixTable({
           </div>
 
           <div className="flex flex-wrap gap-3">
-            {/* Scope Toggle (Standort-Sicht) - hide when requested via prop */}
+            {/* Scope Toggle */}
             {!hideScopeToggle && (
               <div className="flex items-center gap-1 bg-indigo-100 rounded-lg p-1">
                 <span className="px-2 text-xs font-medium text-indigo-600">Sicht:</span>
@@ -411,7 +466,7 @@ export default function LiquidityMatrixTable({
               </div>
             )}
 
-            {/* Estate Filter Toggle */}
+            {/* Estate Filter */}
             <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
               {(["GESAMT", "ALTMASSE", "NEUMASSE", "UNKLAR"] as EstateFilter[]).map((filter) => (
                 <button
@@ -440,7 +495,7 @@ export default function LiquidityMatrixTable({
               {showDetails ? "Mit Details" : "Nur Summen"}
             </button>
 
-            {/* Unreviewed Toggle (Admin-Feature) */}
+            {/* Unreviewed Toggle */}
             <label className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-colors bg-gray-50 border-gray-200 hover:bg-gray-100">
               <input
                 type="checkbox"
@@ -452,26 +507,11 @@ export default function LiquidityMatrixTable({
                 inkl. ungeprüfte
               </span>
             </label>
-
-            {/* Location Breakdown Toggle (nur in Gesamtsicht) */}
-            {scope === "GLOBAL" && (
-              <label className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-colors bg-gray-50 border-gray-200 hover:bg-gray-100">
-                <input
-                  type="checkbox"
-                  checked={showLocationBreakdown}
-                  onChange={(e) => setShowLocationBreakdown(e.target.checked)}
-                  className="w-3.5 h-3.5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span className={showLocationBreakdown ? "text-indigo-700" : "text-gray-600"}>
-                  {locationLoading ? "Lade..." : "Standort-Aufgliederung"}
-                </span>
-              </label>
-            )}
           </div>
         </div>
       </div>
 
-      {/* Unreviewed Warning Banner */}
+      {/* Warning Banners */}
       {data.meta.includeUnreviewed && data.meta.unreviewedCount > 0 && (
         <div className="px-6 py-3 bg-amber-50 border-b border-amber-200">
           <div className="flex items-center gap-2 text-sm">
@@ -481,13 +521,11 @@ export default function LiquidityMatrixTable({
             <span className="font-medium text-amber-900">Ungeprüfte Buchungen enthalten</span>
             <span className="text-amber-700">
               {data.meta.unreviewedCount} von {data.meta.entryCount} Buchungen sind noch nicht geprüft.
-              Diese Zahlen sind vorläufig.
             </span>
           </div>
         </div>
       )}
 
-      {/* IST-Vorrang Info Banner */}
       {data.meta.planIgnoredCount > 0 && (
         <div className="px-6 py-3 bg-green-50 border-b border-green-200">
           <div className="flex items-center gap-2 text-sm">
@@ -502,7 +540,6 @@ export default function LiquidityMatrixTable({
         </div>
       )}
 
-      {/* Scope Hint Banner (nur bei Standort-Scopes) */}
       {data.scopeHint && (
         <div className="px-6 py-3 bg-indigo-50 border-b border-indigo-200">
           <div className="flex items-center gap-2 text-sm">
@@ -516,7 +553,6 @@ export default function LiquidityMatrixTable({
         </div>
       )}
 
-      {/* Validation Warnings */}
       {(data.validation.hasBalanceError || data.validation.hasNegativeBalance || data.validation.unklearPercentage > 10) && (
         <div className="px-6 py-3 bg-amber-50 border-b border-amber-200">
           <div className="flex flex-wrap gap-4 text-sm">
@@ -551,11 +587,10 @@ export default function LiquidityMatrixTable({
       {/* Table */}
       <div className="overflow-auto max-h-[75vh]">
         <table className="w-full text-sm">
-          {/* Sticky Header */}
           <thead className="sticky top-0 z-20">
-            {/* Header Row 1: IST/PLAN Badges */}
+            {/* IST/PLAN Badges */}
             <tr className="border-b border-gray-200 bg-white">
-              <th className="px-4 py-2 text-left font-medium text-gray-700 sticky left-0 bg-white z-30 min-w-[200px]">
+              <th className="px-4 py-2 text-left font-medium text-gray-700 sticky left-0 bg-white z-30 min-w-[260px]">
                 Position
               </th>
               {data.periods.map((period) => {
@@ -573,7 +608,7 @@ export default function LiquidityMatrixTable({
               </th>
             </tr>
 
-            {/* Header Row 2: Period Labels */}
+            {/* Period Labels */}
             <tr className="border-b border-gray-300 bg-gray-50">
               <th className="px-4 py-2 text-left font-semibold text-gray-900 sticky left-0 bg-gray-50 z-30">
                 Periode
@@ -591,221 +626,212 @@ export default function LiquidityMatrixTable({
 
           <tbody>
             {data.blocks
-              .filter((block) => block.rows.length > 0)  // Skip empty blocks
+              .filter((block) => block.rows.length > 0)
               .map((block) => {
-                // Berechne gefilterte Block-Summe für EINNAHMEN (nur sichtbare Zeilen)
-                // Ausgaben und Balances bleiben ungefiltert
-                const isCashInBlock = block.id === 'CASH_IN';
-                const filteredBlockTotals = isCashInBlock
+                const isCashInBlock = block.id === "CASH_IN";
+                const isLiqDevBlock = block.id === "LIQUIDITY_DEVELOPMENT";
+
+                // Compute filtered block totals for estate filter on CASH_IN
+                const filteredBlockTotals = isCashInBlock && estateFilter !== "GESAMT"
                   ? data.periods.map((_, periodIdx) => {
                       let sum = BigInt(0);
                       for (const row of block.rows) {
-                        // Skip section headers, summary rows, and filtered rows
-                        if (row.isSectionHeader || row.isSummary) continue;
+                        if (row.isSectionHeader || row.isSummary || row.parentRowId) continue;
                         if (!shouldShowRow(row.id, estateFilter)) continue;
                         const value = row.values.find(v => v.periodIndex === periodIdx);
-                        if (value) {
-                          sum += BigInt(value.amountCents);
-                        }
+                        if (value) sum += BigInt(value.amountCents);
                       }
                       return sum;
                     })
                   : null;
 
                 return (
-              <Fragment key={block.id}>
-                {/* Block rows */}
-                {block.rows.map((row) => {
-                  // estateFilter: Zeile ausblenden, wenn sie nicht zum Filter passt
-                  if (!shouldShowRow(row.id, estateFilter) && !row.isSummary) {
-                    return null;
-                  }
+                  <Fragment key={block.id}>
+                    {block.rows.map((row) => {
+                      // Estate filter: hide non-matching rows
+                      if (!shouldShowRow(row.id, estateFilter) && !row.isSummary && !row.isSubtotal) {
+                        return null;
+                      }
 
-                  // Section headers: Nur anzeigen wenn mind. 1 Zeile darunter sichtbar ist
-                  if (row.isSectionHeader) {
-                    // Prüfe, ob nachfolgende Zeilen sichtbar sind
-                    const hasVisibleChildren = block.rows.some(r =>
-                      !r.isSectionHeader &&
-                      r.order > row.order &&
-                      shouldShowRow(r.id, estateFilter)
-                    );
-                    if (!hasVisibleChildren) return null;
+                      // Collapse: hide children of collapsed parents
+                      if (row.parentRowId && !expandedRows.has(row.parentRowId)) {
+                        return null;
+                      }
 
-                    return (
-                      <tr
-                        key={row.id}
-                        className="border-b border-gray-200"
-                      >
-                        <td
-                          colSpan={data.periods.length + 2}
-                          className="px-4 py-1.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50/70 sticky left-0 z-10"
-                        >
-                          {row.label}
-                        </td>
-                      </tr>
-                    );
-                  }
+                      // Section headers: only show if visible children exist
+                      if (row.isSectionHeader) {
+                        const hasVisibleChildren = block.rows.some(r =>
+                          !r.isSectionHeader &&
+                          r.order > row.order &&
+                          !r.parentRowId &&
+                          shouldShowRow(r.id, estateFilter)
+                        );
+                        if (!hasVisibleChildren) return null;
 
-                  // Skip bank account sub-rows wenn Block collapsed ist
-                  const isBankRow = (block.id === "OPENING_BALANCE" || block.id === "CLOSING_BALANCE") &&
-                                    row.isSubRow &&
-                                    row.id.includes("balance_");
-
-                  if (isBankRow && collapsedBankBlocks.has(block.id)) {
-                    return null;
-                  }
-
-                  // Bank Block Total Row ist clickable zum Expand/Collapse
-                  const isBankBlockTotal = row.isSummary && (block.id === "OPENING_BALANCE" || block.id === "CLOSING_BALANCE");
-                  const isExpanded = !collapsedBankBlocks.has(block.id);
-
-                  // Bei EINNAHMEN-Summary: Verwende gefilterte Summe wenn estateFilter aktiv
-                  // Bei Balances und Ausgaben: Immer ungefiltert (echte Werte)
-                  const rowTotal = row.isSummary && isCashInBlock && estateFilter !== 'GESAMT' && filteredBlockTotals
-                    ? filteredBlockTotals.reduce((sum, val) => sum + val, BigInt(0))
-                    : BigInt(row.total);
-
-                  const isNegative = rowTotal < BigInt(0);
-                  const bgClass = row.isSummary ? getBlockColorClass(block.id) : "";
-                  const showBreakdown = showLocationBreakdown && scope === "GLOBAL" && !row.isSummary && Object.keys(locationData).length > 0;
-
-                  return (
-                    <Fragment key={row.id}>
-                      <tr
-                        className={`border-b border-gray-100 ${bgClass} ${
-                          row.isSummary ? "font-semibold" : ""
-                        } ${isBankBlockTotal ? "cursor-pointer hover:bg-gray-100" : "hover:bg-gray-50"}`}
-                        onClick={isBankBlockTotal ? () => toggleBankBlock(block.id) : undefined}
-                      >
-                        {/* Row Label */}
-                        <td
-                          className={`px-4 py-2 text-left sticky left-0 z-10 ${bgClass || "bg-white"} ${
-                            row.isSubRow ? "pl-8 text-gray-600" : "text-gray-900"
-                          }`}
-                        >
-                          <div className="flex items-center gap-2">
-                            {isBankBlockTotal && (
-                              <svg
-                                className={`w-4 h-4 text-gray-500 transition-transform ${
-                                  isExpanded ? "rotate-90" : ""
-                                }`}
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M9 5l7 7-7 7"
-                                />
-                              </svg>
-                            )}
-                            <span>{row.label}</span>
-                            {isBankBlockTotal && (
-                              <span className="text-xs text-gray-400 font-normal">
-                                ({isExpanded ? "aufgeklappt" : "eingeklappt"})
-                              </span>
-                            )}
-                          </div>
-                        </td>
-
-                        {/* Period Values */}
-                        {row.values.map((value) => {
-                          // Bei EINNAHMEN-Summary: Verwende gefilterte Summe wenn estateFilter aktiv
-                          // Bei Balances und Ausgaben: Immer ungefiltert
-                          const amount = row.isSummary && isCashInBlock && estateFilter !== 'GESAMT' && filteredBlockTotals
-                            ? filteredBlockTotals[value.periodIndex]
-                            : BigInt(value.amountCents);
-
-                          const isValueNegative = amount < BigInt(0);
-                          const isError = data.validation.errorPeriods.includes(value.periodIndex) && row.isSummary && block.id === "CLOSING_BALANCE";
-                          const hasNoData = value.entryCount === -1;
-
-                          // Klickbar: Nur Datenzeilen (nicht summary, sectionHeader, balance)
-                          const isClickable = !row.isSummary && !row.isSectionHeader &&
-                            !row.id.startsWith("opening_balance_") && !row.id.startsWith("closing_balance_") &&
-                            amount !== BigInt(0);
-
-                          return (
+                        return (
+                          <tr key={row.id} className="border-b border-gray-200">
                             <td
-                              key={`${row.id}-${value.periodIndex}`}
-                              className={`px-2 py-2 text-right tabular-nums ${
-                                hasNoData ? "text-gray-300" : isValueNegative ? "text-red-600" : row.flowType === "INFLOW" ? "text-green-600" : ""
-                              } ${isError ? "bg-red-100" : ""} ${isClickable ? "cursor-pointer hover:bg-blue-50/50 transition-colors" : ""}`}
-                              onClick={isClickable ? () => setSelectedCell({ rowId: row.id, periodIndex: value.periodIndex }) : undefined}
-                              title={isClickable ? "Klicken für Details" : undefined}
+                              colSpan={data.periods.length + 2}
+                              className="px-4 py-1.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide bg-gray-50/70 sticky left-0 z-10"
                             >
-                              {hasNoData ? "–" : formatCurrency(amount.toString())}
+                              {row.label}
                             </td>
-                          );
-                        })}
+                          </tr>
+                        );
+                      }
 
-                        {/* Row Total */}
-                        <td
-                          className={`px-4 py-2 text-right tabular-nums font-medium ${
-                            isNegative ? "text-red-600" : row.flowType === "INFLOW" ? "text-green-600" : ""
-                          }`}
-                        >
-                          {formatCurrency(rowTotal.toString())}
-                        </td>
-                      </tr>
+                      // Determine row display properties
+                      const hasChildren = parentRowIds.has(row.id);
+                      const isExpanded = expandedRows.has(row.id);
+                      const isChild = !!row.parentRowId;
 
-                      {/* Standort-Aufgliederung Sub-Rows */}
-                      {showBreakdown && (
-                        <>
-                          {(["LOCATION_VELBERT", "LOCATION_UCKERATH_EITORF"] as const).map((locKey) => {
-                            const locRow = getLocationRow(locKey, row.id);
-                            if (!locRow) return null;
-                            const locTotal = BigInt(locRow.total);
-                            const locNegative = locTotal < BigInt(0);
+                      // For Standort-Kind rows: get values from location data
+                      const standortMapping = isChild ? getStandortMapping(row.id) : null;
 
-                            return (
-                              <tr
-                                key={`${row.id}-${locKey}`}
-                                className="border-b border-gray-50"
-                              >
-                                <td className="pl-12 pr-4 py-1 text-left text-xs text-gray-400 italic sticky left-0 bg-white z-10">
-                                  {SCOPE_LABELS[locKey]}
-                                </td>
-                                {locRow.values.map((value) => {
-                                  const amount = BigInt(value.amountCents);
-                                  const isLocNeg = amount < BigInt(0);
-                                  return (
-                                    <td
-                                      key={`${row.id}-${locKey}-${value.periodIndex}`}
-                                      className={`px-2 py-1 text-right text-xs tabular-nums ${
-                                        isLocNeg ? "text-red-400" : amount > BigInt(0) ? "text-gray-400" : "text-gray-300"
-                                      }`}
-                                    >
-                                      {amount === BigInt(0) ? "\u2013" : formatCurrency(value.amountCents)}
-                                    </td>
-                                  );
-                                })}
+                      // Calculate row total
+                      let rowTotal: bigint;
+                      if (row.isSummary && isCashInBlock && filteredBlockTotals) {
+                        rowTotal = filteredBlockTotals.reduce((sum, val) => sum + val, BigInt(0));
+                      } else if (standortMapping && locationLoaded) {
+                        const locTotal = getLocationRowTotal(standortMapping.locationKey, standortMapping.sourceRowId);
+                        rowTotal = locTotal ? BigInt(locTotal) : BigInt(0);
+                      } else {
+                        rowTotal = BigInt(row.total);
+                      }
+
+                      const isNegative = rowTotal < BigInt(0);
+                      const bgClass = row.isSummary ? getBlockColorClass(block.id) : row.isSubtotal ? "bg-gray-50" : "";
+                      const isLiqDevRow = isLiqDevBlock;
+
+                      // Sektion IV: special styling for coverage_after_reserves
+                      const isCoverageRow = row.id === "coverage_after_reserves";
+                      const isCoverageBeforeRow = row.id === "coverage_before_reserves";
+
+                      return (
+                        <Fragment key={row.id}>
+                          <tr
+                            className={`border-b ${row.isSubtotal ? "border-t-2 border-gray-300" : "border-gray-100"} ${bgClass} ${
+                              row.isSummary || row.isSubtotal ? "font-semibold" : ""
+                            } ${hasChildren ? "cursor-pointer" : ""} ${
+                              isLiqDevRow && !row.isSummary ? "" : ""
+                            } hover:bg-gray-50`}
+                            onClick={hasChildren ? () => handleToggleRow(row.id) : undefined}
+                          >
+                            {/* Row Label */}
+                            <td
+                              className={`px-4 py-2 text-left sticky left-0 z-10 ${bgClass || "bg-white"} ${
+                                isChild ? "pl-12 text-gray-400 italic text-xs" :
+                                row.isSubRow && !row.isSummary ? "pl-8 text-gray-600" :
+                                "text-gray-900"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                {hasChildren && (
+                                  <span className={`text-gray-400 text-xs transition-transform inline-block ${isExpanded ? "rotate-90" : ""}`}>
+                                    &#9654;
+                                  </span>
+                                )}
+                                <span>{row.label}</span>
+                                {/* Tooltip for credit line */}
+                                {row.id === "credit_line_available" && data.liquidityDevelopment.creditLineNote && (
+                                  <span className="text-xs text-gray-400 font-normal" title={data.liquidityDevelopment.creditLineNote}>
+                                    ({data.liquidityDevelopment.creditLineNote})
+                                  </span>
+                                )}
+                                {/* Tooltip for reserves */}
+                                {row.id === "reserves_total" && data.liquidityDevelopment.reserveDetails.length > 0 && (
+                                  <span
+                                    className="text-xs text-gray-400 font-normal"
+                                    title={`Worst-Case-Betrachtung: ${data.liquidityDevelopment.reserveDetails.map(d => d.name).join(", ")}`}
+                                  >
+                                    (Worst-Case)
+                                  </span>
+                                )}
+                                {/* Loading indicator for location children */}
+                                {hasChildren && !locationLoaded && locationLoading && isExpanded && (
+                                  <span className="text-xs text-gray-400 font-normal">Lade...</span>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Period Values */}
+                            {row.values.map((value) => {
+                              let amount: bigint;
+                              if (row.isSummary && isCashInBlock && filteredBlockTotals) {
+                                amount = filteredBlockTotals[value.periodIndex];
+                              } else if (standortMapping && locationLoaded) {
+                                const locValues = getLocationRowValues(standortMapping.locationKey, standortMapping.sourceRowId);
+                                const locVal = locValues?.find(v => v.periodIndex === value.periodIndex);
+                                amount = locVal ? BigInt(locVal.amountCents) : BigInt(0);
+                              } else if (standortMapping && !locationLoaded) {
+                                amount = BigInt(0);
+                              } else {
+                                amount = BigInt(value.amountCents);
+                              }
+
+                              const isValueNegative = amount < BigInt(0);
+                              const isError = data.validation.errorPeriods.includes(value.periodIndex) &&
+                                (row.id === "closing_balance_total" || row.id === "coverage_after_reserves");
+                              const hasNoData = value.entryCount === -1 && amount === BigInt(0);
+
+                              // Klickbar: Nur Datenzeilen (nicht computed)
+                              const isClickable = !row.isSummary && !row.isSectionHeader && !row.isSubtotal &&
+                                !isChild && !isLiqDevRow &&
+                                amount !== BigInt(0);
+
+                              // Color for coverage rows
+                              const coverageColor = (isCoverageRow || isCoverageBeforeRow)
+                                ? (amount < BigInt(0) ? "text-red-700 font-bold" : "text-green-700 font-bold")
+                                : "";
+
+                              return (
                                 <td
-                                  className={`px-4 py-1 text-right text-xs tabular-nums ${
-                                    locNegative ? "text-red-400" : locTotal > BigInt(0) ? "text-gray-400" : "text-gray-300"
+                                  key={`${row.id}-${value.periodIndex}`}
+                                  className={`px-2 py-2 text-right tabular-nums ${
+                                    coverageColor ||
+                                    (isChild ? (amount === BigInt(0) ? "text-gray-300" : "text-gray-400") :
+                                    hasNoData ? "text-gray-300" :
+                                    isValueNegative ? "text-red-600" :
+                                    row.flowType === "INFLOW" ? "text-green-600" : "")
+                                  } ${isError ? "bg-red-100" : ""} ${
+                                    isClickable ? "cursor-pointer hover:bg-blue-50/50 transition-colors" : ""
                                   }`}
+                                  onClick={isClickable ? () => setSelectedCell({ rowId: row.id, periodIndex: value.periodIndex }) : undefined}
+                                  title={isClickable ? "Klicken für Details" : undefined}
                                 >
-                                  {locTotal === BigInt(0) ? "\u2013" : formatCurrency(locRow.total)}
+                                  {isChild && !locationLoaded && standortMapping ? "\u2013" :
+                                   hasNoData ? "\u2013" :
+                                   formatCurrency(amount.toString())}
                                 </td>
-                              </tr>
-                            );
-                          })}
-                        </>
-                      )}
-                    </Fragment>
-                  );
-                })}
+                              );
+                            })}
 
-                {/* Spacing row after block (except last) */}
-                {block.order < data.blocks.length && (
-                  <tr className="h-2 bg-white">
-                    <td colSpan={data.periods.length + 2}></td>
-                  </tr>
-                )}
-              </Fragment>
-            );
+                            {/* Row Total */}
+                            <td
+                              className={`px-4 py-2 text-right tabular-nums font-medium ${
+                                (isCoverageRow || isCoverageBeforeRow)
+                                  ? (isNegative ? "text-red-700 font-bold" : "text-green-700 font-bold")
+                                  : isChild ? (rowTotal === BigInt(0) ? "text-gray-300" : "text-gray-400")
+                                  : isNegative ? "text-red-600"
+                                  : row.flowType === "INFLOW" ? "text-green-600" : ""
+                              }`}
+                            >
+                              {isChild && !locationLoaded && standortMapping ? "\u2013" :
+                               formatCurrency(rowTotal.toString())}
+                            </td>
+                          </tr>
+                        </Fragment>
+                      );
+                    })}
+
+                    {/* Block spacing */}
+                    {block.order < data.blocks.length && (
+                      <tr className="h-2 bg-white">
+                        <td colSpan={data.periods.length + 2}></td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
               })}
           </tbody>
         </table>

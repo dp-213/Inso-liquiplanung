@@ -69,6 +69,26 @@ export interface AggregateResult {
 // CELL EXPLANATION (API Response)
 // =============================================================================
 
+// =============================================================================
+// LIQUIDITY DEVELOPMENT (Sektion IV)
+// =============================================================================
+
+export interface LiquidityDevelopmentData {
+  creditLineCents: string;           // Verfügbare Kreditlinie (gesamt)
+  creditLineStatus: string;          // VEREINBART / OFFEN / KEINE
+  creditLineNote: string | null;     // z.B. "Sparkasse HRV, max. 137 T€"
+  reservesTotalCents: string;        // Summe Rückstellungen
+  reserveDetails: Array<{
+    name: string;
+    amountCents: string;
+    effectGroup: string;
+  }>;
+}
+
+// =============================================================================
+// CELL EXPLANATION (API Response)
+// =============================================================================
+
 export interface CellExplanation {
   context: {
     rowId: string;

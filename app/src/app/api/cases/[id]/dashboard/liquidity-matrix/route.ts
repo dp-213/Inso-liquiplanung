@@ -1,16 +1,17 @@
 /**
  * API: Liquiditätsmatrix für IV-Dashboard
  *
- * Aggregiert LedgerEntries in IV-konforme Struktur:
- * - Anfangsbestand je Periode (fortgeschrieben)
- * - Cash-In/Out nach konfigurierbaren Zeilen
- * - Endbestand je Periode
- * - Optional: Bank-Split, Alt/Neu-Filter
+ * IDW S11-konforme Struktur mit 4 Blöcken:
+ * I.  Finanzmittelbestand Periodenanfang
+ * II. Einzahlungen
+ * III. Auszahlungen (inkl. Zwischensumme insolvenzspezifisch)
+ * IV. Liquiditätsentwicklung (Veränderung, EoP, Kreditlinie, Rückstellungen)
  *
  * GET /api/cases/[id]/dashboard/liquidity-matrix
  * Query-Parameter:
- * - estateFilter: GESAMT | ALTMASSE | NEUMASSE | UNKLAR
  * - showDetails: true | false (nur Summen oder mit Unterzeilen)
+ * - scope: GLOBAL | LOCATION_VELBERT | LOCATION_UCKERATH_EITORF
+ * - includeUnreviewed: true | false
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,6 +21,7 @@ import { getCustomerSession, checkCaseAccess } from '@/lib/customer-auth';
 import {
   HVPLUS_MATRIX_BLOCKS,
   HVPLUS_MATRIX_ROWS,
+  INSOLVENCY_ROW_IDS,
   getRowsForBlock,
   getRowsForScope,
   filterEntriesByScope,
@@ -29,6 +31,7 @@ import {
   type LiquidityScope,
 } from '@/lib/cases/haevg-plus/matrix-config';
 import { aggregateEntries } from '@/lib/liquidity-matrix/aggregate';
+import type { LiquidityDevelopmentData } from '@/lib/liquidity-matrix/types';
 
 // =============================================================================
 // TYPES
@@ -39,13 +42,13 @@ export interface MatrixPeriod {
   periodLabel: string;
   periodStartDate: string;
   periodEndDate: string;
-  valueType: 'IST' | 'PLAN' | 'MIXED';  // Basierend auf Datenquellen
+  valueType: 'IST' | 'PLAN' | 'MIXED';
 }
 
 export interface MatrixRowValue {
   rowId: string;
   periodIndex: number;
-  amountCents: string;  // BigInt als String für JSON
+  amountCents: string;
   entryCount: number;
 }
 
@@ -58,9 +61,12 @@ export interface MatrixRow {
   isSubRow: boolean;
   isSummary: boolean;
   isSectionHeader?: boolean;
+  isSubtotal?: boolean;
+  parentRowId?: string;
+  defaultExpanded?: boolean;
   flowType?: 'INFLOW' | 'OUTFLOW';
   values: MatrixRowValue[];
-  total: string;  // Summe über alle Perioden
+  total: string;
 }
 
 export interface MatrixBlock {
@@ -68,7 +74,7 @@ export interface MatrixBlock {
   label: string;
   order: number;
   rows: MatrixRow[];
-  totals: string[];  // Summe pro Periode
+  totals: string[];
 }
 
 export interface LiquidityMatrixData {
@@ -76,23 +82,24 @@ export interface LiquidityMatrixData {
   caseName: string;
   scope: LiquidityScope;
   scopeLabel: string;
-  scopeHint: string | null;  // Hinweis für Standort-Scopes
+  scopeHint: string | null;
   periods: MatrixPeriod[];
   blocks: MatrixBlock[];
+  liquidityDevelopment: LiquidityDevelopmentData;
   validation: {
-    hasBalanceError: boolean;  // Anfang + In + Out != Ende
-    hasNegativeBalance: boolean;  // Negativer Endbestand
-    unklearPercentage: number;  // Anteil UNKLAR
-    errorPeriods: number[];  // Perioden mit Fehlern
+    hasBalanceError: boolean;
+    hasNegativeBalance: boolean;
+    unklearPercentage: number;
+    errorPeriods: number[];
   };
   meta: {
     entryCount: number;
     istCount: number;
     planCount: number;
-    planIgnoredCount: number;  // PLAN-Buchungen ignoriert wegen IST-Vorrang
+    planIgnoredCount: number;
     unklearCount: number;
-    unreviewedCount: number;  // Anzahl ungeprüfter Buchungen (nur wenn includeUnreviewed=true)
-    includeUnreviewed: boolean;  // Zeigt an ob ungeprüfte enthalten sind
+    unreviewedCount: number;
+    includeUnreviewed: boolean;
     generatedAt: string;
   };
 }
@@ -121,7 +128,7 @@ function getPeriodDates(periodIndex: number, startDate: Date, periodType: string
     start.setMonth(start.getMonth() + periodIndex);
     start.setDate(1);
     end.setMonth(end.getMonth() + periodIndex + 1);
-    end.setDate(0);  // Letzter Tag des Monats
+    end.setDate(0);
   } else {
     start.setDate(start.getDate() + periodIndex * 7);
     end.setDate(start.getDate() + 6);
@@ -150,7 +157,6 @@ export async function GET(
       return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
     }
 
-    // Falls Customer-Session: Prüfe Case-Access
     if (customerSession && !adminSession) {
       const access = await checkCaseAccess(customerSession.customerId, caseId);
       if (!access.hasAccess) {
@@ -164,7 +170,6 @@ export async function GET(
     const scope: LiquidityScope = ['GLOBAL', 'LOCATION_VELBERT', 'LOCATION_UCKERATH_EITORF'].includes(scopeParam)
       ? (scopeParam as LiquidityScope)
       : 'GLOBAL';
-    // includeUnreviewed: Default false = nur CONFIRMED + ADJUSTED
     const includeUnreviewed = searchParams.get('includeUnreviewed') === 'true';
 
     // 1. Load Case with Plan settings
@@ -192,21 +197,32 @@ export async function GET(
     const periodCount = plan.periodCount || 10;
     const startDate = plan.planStartDate ? new Date(plan.planStartDate) : new Date();
 
-    // 2. Load LedgerEntries
-    // WICHTIG: estateFilter wird NICHT im Backend angewendet!
-    // Backend aggregiert IMMER GESAMT. estateFilter wirkt nur im Frontend (Zeilen-Ausblendung).
-    //
-    // reviewStatus-Filter: Default nur geprüfte (CONFIRMED, ADJUSTED)
-    // Mit includeUnreviewed=true auch UNREVIEWED
+    // 2. Load BankAgreements für Kreditlinie
+    const bankAgreements = await prisma.bankAgreement.findMany({
+      where: { caseId, agreementStatus: 'VEREINBART' },
+      include: { bankAccount: { select: { bankName: true } } },
+    });
+    const creditLineCents = bankAgreements.reduce(
+      (sum, a) => sum + (a.creditCapCents || BigInt(0)), BigInt(0)
+    );
+
+    // 3. Load Rückstellungen aus InsolvencyEffects (isAvailabilityOnly=true)
+    const reserveEffects = await prisma.insolvencyEffect.findMany({
+      where: { planId: plan.id, isActive: true, isAvailabilityOnly: true },
+    });
+    const reservesTotalCents = reserveEffects.reduce(
+      (sum, e) => sum + (e.amountCents < 0 ? -e.amountCents : e.amountCents), BigInt(0)
+    );
+
+    // 4. Load LedgerEntries
     const reviewStatusFilter = includeUnreviewed
-      ? { not: 'REJECTED' }  // Alles außer REJECTED
-      : { in: ['CONFIRMED', 'ADJUSTED'] };  // Nur geprüfte
+      ? { not: 'REJECTED' }
+      : { in: ['CONFIRMED', 'ADJUSTED'] };
 
     const allEntries = await prisma.ledgerEntry.findMany({
       where: {
         caseId,
         reviewStatus: reviewStatusFilter,
-        // KEIN estateWhere mehr! Backend liefert ALLE Entries.
       },
       include: {
         counterparty: { select: { id: true, name: true } },
@@ -216,7 +232,7 @@ export async function GET(
       orderBy: { transactionDate: 'asc' },
     });
 
-    // 3b. Apply Scope Filter - WICHTIG: VOR der Aggregation!
+    // 5. Apply Scope Filter
     const entries = filterEntriesByScope(
       allEntries.map(e => ({
         ...e,
@@ -225,10 +241,9 @@ export async function GET(
       scope
     );
 
-    // 4. Build Bank Account ID mapping
+    // 6. Build Bank Account ID mapping
     const bankAccountMap = new Map<string, string>();
     for (const acc of existingCase.bankAccounts) {
-      // Map by name pattern for HVPlus
       const nameLower = acc.bankName.toLowerCase();
       if (nameLower.includes('sparkasse')) {
         bankAccountMap.set(acc.id, 'sparkasse');
@@ -237,7 +252,7 @@ export async function GET(
       }
     }
 
-    // 5. Build periods
+    // 7. Build periods
     const periods: MatrixPeriod[] = [];
     for (let i = 0; i < periodCount; i++) {
       const { start, end } = getPeriodDates(i, startDate, periodType);
@@ -246,14 +261,14 @@ export async function GET(
         periodLabel: getPeriodLabel(i, startDate, periodType),
         periodStartDate: start.toISOString().split('T')[0],
         periodEndDate: end.toISOString().split('T')[0],
-        valueType: 'MIXED',  // Will be determined later
+        valueType: 'MIXED',
       });
     }
 
-    // 6. Get rows for current scope (filters out scope-specific rows like Velbert details in GLOBAL)
+    // 8. Get rows for current scope
     const scopeRows = getRowsForScope(HVPLUS_MATRIX_ROWS, scope);
 
-    // 7+8. Aggregation via shared aggregate function
+    // 9. Aggregation via shared aggregate function
     const aggregation = aggregateEntries({
       entries: entries as Parameters<typeof aggregateEntries>[0]['entries'],
       rows: scopeRows,
@@ -264,100 +279,126 @@ export async function GET(
       traceMode: false,
     });
 
-    const { rowAggregations, periodsWithIst, periodValueTypes, stats } = aggregation;
+    const { rowAggregations, periodValueTypes, stats } = aggregation;
     const { totalEntries, istCount, planCount, planIgnoredCount, unklearCount, unreviewedCount } = stats;
 
-    // 9. Determine period value types
-    for (const [periodIdx, { ist, plan }] of periodValueTypes) {
-      if (ist > 0 && plan === 0) {
+    // 10. Determine period value types
+    for (const [periodIdx, { ist, plan: planCnt }] of periodValueTypes) {
+      if (ist > 0 && planCnt === 0) {
         periods[periodIdx].valueType = 'IST';
-      } else if (plan > 0 && ist === 0) {
+      } else if (planCnt > 0 && ist === 0) {
         periods[periodIdx].valueType = 'PLAN';
       } else {
         periods[periodIdx].valueType = 'MIXED';
       }
     }
 
-    // 10. Calculate block sums and opening/closing balances
-    const blockTotals = new Map<MatrixBlockId, bigint[]>();
-    for (const block of HVPLUS_MATRIX_BLOCKS) {
-      blockTotals.set(block.id, Array(periodCount).fill(BigInt(0)));
-    }
-
-    // Calculate Cash-In total
+    // 11. Calculate block sums
+    // CASH_IN total
+    const cashInTotals = Array(periodCount).fill(BigInt(0)) as bigint[];
     const cashInRows = getRowsForBlock('CASH_IN', scopeRows);
     for (const row of cashInRows) {
-      if (!row.isSummary) {
-        const rowPeriods = rowAggregations.get(row.id)!;
-        const totals = blockTotals.get('CASH_IN')!;
-        for (let i = 0; i < periodCount; i++) {
-          totals[i] += rowPeriods.get(i)!.amount;
-        }
-      }
-    }
-
-    // Calculate Cash-Out totals (all outflow blocks)
-    for (const blockId of ['CASH_OUT_OPERATIVE', 'CASH_OUT_TAX', 'CASH_OUT_INSOLVENCY'] as MatrixBlockId[]) {
-      const rows = getRowsForBlock(blockId, scopeRows);
-      for (const row of rows) {
-        if (!row.isSummary) {
-          const rowPeriods = rowAggregations.get(row.id)!;
-          const totals = blockTotals.get(blockId)!;
+      if (!row.isSummary && !row.isSectionHeader && !row.parentRowId) {
+        const rowPeriods = rowAggregations.get(row.id);
+        if (rowPeriods) {
           for (let i = 0; i < periodCount; i++) {
-            totals[i] += rowPeriods.get(i)!.amount;
+            cashInTotals[i] += rowPeriods.get(i)!.amount;
           }
         }
       }
     }
 
-    // Calculate CASH_OUT_TOTAL (Summe aller Auszahlungen)
-    const cashOutTotalArr = Array(periodCount).fill(BigInt(0)) as bigint[];
-    for (let i = 0; i < periodCount; i++) {
-      cashOutTotalArr[i] =
-        blockTotals.get('CASH_OUT_OPERATIVE')![i] +
-        blockTotals.get('CASH_OUT_TAX')![i] +
-        blockTotals.get('CASH_OUT_INSOLVENCY')![i];
+    // CASH_OUT total (all outflow rows in the unified CASH_OUT block)
+    const cashOutTotals = Array(periodCount).fill(BigInt(0)) as bigint[];
+    const cashOutRows = getRowsForBlock('CASH_OUT', scopeRows);
+    for (const row of cashOutRows) {
+      if (!row.isSummary && !row.isSectionHeader && !row.isSubtotal && !row.parentRowId) {
+        const rowPeriods = rowAggregations.get(row.id);
+        if (rowPeriods) {
+          for (let i = 0; i < periodCount; i++) {
+            cashOutTotals[i] += rowPeriods.get(i)!.amount;
+          }
+        }
+      }
     }
-    blockTotals.set('CASH_OUT_TOTAL', cashOutTotalArr);
 
-    // 10b. Populate Bank-spezifische Opening/Closing Balance Zeilen
-    // WICHTIG: Muss VOR der Opening/Closing Balance Total-Berechnung erfolgen!
-    // Für jedes Bankkonto: Berechne running balance pro Periode
-    // WICHTIG: Bank-Balances sind immer GLOBAL (nicht scope-gefiltert),
-    // aber die Sichtbarkeit der Zeilen wird über visibleInScopes gesteuert
+    // Insolvency subtotal (nur die spezifischen Inso-Zeilen)
+    const insoSubtotals = Array(periodCount).fill(BigInt(0)) as bigint[];
+    for (const insoRowId of INSOLVENCY_ROW_IDS) {
+      const rowPeriods = rowAggregations.get(insoRowId);
+      if (rowPeriods) {
+        for (let i = 0; i < periodCount; i++) {
+          insoSubtotals[i] += rowPeriods.get(i)!.amount;
+        }
+      }
+    }
 
-    // 10c. Calculate Opening/Closing Balance Totals
-    // Bankkonten-Details entfernt (2026-02-09) - nur noch Totals aus Cashflows
-    // Einzelne Konten werden im Bankenspiegel (BankAccountsTab) angezeigt
-    console.log('[Liquidity Matrix] Berechne Balance-Totals aus Cashflows...');
+    // Set subtotal in rowAggregations for cash_out_subtotal_insolvency
+    const insoSubtotalAgg = rowAggregations.get('cash_out_subtotal_insolvency');
+    if (insoSubtotalAgg) {
+      for (let i = 0; i < periodCount; i++) {
+        insoSubtotalAgg.get(i)!.amount = insoSubtotals[i];
+      }
+    }
 
+    // 12. Calculate Opening/Closing Balances
     const openingBalances: bigint[] = [];
     const closingBalances: bigint[] = [];
 
     for (let i = 0; i < periodCount; i++) {
-      // Opening Balance: Periode 0 startet bei 0, danach = Closing der Vorperiode
       const periodOpening = i === 0 ? BigInt(0) : closingBalances[i - 1];
       openingBalances.push(periodOpening);
 
-      // Closing Balance = Opening + Cash In + Cash Out
-      const cashIn = blockTotals.get('CASH_IN')![i];
-      const cashOutTotal = blockTotals.get('CASH_OUT_TOTAL')![i];
-      const closing = periodOpening + cashIn + cashOutTotal;
+      const closing = periodOpening + cashInTotals[i] + cashOutTotals[i];
       closingBalances.push(closing);
     }
 
-    console.log(
-      `[Balance Total] Period 0: Opening ${Number(openingBalances[0]) / 100}€, Closing ${Number(closingBalances[0]) / 100}€`
-    );
-    console.log(
-      `[Balance Total] Period 1: Opening ${Number(openingBalances[1]) / 100}€ (should equal Closing P0: ${Number(closingBalances[0]) / 100}€)`
-    );
+    // 13. Sektion IV: Liquiditätsentwicklung berechnen
+    // Alle 6 Zeilen sind computed — direkt in rowAggregations schreiben
+    for (let i = 0; i < periodCount; i++) {
+      const change = cashInTotals[i] + cashOutTotals[i];
+      const coverage = closingBalances[i] + creditLineCents;
+      const coverageAfter = coverage - reservesTotalCents;
 
-    // Set balance block totals
+      // liquidity_change
+      const lcAgg = rowAggregations.get('liquidity_change');
+      if (lcAgg) { lcAgg.get(i)!.amount = change; lcAgg.get(i)!.count = -1; }
+
+      // closing_balance_total
+      const cbAgg = rowAggregations.get('closing_balance_total');
+      if (cbAgg) { cbAgg.get(i)!.amount = closingBalances[i]; cbAgg.get(i)!.count = -1; }
+
+      // credit_line_available
+      const clAgg = rowAggregations.get('credit_line_available');
+      if (clAgg) { clAgg.get(i)!.amount = creditLineCents; clAgg.get(i)!.count = -1; }
+
+      // coverage_before_reserves
+      const cbrAgg = rowAggregations.get('coverage_before_reserves');
+      if (cbrAgg) { cbrAgg.get(i)!.amount = coverage; cbrAgg.get(i)!.count = -1; }
+
+      // reserves_total (konstanter Worst-Case-Betrag, negativ dargestellt)
+      const rtAgg = rowAggregations.get('reserves_total');
+      if (rtAgg) { rtAgg.get(i)!.amount = -reservesTotalCents; rtAgg.get(i)!.count = -1; }
+
+      // coverage_after_reserves
+      const carAgg = rowAggregations.get('coverage_after_reserves');
+      if (carAgg) { carAgg.get(i)!.amount = coverageAfter; carAgg.get(i)!.count = -1; }
+    }
+
+    // Block totals map for building response
+    const blockTotals = new Map<MatrixBlockId, bigint[]>();
     blockTotals.set('OPENING_BALANCE', openingBalances);
-    blockTotals.set('CLOSING_BALANCE', closingBalances);
+    blockTotals.set('CASH_IN', cashInTotals);
+    blockTotals.set('CASH_OUT', cashOutTotals);
+    // Liquiditätsentwicklung hat keine eigene "Block-Summe" — jede Zeile ist eigenständig
+    // Verwende coverage_after_reserves als Block-Total
+    const liqDevTotals = Array(periodCount).fill(BigInt(0)) as bigint[];
+    for (let i = 0; i < periodCount; i++) {
+      liqDevTotals[i] = closingBalances[i] + creditLineCents - reservesTotalCents;
+    }
+    blockTotals.set('LIQUIDITY_DEVELOPMENT', liqDevTotals);
 
-    // 11. Build response blocks
+    // 14. Build response blocks
     const responseBlocks: MatrixBlock[] = [];
 
     for (const blockConfig of HVPLUS_MATRIX_BLOCKS) {
@@ -366,8 +407,9 @@ export async function GET(
 
       for (const row of blockRows) {
         // Skip sub-rows and section headers if showDetails is false
-        if (!showDetails && row.isSubRow) continue;
+        if (!showDetails && row.isSubRow && !row.isSummary) continue;
         if (!showDetails && row.isSectionHeader) continue;
+        if (!showDetails && row.isSubtotal) continue;
 
         const rowPeriods = rowAggregations.get(row.id);
         const values: MatrixRowValue[] = [];
@@ -377,9 +419,13 @@ export async function GET(
           let amount: bigint;
           let count = 0;
 
-          if (row.isSummary) {
-            // Use block totals for summary rows
+          if (row.isSummary && blockConfig.id !== 'LIQUIDITY_DEVELOPMENT') {
+            // Use block totals for summary rows (except Sektion IV — each row is its own computed value)
             amount = blockTotals.get(blockConfig.id)![i];
+            count = -1;
+          } else if (row.isSubtotal && row.id === 'cash_out_subtotal_insolvency') {
+            amount = insoSubtotals[i];
+            count = -1;
           } else if (rowPeriods) {
             const periodData = rowPeriods.get(i)!;
             amount = periodData.amount;
@@ -407,6 +453,9 @@ export async function GET(
           isSubRow: row.isSubRow,
           isSummary: row.isSummary,
           ...(row.isSectionHeader ? { isSectionHeader: true } : {}),
+          ...(row.isSubtotal ? { isSubtotal: true } : {}),
+          ...(row.parentRowId ? { parentRowId: row.parentRowId } : {}),
+          ...(row.defaultExpanded !== undefined ? { defaultExpanded: row.defaultExpanded } : {}),
           flowType: row.flowType,
           values,
           total: rowTotal.toString(),
@@ -422,28 +471,22 @@ export async function GET(
       });
     }
 
-    // 12. Validation checks
+    // 15. Validation checks
     let hasBalanceError = false;
     let hasNegativeBalance = false;
     const errorPeriods: number[] = [];
 
     for (let i = 0; i < periodCount; i++) {
       const opening = openingBalances[i];
-      const cashIn = blockTotals.get('CASH_IN')![i];
-      const cashOutTotal = blockTotals.get('CASH_OUT_TOTAL')![i];
-      const closing = closingBalances[i];
+      const calculatedClosing = opening + cashInTotals[i] + cashOutTotals[i];
 
-      const calculatedClosing = opening + cashIn + cashOutTotal;
-
-      // Check for balance error (allow small rounding tolerance)
-      const diff = closing - calculatedClosing;
+      const diff = closingBalances[i] - calculatedClosing;
       if (diff > BigInt(100) || diff < BigInt(-100)) {
         hasBalanceError = true;
         errorPeriods.push(i);
       }
 
-      // Check for negative balance
-      if (closing < BigInt(0)) {
+      if (closingBalances[i] < BigInt(0)) {
         hasNegativeBalance = true;
         if (!errorPeriods.includes(i)) {
           errorPeriods.push(i);
@@ -453,7 +496,24 @@ export async function GET(
 
     const unklearPercentage = totalEntries > 0 ? (unklearCount / totalEntries) * 100 : 0;
 
-    // 13. Build response
+    // 16. Liquidity Development metadata
+    const liquidityDevelopment: LiquidityDevelopmentData = {
+      creditLineCents: creditLineCents.toString(),
+      creditLineStatus: bankAgreements.length > 0 ? 'VEREINBART' : 'KEINE',
+      creditLineNote: bankAgreements.length > 0
+        ? bankAgreements.map(a =>
+            `${a.bankAccount.bankName}: ${(Number(a.creditCapCents || 0) / 100).toLocaleString('de-DE')} €`
+          ).join(', ')
+        : null,
+      reservesTotalCents: reservesTotalCents.toString(),
+      reserveDetails: reserveEffects.map(e => ({
+        name: e.name,
+        amountCents: e.amountCents.toString(),
+        effectGroup: e.effectGroup,
+      })),
+    };
+
+    // 17. Build response
     const response: LiquidityMatrixData = {
       caseId,
       caseName: existingCase.debtorName,
@@ -462,6 +522,7 @@ export async function GET(
       scopeHint: getScopeHintText(scope),
       periods,
       blocks: responseBlocks,
+      liquidityDevelopment,
       validation: {
         hasBalanceError,
         hasNegativeBalance,

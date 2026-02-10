@@ -44,6 +44,13 @@ const STANDARD_EFFECTS = [
   { name: "Insolvenzspezifische Versicherungen", type: "OUTFLOW", group: "PROCEDURE_COST" },
 ];
 
+const RESERVE_TEMPLATES = [
+  { name: "IV-Vergütung (geschätzt)", type: "OUTFLOW", group: "PROCEDURE_COST" },
+  { name: "Gerichtskosten (geschätzt)", type: "OUTFLOW", group: "PROCEDURE_COST" },
+  { name: "Gläubigerausschuss (geschätzt)", type: "OUTFLOW", group: "PROCEDURE_COST" },
+  { name: "Massekosten-Reserve", type: "OUTFLOW", group: "GENERAL" },
+];
+
 export default function InsolvencyEffectsPage() {
   const params = useParams();
   const caseId = params.id as string;
@@ -60,7 +67,10 @@ export default function InsolvencyEffectsPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Neue States für Transfer-Funktionalität
+  // Tab State
+  const [activeTab, setActiveTab] = useState<"effects" | "reserves">("effects");
+
+  // Transfer
   const [selectedEffectIds, setSelectedEffectIds] = useState<Set<string>>(new Set());
   const [transferredEffectIds, setTransferredEffectIds] = useState<Set<string>>(new Set());
 
@@ -72,6 +82,7 @@ export default function InsolvencyEffectsPage() {
     periodIndex: 0,
     amountCents: "",
     effectId: null as string | null,
+    isAvailabilityOnly: false,
   });
 
   const fetchTransferStatus = useCallback(async (effectIds: string[]) => {
@@ -99,8 +110,7 @@ export default function InsolvencyEffectsPage() {
           periodCount: data.periodCount || 13,
           planStartDate: data.planStartDate || new Date().toISOString(),
         });
-        // Transfer-Status laden
-        const effectIds = rawEffects.map((e: InsolvencyEffect) => e.id);
+        const effectIds = rawEffects.filter((e: InsolvencyEffect) => !e.isAvailabilityOnly).map((e: InsolvencyEffect) => e.id);
         fetchTransferStatus(effectIds);
       }
     } catch {
@@ -122,7 +132,6 @@ export default function InsolvencyEffectsPage() {
         const date = new Date(planStart.getFullYear(), planStart.getMonth() + i, 1);
         labels.push(date.toLocaleDateString("de-DE", { month: "short", year: "2-digit" }));
       } else {
-        // Für wöchentlich: Berechne Start + i Wochen
         const weekDate = new Date(planStart);
         weekDate.setDate(weekDate.getDate() + i * 7);
         const weekNumber = Math.ceil((weekDate.getTime() - new Date(weekDate.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
@@ -152,6 +161,7 @@ export default function InsolvencyEffectsPage() {
           periodIndex: formData.periodIndex,
           amountCents: Math.round(parseFloat(formData.amountCents) * 100),
           effectId: formData.effectId,
+          isAvailabilityOnly: formData.isAvailabilityOnly,
         }),
       });
 
@@ -160,7 +170,7 @@ export default function InsolvencyEffectsPage() {
         throw new Error(data.error || "Fehler beim Speichern");
       }
 
-      setSuccess("Insolvenzeffekt gespeichert");
+      setSuccess(formData.isAvailabilityOnly ? "Rückstellung gespeichert" : "Insolvenzeffekt gespeichert");
       resetForm();
       fetchData();
     } catch (err) {
@@ -171,7 +181,7 @@ export default function InsolvencyEffectsPage() {
   }
 
   async function handleDelete(effectId: string) {
-    if (!confirm("Insolvenzeffekt wirklich löschen?")) return;
+    if (!confirm("Eintrag wirklich löschen?")) return;
 
     try {
       const res = await fetch(`/api/cases/${caseId}/plan/insolvency-effects?effectId=${effectId}`, {
@@ -183,7 +193,7 @@ export default function InsolvencyEffectsPage() {
         throw new Error(data.error || "Fehler beim Löschen");
       }
 
-      setSuccess("Insolvenzeffekt gelöscht");
+      setSuccess("Eintrag gelöscht");
       setSelectedEffectIds((prev) => {
         const next = new Set(prev);
         next.delete(effectId);
@@ -225,8 +235,7 @@ export default function InsolvencyEffectsPage() {
       setSuccess(messages.join(", ") || "Transfer abgeschlossen");
       setSelectedEffectIds(new Set());
 
-      // Transfer-Status aktualisieren
-      const effectIds = effects.map((e) => e.id);
+      const effectIds = effects.filter(e => !e.isAvailabilityOnly).map((e) => e.id);
       fetchTransferStatus(effectIds);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler beim Transfer");
@@ -244,6 +253,7 @@ export default function InsolvencyEffectsPage() {
       periodIndex: effect.periodIndex,
       amountCents: (Number(effect.amountCents) / 100).toString(),
       effectId: effect.id,
+      isAvailabilityOnly: effect.isAvailabilityOnly || false,
     });
   }
 
@@ -256,19 +266,21 @@ export default function InsolvencyEffectsPage() {
       periodIndex: 0,
       amountCents: "",
       effectId: null,
+      isAvailabilityOnly: activeTab === "reserves",
     });
   }
 
-  function applyStandardEffect(standardEffect: typeof STANDARD_EFFECTS[0]) {
+  function applyTemplate(template: { name: string; type: string; group: string }) {
     setFormData({
       ...formData,
-      name: standardEffect.name,
-      effectType: standardEffect.type as "INFLOW" | "OUTFLOW",
-      effectGroup: standardEffect.group,
+      name: template.name,
+      effectType: template.type as "INFLOW" | "OUTFLOW",
+      effectGroup: template.group,
+      isAvailabilityOnly: activeTab === "reserves",
     });
   }
 
-  function formatCurrency(cents: string | number): string {
+  function formatCurrencyLocal(cents: string | number): string {
     const value = typeof cents === "string" ? Number(cents) : cents;
     return (value / 100).toLocaleString("de-DE", {
       minimumFractionDigits: 0,
@@ -305,7 +317,16 @@ export default function InsolvencyEffectsPage() {
     );
   }
 
+  // Filtered effects based on active tab
+  const tabEffects = activeTab === "effects"
+    ? effects.filter(e => !e.isAvailabilityOnly)
+    : effects.filter(e => e.isAvailabilityOnly);
+
   const transferableEffects = effects.filter((e) => !e.isAvailabilityOnly);
+  const reserveEffects = effects.filter(e => e.isAvailabilityOnly);
+  const reserveTotal = reserveEffects.reduce((sum, e) => sum + Math.abs(Number(e.amountCents)), 0);
+
+  const templates = activeTab === "effects" ? STANDARD_EFFECTS : RESERVE_TEMPLATES;
 
   return (
     <div className="space-y-6">
@@ -328,7 +349,7 @@ export default function InsolvencyEffectsPage() {
           <div>
             <h1 className="text-2xl font-bold text-[var(--foreground)]">Insolvenzspezifische Effekte</h1>
             <p className="mt-1 text-sm text-[var(--secondary)]">
-              Erfassen Sie insolvenzspezifische Zahlungsströme und überführen Sie diese in die operative Planung
+              Zahlungswirksame Effekte und Rückstellungen für die Liquiditätsplanung
             </p>
           </div>
           <Link href={`/admin/cases/${caseId}`} className="btn-secondary">
@@ -337,25 +358,74 @@ export default function InsolvencyEffectsPage() {
         </div>
       </div>
 
-      {/* Info-Box: Was sind Insolvenzeffekte? */}
-      <div className="admin-card p-4 bg-amber-50 border-amber-200">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div>
-            <h4 className="text-sm font-medium text-amber-800">
-              Insolvenzeffekte = Echte zahlungswirksame Ereignisse
-            </h4>
-            <p className="text-xs text-amber-700 mt-1">
-              Insolvenzeffekte sind keine Szenarien, sondern <strong>rechtlich wirksame Zahlungswirkungen</strong>:
-              Verfahrenskosten, Masseverbindlichkeiten, Halteprämien, Anfechtungsrückflüsse, etc.
-              Mit <em>&quot;In Planung überführen&quot;</em> werden sie als PLAN-Einträge im Zahlungsregister angelegt
-              und fließen in die Liquiditätsberechnung ein.
-            </p>
-          </div>
+      {/* Tab Navigation */}
+      <div className="admin-card">
+        <div className="flex border-b border-[var(--border)]">
+          <button
+            onClick={() => { setActiveTab("effects"); resetForm(); }}
+            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "effects"
+                ? "border-blue-500 text-blue-700"
+                : "border-transparent text-[var(--secondary)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            Zahlungswirksame Effekte ({transferableEffects.length})
+          </button>
+          <button
+            onClick={() => { setActiveTab("reserves"); resetForm(); }}
+            className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "reserves"
+                ? "border-blue-500 text-blue-700"
+                : "border-transparent text-[var(--secondary)] hover:text-[var(--foreground)]"
+            }`}
+          >
+            Rückstellungen ({reserveEffects.length})
+            {reserveTotal > 0 && (
+              <span className="ml-2 text-xs text-gray-500">
+                (Gesamt: {formatCurrencyLocal(reserveTotal)} €)
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Tab Info Box */}
+        <div className="p-4">
+          {activeTab === "effects" ? (
+            <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-amber-800">
+                  Zahlungswirksame Effekte
+                </h4>
+                <p className="text-xs text-amber-700 mt-1">
+                  Rechtlich wirksame Zahlungswirkungen: Verfahrenskosten, Masseverbindlichkeiten, Halteprämien, etc.
+                  Mit <em>&quot;In Planung überführen&quot;</em> werden sie als PLAN-Einträge im Zahlungsregister angelegt.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-blue-800">
+                  Rückstellungen (Liquiditätsreserve)
+                </h4>
+                <p className="text-xs text-blue-700 mt-1">
+                  Diese Beträge werden als Liquiditätsreserve berücksichtigt und mindern die verfügbare Überdeckung
+                  in der Liquiditätstabelle (Sektion IV). Sie werden <strong>nicht</strong> ins Zahlungsregister überführt,
+                  sondern als konstanter Worst-Case-Abzug in jeder Periode dargestellt.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -371,23 +441,25 @@ export default function InsolvencyEffectsPage() {
         </div>
       )}
 
-      {/* Standard Effects Quick Add */}
+      {/* Templates Quick Add */}
       <div className="admin-card p-4">
-        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">Standard-Positionen</h3>
+        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">
+          {activeTab === "effects" ? "Standard-Positionen" : "Rückstellungs-Vorlagen"}
+        </h3>
         <div className="flex flex-wrap gap-2">
-          {STANDARD_EFFECTS.map((effect) => (
+          {templates.map((template) => (
             <button
-              key={effect.name}
-              onClick={() => {
-                applyStandardEffect(effect);
-              }}
+              key={template.name}
+              onClick={() => applyTemplate(template)}
               className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
-                effect.type === "INFLOW"
+                template.type === "INFLOW"
                   ? "border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
-                  : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                  : activeTab === "reserves"
+                    ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    : "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
               }`}
             >
-              {effect.type === "INFLOW" ? "+" : "-"} {effect.name}
+              {template.type === "INFLOW" ? "+" : "-"} {template.name}
             </button>
           ))}
         </div>
@@ -396,7 +468,9 @@ export default function InsolvencyEffectsPage() {
       {/* Add/Edit Form */}
       <div className="admin-card p-6">
         <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
-          {formData.effectId ? "Effekt bearbeiten" : "Neuen Effekt hinzufügen"}
+          {formData.effectId
+            ? (activeTab === "reserves" ? "Rückstellung bearbeiten" : "Effekt bearbeiten")
+            : (activeTab === "reserves" ? "Neue Rückstellung hinzufügen" : "Neuen Effekt hinzufügen")}
         </h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -409,7 +483,7 @@ export default function InsolvencyEffectsPage() {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="input w-full"
-                placeholder="z.B. Anfechtung SV-Beiträge"
+                placeholder={activeTab === "reserves" ? "z.B. IV-Vergütung" : "z.B. Anfechtung SV-Beiträge"}
                 required
               />
             </div>
@@ -446,13 +520,12 @@ export default function InsolvencyEffectsPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Periode *
+                {activeTab === "reserves" ? "Periode (optional)" : "Periode *"}
               </label>
               <select
                 value={formData.periodIndex}
                 onChange={(e) => setFormData({ ...formData, periodIndex: parseInt(e.target.value) })}
                 className="input w-full"
-                required
               >
                 {periodLabels.map((label, index) => (
                   <option key={index} value={index}>{label}</option>
@@ -500,8 +573,8 @@ export default function InsolvencyEffectsPage() {
         </form>
       </div>
 
-      {/* Transfer-Aktionen */}
-      {effects.length > 0 && (
+      {/* Transfer Actions (nur im Effects-Tab) */}
+      {activeTab === "effects" && transferableEffects.length > 0 && (
         <div className="admin-card p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -537,64 +610,71 @@ export default function InsolvencyEffectsPage() {
         </div>
       )}
 
-      {/* Existing Effects Table */}
+      {/* Effects/Reserves Table */}
       <div className="admin-card">
         <div className="px-6 py-4 border-b border-[var(--border)]">
           <h2 className="text-lg font-semibold text-[var(--foreground)]">
-            Erfasste Effekte ({effects.length})
+            {activeTab === "effects"
+              ? `Zahlungswirksame Effekte (${tabEffects.length})`
+              : `Rückstellungen (${tabEffects.length})`}
           </h2>
         </div>
-        {effects.length === 0 ? (
+        {tabEffects.length === 0 ? (
           <div className="p-8 text-center text-[var(--muted)]">
-            Noch keine Insolvenzeffekte erfasst
+            {activeTab === "effects"
+              ? "Noch keine zahlungswirksamen Effekte erfasst"
+              : "Noch keine Rückstellungen erfasst"}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[var(--border)]">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectedEffectIds.size === transferableEffects.length && transferableEffects.length > 0}
-                      onChange={toggleAllEffects}
-                      className="rounded border-gray-300"
-                      title="Alle auswählen"
-                    />
-                  </th>
+                  {activeTab === "effects" && (
+                    <th className="px-4 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        checked={selectedEffectIds.size === transferableEffects.length && transferableEffects.length > 0}
+                        onChange={toggleAllEffects}
+                        className="rounded border-gray-300"
+                        title="Alle auswählen"
+                      />
+                    </th>
+                  )}
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Position</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Typ</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Gruppe</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Periode</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--secondary)] uppercase">Betrag</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Status</th>
+                  {activeTab === "effects" && (
+                    <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Status</th>
+                  )}
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Aktionen</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {effects.map((effect) => {
+                {tabEffects.map((effect) => {
                   const isTransferred = transferredEffectIds.has(effect.id);
-                  const isAvailabilityOnly = effect.isAvailabilityOnly;
                   return (
                     <tr key={effect.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        {!isAvailabilityOnly ? (
+                      {activeTab === "effects" && (
+                        <td className="px-4 py-3">
                           <input
                             type="checkbox"
                             checked={selectedEffectIds.has(effect.id)}
                             onChange={() => toggleEffectSelection(effect.id)}
                             className="rounded border-gray-300"
                           />
-                        ) : (
-                          <span className="text-xs text-gray-400" title="Nur Verfügbarkeitsanzeige">—</span>
-                        )}
-                      </td>
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-sm font-medium text-[var(--foreground)]">{effect.name}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 text-xs rounded-full ${
                           effect.effectType === "INFLOW"
                             ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
+                            : activeTab === "reserves"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-red-100 text-red-700"
                         }`}>
                           {effect.effectType === "INFLOW" ? "Einzahlung" : "Auszahlung"}
                         </span>
@@ -606,25 +686,24 @@ export default function InsolvencyEffectsPage() {
                         {periodLabels[effect.periodIndex] || `Periode ${effect.periodIndex + 1}`}
                       </td>
                       <td className={`px-4 py-3 text-sm text-right font-medium ${
-                        effect.effectType === "INFLOW" ? "text-green-600" : "text-red-600"
+                        effect.effectType === "INFLOW" ? "text-green-600" :
+                        activeTab === "reserves" ? "text-blue-600" : "text-red-600"
                       }`}>
-                        {effect.effectType === "INFLOW" ? "+" : "-"}{formatCurrency(effect.amountCents)} €
+                        {effect.effectType === "INFLOW" ? "+" : "-"}{formatCurrencyLocal(effect.amountCents)} €
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        {isAvailabilityOnly ? (
-                          <span className="badge badge-info text-xs" title="Nur zur Verfügbarkeitsanzeige, nicht transferierbar">
-                            Verfügbarkeit
-                          </span>
-                        ) : isTransferred ? (
-                          <span className="badge badge-success text-xs" title="Bereits als PLAN-Entry im Ledger">
-                            ✓ Im Ledger
-                          </span>
-                        ) : (
-                          <span className="badge badge-neutral text-xs">
-                            Nicht überführt
-                          </span>
-                        )}
-                      </td>
+                      {activeTab === "effects" && (
+                        <td className="px-4 py-3 text-center">
+                          {isTransferred ? (
+                            <span className="badge badge-success text-xs" title="Bereits als PLAN-Entry im Ledger">
+                              ✓ Im Ledger
+                            </span>
+                          ) : (
+                            <span className="badge badge-neutral text-xs">
+                              Nicht überführt
+                            </span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-3 text-center">
                         <div className="flex justify-center gap-1">
                           <button

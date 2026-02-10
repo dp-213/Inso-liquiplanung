@@ -1,30 +1,28 @@
 /**
  * HVPlus Liquiditätsmatrix Konfiguration
  *
- * Struktur der IV-Liquiditätstabelle für HVPlus eG:
+ * IDW S11-konforme Struktur mit 4 Blöcken:
  *
- * EINZAHLUNGEN:
- *   HZV, KV, PVS (Umsatz/Neumasse)
- *   Altforderungen HZV, KV, PVS (Altmasse)
- *   Insolvenzspezifische Einzahlungen
- *   Sonstige (Fallback)
- *
- * BETRIEBLICHE AUSZAHLUNGEN:
- *   Personalaufwand
- *   Betriebskosten
- *   Sonstige (Fallback)
- *
- * INSOLVENZSPEZIFISCHE AUSZAHLUNGEN:
- *   Rückzahlung Insolvenzgeld, Vorfinanzierung, Sachaufnahme
+ * I.  FINANZMITTELBESTAND PERIODENANFANG
+ * II. EINZAHLUNGEN
+ *     - Umsatz (Neumasse): HZV, KV, PVS
+ *     - Altforderungen: HZV, KV, PVS
+ *     - Sonstige: Inso-Einz., Auskehrungen, Sonstige
+ * III. AUSZAHLUNGEN
+ *     - Personal (mit Sozialabg., Altverb.)
+ *     - Betriebskosten (mit Standort-Detail, Altverb.)
+ *     - Steuern
+ *     - Insolvenzspezifische Auszahlungen
+ *     - Summe Auszahlungen
+ * IV. LIQUIDITÄTSENTWICKLUNG
+ *     - Veränderung, EoP, Kreditlinie, Überdeckung, Rückstellungen
  *
  * STANDORT-LOGIK:
- *   Keine standortspezifischen Zeilen -- die Standort-Toggles filtern die
- *   Entries VOR dem Matching. In GLOBAL sieht man alle, in Velbert nur
- *   Velbert-Entries. Dieselben Zeilen, unterschiedliche Werte.
+ *   Standort-Detail-Zeilen (parentRowId) werden über parallel-gefetchte
+ *   Scope-Daten gefüllt. parentRowId steuert nur die Visibility (Collapse).
  *
  * MATCHING:
  *   Zweistufig: (1) CATEGORY_TAG für PLAN-Daten, (2) andere Kriterien für IST.
- *   Dadurch keine Konflikte zwischen Anzeige-Reihenfolge und Match-Priorität.
  */
 
 // =============================================================================
@@ -45,11 +43,8 @@ export const LIQUIDITY_SCOPE_LABELS: Record<LiquidityScope, string> = {
 export type MatrixBlockId =
   | 'OPENING_BALANCE'
   | 'CASH_IN'
-  | 'CASH_OUT_OPERATIVE'
-  | 'CASH_OUT_TAX'
-  | 'CASH_OUT_INSOLVENCY'
-  | 'CASH_OUT_TOTAL'
-  | 'CLOSING_BALANCE';
+  | 'CASH_OUT'
+  | 'LIQUIDITY_DEVELOPMENT';
 
 export type MatrixRowMatchType =
   | 'COUNTERPARTY_ID'
@@ -64,7 +59,7 @@ export type MatrixRowMatchType =
 export interface MatrixRowMatch {
   type: MatrixRowMatchType;
   value: string;
-  description?: string;  // Menschenlesbare Beschreibung dieser Regel
+  description?: string;
 }
 
 export interface MatrixRowConfig {
@@ -75,9 +70,12 @@ export interface MatrixRowConfig {
   order: number;
   isSubRow: boolean;
   isSummary: boolean;
-  isSectionHeader?: boolean;  // Visuelle Gruppierung ohne Werte (z.B. "Umsatz", "Altforderungen")
+  isSectionHeader?: boolean;
+  isSubtotal?: boolean;       // Zwischensumme (bold, Linie oben)
+  parentRowId?: string;        // Collapse-Eltern-Zeile
+  defaultExpanded?: boolean;   // Kinder sichtbar? (default: true)
   matches: MatrixRowMatch[];
-  matchDescription?: string;  // Menschenlesbare Erklärung, was diese Zeile erfasst
+  matchDescription?: string;
   flowType?: 'INFLOW' | 'OUTFLOW';
   bankAccountId?: string;
   visibleInScopes?: LiquidityScope[];
@@ -99,57 +97,36 @@ export interface LiquidityMatrixConfig {
 }
 
 // =============================================================================
-// HVPLUS MATRIX KONFIGURATION
+// HVPLUS MATRIX KONFIGURATION — 4 Blöcke (IDW S11)
 // =============================================================================
 
 export const HVPLUS_MATRIX_BLOCKS: MatrixBlockConfig[] = [
   {
     id: 'OPENING_BALANCE',
-    label: 'Zahlungsmittelbestand am Anfang der Periode',
+    label: 'I. Finanzmittelbestand Periodenanfang',
     order: 1,
     summaryRowId: 'opening_balance_total',
     cssClass: 'bg-gray-50',
   },
   {
     id: 'CASH_IN',
-    label: 'Einzahlungen',
+    label: 'II. Einzahlungen',
     order: 2,
     summaryRowId: 'cash_in_total',
     cssClass: 'bg-green-50',
   },
   {
-    id: 'CASH_OUT_OPERATIVE',
-    label: 'Betriebliche Auszahlungen',
+    id: 'CASH_OUT',
+    label: 'III. Auszahlungen',
     order: 3,
-    summaryRowId: 'cash_out_operative_total',
-    cssClass: 'bg-red-50',
-  },
-  {
-    id: 'CASH_OUT_TAX',
-    label: 'Steuerlicher Cash-Out',
-    order: 4,
-    summaryRowId: 'cash_out_tax_total',
-    cssClass: 'bg-orange-50',
-  },
-  {
-    id: 'CASH_OUT_INSOLVENCY',
-    label: 'Insolvenzspezifische Auszahlungen',
-    order: 5,
-    summaryRowId: 'cash_out_insolvency_total',
-    cssClass: 'bg-purple-50',
-  },
-  {
-    id: 'CASH_OUT_TOTAL',
-    label: 'Summe Auszahlungen',
-    order: 6,
     summaryRowId: 'cash_out_total',
     cssClass: 'bg-red-50',
   },
   {
-    id: 'CLOSING_BALANCE',
-    label: 'Zahlungsmittelbestand am Ende der Periode',
-    order: 7,
-    summaryRowId: 'closing_balance_total',
+    id: 'LIQUIDITY_DEVELOPMENT',
+    label: 'IV. Liquiditätsentwicklung',
+    order: 4,
+    summaryRowId: 'coverage_after_reserves',
     cssClass: 'bg-blue-50',
   },
 ];
@@ -162,22 +139,19 @@ export const HVPLUS_MATRIX_BLOCKS: MatrixBlockConfig[] = [
 // =============================================================================
 
 export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
-  // ─── BLOCK A: OPENING BALANCE ───────────────────────────────────────
+  // ─── BLOCK I: OPENING BALANCE ──────────────────────────────────────
   {
     id: 'opening_balance_total',
-    label: 'Zahlungsmittelbestand am Anfang der Periode',
+    label: 'Guthaben (+) / Kreditinanspruchnahme (−)',
     block: 'OPENING_BALANCE',
     order: 1,
     isSubRow: false,
     isSummary: true,
     matches: [],
   },
-  // Bankkonten-Detail-Zeilen entfernt (2026-02-09)
-  // Begründung: Redundant zu BankAccountsTab, nicht verknüpft mit Kategorien
-  // Liqui-Tabelle zeigt nur Cashflow-Kategorien, keine einzelnen Konten
 
-  // ─── BLOCK B: EINZAHLUNGEN ──────────────────────────────────────────
-  // Reihenfolge: Umsatz (HZV/KV/PVS), dann Altforderungen, dann Inso, dann Sonstige
+  // ─── BLOCK II: EINZAHLUNGEN ────────────────────────────────────────
+
   {
     id: 'cash_in_total',
     label: 'Summe Einzahlungen',
@@ -209,42 +183,111 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     order: 10,
     isSubRow: true,
     isSummary: false,
+    defaultExpanded: false,
     flowType: 'INFLOW',
-    matchDescription: 'Einnahmen aus Hausarztzentrierter Versorgung (HZV/HAVG). Zuordnung primär über Kategorie-Tag, sekundär über Gegenpartei-Name.',
+    matchDescription: 'Einnahmen aus Hausarztzentrierter Versorgung (HZV/HAVG).',
     matches: [
       { type: 'CATEGORY_TAG', value: 'HZV', description: 'Buchungen mit Kategorie-Tag „HZV"' },
       { type: 'COUNTERPARTY_PATTERN', value: '(HZV|HAVG|HAEVG|Hausarzt)', description: 'Gegenpartei enthält „HZV", „HAVG", „HAEVG" oder „Hausarzt"' },
     ],
   },
   {
-    id: 'cash_in_kv',
-    label: 'KV',
-    labelShort: 'KV',
+    id: 'cash_in_hzv_velbert',
+    label: 'Velbert',
     block: 'CASH_IN',
     order: 11,
     isSubRow: true,
     isSummary: false,
+    parentRowId: 'cash_in_hzv',
+    matches: [],
     flowType: 'INFLOW',
-    matchDescription: 'Einnahmen der Kassenärztlichen Vereinigung (KVNO). Zuordnung primär über Kategorie-Tag, sekundär über Gegenpartei-Name.',
+  },
+  {
+    id: 'cash_in_hzv_uckerath',
+    label: 'Uckerath/Eitorf',
+    block: 'CASH_IN',
+    order: 12,
+    isSubRow: true,
+    isSummary: false,
+    parentRowId: 'cash_in_hzv',
+    matches: [],
+    flowType: 'INFLOW',
+  },
+  {
+    id: 'cash_in_kv',
+    label: 'KV',
+    labelShort: 'KV',
+    block: 'CASH_IN',
+    order: 15,
+    isSubRow: true,
+    isSummary: false,
+    defaultExpanded: false,
+    flowType: 'INFLOW',
+    matchDescription: 'Einnahmen der Kassenärztlichen Vereinigung (KVNO).',
     matches: [
       { type: 'CATEGORY_TAG', value: 'KV', description: 'Buchungen mit Kategorie-Tag „KV"' },
       { type: 'COUNTERPARTY_PATTERN', value: '(KV|KVNO|Kassenärztliche)', description: 'Gegenpartei enthält „KV", „KVNO" oder „Kassenärztliche"' },
     ],
   },
   {
+    id: 'cash_in_kv_velbert',
+    label: 'Velbert',
+    block: 'CASH_IN',
+    order: 16,
+    isSubRow: true,
+    isSummary: false,
+    parentRowId: 'cash_in_kv',
+    matches: [],
+    flowType: 'INFLOW',
+  },
+  {
+    id: 'cash_in_kv_uckerath',
+    label: 'Uckerath/Eitorf',
+    block: 'CASH_IN',
+    order: 17,
+    isSubRow: true,
+    isSummary: false,
+    parentRowId: 'cash_in_kv',
+    matches: [],
+    flowType: 'INFLOW',
+  },
+  {
     id: 'cash_in_pvs',
     label: 'PVS',
     labelShort: 'PVS',
     block: 'CASH_IN',
-    order: 12,
+    order: 20,
     isSubRow: true,
     isSummary: false,
+    defaultExpanded: false,
     flowType: 'INFLOW',
-    matchDescription: 'Einnahmen über Privatärztliche Verrechnungsstelle (PVS). Zuordnung primär über Kategorie-Tag, sekundär über Gegenpartei-Name.',
+    matchDescription: 'Einnahmen über Privatärztliche Verrechnungsstelle (PVS).',
     matches: [
       { type: 'CATEGORY_TAG', value: 'PVS', description: 'Buchungen mit Kategorie-Tag „PVS"' },
       { type: 'COUNTERPARTY_PATTERN', value: '(PVS|Privat|Privatpatient)', description: 'Gegenpartei enthält „PVS", „Privat" oder „Privatpatient"' },
     ],
+  },
+  {
+    id: 'cash_in_pvs_velbert',
+    label: 'Velbert',
+    block: 'CASH_IN',
+    order: 21,
+    isSubRow: true,
+    isSummary: false,
+    parentRowId: 'cash_in_pvs',
+    matches: [],
+    flowType: 'INFLOW',
+  },
+  {
+    id: 'cash_in_pvs_uckerath',
+    label: 'Uckerath/Eitorf',
+    block: 'CASH_IN',
+    order: 22,
+    isSubRow: true,
+    isSummary: false,
+    parentRowId: 'cash_in_pvs',
+    matches: [],
+    flowType: 'INFLOW',
   },
 
   // --- Altforderungen (Altmasse) ---
@@ -252,7 +295,7 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     id: 'cash_in_altforderung_header',
     label: 'Altforderungen (Altmasse)',
     block: 'CASH_IN',
-    order: 15,
+    order: 30,
     isSubRow: false,
     isSummary: false,
     isSectionHeader: true,
@@ -264,42 +307,111 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     label: 'Altforderungen HZV',
     labelShort: 'Alt HZV',
     block: 'CASH_IN',
-    order: 20,
+    order: 31,
     isSubRow: true,
     isSummary: false,
+    defaultExpanded: false,
     flowType: 'INFLOW',
-    matchDescription: 'HZV-Altforderungen: Vor Insolvenzeröffnung erbrachte Leistungen, nach Eröffnung bezahlt. Entstehen durch Alt/Neu-Split.',
+    matchDescription: 'HZV-Altforderungen: Vor Insolvenzeröffnung erbrachte Leistungen.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'ALTFORDERUNG_HZV', description: 'Buchungen mit Kategorie-Tag „ALTFORDERUNG_HZV"' },
     ],
+  },
+  {
+    id: 'cash_in_altforderung_hzv_velbert',
+    label: 'Velbert',
+    block: 'CASH_IN',
+    order: 32,
+    isSubRow: true,
+    isSummary: false,
+    parentRowId: 'cash_in_altforderung_hzv',
+    matches: [],
+    flowType: 'INFLOW',
+  },
+  {
+    id: 'cash_in_altforderung_hzv_uckerath',
+    label: 'Uckerath/Eitorf',
+    block: 'CASH_IN',
+    order: 33,
+    isSubRow: true,
+    isSummary: false,
+    parentRowId: 'cash_in_altforderung_hzv',
+    matches: [],
+    flowType: 'INFLOW',
   },
   {
     id: 'cash_in_altforderung_kv',
     label: 'Altforderungen KV',
     labelShort: 'Alt KV',
     block: 'CASH_IN',
-    order: 21,
+    order: 35,
     isSubRow: true,
     isSummary: false,
+    defaultExpanded: false,
     flowType: 'INFLOW',
-    matchDescription: 'KV-Altforderungen: Vor Insolvenzeröffnung erbrachte Leistungen, nach Eröffnung bezahlt. Entstehen durch Alt/Neu-Split.',
+    matchDescription: 'KV-Altforderungen: Vor Insolvenzeröffnung erbrachte Leistungen.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'ALTFORDERUNG_KV', description: 'Buchungen mit Kategorie-Tag „ALTFORDERUNG_KV"' },
     ],
+  },
+  {
+    id: 'cash_in_altforderung_kv_velbert',
+    label: 'Velbert',
+    block: 'CASH_IN',
+    order: 36,
+    isSubRow: true,
+    isSummary: false,
+    parentRowId: 'cash_in_altforderung_kv',
+    matches: [],
+    flowType: 'INFLOW',
+  },
+  {
+    id: 'cash_in_altforderung_kv_uckerath',
+    label: 'Uckerath/Eitorf',
+    block: 'CASH_IN',
+    order: 37,
+    isSubRow: true,
+    isSummary: false,
+    parentRowId: 'cash_in_altforderung_kv',
+    matches: [],
+    flowType: 'INFLOW',
   },
   {
     id: 'cash_in_altforderung_pvs',
     label: 'Altforderungen PVS',
     labelShort: 'Alt PVS',
     block: 'CASH_IN',
-    order: 22,
+    order: 39,
     isSubRow: true,
     isSummary: false,
+    defaultExpanded: false,
     flowType: 'INFLOW',
-    matchDescription: 'PVS-Altforderungen: Vor Insolvenzeröffnung erbrachte Leistungen, nach Eröffnung bezahlt. Entstehen durch Alt/Neu-Split.',
+    matchDescription: 'PVS-Altforderungen: Vor Insolvenzeröffnung erbrachte Leistungen.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'ALTFORDERUNG_PVS', description: 'Buchungen mit Kategorie-Tag „ALTFORDERUNG_PVS"' },
     ],
+  },
+  {
+    id: 'cash_in_altforderung_pvs_velbert',
+    label: 'Velbert',
+    block: 'CASH_IN',
+    order: 40,
+    isSubRow: true,
+    isSummary: false,
+    parentRowId: 'cash_in_altforderung_pvs',
+    matches: [],
+    flowType: 'INFLOW',
+  },
+  {
+    id: 'cash_in_altforderung_pvs_uckerath',
+    label: 'Uckerath/Eitorf',
+    block: 'CASH_IN',
+    order: 41,
+    isSubRow: true,
+    isSummary: false,
+    parentRowId: 'cash_in_altforderung_pvs',
+    matches: [],
+    flowType: 'INFLOW',
   },
 
   // --- Sonstige Einzahlungen ---
@@ -307,7 +419,7 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     id: 'cash_in_sonstige_header',
     label: 'Sonstige Einzahlungen',
     block: 'CASH_IN',
-    order: 25,
+    order: 50,
     isSubRow: false,
     isSummary: false,
     isSectionHeader: true,
@@ -319,12 +431,12 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     label: 'Insolvenzspezifische Einzahlungen',
     labelShort: 'Inso Ein',
     block: 'CASH_IN',
-    order: 30,
+    order: 51,
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
     visibleInScopes: ['GLOBAL'],
-    matchDescription: 'Insolvenzspezifische Einzahlungen (z.B. Massekredit-Auszahlungen). Nur in Gesamtansicht sichtbar.',
+    matchDescription: 'Insolvenzspezifische Einzahlungen (z.B. Massekredit-Auszahlungen).',
     matches: [
       { type: 'CATEGORY_TAG', value: 'INSO_EINZAHLUNG', description: 'Buchungen mit Kategorie-Tag „INSO_EINZAHLUNG"' },
       { type: 'DESCRIPTION_PATTERN', value: '(insolvenzspezifisch.*Einzahlung)', description: 'Buchungstext enthält „insolvenzspezifisch" und „Einzahlung"' },
@@ -335,7 +447,7 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     label: 'Auskehrungen Altkonten',
     labelShort: 'Auskehr.',
     block: 'CASH_IN',
-    order: 31,
+    order: 52,
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
@@ -349,11 +461,11 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     label: 'Sonstige Einnahmen (Gutachten, Privatpatienten)',
     labelShort: 'Sonst. Einnahmen',
     block: 'CASH_IN',
-    order: 32,
+    order: 53,
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
-    matchDescription: 'Sonstige Einnahmen wie Gutachten, Privatpatienten-Direktzahlungen und ähnliches.',
+    matchDescription: 'Sonstige Einnahmen wie Gutachten, Privatpatienten-Direktzahlungen.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'EINNAHME_SONSTIGE', description: 'Buchungen mit Kategorie-Tag „EINNAHME_SONSTIGE"' },
     ],
@@ -367,63 +479,73 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
-    matchDescription: 'Auffangzeile für alle Einzahlungen, die keiner spezifischeren Zeile zugeordnet werden konnten.',
-    matches: [{ type: 'FALLBACK', value: 'INFLOW', description: 'Alle übrigen Einzahlungen ohne spezifische Zuordnung' }],
+    matchDescription: 'Auffangzeile für alle Einzahlungen ohne spezifische Zuordnung.',
+    matches: [{ type: 'FALLBACK', value: 'INFLOW', description: 'Alle übrigen Einzahlungen' }],
   },
 
-  // ─── BLOCK C: BETRIEBLICHE AUSZAHLUNGEN ─────────────────────────────
-  // Keine Standort-Aufteilung -- die Toggles filtern die Entries.
-  {
-    id: 'cash_out_operative_total',
-    label: 'Betriebliche Auszahlungen',
-    block: 'CASH_OUT_OPERATIVE',
-    order: 1,
-    isSubRow: false,
-    isSummary: true,
-    matches: [],
-    flowType: 'OUTFLOW',
-  },
+  // ─── BLOCK III: AUSZAHLUNGEN ───────────────────────────────────────
+
+  // --- Betriebliche Auszahlungen ---
   {
     id: 'cash_out_personal',
     label: 'Personalaufwand',
     labelShort: 'Personal',
-    block: 'CASH_OUT_OPERATIVE',
-    order: 2,
+    block: 'CASH_OUT',
+    order: 10,
     isSubRow: true,
     isSummary: false,
+    defaultExpanded: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
-    matchDescription: 'Personalaufwand (Löhne, Gehälter). Zuordnung über Kategorie-Tag oder Buchungstext. Nur in Gesamtansicht sichtbar.',
+    matchDescription: 'Personalaufwand (Löhne, Gehälter).',
     matches: [
       { type: 'CATEGORY_TAG', value: 'PERSONAL', description: 'Buchungen mit Kategorie-Tag „PERSONAL"' },
       { type: 'DESCRIPTION_PATTERN', value: '(Lohn|Gehalt|Personal|SV-Beitrag|Sozialversicherung)', description: 'Buchungstext enthält Lohn, Gehalt, Personal, SV-Beitrag oder Sozialversicherung' },
     ],
   },
   {
-    id: 'cash_out_personal_sozialabgaben',
-    label: 'Sozialabgaben (Arbeitgeber-Anteil)',
+    id: 'cash_out_personal_sozial',
+    label: 'Sozialabgaben (AG-Anteil)',
     labelShort: 'Sozialabg.',
-    block: 'CASH_OUT_OPERATIVE',
-    order: 3,
+    block: 'CASH_OUT',
+    order: 11,
     isSubRow: true,
     isSummary: false,
+    parentRowId: 'cash_out_personal',
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
-    matchDescription: 'Arbeitgeber-Anteile zur Sozialversicherung. Nur in Gesamtansicht sichtbar.',
+    matchDescription: 'Arbeitgeber-Anteile zur Sozialversicherung.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'SOZIALABGABEN', description: 'Buchungen mit Kategorie-Tag „SOZIALABGABEN"' },
     ],
   },
   {
+    id: 'cash_out_altverb_personal',
+    label: 'Personalaufwand (Altmasse)',
+    labelShort: 'Personal (Alt)',
+    block: 'CASH_OUT',
+    order: 12,
+    isSubRow: true,
+    isSummary: false,
+    parentRowId: 'cash_out_personal',
+    flowType: 'OUTFLOW',
+    matchDescription: 'Personal-Altverbindlichkeiten: Lohnforderungen von vor Insolvenzeröffnung.',
+    matches: [
+      { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_PERSONAL', description: 'Buchungen mit Kategorie-Tag „ALTVERBINDLICHKEIT_PERSONAL"' },
+    ],
+  },
+
+  {
     id: 'cash_out_betriebskosten',
     label: 'Betriebskosten',
     labelShort: 'Betriebsk.',
-    block: 'CASH_OUT_OPERATIVE',
-    order: 10,
+    block: 'CASH_OUT',
+    order: 20,
     isSubRow: true,
     isSummary: false,
+    defaultExpanded: false,
     flowType: 'OUTFLOW',
-    matchDescription: 'Laufende Betriebskosten (Miete, Strom, IT, Versicherungen, etc.). Zuordnung über diverse Kategorie-Tags oder Buchungstext.',
+    matchDescription: 'Laufende Betriebskosten (Miete, Strom, IT, Versicherungen, etc.).',
     matches: [
       { type: 'CATEGORY_TAG', value: 'BETRIEBSKOSTEN', description: 'Allgemeine Betriebskosten' },
       { type: 'CATEGORY_TAG', value: 'MIETE', description: 'Mietkosten' },
@@ -437,125 +559,81 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
       { type: 'DESCRIPTION_PATTERN', value: '(Miete|Strom|Gas|Energie|Telefon|Software|Versicherung|Material|Praxisbedarf|EDV|IT|Wartung|Nebenkosten|Raumkosten)', description: 'Buchungstext enthält betriebskostentypische Begriffe' },
     ],
   },
-
-  // --- Auszahlungen Altverbindlichkeiten ---
   {
-    id: 'cash_out_altverbindlichkeit_header',
-    label: 'Auszahlungen Altverbindlichkeiten',
-    block: 'CASH_OUT_OPERATIVE',
-    order: 50,
-    isSubRow: false,
+    id: 'cash_out_betriebskosten_velbert',
+    label: 'Velbert',
+    block: 'CASH_OUT',
+    order: 21,
+    isSubRow: true,
     isSummary: false,
-    isSectionHeader: true,
+    parentRowId: 'cash_out_betriebskosten',
     matches: [],
     flowType: 'OUTFLOW',
   },
   {
-    id: 'cash_out_altverbindlichkeit_personal',
-    label: 'Personalaufwand (Altmasse)',
-    labelShort: 'Personal (Alt)',
-    block: 'CASH_OUT_OPERATIVE',
-    order: 51,
+    id: 'cash_out_betriebskosten_uckerath',
+    label: 'Uckerath/Eitorf',
+    block: 'CASH_OUT',
+    order: 22,
     isSubRow: true,
     isSummary: false,
+    parentRowId: 'cash_out_betriebskosten',
+    matches: [],
     flowType: 'OUTFLOW',
-    matchDescription: 'Personal-Altverbindlichkeiten: Lohnforderungen von vor Insolvenzeröffnung. Entstehen durch Alt/Neu-Split.',
-    matches: [
-      { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_PERSONAL', description: 'Buchungen mit Kategorie-Tag „ALTVERBINDLICHKEIT_PERSONAL"' },
-    ],
   },
   {
-    id: 'cash_out_altverbindlichkeit_sozialabgaben',
-    label: 'Sozialabgaben (Altmasse)',
-    labelShort: 'Sozialabg. (Alt)',
-    block: 'CASH_OUT_OPERATIVE',
-    order: 52,
-    isSubRow: true,
-    isSummary: false,
-    flowType: 'OUTFLOW',
-    matchDescription: 'Sozialabgaben-Altverbindlichkeiten: Beiträge von vor Insolvenzeröffnung. Entstehen durch Alt/Neu-Split.',
-    matches: [
-      { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_SOZIALABGABEN', description: 'Buchungen mit Kategorie-Tag „ALTVERBINDLICHKEIT_SOZIALABGABEN"' },
-    ],
-  },
-  {
-    id: 'cash_out_altverbindlichkeit_betriebskosten',
+    id: 'cash_out_altverb_betriebskosten',
     label: 'Betriebskosten (Altmasse)',
     labelShort: 'Betriebsk. (Alt)',
-    block: 'CASH_OUT_OPERATIVE',
-    order: 53,
+    block: 'CASH_OUT',
+    order: 23,
     isSubRow: true,
     isSummary: false,
+    parentRowId: 'cash_out_betriebskosten',
     flowType: 'OUTFLOW',
-    matchDescription: 'Betriebskosten-Altverbindlichkeiten: Rechnungen von vor Insolvenzeröffnung. Entstehen durch Alt/Neu-Split.',
+    matchDescription: 'Betriebskosten-Altverbindlichkeiten.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN', description: 'Buchungen mit Kategorie-Tag „ALTVERBINDLICHKEIT_BETRIEBSKOSTEN"' },
     ],
   },
 
   {
+    id: 'cash_out_steuern',
+    label: 'Steuern',
+    labelShort: 'Steuern',
+    block: 'CASH_OUT',
+    order: 30,
+    isSubRow: true,
+    isSummary: false,
+    flowType: 'OUTFLOW',
+    matchDescription: 'Umsatzsteuer und sonstige Steuerzahlungen.',
+    matches: [
+      { type: 'CATEGORY_TAG', value: 'STEUERN', description: 'Buchungen mit Kategorie-Tag „STEUERN"' },
+      { type: 'DESCRIPTION_PATTERN', value: '(Umsatzsteuer|USt|MwSt|Vorsteuer|Finanzamt|Gewerbesteuer|Körperschaftsteuer|Lohnsteuer)', description: 'Buchungstext enthält Steuer-Begriffe' },
+    ],
+  },
+  {
     id: 'cash_out_operative_sonstige',
     label: 'Sonstige Auszahlungen',
     labelShort: 'Sonstige',
-    block: 'CASH_OUT_OPERATIVE',
-    order: 99,
+    block: 'CASH_OUT',
+    order: 35,
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
-    matchDescription: 'Auffangzeile für alle betrieblichen Auszahlungen, die keiner spezifischeren Zeile zugeordnet werden konnten.',
-    matches: [{ type: 'FALLBACK', value: 'OUTFLOW_OPERATIVE', description: 'Alle übrigen betrieblichen Auszahlungen ohne spezifische Zuordnung' }],
+    matchDescription: 'Auffangzeile für alle Auszahlungen ohne spezifische Zuordnung.',
+    matches: [{ type: 'FALLBACK', value: 'OUTFLOW', description: 'Alle übrigen Auszahlungen' }],
   },
 
-  // ─── BLOCK D: STEUERLICHER CASH-OUT ──────────────────────────────────
+  // --- Insolvenzspezifische Auszahlungen ---
   {
-    id: 'cash_out_tax_total',
-    label: 'Steuerlicher Cash-Out',
-    block: 'CASH_OUT_TAX',
-    order: 1,
-    isSubRow: false,
-    isSummary: true,
-    matches: [],
-    flowType: 'OUTFLOW',
-  },
-  {
-    id: 'cash_out_ust',
-    label: 'Umsatzsteuer (Zahllast)',
-    labelShort: 'USt',
-    block: 'CASH_OUT_TAX',
-    order: 2,
-    isSubRow: true,
-    isSummary: false,
-    flowType: 'OUTFLOW',
-    matchDescription: 'Umsatzsteuer-Zahlungen an das Finanzamt. Zuordnung über Buchungstext.',
-    matches: [
-      { type: 'DESCRIPTION_PATTERN', value: '(Umsatzsteuer|USt|MwSt|Vorsteuer|Finanzamt)', description: 'Buchungstext enthält Umsatzsteuer, USt, MwSt, Vorsteuer oder Finanzamt' },
-    ],
-  },
-  {
-    id: 'cash_out_sonstige_steuern',
-    label: 'Sonstige Steuern',
-    labelShort: 'Sonst. Steuern',
-    block: 'CASH_OUT_TAX',
-    order: 3,
-    isSubRow: true,
-    isSummary: false,
-    flowType: 'OUTFLOW',
-    matchDescription: 'Sonstige Steuerzahlungen (Gewerbesteuer, Lohnsteuer, etc.). Zuordnung über Kategorie-Tag oder Buchungstext.',
-    matches: [
-      { type: 'CATEGORY_TAG', value: 'STEUERN', description: 'Buchungen mit Kategorie-Tag „STEUERN"' },
-      { type: 'DESCRIPTION_PATTERN', value: '(Gewerbesteuer|Körperschaftsteuer|Lohnsteuer)', description: 'Buchungstext enthält Gewerbesteuer, Körperschaftsteuer oder Lohnsteuer' },
-    ],
-  },
-
-  // ─── BLOCK E: INSOLVENZSPEZIFISCHE AUSZAHLUNGEN ──────────────────────
-  // Zentrale Kosten, nur in GLOBAL sichtbar
-  {
-    id: 'cash_out_insolvency_total',
+    id: 'cash_out_inso_header',
     label: 'Insolvenzspezifische Auszahlungen',
-    block: 'CASH_OUT_INSOLVENCY',
-    order: 1,
+    block: 'CASH_OUT',
+    order: 50,
     isSubRow: false,
-    isSummary: true,
+    isSummary: false,
+    isSectionHeader: true,
     matches: [],
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
@@ -564,8 +642,8 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     id: 'cash_out_inso_rueckzahlung',
     label: 'Rückzahlung Insolvenzgeld',
     labelShort: 'Rückz. InsoGeld',
-    block: 'CASH_OUT_INSOLVENCY',
-    order: 2,
+    block: 'CASH_OUT',
+    order: 51,
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
@@ -580,13 +658,13 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     id: 'cash_out_inso_vorfinanzierung',
     label: 'Vorfinanzierung Insolvenzgeld',
     labelShort: 'Vorfin. InsoGeld',
-    block: 'CASH_OUT_INSOLVENCY',
-    order: 3,
+    block: 'CASH_OUT',
+    order: 52,
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
-    matchDescription: 'Vorfinanzierung von Insolvenzgeld durch den Insolvenzverwalter.',
+    matchDescription: 'Vorfinanzierung von Insolvenzgeld.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'INSO_VORFINANZIERUNG', description: 'Buchungen mit Kategorie-Tag „INSO_VORFINANZIERUNG"' },
       { type: 'DESCRIPTION_PATTERN', value: '(Vorfinanzierung.*Insolvenzgeld|Insolvenzgeld.*Vorfinanzierung)', description: 'Buchungstext enthält „Vorfinanzierung Insolvenzgeld"' },
@@ -596,8 +674,8 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     id: 'cash_out_inso_sachaufnahme',
     label: 'Sachaufnahme',
     labelShort: 'Sachaufn.',
-    block: 'CASH_OUT_INSOLVENCY',
-    order: 4,
+    block: 'CASH_OUT',
+    order: 53,
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
@@ -612,89 +690,113 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     id: 'cash_out_inso_darlehen',
     label: 'Darlehens-Tilgung',
     labelShort: 'Darlehen',
-    block: 'CASH_OUT_INSOLVENCY',
-    order: 5,
+    block: 'CASH_OUT',
+    order: 54,
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
-    matchDescription: 'Tilgung des Massekredits (Sparkasse HRV, max. 137.000 EUR).',
+    matchDescription: 'Tilgung des Massekredits.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'DARLEHEN_TILGUNG', description: 'Buchungen mit Kategorie-Tag „DARLEHEN_TILGUNG"' },
     ],
   },
   {
     id: 'cash_out_inso_verfahrenskosten',
-    label: 'Beratung / Sonstiges Verfahren',
+    label: 'Verfahrenskosten / Beratung',
     labelShort: 'Verfahren',
-    block: 'CASH_OUT_INSOLVENCY',
-    order: 6,
+    block: 'CASH_OUT',
+    order: 55,
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
-    matchDescription: 'Verfahrenskosten und sonstige Kosten des Insolvenzverfahrens.',
+    matchDescription: 'Verfahrenskosten, Gerichtskosten und Beratungskosten.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'VERFAHRENSKOSTEN', description: 'Buchungen mit Kategorie-Tag „VERFAHRENSKOSTEN"' },
-    ],
-  },
-  {
-    id: 'cash_out_verfahrenskosten',
-    label: 'Verfahrenskosten',
-    labelShort: 'Verf.kosten',
-    block: 'CASH_OUT_INSOLVENCY',
-    order: 10,
-    isSubRow: true,
-    isSummary: false,
-    flowType: 'OUTFLOW',
-    visibleInScopes: ['GLOBAL'],
-    matchDescription: 'Gerichts- und Verfahrenskosten. Zuordnung über Rechtsstatus oder Buchungstext.',
-    matches: [
       { type: 'LEGAL_BUCKET', value: 'ABSONDERUNG', description: 'Buchungen mit Rechtsstatus „ABSONDERUNG"' },
-      { type: 'DESCRIPTION_PATTERN', value: '(Verfahren|Gericht|Insolvenz|Verwalter)', description: 'Buchungstext enthält Verfahren, Gericht, Insolvenz oder Verwalter' },
+      { type: 'DESCRIPTION_PATTERN', value: '(Verfahren|Gericht|Insolvenz|Verwalter|Berater|Rechtsanwalt|Steuerberater|Gutachter|Unternehmensberater)', description: 'Buchungstext enthält Verfahrens-/Beratungsbegriffe' },
     ],
   },
   {
-    id: 'cash_out_beratung',
-    label: 'Beratung / Sonstiges Verfahren',
-    labelShort: 'Beratung',
-    block: 'CASH_OUT_INSOLVENCY',
-    order: 11,
-    isSubRow: true,
+    id: 'cash_out_subtotal_insolvency',
+    label: 'Zwischensumme insolvenzspezifisch',
+    block: 'CASH_OUT',
+    order: 59,
+    isSubRow: false,
     isSummary: false,
+    isSubtotal: true,
+    matches: [],
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
-    matchDescription: 'Beratungskosten (Rechtsanwälte, Steuerberater, Unternehmensberater, Gutachter).',
-    matches: [
-      { type: 'DESCRIPTION_PATTERN', value: '(Berater|Rechtsanwalt|Steuerberater|Gutachter|Unternehmensberater)', description: 'Buchungstext enthält Berater, Rechtsanwalt, Steuerberater, Gutachter oder Unternehmensberater' },
-    ],
   },
-
-  // ─── BLOCK: SUMME AUSZAHLUNGEN ─────────────────────────────────────
   {
     id: 'cash_out_total',
     label: 'Summe Auszahlungen',
-    block: 'CASH_OUT_TOTAL',
-    order: 1,
+    block: 'CASH_OUT',
+    order: 99,
     isSubRow: false,
     isSummary: true,
     matches: [],
     flowType: 'OUTFLOW',
   },
 
-  // ─── BLOCK F: CLOSING BALANCE ───────────────────────────────────────
+  // ─── BLOCK IV: LIQUIDITÄTSENTWICKLUNG ──────────────────────────────
+  // Alle Zeilen sind computed (keine LedgerEntry-Matches)
   {
-    id: 'closing_balance_total',
-    label: 'Zahlungsmittelbestand am Ende der Periode',
-    block: 'CLOSING_BALANCE',
+    id: 'liquidity_change',
+    label: 'Veränderung Finanzmittel (Ein − Aus)',
+    block: 'LIQUIDITY_DEVELOPMENT',
     order: 1,
     isSubRow: false,
     isSummary: true,
     matches: [],
   },
-  // Bankkonten-Detail-Zeilen entfernt (2026-02-09)
-  // Begründung: Redundant zu BankAccountsTab, nicht verknüpft mit Kategorien
-  // Liqui-Tabelle zeigt nur Cashflow-Kategorien, keine einzelnen Konten
+  {
+    id: 'closing_balance_total',
+    label: 'Guthaben (+) / Kreditinanspruchnahme (−) EoP',
+    block: 'LIQUIDITY_DEVELOPMENT',
+    order: 2,
+    isSubRow: false,
+    isSummary: true,
+    matches: [],
+  },
+  {
+    id: 'credit_line_available',
+    label: '+ Verfügbare Kreditlinie',
+    block: 'LIQUIDITY_DEVELOPMENT',
+    order: 3,
+    isSubRow: false,
+    isSummary: true,
+    matches: [],
+  },
+  {
+    id: 'coverage_before_reserves',
+    label: '= Überdeckung / Unterdeckung EoP',
+    block: 'LIQUIDITY_DEVELOPMENT',
+    order: 4,
+    isSubRow: false,
+    isSummary: true,
+    matches: [],
+  },
+  {
+    id: 'reserves_total',
+    label: '− Rückstellungen (Worst-Case)',
+    block: 'LIQUIDITY_DEVELOPMENT',
+    order: 5,
+    isSubRow: false,
+    isSummary: true,
+    matches: [],
+  },
+  {
+    id: 'coverage_after_reserves',
+    label: '= Überdeckung / Unterdeckung (inkl. Rückstellungen)',
+    block: 'LIQUIDITY_DEVELOPMENT',
+    order: 6,
+    isSubRow: false,
+    isSummary: true,
+    matches: [],
+  },
 ];
 
 // =============================================================================
@@ -736,14 +838,13 @@ export const HVPLUS_MATRIX_CONFIG: LiquidityMatrixConfig = {
 
 /**
  * Ergebnis eines Zeilen-Matchings mit Trace-Information.
- * Enthält neben der Zeile auch Angaben darüber, WELCHER Match gegriffen hat.
  */
 export interface MatchResult {
   row: MatrixRowConfig;
   matchType: MatrixRowMatchType;
   matchValue: string;
   matchStage: 'CATEGORY_TAG' | 'OTHER_CRITERIA' | 'FALLBACK';
-  matchDescription: string;  // Menschenlesbare Beschreibung des greifenden Matches
+  matchDescription: string;
 }
 
 /**
@@ -771,6 +872,8 @@ export function findMatchingRowWithTrace(
   const eligibleRows = rows.filter(row =>
     row.flowType === flowType &&
     !row.isSummary &&
+    !row.isSubtotal &&
+    !row.parentRowId &&     // Standort-Kinder haben keine eigenen Matches
     row.matches.length > 0
   );
 
@@ -788,11 +891,9 @@ export function findMatchingRowWithTrace(
         };
       }
     }
-    // categoryTag gesetzt aber keine passende Zeile → weiter zu Stufe 2/Fallback
   }
 
   // --- Stufe 2: Andere Kriterien (für IST-Daten ohne categoryTag) ---
-  // Sortierung: spezifisch zuerst, Fallback zuletzt
   const sortedRows = [...eligibleRows].sort((a, b) => {
     const aIsFallback = a.matches.some(m => m.type === 'FALLBACK');
     const bIsFallback = b.matches.some(m => m.type === 'FALLBACK');
@@ -807,7 +908,6 @@ export function findMatchingRowWithTrace(
     let firstMatchValue = '';
     let firstMatchDescription = '';
 
-    // Zähle nur Nicht-CATEGORY_TAG und Nicht-FALLBACK Matches
     const otherMatches = row.matches.filter(
       m => m.type !== 'FALLBACK' && m.type !== 'CATEGORY_TAG'
     );
@@ -817,7 +917,7 @@ export function findMatchingRowWithTrace(
       let matched = false;
       switch (match.type) {
         case 'CATEGORY_TAG':
-          break; // Bereits in Stufe 1 geprüft
+          break;
         case 'COUNTERPARTY_ID':
           matched = entry.counterpartyId === match.value;
           break;
@@ -837,6 +937,7 @@ export function findMatchingRowWithTrace(
           matched = entry.legalBucket === match.value;
           break;
         case 'FALLBACK':
+          // FALLBACK matcht sowohl 'OUTFLOW' als auch das alte 'OUTFLOW_OPERATIVE'
           if (match.value === flowType || match.value === `${flowType}_OPERATIVE`) {
             return {
               row,
@@ -952,13 +1053,6 @@ export function getScopeHintText(scope: LiquidityScope): string | null {
 
 /**
  * Mappt einen Neumasse-categoryTag auf den entsprechenden Alt-categoryTag.
- *
- * EINNAHMEN: 'HZV' → 'ALTFORDERUNG_HZV' (Altforderungen = vor Insolvenz erbrachte Leistungen)
- * AUSGABEN: 'PERSONAL' → 'ALTVERBINDLICHKEIT_PERSONAL' (Altverbindlichkeiten = vor Insolvenz entstandene Verbindlichkeiten)
- *
- * Wird verwendet für estateRatio-Splitting:
- * - Neu-Anteil → Original categoryTag
- * - Alt-Anteil → Alt-categoryTag (Altforderung oder Altverbindlichkeit)
  */
 export function getAltforderungCategoryTag(neumasseTag: string | null): string | null {
   if (!neumasseTag) return null;
@@ -974,7 +1068,7 @@ export function getAltforderungCategoryTag(neumasseTag: string | null): string |
     'SOZIALABGABEN': 'ALTVERBINDLICHKEIT_SOZIALABGABEN',
     'BETRIEBSKOSTEN': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
 
-    // Detail-Tags Betriebskosten (falls einzeln gematched)
+    // Detail-Tags Betriebskosten
     'MIETE': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
     'STROM': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
     'KOMMUNIKATION': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
@@ -987,3 +1081,21 @@ export function getAltforderungCategoryTag(neumasseTag: string | null): string |
 
   return mapping[neumasseTag] || null;
 }
+
+/**
+ * Gibt alle Zeilen zurück, die eine bestimmte parentRowId haben
+ */
+export function getChildRows(parentRowId: string, rows: MatrixRowConfig[]): MatrixRowConfig[] {
+  return rows.filter(row => row.parentRowId === parentRowId);
+}
+
+/**
+ * IDs der insolvenzspezifischen Auszahlungszeilen (für Zwischensumme)
+ */
+export const INSOLVENCY_ROW_IDS = [
+  'cash_out_inso_rueckzahlung',
+  'cash_out_inso_vorfinanzierung',
+  'cash_out_inso_sachaufnahme',
+  'cash_out_inso_darlehen',
+  'cash_out_inso_verfahrenskosten',
+];
