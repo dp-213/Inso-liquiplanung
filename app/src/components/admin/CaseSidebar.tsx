@@ -71,7 +71,7 @@ export default function CaseSidebar({
       label: "VERFAHREN",
       items: [
         { name: "Insolvenzeffekte", href: `${base}/insolvency-effects` },
-        { name: "Sicherungsrechte", href: `${base}/security-rights` },
+        { name: "Banken & Sicherungsrechte", href: `${base}/banken-sicherungsrechte` },
       ],
     },
     {
@@ -90,12 +90,6 @@ export default function CaseSidebar({
         { name: "Klassifikation", href: `${base}/ist-klassifikation` },
         { name: "Verifikation", href: `${base}/zahlungsverifikation` },
         { name: "IV-Kommunikation", href: `${base}/iv-kommunikation` },
-      ],
-    },
-    {
-      label: "FINANZIERUNG",
-      items: [
-        { name: "Kreditlinien", href: `${base}/finanzierung` },
       ],
     },
     {

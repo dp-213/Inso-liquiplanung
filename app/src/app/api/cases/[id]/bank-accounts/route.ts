@@ -181,6 +181,8 @@ export async function GET(
         accountName: acc.accountName,
         iban: acc.iban,
         status: acc.status,
+        isLiquidityRelevant: acc.isLiquidityRelevant,
+        securityHolder: acc.securityHolder,
         location: acc.location, // Verwendet echte DB-Relation
         openingBalanceCents: acc.openingBalanceCents.toString(),
         ledgerSumCents: balance?.ledgerSumCents.toString() ?? "0",

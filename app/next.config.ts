@@ -1,8 +1,15 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   // Für Production Build
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
+
+  // Workaround: .next Verzeichnis auf Pfad ohne Leerzeichen
+  // (Next.js Webpack Dev-Server hat Bugs mit Leerzeichen im Projektpfad)
+  distDir: process.env.NODE_ENV !== 'production'
+    ? path.join('/tmp', 'next-dev-inso-liqui', '.next')
+    : '.next',
 
   // ESLint: Ignoriere während Build
   eslint: {
@@ -28,13 +35,7 @@ const nextConfig: NextConfig = {
   },
 
   // Webpack (für `next build` / Production)
-  webpack: (config, { isServer, dev }) => {
-    // Webpack Persistent Cache deaktivieren im Dev-Modus
-    // (Workaround für ENOENT-Fehler bei Pfaden mit Leerzeichen)
-    if (dev) {
-      config.cache = false;
-    }
-
+  webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.alias = {
         ...config.resolve.alias,
