@@ -1,7 +1,6 @@
 "use client";
 
 import { use } from 'react';
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
@@ -36,21 +35,6 @@ export default function BusinessLogicPage() {
       {/* Header mit Navigation */}
       <div className="border-b border-[var(--border)] bg-[var(--card)]">
         <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-            <Link href="/admin" className="hover:text-[var(--text)] transition-colors">
-              Admin
-            </Link>
-            <span>›</span>
-            <Link href="/admin/cases" className="hover:text-[var(--text)] transition-colors">
-              Fälle
-            </Link>
-            <span>›</span>
-            <Link href={`/admin/cases/${id}`} className="hover:text-[var(--text)] transition-colors">
-              {loading ? '...' : caseName}
-            </Link>
-            <span>›</span>
-            <span className="text-[var(--text)]">Business-Logik</span>
-          </div>
           <h1 className="text-2xl font-bold">Business-Logik der Liquiditätsplanung</h1>
           <p className="text-muted-foreground mt-1">
             Grundkonzepte für Insolvenzverfahren — Einnahmen, Einzahlungen, Alt/Neu-Masse

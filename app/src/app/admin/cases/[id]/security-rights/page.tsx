@@ -74,23 +74,6 @@ export default async function SecurityRightsPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center text-sm text-[var(--muted)]">
-        <Link href="/admin/cases" className="hover:text-[var(--primary)]">
-          Fälle
-        </Link>
-        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <Link href={`/admin/cases/${id}`} className="hover:text-[var(--primary)]">
-          {caseData.debtorName}
-        </Link>
-        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <span className="text-[var(--foreground)]">Sicherungsrechte</span>
-      </div>
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -100,9 +83,6 @@ export default async function SecurityRightsPage({ params }: PageProps) {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href={`/admin/cases/${id}`} className="btn-secondary">
-            Zurück zum Fall
-          </Link>
           <Link href={`/admin/cases/${id}/bank-accounts`} className="btn-primary flex items-center">
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />

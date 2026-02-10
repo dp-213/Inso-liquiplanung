@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 
 interface IVNote {
   id: string;
@@ -15,7 +15,6 @@ interface IVNote {
 
 export default function IVKommunikationPage() {
   const params = useParams();
-  const router = useRouter();
   const caseId = params.id as string;
 
   const [notes, setNotes] = useState<IVNote[]>([]);
@@ -157,12 +156,6 @@ export default function IVKommunikationPage() {
               Notizen & Fragen an Insolvenzverwalter (Sonja ist einziges Interface)
             </p>
           </div>
-          <button
-            onClick={() => router.push(`/admin/cases/${caseId}`)}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-md transition"
-          >
-            ← Zurück
-          </button>
         </div>
       </div>
 

@@ -1,7 +1,6 @@
 
 import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
-import Link from "next/link";
 import { OrderList } from "./OrderList";
 import { CompanyTokenManager } from "./CompanyTokenManager";
 
@@ -60,19 +59,6 @@ export default async function AdminOrdersPage({ params }: PageProps) {
 
     return (
         <div className="space-y-6">
-            {/* Breadcrumb */}
-            <div className="flex items-center text-sm text-gray-500">
-                <Link href="/admin/cases" className="hover:text-indigo-600">Fälle</Link>
-                <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-                <Link href={`/admin/cases/${caseId}`} className="hover:text-indigo-600">{caseData.debtorName}</Link>
-                <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-                <span className="text-gray-900 font-medium">Freigaben</span>
-            </div>
-
             <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold text-gray-900">Bestell- & Zahlfreigaben</h1>
             </div>

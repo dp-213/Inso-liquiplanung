@@ -564,43 +564,15 @@ export default function LedgerEntryEditPage({
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center text-sm text-[var(--muted)]">
-        <Link href="/admin/cases" className="hover:text-[var(--primary)]">
-          Fälle
-        </Link>
-        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <Link href={`/admin/cases/${id}`} className="hover:text-[var(--primary)]">
-          {caseData.debtorName}
-        </Link>
-        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <Link href={`/admin/cases/${id}/ledger`} className="hover:text-[var(--primary)]">
-          Zahlungsregister
-        </Link>
-        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <span className="text-[var(--foreground)]">Bearbeiten</span>
-      </div>
-
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-[var(--foreground)]">Ledger-Eintrag bearbeiten</h1>
-            <ReviewStatusBadge status={entry.reviewStatus} />
-          </div>
-          <p className="text-[var(--secondary)] mt-1">
-            {caseData.caseNumber} - {caseData.debtorName}
-          </p>
+      <div>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">Ledger-Eintrag bearbeiten</h1>
+          <ReviewStatusBadge status={entry.reviewStatus} />
         </div>
-        <Link href={`/admin/cases/${id}/ledger`} className="btn-secondary">
-          Zurück zum Zahlungsregister
-        </Link>
+        <p className="text-[var(--secondary)] mt-1">
+          {caseData.caseNumber} - {caseData.debtorName}
+        </p>
       </div>
 
       {/* Messages */}

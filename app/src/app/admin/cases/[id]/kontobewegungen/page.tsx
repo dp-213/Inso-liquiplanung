@@ -147,9 +147,6 @@ export default function KontobewegungPage({
       <div className="space-y-6">
         <div className="admin-card p-8 text-center">
           <p className="text-[var(--danger)]">{error || "Keine Daten"}</p>
-          <Link href="/admin/cases" className="btn-secondary mt-4 inline-block">
-            Zurück zur Übersicht
-          </Link>
         </div>
       </div>
     );
@@ -157,21 +154,6 @@ export default function KontobewegungPage({
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center text-sm text-[var(--muted)]">
-        <Link href="/admin/cases" className="hover:text-[var(--primary)]">Fälle</Link>
-        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <Link href={`/admin/cases/${id}`} className="hover:text-[var(--primary)]">
-          {data.case.debtorName}
-        </Link>
-        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <span className="text-[var(--foreground)]">IST-Kontobewegungen</span>
-      </div>
-
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

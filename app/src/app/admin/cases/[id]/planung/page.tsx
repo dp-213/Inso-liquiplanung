@@ -95,15 +95,6 @@ export default function PlanungPage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center text-sm text-[var(--muted)]">
-          <Link href="/admin/cases" className="hover:text-[var(--primary)]">
-            Fälle
-          </Link>
-          <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-          <span className="text-[var(--foreground)]">Wird geladen...</span>
-        </div>
         <div className="admin-card p-8 text-center">
           <div className="w-12 h-12 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="mt-4 text-[var(--secondary)]">Planung wird geladen...</p>
@@ -115,15 +106,6 @@ export default function PlanungPage() {
   if (error || !data) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center text-sm text-[var(--muted)]">
-          <Link href="/admin/cases" className="hover:text-[var(--primary)]">
-            Fälle
-          </Link>
-          <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-          <span className="text-[var(--foreground)]">Fehler</span>
-        </div>
         <div className="admin-card p-8 text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -132,9 +114,6 @@ export default function PlanungPage() {
           </div>
           <h1 className="text-xl font-bold text-[var(--foreground)] mb-2">Fehler beim Laden</h1>
           <p className="text-[var(--secondary)] mb-4">{error}</p>
-          <Link href="/admin/cases" className="btn-primary">
-            Zurück zur Übersicht
-          </Link>
         </div>
       </div>
     );
@@ -179,23 +158,7 @@ export default function PlanungPage() {
   return (
     <div className="space-y-6">
       {/* Header mit Tab-Switcher */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center text-sm text-[var(--muted)]">
-          <Link href="/admin/cases" className="hover:text-[var(--primary)]">
-            Fälle
-          </Link>
-          <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-          <Link href={`/admin/cases/${caseId}/results`} className="hover:text-[var(--primary)]">
-            HVPlus
-          </Link>
-          <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-          <span className="text-[var(--foreground)]">Planung</span>
-        </div>
-
+      <div className="flex items-center justify-end">
         {/* Tab Switcher: Dashboard / Planung */}
         <div className="flex items-center bg-blue-50 rounded-lg p-1 border-2 border-blue-300">
           <Link

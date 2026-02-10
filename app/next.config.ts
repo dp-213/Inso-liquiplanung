@@ -28,7 +28,13 @@ const nextConfig: NextConfig = {
   },
 
   // Webpack (für `next build` / Production)
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev }) => {
+    // Webpack Persistent Cache deaktivieren im Dev-Modus
+    // (Workaround für ENOENT-Fehler bei Pfaden mit Leerzeichen)
+    if (dev) {
+      config.cache = false;
+    }
+
     if (!isServer) {
       config.resolve.alias = {
         ...config.resolve.alias,

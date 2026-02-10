@@ -94,23 +94,6 @@ export default async function ISTKlassifikationPage({ params }: PageProps) {
 
   return (
     <div className="space-y-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center text-sm text-[var(--muted)]">
-        <Link href="/admin/cases" className="hover:text-[var(--primary)]">
-          Fälle
-        </Link>
-        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <Link href={`/admin/cases/${id}`} className="hover:text-[var(--primary)]">
-          {caseData.debtorName}
-        </Link>
-        <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-        </svg>
-        <span className="text-[var(--foreground)]">IST-Klassifikation</span>
-      </div>
-
       {/* Header */}
       <div className="admin-card p-6">
         <div className="flex items-start justify-between">

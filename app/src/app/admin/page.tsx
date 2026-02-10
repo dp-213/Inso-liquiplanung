@@ -437,7 +437,7 @@ export default async function AdminDashboard() {
                   target="_blank"
                   className="text-sm text-green-600 hover:underline font-medium"
                 >
-                  Oeffnen →
+                  Öffnen →
                 </Link>
               </div>
             </div>
