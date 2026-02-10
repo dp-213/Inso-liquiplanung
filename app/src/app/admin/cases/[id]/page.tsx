@@ -1,8 +1,6 @@
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import ShareLinksManager from "@/components/admin/ShareLinksManager";
-import CustomerAccessManager from "@/components/admin/CustomerAccessManager";
 import CaseCalculationPreview from "@/components/admin/CaseCalculationPreview";
 
 interface PageProps {
@@ -34,26 +32,9 @@ async function getCaseData(id: string) {
           },
         },
       },
-      shareLinks: {
-        orderBy: { createdAt: "desc" },
-      },
       ingestionJobs: {
         orderBy: { startedAt: "desc" },
         take: 5,
-      },
-      customerAccess: {
-        include: {
-          customer: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              company: true,
-              isActive: true,
-            },
-          },
-        },
-        orderBy: { grantedAt: "desc" },
       },
     },
   });
@@ -248,10 +229,37 @@ export default async function CaseDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Share Links and Customer Access Management */}
+        {/* Quick Links */}
         <div className="lg:col-span-1 space-y-6">
-          <ShareLinksManager caseId={id} initialLinks={caseData.shareLinks} />
-          <CustomerAccessManager caseId={id} initialAccess={caseData.customerAccess} />
+          <div className="admin-card p-6">
+            <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Zugang</h2>
+            <div className="space-y-3">
+              <Link
+                href={`/admin/cases/${id}/freigaben`}
+                className="flex items-center justify-between p-3 rounded-md border border-[var(--border)] hover:bg-gray-50 dark:hover:bg-[var(--card)]/80 transition-colors"
+              >
+                <div>
+                  <p className="font-medium text-[var(--foreground)]">Externe Freigaben</p>
+                  <p className="text-sm text-[var(--muted)]">Zugriffslinks verwalten</p>
+                </div>
+                <svg className="w-5 h-5 text-[var(--muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+              <Link
+                href={`/admin/cases/${id}/kundenzugaenge`}
+                className="flex items-center justify-between p-3 rounded-md border border-[var(--border)] hover:bg-gray-50 dark:hover:bg-[var(--card)]/80 transition-colors"
+              >
+                <div>
+                  <p className="font-medium text-[var(--foreground)]">Kundenzugänge</p>
+                  <p className="text-sm text-[var(--muted)]">Kunden-Zugriffsrechte verwalten</p>
+                </div>
+                <svg className="w-5 h-5 text-[var(--muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>

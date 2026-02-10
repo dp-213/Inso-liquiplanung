@@ -56,7 +56,6 @@ export default function CaseSidebar({
       items: [
         { name: "Zahlungsregister", href: `${base}/ledger` },
         { name: "Import", href: `${base}/ingestion` },
-        { name: "IST-Daten", href: `${base}/kontobewegungen` },
         { name: "Freigaben", href: `${base}/orders`, badge: pendingOrderCount },
       ],
     },
@@ -79,7 +78,7 @@ export default function CaseSidebar({
       label: "PLANUNG",
       items: [
         { name: "Prämissen", href: `${base}/assumptions` },
-        { name: "Datenraum", href: `${base}/planung` },
+        { name: "Freie Planung", href: `${base}/planung` },
         { name: "Liquiditätsplan", href: `${base}/results` },
         { name: "Business-Logik", href: `${base}/business-logic` },
       ],
@@ -87,6 +86,7 @@ export default function CaseSidebar({
     {
       label: "ANALYSE",
       items: [
+        { name: "IST-Daten", href: `${base}/kontobewegungen` },
         { name: "Klassifikation", href: `${base}/ist-klassifikation` },
         { name: "Verifikation", href: `${base}/zahlungsverifikation` },
         { name: "IV-Kommunikation", href: `${base}/iv-kommunikation` },
@@ -96,6 +96,13 @@ export default function CaseSidebar({
       label: "FINANZIERUNG",
       items: [
         { name: "Kreditlinien", href: `${base}/finanzierung` },
+      ],
+    },
+    {
+      label: "ZUGANG",
+      items: [
+        { name: "Externe Freigaben", href: `${base}/freigaben` },
+        { name: "Kundenzugänge", href: `${base}/kundenzugaenge` },
       ],
     },
   ];
@@ -185,7 +192,7 @@ export default function CaseSidebar({
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
-          Bearbeiten
+          Fall bearbeiten
         </Link>
         <Link
           href={`${base}/results`}

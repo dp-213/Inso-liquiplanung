@@ -115,7 +115,7 @@ export default function CustomerAccessManager({
   };
 
   const revokeAccess = async (accessId: string) => {
-    if (!confirm("Moechten Sie diesen Kundenzugang wirklich widerrufen?")) {
+    if (!confirm("Möchten Sie diesen Kundenzugang wirklich widerrufen?")) {
       return;
     }
 
@@ -156,7 +156,7 @@ export default function CustomerAccessManager({
   return (
     <div className="admin-card">
       <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-[var(--foreground)]">Kundenzugaenge</h2>
+        <h2 className="text-lg font-semibold text-[var(--foreground)]">Kundenzugänge</h2>
         <button
           onClick={() => {
             setShowCreateForm(!showCreateForm);
@@ -167,7 +167,7 @@ export default function CustomerAccessManager({
           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
-          Zugang hinzufuegen
+          Zugang hinzufügen
         </button>
       </div>
 
@@ -220,7 +220,7 @@ export default function CustomerAccessManager({
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Gueltigkeitsdauer (Tage)
+                Gültigkeitsdauer (Tage)
               </label>
               <input
                 type="number"
@@ -287,7 +287,7 @@ export default function CustomerAccessManager({
                   </div>
                   {accessItem.expiresAt && (
                     <p className="text-xs text-[var(--warning)] mt-1">
-                      Gueltig bis: {new Date(accessItem.expiresAt).toLocaleDateString("de-DE")}
+                      Gültig bis: {new Date(accessItem.expiresAt).toLocaleDateString("de-DE")}
                     </p>
                   )}
                 </div>
@@ -323,8 +323,8 @@ export default function CustomerAccessManager({
                 d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
               />
             </svg>
-            <p className="text-sm">Keine Kundenzugaenge</p>
-            <p className="text-xs mt-1">Fuegen Sie Kunden hinzu, um ihnen Zugriff zu gewaehren</p>
+            <p className="text-sm">Keine Kundenzugänge</p>
+            <p className="text-xs mt-1">Fügen Sie Kunden hinzu, um ihnen Zugriff zu gewähren</p>
           </div>
         )}
       </div>
@@ -342,7 +342,7 @@ export default function CustomerAccessManager({
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
-              {inactiveAccess.length} widerrufene Zugaenge
+              {inactiveAccess.length} widerrufene Zugänge
             </summary>
             <div className="divide-y divide-[var(--border)]">
               {inactiveAccess.map((accessItem) => (
