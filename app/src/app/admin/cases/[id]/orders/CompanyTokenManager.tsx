@@ -21,6 +21,7 @@ export function CompanyTokenManager({ caseId }: CompanyTokenManagerProps) {
     const [isCreating, setIsCreating] = useState(false);
     const [newLabel, setNewLabel] = useState("");
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [createError, setCreateError] = useState<string | null>(null);
 
     useEffect(() => {
         loadTokens();
@@ -43,6 +44,7 @@ export function CompanyTokenManager({ caseId }: CompanyTokenManagerProps) {
     async function createToken() {
         if (!newLabel.trim()) return;
         setIsCreating(true);
+        setCreateError(null);
         try {
             const res = await fetch(`/api/cases/${caseId}/tokens`, {
                 method: "POST",
@@ -53,7 +55,12 @@ export function CompanyTokenManager({ caseId }: CompanyTokenManagerProps) {
             if (res.ok) {
                 setNewLabel("");
                 loadTokens();
+            } else {
+                const data = await res.json().catch(() => null);
+                setCreateError(data?.error || "Link konnte nicht erstellt werden.");
             }
+        } catch {
+            setCreateError("Netzwerkfehler – bitte erneut versuchen.");
         } finally {
             setIsCreating(false);
         }
@@ -71,11 +78,11 @@ export function CompanyTokenManager({ caseId }: CompanyTokenManagerProps) {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                        <LinkIcon className="h-5 w-5 mr-2 text-red-500" />
+                        <LinkIcon className="h-5 w-5 mr-2 text-indigo-500" />
                         Zugangs-Links verwalten
                     </h3>
                     <p className="text-sm text-gray-500 mt-1">
-                        Erstellen Sie sichere Links für Firmen, um Rechnungen einzureichen.
+                        Erstellen Sie sichere Links für Firmen zum Einreichen von Bestell- und Zahlungsanfragen.
                     </p>
                 </div>
             </div>
@@ -87,18 +94,21 @@ export function CompanyTokenManager({ caseId }: CompanyTokenManagerProps) {
                         value={newLabel}
                         onChange={(e) => setNewLabel(e.target.value)}
                         placeholder="Bezeichnung (z.B. Steuerbüro, Lieferanten-Portal)"
-                        className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-red-500 focus:ring-red-500 sm:text-sm py-2.5 px-3"
+                        className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 px-3"
                         onKeyDown={(e) => e.key === "Enter" && createToken()}
                     />
                     <button
                         onClick={createToken}
                         disabled={isCreating || !newLabel.trim()}
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 transition-all active:scale-95"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-all active:scale-95"
                     >
                         {isCreating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
                         Neuer Link
                     </button>
                 </div>
+                {createError && (
+                    <p className="mt-2 text-sm text-red-600">{createError}</p>
+                )}
             </div>
 
             <div className="space-y-3">
@@ -113,7 +123,7 @@ export function CompanyTokenManager({ caseId }: CompanyTokenManagerProps) {
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {tokens.map((token) => (
-                            <div key={token.id} className="relative group bg-white p-4 rounded-xl border border-gray-200 hover:border-red-200 hover:shadow-md transition-all duration-200">
+                            <div key={token.id} className="relative group bg-white p-4 rounded-xl border border-gray-200 hover:border-indigo-200 hover:shadow-md transition-all duration-200">
                                 <div className="flex justify-between items-start mb-2">
                                     <h4 className="font-semibold text-gray-900 truncate pr-2" title={token.label}>
                                         {token.label}
@@ -130,7 +140,7 @@ export function CompanyTokenManager({ caseId }: CompanyTokenManagerProps) {
                                         onClick={() => copyLink(token.id, token.token)}
                                         className={`inline-flex items-center px-2.5 py-1.5 rounded-md text-xs font-medium transition-colors ${copiedId === token.id
                                                 ? 'bg-green-100 text-green-700'
-                                                : 'bg-red-50 text-red-700 hover:bg-red-100'
+                                                : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                                             }`}
                                     >
                                         {copiedId === token.id ? (

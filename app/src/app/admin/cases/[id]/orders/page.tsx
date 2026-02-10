@@ -82,7 +82,7 @@ export default async function AdminOrdersPage({ params }: PageProps) {
             <div className="bg-white shadow rounded-lg overflow-hidden">
                 <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
                     <h3 className="text-lg leading-6 font-medium text-gray-900 flex items-center">
-                        <span className="bg-red-100 text-red-800 py-0.5 px-2.5 rounded-full text-xs font-medium mr-2">{pendingOrders.length}</span>
+                        <span className="bg-amber-100 text-amber-800 py-0.5 px-2.5 rounded-full text-xs font-medium mr-2">{pendingOrders.length}</span>
                         Offene Anfragen
                     </h3>
                 </div>

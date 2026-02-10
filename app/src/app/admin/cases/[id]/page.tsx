@@ -211,7 +211,7 @@ export default async function CaseDetailPage({ params }: PageProps) {
                 </svg>
                 Freigaben
                 {pendingOrderCount > 0 && (
-                  <span className="ml-1.5 inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1 rounded-full text-xs font-bold bg-red-500 text-white">
+                  <span className="ml-1.5 inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1 rounded-full text-xs font-bold bg-amber-500 text-white">
                     {pendingOrderCount}
                   </span>
                 )}

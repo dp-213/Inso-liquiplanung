@@ -51,9 +51,7 @@ export default async function SubmitOrderPage({ params }: PageProps) {
 
                 <div className="text-center text-xs text-gray-400">
                     <p>
-                        Eingereicht via Inso-Liquiplanung Token-Link.
-                        <br />
-                        Zugang bereitgestellt für: {companyToken.label}
+                        Sicheres Einreichungsportal · Bereitgestellt für: {companyToken.label}
                     </p>
                 </div>
             </div>

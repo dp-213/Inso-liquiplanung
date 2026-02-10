@@ -264,7 +264,7 @@ export function OrderList({ orders, caseId, isPending }: OrderListProps) {
                                     <SortIcon field="creditor" />
                                 </span>
                             </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            <th scope="col" className="hidden sm:table-cell px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                 Beschreibung
                             </th>
                             <th
@@ -277,7 +277,7 @@ export function OrderList({ orders, caseId, isPending }: OrderListProps) {
                                     <SortIcon field="amount" />
                                 </span>
                             </th>
-                            <th scope="col" className="px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            <th scope="col" className="hidden sm:table-cell px-6 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">
                                 Beleg
                             </th>
                             <th scope="col" className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -293,7 +293,7 @@ export function OrderList({ orders, caseId, isPending }: OrderListProps) {
                             const fmt = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
 
                             return (
-                                <tr key={order.id} className={`transition-colors duration-150 ${isPending ? "hover:bg-red-50/30" : "bg-gray-50/50"}`}>
+                                <tr key={order.id} className={`transition-colors duration-150 ${isPending ? "hover:bg-amber-50/30" : "bg-gray-50/50"}`}>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         {getTypeBadge(order.type)}
                                     </td>
@@ -305,10 +305,13 @@ export function OrderList({ orders, caseId, isPending }: OrderListProps) {
                                             Eing.: {new Date(order.createdAt).toLocaleDateString("de-DE")}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                        {order.creditor}
+                                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                                        <div className="whitespace-nowrap">{order.creditor}</div>
+                                        <div className="sm:hidden text-xs text-gray-500 font-normal mt-0.5 truncate max-w-[200px]" title={order.description}>
+                                            {order.description}
+                                        </div>
                                     </td>
-                                    <td className="px-6 py-4 text-sm text-gray-500 max-w-xs">
+                                    <td className="hidden sm:table-cell px-6 py-4 text-sm text-gray-500 max-w-xs">
                                         <div className="truncate" title={order.description}>
                                             {order.description}
                                         </div>
@@ -334,7 +337,7 @@ export function OrderList({ orders, caseId, isPending }: OrderListProps) {
                                             </div>
                                         )}
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                                    <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-center">
                                         {order.documentName ? (
                                             <div className="flex justify-center gap-1">
                                                 <a
@@ -362,7 +365,7 @@ export function OrderList({ orders, caseId, isPending }: OrderListProps) {
                                                     onClick={() => openApproveModal(order)}
                                                     disabled={isProcessing}
                                                     className="group flex items-center justify-center p-2 rounded-full text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-700 transition-all shadow-sm hover:shadow active:scale-95 disabled:opacity-50 disabled:shadow-none"
-                                                    title="Freigeben & Buchen"
+                                                    title="Freigeben"
                                                 >
                                                     {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
                                                     <span className="sr-only">Freigeben</span>

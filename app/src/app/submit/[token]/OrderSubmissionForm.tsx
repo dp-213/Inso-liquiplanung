@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, Upload, CheckCircle, AlertCircle, FileText, Calendar, Euro, ShoppingCart, CreditCard } from "lucide-react";
+import { Loader2, Upload, CheckCircle, AlertCircle, FileText, Calendar, Euro, ShoppingCart, CreditCard, ArrowLeft } from "lucide-react";
 import { StatusSteps } from "./StatusSteps";
 
 type OrderType = "BESTELLUNG" | "ZAHLUNG";
@@ -130,9 +130,11 @@ export function OrderSubmissionForm({ token }: OrderSubmissionFormProps) {
             <div className="mb-6 flex items-center justify-between">
                 <button
                     onClick={() => setOrderType(null)}
-                    className="text-sm text-gray-500 hover:text-indigo-600 transition-colors"
+                    className="inline-flex items-center text-sm text-gray-500 hover:text-indigo-600 transition-colors"
+                    aria-label="Zurück zur Typauswahl"
                 >
-                    &larr; Andere Art wählen
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    Andere Art wählen
                 </button>
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${typeBadge.bg} ${typeBadge.text}`}>
                     <typeBadge.icon className="h-3 w-3 mr-1" />
@@ -146,7 +148,7 @@ export function OrderSubmissionForm({ token }: OrderSubmissionFormProps) {
 
             <form className="space-y-8" onSubmit={onSubmit}>
                 {error && (
-                    <div className="rounded-xl bg-red-50 p-4 border border-red-100 shadow-sm animate-pulse">
+                    <div className="rounded-xl bg-red-50 p-4 border border-red-100 shadow-sm">
                         <div className="flex">
                             <div className="flex-shrink-0">
                                 <AlertCircle className="h-5 w-5 text-red-400" />
@@ -271,7 +273,7 @@ export function OrderSubmissionForm({ token }: OrderSubmissionFormProps) {
                                     <span className="pl-1">oder hierher ziehen</span>
                                 </div>
                                 <p className="text-xs text-gray-500">
-                                    PDF, PNG, JPG bis 10MB
+                                    PDF, PNG, JPG – max. 10 MB
                                 </p>
                                 {fileName && (
                                     <div className="mt-4 inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 animate-fadeIn">
@@ -308,7 +310,7 @@ export function OrderSubmissionForm({ token }: OrderSubmissionFormProps) {
                         )}
                     </button>
                     <p className="mt-4 text-center text-xs text-gray-400">
-                        Mit dem Absenden bestätigen Sie die Richtigkeit der Angaben.
+                        Ihre Angaben werden verschlüsselt übertragen.
                     </p>
                 </div>
             </form>
