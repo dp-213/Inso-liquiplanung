@@ -133,7 +133,10 @@ export async function GET(
       ? { not: 'REJECTED' }
       : { in: ['CONFIRMED', 'ADJUSTED'] };
 
-    // ISK-Only-Filter: Konsistent mit Matrix-API
+    // ISK-Only-Filter: Konsistent mit Matrix-API.
+    // HINWEIS: isLiquidityRelevant-Filter ist konsistent mit der Matrix-API.
+    // Falls Zell-Details leer sind, prüfe ob isLiquidityRelevant in der DB korrekt gesetzt ist.
+    // Siehe: Bug-Analyse 2026-02-10 — Datenproblem, kein Code-Bug.
     const liquidityAccountIds = existingCase.bankAccounts
       .filter(a => a.isLiquidityRelevant)
       .map(a => a.id);

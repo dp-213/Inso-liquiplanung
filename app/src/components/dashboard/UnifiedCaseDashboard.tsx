@@ -291,10 +291,9 @@ export default function UnifiedCaseDashboard({
   // Tabs die interne APIs mit Session-Auth benötigen
   const tabsRequiringInternalApi = new Set([
     "liquidity-matrix",
-    "banks",
+    "banks-security",
     "revenue", // RevenueTable braucht API
     "estate", // Estate-Summary API
-    "security",
     "locations",
     "compare",
     "business-logik",
@@ -302,7 +301,7 @@ export default function UnifiedCaseDashboard({
 
   // Tabs die Scope NICHT unterstützen (zeigen immer global)
   const tabsWithoutScopeSupport = new Set([
-    "banks",    // BankAccountsTab zeigt alle Konten (Scope-Filter wäre irreführend für Bank-Übersicht)
+    "banks-security",    // BankAccountsTab zeigt alle Konten (Scope-Filter wäre irreführend für Bank-Übersicht)
   ]);
 
   // Get visible tabs
@@ -435,25 +434,26 @@ export default function UnifiedCaseDashboard({
           </div>
         );
 
-      case "banks":
+      case "banks-security":
         return (
           <div className="space-y-6">
-            {caseId ? (
+            {caseId && (
               <>
-                {/* Bankkonto-Übersicht mit Opening Balance und aktuellen Salden */}
+                {/* Sektion 1: Bankenspiegel */}
                 <div className="admin-card p-6">
+                  <h2 className="text-lg font-semibold mb-4">Bankenspiegel</h2>
                   <BankAccountsTab caseId={caseId} />
                 </div>
 
-                {/* Massekredit-Analyse (bestehend) */}
+                {/* Sektion 2: Verfügbarkeit über Zeit */}
+                <div className="admin-card p-6">
+                  <h2 className="text-lg font-semibold mb-4">Verfügbarkeit über Zeit</h2>
+                  <SecurityRightsChart caseId={caseId} periods={10} />
+                </div>
+
+                {/* Sektion 3: Massekredit-Analyse */}
                 <MasseCreditTab caseId={caseId} />
               </>
-            ) : (
-              <div className="admin-card p-6">
-                <div className="text-center text-gray-500">
-                  Case-ID nicht verfügbar
-                </div>
-              </div>
             )}
           </div>
         );
@@ -471,47 +471,6 @@ export default function UnifiedCaseDashboard({
                 <RevenueTable caseId={caseId} months={6} showSummary={true} scope={scope} />
               </div>
             )}
-          </div>
-        );
-
-      case "security":
-        return (
-          <div className="space-y-6">
-            {/* Verfügbar vs. Gebunden Chart */}
-            {caseId && (
-              <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Verfügbarkeit über Zeit</h2>
-                <SecurityRightsChart caseId={caseId} periods={10} />
-              </div>
-            )}
-
-            {/* Bank Account Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="admin-card p-4">
-                <div className="text-sm text-[var(--secondary)]">Bankguthaben Gesamt</div>
-                <div className="text-2xl font-bold text-[var(--foreground)]">{formatCurrencyFn(bankAccountData.totalBalance)}</div>
-              </div>
-              <div className="admin-card p-4">
-                <div className="text-sm text-[var(--secondary)]">Davon verfügbar</div>
-                <div className="text-2xl font-bold text-green-600">{formatCurrencyFn(bankAccountData.totalAvailable)}</div>
-              </div>
-              <div className="admin-card p-4">
-                <div className="text-sm text-[var(--secondary)]">Bankkonten</div>
-                <div className="text-2xl font-bold text-[var(--foreground)]">{bankAccountData.accounts.length}</div>
-              </div>
-            </div>
-
-            <div className="admin-card p-6">
-              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Bankkonto-Übersicht (Bankenspiegel)</h2>
-              <p className="text-sm text-[var(--secondary)] mb-4">Zeigt alle Bankkonten mit Standort-Zuordnung, Opening Balance und aktuellen Salden</p>
-              {caseId ? (
-                <BankAccountsTab caseId={caseId} />
-              ) : (
-                <div className="p-8 bg-gray-50 rounded-lg text-center">
-                  <p className="text-[var(--muted)]">Case-ID nicht verfügbar</p>
-                </div>
-              )}
-            </div>
           </div>
         );
 

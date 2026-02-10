@@ -293,12 +293,14 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
       panels: [],
     },
     {
-      id: "banks",
-      label: "Banken/Massekredit",
+      id: "banks-security",
+      label: "Banken & Sicherungsrechte",
       icon: "bank",
       panels: [
-        { type: "massekredit-overview", visible: true, order: 1 },
-        { type: "massekredit-per-bank", visible: true, order: 2 },
+        { type: "bank-accounts", visible: true, order: 1 },
+        { type: "security-rights", visible: true, order: 2 },
+        { type: "massekredit-overview", visible: true, order: 3 },
+        { type: "massekredit-per-bank", visible: true, order: 4 },
       ],
     },
     {
@@ -309,16 +311,6 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
         { type: "revenue-sources", visible: true, order: 1 },
         { type: "revenue-categories", visible: true, order: 2 },
         { type: "revenue-chart", visible: true, order: 3 },
-      ],
-    },
-    {
-      id: "security",
-      label: "Sicherungsrechte",
-      icon: "shield",
-      panels: [
-        { type: "bank-accounts", visible: true, order: 1 },
-        { type: "security-rights", visible: true, order: 2 },
-        { type: "settlement-progress", visible: true, order: 3 },
       ],
     },
     {
