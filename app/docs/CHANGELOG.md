@@ -4,6 +4,56 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.23.0 – Zuordnungs-Korrektur & Regeln-Transparenz
+
+**Datum:** 10. Februar 2026
+
+### Bugfixes
+
+- **8 Darlehens-Entries korrigiert:** Sondertilgungen (-292K EUR) und Zinszahlungen vom apoBank-Gläubigerkonto waren als HZV/MIXED klassifiziert. Korrektur: `categoryTag=DARLEHEN_TILGUNG`, `estateAllocation=ALTMASSE`, `counterpartyId=cp-servicegesellschaft-hausarztpraxis`. Q4-Umsatzregel gilt nur für operative Umsätze, nicht für Gesellschafterdarlehen.
+
+### Neue Funktionen
+
+- **ISK-Only-Filter für Liquiditätsmatrix:** Neues Feld `isLiquidityRelevant` auf `BankAccount`. Matrix zeigt nur operative Massekonten (ISK Velbert + ISK Uckerath), PLAN-Entries und Entries ohne Bankzuordnung. Gläubigerkonto-Buchungen (329 Entries) bleiben im Ledger, erscheinen aber nicht in der Matrix.
+- **Systemregeln-Sektion im Regeln-Tab:** Read-Only-Darstellung der hardcodierten Estate-Zuordnungsregeln (KV Q4: 1/3 Alt / 2/3 Neu, HZV Okt: 29/31 Alt / 2/31 Neu). Massekreditvertrag-Referenzen und Fallback-Hinweis.
+- **19 Classification Rules nach Turso synchronisiert:** Service-Date-Rules (HZV Vormonat, KV Vorquartal, etc.) jetzt auch in Production sichtbar.
+
+### Schema-Änderungen
+
+- `BankAccount.isLiquidityRelevant` (Boolean, default: false) – ISK-Konten = true
+
+### Geänderte Dateien
+
+- `app/prisma/schema.prisma` – isLiquidityRelevant
+- `app/src/app/api/cases/[id]/dashboard/liquidity-matrix/route.ts` – ISK-Filter
+- `app/src/app/api/cases/[id]/matrix/explain-cell/route.ts` – ISK-Filter (konsistent)
+- `app/src/app/admin/cases/[id]/rules/page.tsx` – Systemregeln-Sektion
+
+---
+
+## Version 2.22.0 – ISK-Abgleich & Counterparty-Vervollständigung
+
+**Datum:** 10. Februar 2026
+
+### Datenverarbeitung
+
+- **apoBank Massekreditvertrag:** PDF extrahiert und strukturiert in `02-extracted/` + `03-classified/VERTRAEGE/`. Alle Vertragsdetails (Konten, Sicherheiten, Alt/Neu-Regeln, Massekredit 100K EUR) dokumentiert. IBAN-Tippfehler im Vertrag entdeckt und dokumentiert.
+- **ISK-Einzahlungsliste:** Excel (239 Uckerath + 8 Velbert Zeilen) vollständig extrahiert, triple-verifiziert (2.223 Felder, 0 Abweichungen).
+- **Ledger-Abgleich ISK:** Alle 247 Excel-Zeilen 1:1 gegen DB-LedgerEntries geprüft (Datum + Betrag + Inhalt). Ergebnis: 100% deckungsgleich. Bericht in `06-review/ISK_Ledger_Abgleich.md`.
+
+### Klassifikation
+
+- **28 ISK-Entries:** Counterparty-Zuordnung anhand Excel-Creditor/Debtor-Felder. ISK Nov-Dez jetzt 247/247 = 100% mit Counterparty (vorher 219/247 = 89%).
+- **Neue Counterparty:** `Landesoberkasse NRW (Beihilfe)` für 4 Beihilfe-Zahlungen angelegt.
+- **Turso-Sync:** 1 INSERT (Counterparty) + 28 UPDATEs (LedgerEntries) auf Production synchronisiert.
+
+### Case-Daten (HVPlus)
+
+- **01-raw/ Reorganisation:** Thematische Ordnerstruktur (Verträge, Kontoauszüge, Korrespondenz, Gespräche, Planung, Referenz, Datenraum). 4 Duplikate entfernt, 3 Dateien umbenannt, `_INDEX.md` erstellt.
+- **case-context.json:** apoBank-Sektion vollständig aktualisiert, Kontaktperson Roxana Schurgacz hinzugefügt, apoBank-Datenanforderung als ERLEDIGT markiert.
+
+---
+
 ## Version 2.21.0 – Bestell- & Zahlfreigabe-Modul
 
 **Datum:** 10. Februar 2026

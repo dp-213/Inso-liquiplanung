@@ -4,6 +4,91 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-034: Liquiditätsmatrix = nur ISK-Konten (isLiquidityRelevant)
+
+**Datum:** 10. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Die Liquiditätsmatrix zeigte 747 Entries, davon 329 von Nicht-ISK-Konten (apoBank-Gläubigerkonto, Sparkasse-Geschäftskonto). Zwei Sondertilgungen (-292K EUR) verzerrten die Matrix massiv. Viele Nicht-ISK-Entries sind aber legitime Übergangsbuchungen (ISK Uckerath erst ab 13.11., ISK Velbert ab 05.12.).
+
+### Entscheidung
+
+Neues Boolean-Feld `isLiquidityRelevant` auf `BankAccount`. Die Matrix-API filtert: nur Entries von Konten mit `isLiquidityRelevant=true`, Entries ohne Bankzuordnung (`bankAccountId=null`), und PLAN-Entries. Aktuell: ISK Velbert und ISK Uckerath = true, alle anderen = false.
+
+### Begründung
+
+- Pauschales Ausfiltern aller Nicht-ISK-Entries wäre falsch (44% aller Entries!)
+- Stattdessen: Saubere Steuerung über DB-Flag pro Konto
+- Matrix = verfügbare Masse (ISK). Ledger = vollständige Wahrheit (alle Konten)
+- Orthogonal zur Darlehens-Korrektur (die auch im Ledger nötig ist)
+
+### Konsequenzen
+
+- Matrix zeigt ~418 statt 747 Entries
+- Gläubigerkonto-Buchungen nur im Ledger sichtbar, nicht in Matrix
+- Bei neuen Bankkonten muss `isLiquidityRelevant` explizit gesetzt werden
+
+---
+
+## ADR-035: Q4-Umsatzregel nicht auf Darlehenstilgungen anwendbar
+
+**Datum:** 10. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+8 Darlehens-Entries (Gesellschafterdarlehen SHP) vom apoBank-Gläubigerkonto hatten `estateAllocation=MIXED` mit 67% Neu-Anteil. Die Q4-Regel (1/3 Alt, 2/3 Neu) war irrtümlich auf Darlehenstilgungen angewendet worden.
+
+### Entscheidung
+
+Manuelle Korrektur aller 8 Entries: `categoryTag=DARLEHEN_TILGUNG`, `estateAllocation=ALTMASSE` (100%), `allocationSource=MANUAL_CORRECTION`.
+
+### Begründung
+
+- Q4-Umsatzregel aus Massekreditvertrag §1(2) gilt explizit nur für **Umsatzerlöse** (KV/HZV/PVS)
+- Gesellschafterdarlehen sind vorinsolvenzliche Verbindlichkeiten = per Definition 100% Altmasse
+- Automatische Zuordnung hatte keinen Kontext über Buchungstyp (Darlehen vs. Umsatz)
+
+### Konsequenzen
+
+- Sonstige Auszahlungen Oktober massiv korrigiert (~292K weniger)
+- Ähnliche manuelle Korrekturen bei neuen Darlehens-Entries nötig
+- Langfristig: Classification Rule für Darlehenstilgungen anlegen
+
+---
+
+## ADR-033: IV-Excel als Counterparty-Zuordnungsquelle
+
+**Datum:** 10. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Die ISK-Einzahlungsliste vom IV (Excel) enthält Creditor/Debtor-Felder, die in den Kontoauszügen (unsere Import-Quelle) nicht als separate Felder vorliegen. 28 von 247 ISK-Entries hatten keine Counterparty-Zuordnung.
+
+### Entscheidung
+
+Creditor/Debtor-Namen aus der IV-Excel werden als Quelle für Counterparty-Zuordnungen genutzt:
+- Matching gegen bestehende Counterparties (Name + matchPattern)
+- Bei Bedarf neue Counterparties anlegen (hier: Landesoberkasse NRW)
+- Jede Zuordnung wird manuell plausibilisiert (kein Auto-Commit)
+
+### Begründung
+
+- Die Excel ist „die Wahrheit vom IV" – offizielle Einzahlungsliste
+- Creditor/Debtor-Namen sind strukturiert und zuverlässiger als Pattern-Matching auf Freitext-Beschreibungen
+- Einmalige Aktion pro ISK-Periode, kein laufender Prozess
+
+### Konsequenzen
+
+- ISK Nov-Dez Counterparty-Abdeckung: 89% → 100%
+- Neue Counterparty `Landesoberkasse NRW (Beihilfe)` für Beihilfe-Zahlungen (Typ BEHÖRDE)
+- Bei künftigen ISK-Perioden gleichen Workflow wiederholen
+
+---
+
 ## ADR-032: Bestell- & Zahlfreigabe-Modul
 
 **Datum:** 10. Februar 2026

@@ -79,8 +79,8 @@ Keine automatische Extrapolation oder Trendberechnung. Determinismus-Prinzip: Pr
 
 ### Fehlende Dezember-Kontoauszüge
 
-3 von 5 Bankkonten ohne Dezember-Daten. Über 250K EUR Bewegungen nicht nachvollziehbar.
-**Status:** Offene Datenanforderung an IV.
+3 von 5 Bankkonten ohne Dezember-Daten (Sparkasse, apoBank HVPlus, apoBank Uckerath). ISK-Einzahlungsliste (Nov-Dez) liegt jetzt vor und deckt ISK-Seite ab.
+**Status:** Offene Datenanforderung an IV für Geschäftskonten-Auszüge.
 
 ## Freigabe-Modul (Orders)
 
@@ -212,4 +212,4 @@ Bankkonten-Details bewusst aus Liquidity Matrix entfernt (ADR-030). Bankkonten-T
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-10 (v2.21.0)
+**Letzte Aktualisierung:** 2026-02-10 (v2.22.0)

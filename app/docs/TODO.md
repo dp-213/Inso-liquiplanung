@@ -66,9 +66,9 @@ Bankkonten-Details (Opening/Closing Balance pro Bank) bewusst aus Liquidity Matr
 
 ### Fehlende Dezember-Kontoauszüge (HVPlus)
 
-**Status:** Offene Datenanforderung an IV
+**Status:** Teilweise gelöst – ISK-Daten vollständig, Geschäftskonten offen
 
-3 von 5 Bankkonten haben keine Dezember-Kontoauszüge. Über 250K EUR Bewegungen nicht nachvollziehbar.
+ISK-Einzahlungsliste (Nov-Dez 2025) vom IV erhalten und verifiziert: 247 Entries, 100% deckungsgleich mit DB. Fehlend bleiben: Sparkasse HRV, apoBank HVPlus, apoBank Uckerath (Geschäftskonten).
 
 ---
 
@@ -107,5 +107,5 @@ Legacy-Ordner aufgelöst: 4 unique Dateien nach `01-raw/` verschoben, 2 ältere 
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-10 (v2.21.0)
+**Letzte Aktualisierung:** 2026-02-10 (v2.22.0)
 
