@@ -19,6 +19,7 @@
    - [4.5 Prämissen](#45-prämissen)
    - [4.6 Insolvenzeffekte](#46-insolvenzeffekte)
    - [4.7 Bankenspiegel](#47-bankenspiegel)
+   - [4.7b Banken & Sicherungsrechte](#47b-banken--sicherungsrechte)
    - [4.8 Zahlungsregister (Ledger)](#48-zahlungsregister-ledger)
    - [4.9 Steuerungsdimensionen](#49-steuerungsdimensionen-ledgerentry)
    - [4.10 Planungsart (Horizont)](#410-planungsart-horizont)
@@ -557,6 +558,50 @@ model BankAccount {
   case Case @relation(...)
 }
 ```
+
+---
+
+### 4.7b Banken & Sicherungsrechte
+
+**Pfad:** `/admin/cases/[id]/banken-sicherungsrechte`
+
+#### Funktion
+Zusammengefasste Ansicht aller Bankkonten, Sicherungsvereinbarungen und Massekredit-Berechnungen. Ersetzt die alten Tabs „Sicherungsrechte" und „Kreditlinien" (ADR-036).
+
+#### Drei-Ebenen-Trennung
+- **Liquidität** (Matrix) = Cashflows und Periodenbalances
+- **Masse** (Masseübersicht) = Alt/Neu-Zuordnung
+- **Banken-Sicherung** (dieser Tab) = Kontenstruktur, Vereinbarungen, Massekredit
+
+#### Sektionen
+
+**A) Bankenspiegel**
+Tabelle aller Konten mit Typ-Badge (ISK/Gläubigerkonto), Sicherungsnehmer und Status. Keine Saldo-KPIs.
+
+**B) Sicherungsrechte & Vereinbarungen**
+Daten aus Massekredit-API (`/api/cases/[id]/massekredit`):
+- Globalzession (Ja/Nein)
+- Fortführungsbeitrag (Satz + Betrag)
+- Status-Badges: VEREINBART (grün), VERHANDLUNG (gelb), OFFEN (rot)
+- Unsicherheits-Hinweise bei `isUncertain=true`
+
+**C) Massekredit-Status**
+Pro-Bank-Berechnungskarten:
+- Altforderungen brutto → Fortführungsbeitrag → USt → Massekredit
+- Headroom mit Fortschrittsbalken und Ampelfarben (>50% grün, 20-50% gelb, <20% rot)
+- UNKLAR-Warning wenn Buchungen ohne Alt/Neu-Zuordnung existieren
+
+#### APIs
+
+| Endpunkt | Zweck |
+|----------|-------|
+| `GET /api/cases/[id]/bank-accounts` | Kontoliste (inkl. `isLiquidityRelevant`, `securityHolder`) |
+| `GET /api/cases/[id]/massekredit` | Massekredit-Berechnung (kann 404 sein wenn keine BankAgreements) |
+
+#### Navigation
+
+- Sidebar: VERFAHREN → „Banken & Sicherungsrechte"
+- Alte Routes `/security-rights` und `/finanzierung` redirecten hierher
 
 ---
 

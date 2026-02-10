@@ -4,6 +4,34 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.24.0 – Banken & Sicherungsrechte (Drei-Ebenen-Trennung)
+
+**Datum:** 10. Februar 2026
+
+### Neue Funktionen
+
+- **Neuer Tab „Banken & Sicherungsrechte":** Zusammenführung der bisherigen Tabs „Sicherungsrechte" und „Kreditlinien" zu einem sauberen Tab unter `/admin/cases/[id]/banken-sicherungsrechte`. Drei Sektionen:
+  - **Bankenspiegel:** Alle Konten mit Typ (ISK/Gläubigerkonto), Sicherungsnehmer, Status. Keine Saldo-KPIs (Drei-Ebenen-Trennung).
+  - **Sicherungsrechte & Vereinbarungen:** Globalzession, Fortführungsbeitrag, Status-Badges (Vereinbart/Verhandlung/Offen), Unsicherheits-Hinweise.
+  - **Massekredit-Status:** Pro-Bank-Berechnungskarten mit Headroom-Ampel (>50% grün, 20-50% gelb, <20% rot), UNKLAR-Warning, Gesamt-Summe.
+- **Massekredit-API erstmals im UI genutzt:** Die bestehende `/api/cases/[id]/massekredit`-API wird jetzt im Massekredit-Status-Tab konsumiert (war bisher ungenutzt).
+
+### Änderungen
+
+- **Sidebar:** „Sicherungsrechte" → „Banken & Sicherungsrechte" unter VERFAHREN. FINANZIERUNG-Sektion komplett entfernt.
+- **bank-accounts API erweitert:** `isLiquidityRelevant` und `securityHolder` in der Response ergänzt (rückwärtskompatibel).
+- **Redirects:** `/security-rights` und `/finanzierung` leiten auf neue Route weiter.
+
+### Geänderte Dateien
+
+- `app/src/app/admin/cases/[id]/banken-sicherungsrechte/page.tsx` – NEU
+- `app/src/app/api/cases/[id]/bank-accounts/route.ts` – isLiquidityRelevant + securityHolder
+- `app/src/components/admin/CaseSidebar.tsx` – Navigation
+- `app/src/app/admin/cases/[id]/security-rights/page.tsx` – Redirect
+- `app/src/app/admin/cases/[id]/finanzierung/page.tsx` – Redirect
+
+---
+
 ## Version 2.23.0 – Zuordnungs-Korrektur & Regeln-Transparenz
 
 **Datum:** 10. Februar 2026

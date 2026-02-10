@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.21.0
+**Version:** 2.24.0
 **Stand:** 10. Februar 2026
 
 ---

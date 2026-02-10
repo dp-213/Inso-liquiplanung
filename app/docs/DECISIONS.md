@@ -4,6 +4,44 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-036: Drei-Ebenen-Trennung – Banken & Sicherungsrechte als eigener Tab
+
+**Datum:** 10. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Das Admin-Dashboard vermischte drei konzeptionell verschiedene Ebenen:
+1. **Liquidität** (Matrix) – Cashflows und Periodenbalances
+2. **Masse** (Masseübersicht) – Alt/Neu-Zuordnung, Estate Summary
+3. **Banken-Sicherung** – Kontenstruktur, Globalzessionen, Massekredit-Headroom
+
+Der alte „Sicherungsrechte"-Tab zeigte einen Bankenspiegel mit Saldo-KPIs (Ebenenvermischung), der „Kreditlinien"-Tab war ein leerer Placeholder, und die bestehende Massekredit-API wurde nirgends genutzt.
+
+### Entscheidung
+
+Zusammenführung zu einem neuen Tab „Banken & Sicherungsrechte" mit drei Sektionen:
+- **Bankenspiegel:** Kontenstruktur (ISK vs. Gläubigerkonto), KEINE Salden
+- **Sicherungsrechte & Vereinbarungen:** Tabelle aus Massekredit-API (`perBank`)
+- **Massekredit-Status:** Berechnungskarten mit Headroom-Ampel
+
+Alte Tabs (`/security-rights`, `/finanzierung`) leiten per `redirect()` auf die neue Route weiter. FINANZIERUNG-Sektion aus der Sidebar entfernt.
+
+### Begründung
+
+- **Separation of Concerns:** Salden gehören in die Liquiditätsmatrix, nicht in den Bankenspiegel
+- **Kein Feature-Verlust:** Alle Informationen sind verfügbar, nur klarer strukturiert
+- **Massekredit-API war ungenutzt:** Investment in API-Entwicklung wird jetzt realisiert
+- **Redirects statt Löschung:** Keine Breaking Changes für bestehende Bookmarks
+
+### Konsequenzen
+
+- Portal-Tabs (`/portal/cases/[id]/security`, `/portal/cases/[id]/finanzierung`) bleiben unverändert
+- Dashboard-Panel-Types (`security-rights` in `types/dashboard.ts`) bleiben unverändert
+- bank-accounts API rückwärtskompatibel erweitert (neue Felder `isLiquidityRelevant`, `securityHolder`)
+
+---
+
 ## ADR-034: Liquiditätsmatrix = nur ISK-Konten (isLiquidityRelevant)
 
 **Datum:** 10. Februar 2026
