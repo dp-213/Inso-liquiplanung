@@ -58,6 +58,16 @@ export async function createSession(username: string): Promise<void> {
 }
 
 export async function getSession(): Promise<SessionData | null> {
+  // Auto-Login auf localhost (nicht in Production)
+  if (process.env.NODE_ENV !== "production") {
+    return {
+      userId: "admin",
+      username: "admin",
+      isAdmin: true,
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    };
+  }
+
   const cookieStore = await cookies();
   const token = cookieStore.get("session")?.value;
 

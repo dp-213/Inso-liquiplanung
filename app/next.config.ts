@@ -4,17 +4,22 @@ const nextConfig: NextConfig = {
   // Für Production Build
   output: process.env.NODE_ENV === 'production' ? 'standalone' : undefined,
 
-  // ESLint: Ignoriere während Build (Warnings blockieren nicht mehr)
+  // ESLint: Ignoriere während Build
   eslint: {
     ignoreDuringBuilds: true,
   },
 
-  // Server-only Packages (nicht im Client-Bundle)
-  serverExternalPackages: ['@prisma/client', '@prisma/adapter-libsql'],
+  // Server-only Packages: Nicht bundlen, sondern als externe Module laden.
+  // Verhindert Turbopack/Webpack-Fehler mit .md/.node Dateien in diesen Paketen.
+  serverExternalPackages: [
+    '@prisma/client',
+    '@prisma/adapter-libsql',
+    '@libsql/client',
+    '@libsql/isomorphic-fetch',
+  ],
 
-  // Fix für libsql Import-Fehler
+  // Webpack (für `next build` / Production)
   webpack: (config, { isServer }) => {
-    // Nur auf Server-Seite libsql verarbeiten
     if (!isServer) {
       config.resolve.alias = {
         ...config.resolve.alias,
@@ -22,19 +27,6 @@ const nextConfig: NextConfig = {
         '@libsql/client': false,
       };
     }
-
-    // Ignoriere nicht-Code-Dateien aus node_modules
-    config.module.rules.push({
-      test: /\.(md|txt)$/,
-      type: 'asset/source',
-    });
-
-    // Ignoriere LICENSE und .node Binaries
-    config.module.rules.push({
-      test: /\.(LICENSE|\.node)$/,
-      type: 'asset/resource',
-    });
-
     return config;
   },
 };

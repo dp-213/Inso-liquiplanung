@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, use, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, use, useRef } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -16,6 +16,7 @@ import {
   CATEGORY_TAG_SOURCE_LABELS,
 } from "@/lib/ledger";
 import { formatAllocationSource, formatCategoryTagSource } from "@/lib/ledger/format-helpers";
+import { ColumnFilter, ColumnFilterValue } from "@/components/ledger/ColumnFilter";
 
 type TabType = "all" | "review" | "rules" | "sources";
 
@@ -31,20 +32,20 @@ interface ColumnConfig {
 const COLUMN_DEFINITIONS: ColumnConfig[] = [
   { id: "checkbox", label: "Auswahl", defaultVisible: true, defaultWidth: 40, minWidth: 40 },
   { id: "transactionDate", label: "Datum", defaultVisible: true, defaultWidth: 100, minWidth: 80 },
+  { id: "categoryTag", label: "Matrix-Kat.", defaultVisible: true, defaultWidth: 140, minWidth: 100 },
   { id: "description", label: "Beschreibung", defaultVisible: true, defaultWidth: 250, minWidth: 150 },
   { id: "amountCents", label: "Betrag", defaultVisible: true, defaultWidth: 110, minWidth: 90 },
-  { id: "import", label: "Quelle", defaultVisible: true, defaultWidth: 180, minWidth: 120 }, // Moved after amountCents, renamed to "Quelle", wider
+  { id: "import", label: "Quelle", defaultVisible: true, defaultWidth: 180, minWidth: 120 },
+  { id: "location", label: "Standort", defaultVisible: true, defaultWidth: 120, minWidth: 80 },
+  { id: "bankAccount", label: "Bankkonto", defaultVisible: true, defaultWidth: 150, minWidth: 100 },
+  { id: "counterparty", label: "Gegenpartei", defaultVisible: true, defaultWidth: 150, minWidth: 100 },
   { id: "valueType", label: "Typ", defaultVisible: true, defaultWidth: 70, minWidth: 60 },
   { id: "estateAllocation", label: "Alt/Neu", defaultVisible: true, defaultWidth: 90, minWidth: 70 },
-  { id: "legalBucket", label: "Rechtsstatus", defaultVisible: true, defaultWidth: 100, minWidth: 80 },
+  { id: "legalBucket", label: "Rechtsstatus", defaultVisible: true, defaultWidth: 110, minWidth: 90 },
   { id: "reviewStatus", label: "Review", defaultVisible: true, defaultWidth: 90, minWidth: 70 },
   { id: "suggestion", label: "Vorschlag", defaultVisible: false, defaultWidth: 100, minWidth: 80 },
   { id: "dimSuggestion", label: "Dim.-Vorschlag", defaultVisible: false, defaultWidth: 100, minWidth: 80 },
-  { id: "counterparty", label: "Gegenpartei", defaultVisible: true, defaultWidth: 150, minWidth: 100 },
-  { id: "location", label: "Standort", defaultVisible: true, defaultWidth: 120, minWidth: 80 },
-  { id: "bankAccount", label: "Bankkonto", defaultVisible: true, defaultWidth: 150, minWidth: 100 },
-  { id: "categoryTag", label: "Matrix-Kat.", defaultVisible: true, defaultWidth: 120, minWidth: 80 },
-  { id: "actions", label: "Aktionen", defaultVisible: true, defaultWidth: 130, minWidth: 100 },
+  { id: "actions", label: "Aktionen", defaultVisible: true, defaultWidth: 140, minWidth: 120 },
 ];
 
 const VALUE_TYPE_LABELS: Record<ValueType, string> = {
@@ -149,6 +150,43 @@ export default function CaseLedgerPage({
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "grouped">("table");
 
+  // Column Filters State
+  const [columnFilters, setColumnFilters] = useState<Record<string, ColumnFilterValue>>({});
+
+  const openDetails = useCallback(async (entry: LedgerEntryResponse) => {
+    setDetailsEntry(entry);
+    setDetailsImportData(null);
+    setDetailsLoading(true);
+    try {
+      const res = await fetch(`/api/cases/${id}/ledger/${entry.id}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.importData?.rawData) {
+          const raw = typeof data.importData.rawData === 'string'
+            ? JSON.parse(data.importData.rawData)
+            : data.importData.rawData;
+          setDetailsImportData(raw);
+        }
+      }
+    } catch {
+      // Import-Daten nicht verfügbar
+    } finally {
+      setDetailsLoading(false);
+    }
+  }, [id]);
+
+  const handleColumnFilterChange = useCallback((columnId: string, filter: ColumnFilterValue | null) => {
+    setColumnFilters(prev => {
+      const next = { ...prev };
+      if (filter) {
+        next[columnId] = filter;
+      } else {
+        delete next[columnId];
+      }
+      return next;
+    });
+  }, []);
+
   // Column visibility and widths
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -163,6 +201,8 @@ export default function CaseLedgerPage({
   const [resizingColumn, setResizingColumn] = useState<string | null>(null);
   const [showColumnMenu, setShowColumnMenu] = useState(false);
   const [detailsEntry, setDetailsEntry] = useState<LedgerEntryResponse | null>(null);
+  const [detailsImportData, setDetailsImportData] = useState<Record<string, unknown> | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const tableRef = useRef<HTMLTableElement>(null);
 
   // Dimensions für Name-Lookup
@@ -797,10 +837,12 @@ export default function CaseLedgerPage({
   };
 
   const toggleAllEntries = () => {
-    if (selectedEntries.size === entries.length) {
+    const visibleEntries = sortedEntries;
+    const allVisibleSelected = visibleEntries.length > 0 && visibleEntries.every(e => selectedEntries.has(e.id));
+    if (allVisibleSelected) {
       setSelectedEntries(new Set());
     } else {
-      setSelectedEntries(new Set(entries.map((e) => e.id)));
+      setSelectedEntries(new Set(visibleEntries.map((e) => e.id)));
     }
   };
 
@@ -814,8 +856,53 @@ export default function CaseLedgerPage({
     }
   };
 
-  // Sort entries
-  const sortedEntries = [...entries].sort((a, b) => {
+  // Apply column filters (memoized)
+  const filteredEntries = useMemo(() => entries.filter(entry => {
+    const entryAny = entry as any;
+
+    for (const [columnId, filter] of Object.entries(columnFilters)) {
+      if (filter.type === 'multiselect' && filter.values && filter.values.length > 0) {
+        let value = '';
+        switch(columnId) {
+          case 'categoryTag': value = entryAny.categoryTag || ''; break;
+          case 'valueType': value = entry.valueType; break;
+          case 'legalBucket': value = entry.legalBucket; break;
+          case 'reviewStatus': value = entry.reviewStatus; break;
+          case 'estateAllocation': value = entryAny.estateAllocation || ''; break;
+          case 'import': value = entryAny.importSource || 'Manuell'; break;
+          case 'location': value = entryAny.locationId || ''; break;
+          case 'bankAccount': value = entryAny.bankAccountId || ''; break;
+          case 'counterparty': value = entryAny.counterpartyId || ''; break;
+        }
+        if (!filter.values.includes(value)) return false;
+      }
+
+      if (filter.type === 'text' && filter.text && filter.text.trim()) {
+        let text = '';
+        switch(columnId) {
+          case 'description': text = entry.description.toLowerCase(); break;
+          case 'import': text = (entryAny.importSource || 'Manuell').toLowerCase(); break;
+          case 'location': text = (locationsMap.get(entryAny.locationId) || '').toLowerCase(); break;
+          case 'bankAccount': text = (bankAccountsMap.get(entryAny.bankAccountId) || '').toLowerCase(); break;
+          case 'counterparty': text = (counterpartiesMap.get(entryAny.counterpartyId) || '').toLowerCase(); break;
+        }
+        if (!text.includes(filter.text.toLowerCase().trim())) return false;
+      }
+
+      if (filter.type === 'range') {
+        if (columnId === 'amountCents') {
+          const amountEuro = parseInt(entry.amountCents) / 100;
+          if (filter.min !== undefined && amountEuro < filter.min) return false;
+          if (filter.max !== undefined && amountEuro > filter.max) return false;
+        }
+      }
+    }
+
+    return true;
+  }), [entries, columnFilters, locationsMap, bankAccountsMap, counterpartiesMap]);
+
+  // Sort entries (memoized)
+  const sortedEntries = useMemo(() => [...filteredEntries].sort((a, b) => {
     let comparison = 0;
     switch (sortBy) {
       case "transactionDate":
@@ -838,7 +925,7 @@ export default function CaseLedgerPage({
         break;
     }
     return sortOrder === "asc" ? comparison : -comparison;
-  });
+  }), [filteredEntries, sortBy, sortOrder]);
 
   // Calculate selection summary
   const selectedEntriesData = entries.filter(e => selectedEntries.has(e.id));
@@ -870,6 +957,23 @@ export default function CaseLedgerPage({
       </span>
     </div>
   );
+
+
+  // Filter Options (memoized)
+  const categoryTagOptions = useMemo(() => Object.entries(CATEGORY_TAG_LABELS).map(([value, label]) => ({ value, label })), []);
+  const valueTypeOptions = useMemo(() => Object.entries(VALUE_TYPE_LABELS).map(([value, label]) => ({ value, label })), []);
+  const legalBucketOptions = useMemo(() => Object.entries(LEGAL_BUCKET_LABELS).map(([value, label]) => ({ value, label })), []);
+  const reviewStatusOptions = useMemo(() => Object.entries(REVIEW_STATUS_LABELS).map(([value, label]) => ({ value, label })), []);
+  const estateAllocationOptions = useMemo(() => Object.entries(ESTATE_ALLOCATION_LABELS).map(([value, label]) => ({ value, label })), []);
+
+  const importSourceOptions = useMemo(() => Array.from(new Set(entries.map((e: any) => e.importSource || 'Manuell')))
+    .map(v => ({ value: v, label: v })), [entries]);
+  const locationOptions = useMemo(() => Array.from(new Set(entries.map((e: any) => e.locationId).filter(Boolean)))
+    .map(id => ({ value: id, label: locationsMap.get(id) || id })), [entries, locationsMap]);
+  const bankAccountOptions = useMemo(() => Array.from(new Set(entries.map((e: any) => e.bankAccountId).filter(Boolean)))
+    .map(id => ({ value: id, label: bankAccountsMap.get(id) || id })), [entries, bankAccountsMap]);
+  const counterpartyOptions = useMemo(() => Array.from(new Set(entries.map((e: any) => e.counterpartyId).filter(Boolean)))
+    .map(id => ({ value: id, label: counterpartiesMap.get(id) || id })), [entries, counterpartiesMap]);
 
   const getReviewStatusBadgeClass = (status: ReviewStatus): string => {
     switch (status) {
@@ -1897,7 +2001,18 @@ export default function CaseLedgerPage({
               )}
             </div>
             <span className="text-sm text-[var(--muted)]">
-              {entries.length} Einträge
+              {Object.keys(columnFilters).length > 0
+                ? `${sortedEntries.length} von ${entries.length} Einträgen`
+                : `${entries.length} Einträge`
+              }
+              {Object.keys(columnFilters).length > 0 && (
+                <button
+                  onClick={() => setColumnFilters({})}
+                  className="ml-2 text-xs text-red-500 hover:text-red-700"
+                >
+                  Alle Filter zurücksetzen
+                </button>
+              )}
             </span>
           </div>
         </div>
@@ -1910,10 +2025,14 @@ export default function CaseLedgerPage({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table ref={tableRef} className="admin-table" style={{ tableLayout: "fixed" }}>
+            <table
+              ref={tableRef}
+              className="admin-table"
+              style={{ tableLayout: "fixed" }}
+            >
               <thead>
                 <tr>
-                  {/* Checkbox column - STICKY */}
+                  {/* 1. Checkbox - STICKY */}
                   <th
                     style={{
                       width: columnWidths.checkbox,
@@ -1927,12 +2046,13 @@ export default function CaseLedgerPage({
                   >
                     <input
                       type="checkbox"
-                      checked={selectedEntries.size === entries.length && entries.length > 0}
+                      checked={sortedEntries.length > 0 && sortedEntries.every(e => selectedEntries.has(e.id))}
                       onChange={toggleAllEntries}
                       className="rounded border-gray-300"
                     />
                   </th>
-                  {/* Datum - STICKY */}
+
+                  {/* 2. Datum - STICKY */}
                   {columnVisibility.transactionDate && (
                     <th
                       style={{
@@ -1952,107 +2072,179 @@ export default function CaseLedgerPage({
                       />
                     </th>
                   )}
-                  {/* Beschreibung - STICKY */}
-                  {columnVisibility.description && (
+
+                  {/* 3. Matrix-Kat - STICKY */}
+                  {columnVisibility.categoryTag && (
                     <th
                       style={{
-                        width: columnWidths.description,
+                        width: columnWidths.categoryTag,
+                        maxWidth: columnWidths.categoryTag,
                         position: 'sticky',
                         left: columnWidths.checkbox + columnWidths.transactionDate,
                         zIndex: 10,
                         backgroundColor: 'white',
-                        boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
+                        boxShadow: '2px 0 4px rgba(0,0,0,0.05)',
+                        overflow: 'hidden',
                       }}
-                      className="relative group cursor-pointer"
+                      className="relative group"
                     >
-                      <SortHeader field="description" label="Beschreibung" />
+                      <div className="flex items-center">
+                        Matrix-Kat.
+                        <ColumnFilter columnId="categoryTag" filterType="multiselect" options={categoryTagOptions} currentFilter={columnFilters["categoryTag"]} onFilterChange={handleColumnFilterChange} />
+                      </div>
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "categoryTag")}
+                      />
+                    </th>
+                  )}
+
+                  {/* 4. Beschreibung */}
+                  {columnVisibility.description && (
+                    <th style={{ width: columnWidths.description }} className="relative group cursor-pointer">
+                      <div className="flex items-center">
+                        <SortHeader field="description" label="Beschreibung" />
+                        <span className="ml-1 text-gray-400 hover:text-gray-600 cursor-help" title="Beim Hovern über eine Beschreibung wird der volle Text angezeigt. Für den vollständigen Überweisungstext: Zeile anklicken → Originaldaten aus Kontoauszug">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </span>
+                        <ColumnFilter columnId="description" filterType="text" currentFilter={columnFilters["description"]} onFilterChange={handleColumnFilterChange} />
+                      </div>
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
                         onMouseDown={(e) => handleResizeStart(e, "description")}
                       />
                     </th>
                   )}
-                  {/* Betrag - STICKY */}
+
+                  {/* 5. Betrag */}
                   {columnVisibility.amountCents && (
-                    <th
-                      style={{
-                        width: columnWidths.amountCents,
-                        position: 'sticky',
-                        left: columnWidths.checkbox + columnWidths.transactionDate + columnWidths.description,
-                        zIndex: 10,
-                        backgroundColor: 'white',
-                        boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
-                      }}
-                      className="relative group text-right cursor-pointer"
-                    >
-                      <SortHeader field="amountCents" label="Betrag" className="text-right" />
+                    <th style={{ width: columnWidths.amountCents }} className="relative group text-right cursor-pointer">
+                      <div className="flex items-center justify-end">
+                        <SortHeader field="amountCents" label="Betrag" className="text-right" />
+                        <ColumnFilter columnId="amountCents" filterType="range" currentFilter={columnFilters["amountCents"]} onFilterChange={handleColumnFilterChange} />
+                      </div>
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
                         onMouseDown={(e) => handleResizeStart(e, "amountCents")}
                       />
                     </th>
                   )}
-                  {/* Quelle/Import - STICKY */}
+
+                  {/* 6. Quelle */}
                   {columnVisibility.import && (
-                    <th
-                      style={{
-                        width: columnWidths.import,
-                        position: 'sticky',
-                        left: columnWidths.checkbox + columnWidths.transactionDate + columnWidths.description + columnWidths.amountCents,
-                        zIndex: 10,
-                        backgroundColor: 'white',
-                        boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
-                      }}
-                      className="relative group"
-                    >
-                      Quelle
+                    <th style={{ width: columnWidths.import }} className="relative group">
+                      <div className="flex items-center">
+                        Quelle
+                        <ColumnFilter columnId="import" filterType="multiselect" options={importSourceOptions} currentFilter={columnFilters["import"]} onFilterChange={handleColumnFilterChange} />
+                      </div>
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
                         onMouseDown={(e) => handleResizeStart(e, "import")}
                       />
                     </th>
                   )}
-                  {/* Typ */}
+
+                  {/* 7. Standort */}
+                  {columnVisibility.location && (
+                    <th style={{ width: columnWidths.location }} className="relative group">
+                      <div className="flex items-center">
+                        Standort
+                        <ColumnFilter columnId="location" filterType="multiselect" options={locationOptions} currentFilter={columnFilters["location"]} onFilterChange={handleColumnFilterChange} />
+                      </div>
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "location")}
+                      />
+                    </th>
+                  )}
+
+                  {/* 8. Bankkonto */}
+                  {columnVisibility.bankAccount && (
+                    <th style={{ width: columnWidths.bankAccount }} className="relative group">
+                      <div className="flex items-center">
+                        Bankkonto
+                        <ColumnFilter columnId="bankAccount" filterType="multiselect" options={bankAccountOptions} currentFilter={columnFilters["bankAccount"]} onFilterChange={handleColumnFilterChange} />
+                      </div>
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "bankAccount")}
+                      />
+                    </th>
+                  )}
+
+                  {/* 9. Gegenpartei */}
+                  {columnVisibility.counterparty && (
+                    <th style={{ width: columnWidths.counterparty }} className="relative group">
+                      <div className="flex items-center">
+                        Gegenpartei
+                        <ColumnFilter columnId="counterparty" filterType="multiselect" options={counterpartyOptions} currentFilter={columnFilters["counterparty"]} onFilterChange={handleColumnFilterChange} />
+                      </div>
+                      <div
+                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
+                        onMouseDown={(e) => handleResizeStart(e, "counterparty")}
+                      />
+                    </th>
+                  )}
+
+                  {/* 10. Typ */}
                   {columnVisibility.valueType && (
                     <th style={{ width: columnWidths.valueType }} className="relative group cursor-pointer">
-                      <SortHeader field="valueType" label="Typ" />
+                      <div className="flex items-center">
+                        <SortHeader field="valueType" label="Typ" />
+                        <ColumnFilter columnId="valueType" filterType="multiselect" options={valueTypeOptions} currentFilter={columnFilters["valueType"]} onFilterChange={handleColumnFilterChange} />
+                      </div>
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
                         onMouseDown={(e) => handleResizeStart(e, "valueType")}
                       />
                     </th>
                   )}
-                  {/* Alt/Neu */}
+
+                  {/* 11. Alt/Neu */}
                   {columnVisibility.estateAllocation && (
                     <th style={{ width: columnWidths.estateAllocation }} className="relative group">
-                      Alt/Neu
+                      <div className="flex items-center">
+                        Alt/Neu
+                        <ColumnFilter columnId="estateAllocation" filterType="multiselect" options={estateAllocationOptions} currentFilter={columnFilters["estateAllocation"]} onFilterChange={handleColumnFilterChange} />
+                      </div>
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
                         onMouseDown={(e) => handleResizeStart(e, "estateAllocation")}
                       />
                     </th>
                   )}
-                  {/* Rechtsstatus */}
+
+                  {/* 12. Rechtsstatus */}
                   {columnVisibility.legalBucket && (
                     <th style={{ width: columnWidths.legalBucket }} className="relative group">
-                      <SortHeader field="legalBucket" label="Rechtsstatus" />
+                      <div className="flex items-center">
+                        <SortHeader field="legalBucket" label="Rechtsstatus" />
+                        <ColumnFilter columnId="legalBucket" filterType="multiselect" options={legalBucketOptions} currentFilter={columnFilters["legalBucket"]} onFilterChange={handleColumnFilterChange} />
+                      </div>
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
                         onMouseDown={(e) => handleResizeStart(e, "legalBucket")}
                       />
                     </th>
                   )}
-                  {/* Review */}
+
+                  {/* 13. Review */}
                   {columnVisibility.reviewStatus && (
                     <th style={{ width: columnWidths.reviewStatus }} className="relative group">
-                      <SortHeader field="reviewStatus" label="Review" />
+                      <div className="flex items-center">
+                        <SortHeader field="reviewStatus" label="Review" />
+                        <ColumnFilter columnId="reviewStatus" filterType="multiselect" options={reviewStatusOptions} currentFilter={columnFilters["reviewStatus"]} onFilterChange={handleColumnFilterChange} />
+                      </div>
                       <div
                         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
                         onMouseDown={(e) => handleResizeStart(e, "reviewStatus")}
                       />
                     </th>
                   )}
-                  {/* Vorschlag */}
+
+                  {/* Vorschlag (hidden by default) */}
                   {columnVisibility.suggestion && (
                     <th style={{ width: columnWidths.suggestion }} className="relative group">
                       Vorschlag
@@ -2062,7 +2254,8 @@ export default function CaseLedgerPage({
                       />
                     </th>
                   )}
-                  {/* Dim.-Vorschlag */}
+
+                  {/* Dim.-Vorschlag (hidden by default) */}
                   {columnVisibility.dimSuggestion && (
                     <th style={{ width: columnWidths.dimSuggestion }} className="relative group">
                       Dim.-Vorschlag
@@ -2072,52 +2265,13 @@ export default function CaseLedgerPage({
                       />
                     </th>
                   )}
-                  {/* Gegenpartei */}
-                  {columnVisibility.counterparty && (
-                    <th style={{ width: columnWidths.counterparty }} className="relative group">
-                      Gegenpartei
-                      <div
-                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
-                        onMouseDown={(e) => handleResizeStart(e, "counterparty")}
-                      />
-                    </th>
-                  )}
-                  {/* Standort */}
-                  {columnVisibility.location && (
-                    <th style={{ width: columnWidths.location }} className="relative group">
-                      Standort
-                      <div
-                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
-                        onMouseDown={(e) => handleResizeStart(e, "location")}
-                      />
-                    </th>
-                  )}
-                  {/* Bankkonto */}
-                  {columnVisibility.bankAccount && (
-                    <th style={{ width: columnWidths.bankAccount }} className="relative group">
-                      Bankkonto
-                      <div
-                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
-                        onMouseDown={(e) => handleResizeStart(e, "bankAccount")}
-                      />
-                    </th>
-                  )}
-                  {/* Matrix-Kategorie */}
-                  {columnVisibility.categoryTag && (
-                    <th style={{ width: columnWidths.categoryTag }} className="relative group px-2 py-2 text-left text-xs font-medium text-[var(--muted)] uppercase whitespace-nowrap">
-                      Matrix-Kat.
-                      <div
-                        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 group-hover:bg-blue-200"
-                        onMouseDown={(e) => handleResizeStart(e, "categoryTag")}
-                      />
-                    </th>
-                  )}
-                  {/* Aktionen */}
+
+                  {/* 14. Aktionen */}
                   <th style={{ width: columnWidths.actions }}>Aktionen</th>
                 </tr>
               </thead>
-              <tbody>
-                {sortedEntries.map((entry) => {
+                            <tbody>
+                {sortedEntries.map((entry, index) => {
                   const amount = parseInt(entry.amountCents);
                   const isInflow = amount >= 0;
                   const entryWithExtras = entry as LedgerEntryResponse & {
@@ -2139,15 +2293,37 @@ export default function CaseLedgerPage({
 
                   const isTransfer = !!(entryWithExtras as unknown as { transferPartnerEntryId: string | null }).transferPartnerEntryId;
 
+                  // Zebra stripes: even rows get light gray background
+                  const zebraClass = index % 2 === 0 ? '' : 'bg-gray-50/30';
+                  const rowBgClass = selectedEntries.has(entry.id)
+                    ? "bg-blue-50"
+                    : isTransfer
+                    ? "bg-gray-100 text-gray-500"
+                    : zebraClass;
+
                   return (
-                    <tr key={entry.id} className={`${selectedEntries.has(entry.id) ? "bg-blue-50" : isTransfer ? "bg-gray-50 text-gray-500" : ""}`}>
-                      {/* Checkbox - STICKY */}
+                    <tr
+                      key={entry.id}
+                      className={`${rowBgClass} hover:bg-gray-100/50 transition-colors cursor-pointer`}
+                      onClick={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (target.closest('input, button, a, select')) return;
+                        openDetails(entry);
+                      }}
+                    >
+                      {/* 1. Checkbox - STICKY */}
                       <td
                         style={{
                           position: 'sticky',
                           left: 0,
                           zIndex: 9,
-                          backgroundColor: selectedEntries.has(entry.id) ? '#eff6ff' : isTransfer ? '#f9fafb' : 'white',
+                          backgroundColor: selectedEntries.has(entry.id)
+                            ? '#eff6ff'
+                            : isTransfer
+                            ? '#f3f4f6'
+                            : index % 2 === 0
+                            ? 'white'
+                            : 'rgba(249, 250, 251, 0.5)',
                           boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
                         }}
                       >
@@ -2158,7 +2334,8 @@ export default function CaseLedgerPage({
                           className="rounded border-gray-300"
                         />
                       </td>
-                      {/* Datum - STICKY */}
+
+                      {/* 2. Datum - STICKY */}
                       {columnVisibility.transactionDate && (
                         <td
                           className="whitespace-nowrap"
@@ -2166,23 +2343,86 @@ export default function CaseLedgerPage({
                             position: 'sticky',
                             left: columnWidths.checkbox,
                             zIndex: 9,
-                            backgroundColor: selectedEntries.has(entry.id) ? '#eff6ff' : isTransfer ? '#f9fafb' : 'white',
+                            backgroundColor: selectedEntries.has(entry.id)
+                              ? '#eff6ff'
+                              : isTransfer
+                              ? '#f3f4f6'
+                              : index % 2 === 0
+                              ? 'white'
+                              : 'rgba(249, 250, 251, 0.5)',
                             boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
                           }}
                         >
                           {formatDate(entry.transactionDate)}
                         </td>
                       )}
-                      {/* Beschreibung - STICKY */}
-                      {columnVisibility.description && (
+
+                      {/* 3. Matrix-Kat - STICKY */}
+                      {columnVisibility.categoryTag && (
                         <td
+                          className="px-2 py-1.5 text-xs overflow-hidden"
                           style={{
                             position: 'sticky',
                             left: columnWidths.checkbox + columnWidths.transactionDate,
                             zIndex: 9,
-                            backgroundColor: selectedEntries.has(entry.id) ? '#eff6ff' : isTransfer ? '#f9fafb' : 'white',
+                            width: columnWidths.categoryTag,
+                            maxWidth: columnWidths.categoryTag,
+                            backgroundColor: selectedEntries.has(entry.id)
+                              ? '#eff6ff'
+                              : isTransfer
+                              ? '#f3f4f6'
+                              : index % 2 === 0
+                              ? 'white'
+                              : 'rgba(249, 250, 251, 0.5)',
                             boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
                           }}
+                        >
+                          {(() => {
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                            const ext = entryWithExtras as any;
+                            const tag = ext.categoryTag as string | null;
+                            const source = ext.categoryTagSource as string | null;
+                            const note = ext.categoryTagNote as string | null;
+                            const suggested = ext.suggestedCategoryTag as string | null;
+                            const reason = ext.suggestedCategoryTagReason as string | null;
+
+                            if (tag) {
+                              const label = CATEGORY_TAG_LABELS[tag] || tag;
+                              const sourceLabel = source ? CATEGORY_TAG_SOURCE_LABELS[source as keyof typeof CATEGORY_TAG_SOURCE_LABELS] || source : '';
+                              return (
+                                <span
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-300 max-w-full truncate"
+                                  title={`${label}${sourceLabel ? ` (${sourceLabel})` : ''}${note ? ` | ${note}` : ''}`}
+                                >
+                                  {label}
+                                  {source === 'AUTO' && <span className="text-[9px] opacity-60 shrink-0">A</span>}
+                                  {source === 'MANUELL' && <span className="text-[9px] opacity-60 shrink-0">M</span>}
+                                </span>
+                              );
+                            }
+
+                            if (suggested) {
+                              const label = CATEGORY_TAG_LABELS[suggested] || suggested;
+                              return (
+                                <span
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 border border-dashed border-blue-300 max-w-full truncate"
+                                  title={`${label} (Vorschlag)${reason ? ` | ${reason}` : ''}`}
+                                >
+                                  {label}
+                                  <span className="text-[9px] opacity-60 shrink-0">?</span>
+                                </span>
+                              );
+                            }
+
+                            return <span className="text-[var(--muted)]">&ndash;</span>;
+                          })()}
+                        </td>
+                      )}
+
+                      {/* 4. Beschreibung (NOT sticky anymore) */}
+                      {columnVisibility.description && (
+                        <td
+                          title={entry.description}
                         >
                           <div className="truncate" style={{ maxWidth: columnWidths.description - 16 }}>
                             <div className="font-medium text-[var(--foreground)] truncate">
@@ -2201,41 +2441,33 @@ export default function CaseLedgerPage({
                           </div>
                         </td>
                       )}
-                      {/* Betrag - STICKY */}
+
+                      {/* 5. Betrag (NOT sticky anymore) */}
                       {columnVisibility.amountCents && (
                         <td
                           className={`text-right font-mono whitespace-nowrap ${
                             isInflow ? "text-[var(--success)]" : "text-[var(--danger)]"
                           }`}
-                          style={{
-                            position: 'sticky',
-                            left: columnWidths.checkbox + columnWidths.transactionDate + columnWidths.description,
-                            zIndex: 9,
-                            backgroundColor: selectedEntries.has(entry.id) ? '#eff6ff' : isTransfer ? '#f9fafb' : 'white',
-                            boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
-                          }}
                         >
                           {formatCurrency(entry.amountCents)}
                         </td>
                       )}
-                      {/* Quelle - STICKY */}
+
+                      {/* 6. Quelle (NOT sticky anymore) */}
                       {columnVisibility.import && (
                         <td
                           className="text-xs truncate"
-                          style={{
-                            maxWidth: columnWidths.import,
-                            position: 'sticky',
-                            left: columnWidths.checkbox + columnWidths.transactionDate + columnWidths.description + columnWidths.amountCents,
-                            zIndex: 9,
-                            backgroundColor: selectedEntries.has(entry.id) ? '#eff6ff' : isTransfer ? '#f9fafb' : 'white',
-                            boxShadow: '2px 0 4px rgba(0,0,0,0.05)'
-                          }}
+                          style={{ maxWidth: columnWidths.import }}
                         >
                           {entryWithExtras.importSource ? (
                             <span
-                              className="cursor-pointer hover:text-[var(--primary)] hover:underline truncate block"
-                              onClick={() => setFilterImportJobId(entryWithExtras.importJobId || "")}
-                              title={`${entryWithExtras.importSource}\nKlicken zum Filtern`}
+                              className="import-filter-trigger cursor-pointer hover:text-[var(--primary)] hover:underline truncate block"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setFilterImportJobId(entryWithExtras.importJobId || "");
+                              }}
+                              title={`${entryWithExtras.importSource}
+Klicken zum Filtern`}
                             >
                               {entryWithExtras.importSource}
                             </span>
@@ -2244,6 +2476,53 @@ export default function CaseLedgerPage({
                           )}
                         </td>
                       )}
+
+                      {/* 7. Standort */}
+                      {columnVisibility.location && (
+                        <td
+                          className="text-xs truncate"
+                        >
+                          {entryWithExtras.locationId ? (
+                            <span title={locationsMap.get(entryWithExtras.locationId) || entryWithExtras.locationId}>
+                              {locationsMap.get(entryWithExtras.locationId) || entryWithExtras.locationId}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* 8. Bankkonto */}
+                      {columnVisibility.bankAccount && (
+                        <td
+                          className="text-xs truncate"
+                        >
+                          {entryWithExtras.bankAccountId ? (
+                            <span title={bankAccountsMap.get(entryWithExtras.bankAccountId) || entryWithExtras.bankAccountId}>
+                              {bankAccountsMap.get(entryWithExtras.bankAccountId) || entryWithExtras.bankAccountId}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* 9. Gegenpartei */}
+                      {columnVisibility.counterparty && (
+                        <td
+                          className="text-xs truncate"
+                        >
+                          {entryWithExtras.counterpartyId ? (
+                            <span title={counterpartiesMap.get(entryWithExtras.counterpartyId) || entryWithExtras.counterpartyId}>
+                              {counterpartiesMap.get(entryWithExtras.counterpartyId) || entryWithExtras.counterpartyId}
+                            </span>
+                          ) : (
+                            <span className="text-[var(--muted)]">-</span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* 10. Typ */}
                       {columnVisibility.valueType && (
                         <td>
                           <span className={`badge ${getValueTypeBadgeClass(entry.valueType)}`}>
@@ -2251,6 +2530,8 @@ export default function CaseLedgerPage({
                           </span>
                         </td>
                       )}
+
+                      {/* 11. Alt/Neu */}
                       {columnVisibility.estateAllocation && (
                         <td>
                           {entryWithExtras.estateAllocation ? (
@@ -2265,6 +2546,8 @@ export default function CaseLedgerPage({
                           )}
                         </td>
                       )}
+
+                      {/* 12. Rechtsstatus */}
                       {columnVisibility.legalBucket && (
                         <td>
                           <span className={`badge ${getBucketBadgeClass(entry.legalBucket)}`}>
@@ -2272,6 +2555,8 @@ export default function CaseLedgerPage({
                           </span>
                         </td>
                       )}
+
+                      {/* 13. Review */}
                       {columnVisibility.reviewStatus && (
                         <td>
                           <span className={`badge ${getReviewStatusBadgeClass(entry.reviewStatus as ReviewStatus)}`}>
@@ -2279,6 +2564,8 @@ export default function CaseLedgerPage({
                           </span>
                         </td>
                       )}
+
+                      {/* Vorschlag (hidden by default) */}
                       {columnVisibility.suggestion && (
                         <td>
                           {entryWithExtras.suggestedLegalBucket ? (
@@ -2297,6 +2584,8 @@ export default function CaseLedgerPage({
                           )}
                         </td>
                       )}
+
+                      {/* Dim.-Vorschlag (hidden by default) */}
                       {columnVisibility.dimSuggestion && (
                         <td className="text-xs">
                           {(entryWithExtras.suggestedBankAccountId || entryWithExtras.suggestedCounterpartyId || entryWithExtras.suggestedLocationId) ? (
@@ -2322,115 +2611,68 @@ export default function CaseLedgerPage({
                           )}
                         </td>
                       )}
-                      {columnVisibility.counterparty && (
-                        <td className="text-xs truncate">
-                          {entryWithExtras.counterpartyId ? (
-                            <span title={counterpartiesMap.get(entryWithExtras.counterpartyId) || entryWithExtras.counterpartyId}>
-                              {counterpartiesMap.get(entryWithExtras.counterpartyId) || entryWithExtras.counterpartyId}
-                            </span>
-                          ) : (
-                            <span className="text-[var(--muted)]">-</span>
-                          )}
-                        </td>
-                      )}
-                      {columnVisibility.location && (
-                        <td className="text-xs truncate">
-                          {entryWithExtras.locationId ? (
-                            <span title={locationsMap.get(entryWithExtras.locationId) || entryWithExtras.locationId}>
-                              {locationsMap.get(entryWithExtras.locationId) || entryWithExtras.locationId}
-                            </span>
-                          ) : (
-                            <span className="text-[var(--muted)]">-</span>
-                          )}
-                        </td>
-                      )}
-                      {columnVisibility.bankAccount && (
-                        <td className="text-xs truncate">
-                          {entryWithExtras.bankAccountId ? (
-                            <span title={bankAccountsMap.get(entryWithExtras.bankAccountId) || entryWithExtras.bankAccountId}>
-                              {bankAccountsMap.get(entryWithExtras.bankAccountId) || entryWithExtras.bankAccountId}
-                            </span>
-                          ) : (
-                            <span className="text-[var(--muted)]">-</span>
-                          )}
-                        </td>
-                      )}
-                      {columnVisibility.categoryTag && (
-                        <td className="px-2 py-1.5 text-xs">
-                          {(() => {
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            const ext = entryWithExtras as any;
-                            const tag = ext.categoryTag as string | null;
-                            const source = ext.categoryTagSource as string | null;
-                            const note = ext.categoryTagNote as string | null;
-                            const suggested = ext.suggestedCategoryTag as string | null;
-                            const reason = ext.suggestedCategoryTagReason as string | null;
 
-                            if (tag) {
-                              // Confirmed tag
-                              const label = CATEGORY_TAG_LABELS[tag] || tag;
-                              const sourceLabel = source ? CATEGORY_TAG_SOURCE_LABELS[source as keyof typeof CATEGORY_TAG_SOURCE_LABELS] || source : '';
-                              return (
-                                <span
-                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-300"
-                                  title={`${sourceLabel}${note ? ` | ${note}` : ''}`}
-                                >
-                                  {label}
-                                  {source === 'AUTO' && <span className="text-[9px] opacity-60">A</span>}
-                                  {source === 'MANUELL' && <span className="text-[9px] opacity-60">M</span>}
-                                </span>
-                              );
-                            }
-
-                            if (suggested) {
-                              // Only suggestion
-                              const label = CATEGORY_TAG_LABELS[suggested] || suggested;
-                              return (
-                                <span
-                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-600 border border-dashed border-blue-300"
-                                  title={reason || 'Vorschlag'}
-                                >
-                                  {label}
-                                  <span className="text-[9px] opacity-60">?</span>
-                                </span>
-                              );
-                            }
-
-                            return <span className="text-[var(--muted)]">&ndash;</span>;
-                          })()}
-                        </td>
-                      )}
+                      {/* 14. Aktionen */}
                       <td>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setDetailsEntry(entry)}
-                            className="text-[var(--secondary)] hover:text-[var(--foreground)] text-sm"
-                            title="Details anzeigen"
-                          >
-                            Details
-                          </button>
+                        <div className="flex items-center gap-1.5">
+                          {/* Primary action - Details/Edit */}
                           <Link
                             href={`/admin/cases/${id}/ledger/${entry.id}`}
-                            className="text-[var(--primary)] hover:underline text-sm"
+                            className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                            title="Bearbeiten"
                           >
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
                             Bearbeiten
                           </Link>
-                          {isTransfer && (
+
+                          {/* Secondary actions in dropdown */}
+                          <div className="relative group">
                             <button
-                              onClick={() => handleUnpairTransfer(entry.id)}
-                              className="text-indigo-600 hover:underline text-sm"
-                              title="Umbuchungs-Verknüpfung aufheben"
+                              className="inline-flex items-center justify-center w-6 h-6 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                              title="Weitere Aktionen"
                             >
-                              Entknüpfen
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                              </svg>
                             </button>
-                          )}
-                          <button
-                            onClick={() => handleDeleteEntry(entry.id, entry.description)}
-                            className="text-[var(--danger)] hover:underline text-sm"
-                            title="Eintrag löschen"
-                          >
-                            Löschen
-                          </button>
+
+                            {/* Dropdown menu */}
+                            <div className="absolute right-0 mt-1 w-40 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                              <div className="py-1">
+                                <button
+                                  onClick={() => openDetails(entry)}
+                                  className="w-full px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  Details
+                                </button>
+                                {isTransfer && (
+                                  <button
+                                    onClick={() => handleUnpairTransfer(entry.id)}
+                                    className="w-full px-3 py-2 text-left text-xs text-indigo-600 hover:bg-indigo-50 flex items-center gap-2"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                                    </svg>
+                                    Entknüpfen
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDeleteEntry(entry.id, entry.description)}
+                                  className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 flex items-center gap-2 border-t border-gray-100"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                  Löschen
+                                </button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -2506,6 +2748,73 @@ export default function CaseLedgerPage({
                           </div>
                         )}
                       </dl>
+                    </div>
+
+                    {/* Originaldaten aus Kontoauszug */}
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">Originaldaten aus Kontoauszug</h4>
+                      {detailsLoading ? (
+                        <p className="text-sm text-gray-400">Lade Transaktionsdaten...</p>
+                      ) : detailsImportData ? (
+                        <dl className="grid grid-cols-1 gap-2 text-sm">
+                          {(() => {
+                            const raw = detailsImportData;
+                            // Canonical schema: core, standard, additional, splitAmount
+                            const core = (raw.core || {}) as Record<string, unknown>;
+                            const standard = (raw.standard || {}) as Record<string, unknown>;
+                            const additional = (raw.additional || {}) as Record<string, unknown>;
+                            const splitAmount = (raw.splitAmount || {}) as Record<string, unknown>;
+
+                            const fieldLabels: Record<string, string> = {
+                              datum: 'Buchungsdatum',
+                              betrag: 'Betrag',
+                              bezeichnung: 'Überweisungstext',
+                              einzahlung: 'Einzahlung',
+                              auszahlung: 'Auszahlung',
+                              kategorie: 'Kategorie',
+                              zahlungsart: 'Zahlungsart',
+                              typ: 'Typ',
+                              konto: 'Konto/IBAN',
+                              gegenpartei: 'Auftraggeber/Empfänger',
+                              referenz: 'Referenz/Buchungsnummer',
+                              kommentar: 'Kommentar',
+                              notiz: 'Notiz',
+                              quelle: 'Quelle',
+                              alt_neu_forderung: 'Alt/Neu Forderung',
+                              massetyp: 'Massetyp',
+                              werttyp: 'Werttyp',
+                              unsicherheit: 'Unsicherheit',
+                            };
+
+                            const allFields: [string, string][] = [];
+                            // Core fields first
+                            for (const [k, v] of Object.entries(core)) {
+                              if (v != null && String(v).trim()) allFields.push([fieldLabels[k] || k, String(v)]);
+                            }
+                            // Split amount
+                            for (const [k, v] of Object.entries(splitAmount)) {
+                              if (v != null && String(v).trim()) allFields.push([fieldLabels[k] || k, String(v)]);
+                            }
+                            // Standard fields
+                            for (const [k, v] of Object.entries(standard)) {
+                              if (v != null && String(v).trim()) allFields.push([fieldLabels[k] || k, String(v)]);
+                            }
+                            // Additional (unmapped) fields
+                            for (const [k, v] of Object.entries(additional)) {
+                              if (v != null && String(v).trim()) allFields.push([k, String(v)]);
+                            }
+
+                            return allFields.map(([label, value], i) => (
+                              <div key={i} className="flex gap-3">
+                                <dt className="text-gray-500 min-w-[160px] shrink-0">{label}</dt>
+                                <dd className="font-medium break-all">{value}</dd>
+                              </div>
+                            ));
+                          })()}
+                        </dl>
+                      ) : (
+                        <p className="text-sm text-gray-400">Keine Import-Daten verfügbar (manueller Eintrag)</p>
+                      )}
                     </div>
 
                     {/* Klassifikation */}
