@@ -4,6 +4,55 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.20.0 – Ledger UX-Overhaul & Dokumentations-Aufräumung
+
+**Datum:** 09.-10. Februar 2026
+
+### Neue Funktionen
+
+- **Zeile klicken = Details:** Klick auf beliebige Ledger-Zeile öffnet Details-Modal (ersetzt Drei-Punkte-Menü)
+- **Originaldaten aus Kontoauszug:** Details-Modal zeigt alle Felder aus dem Original-Import (rawData aus IngestionRecord)
+  - Canonical Schema: Buchungsdatum, Überweisungstext, Auftraggeber/Empfänger, Zahlungsart, Referenz
+  - Lädt automatisch via Single-Entry-API (`/api/cases/{id}/ledger/{entryId}`)
+- **Beschreibungs-Tooltip:** Hovern über Beschreibungsspalte zeigt vollen Text
+- **Info-Icon im Spalten-Header:** Erklärt Hover-Funktion und Verweis auf Details-Modal
+
+### Entfernte Features
+
+- **Inline-Editing entfernt:** Doppelklick-Bearbeitung in der Tabelle entfernt (Performance-Problem: fetchData() nach jedem Edit lud 8 API-Endpoints, 12+ Re-Renders, 1-3s Lag - mit Turso noch schlimmer)
+- **Zell-Selektion entfernt:** Keyboard-Navigation und Zell-Markierung entfernt (war an Inline-Editing gekoppelt)
+
+### Bugfixes
+
+- **Import-Daten nicht geladen:** `importRowNumber === 0` ist falsy in JS, API wird jetzt immer aufgerufen
+- **Matrix-Spalte überlappt:** overflow:hidden + maxWidth für categoryTag TD/TH, truncate für Badges
+
+### Performance-Optimierungen (aus vorheriger Session)
+
+- **useMemo für gefilterte Entries:** Vermeidet Neuberechnung bei jedem Render
+- **ColumnFilter als externe Komponente:** Eigene Datei statt inline in 2800-Zeilen-Page
+- **savingRef statt State:** Verhindert setState-Cascade beim Speichern
+
+### Infrastruktur
+
+- **Backup-Script:** `scripts/backup-turso.sh` erstellt – exportiert Turso Production-DB als SQLite
+- **Wöchentlicher Backup-Cronjob:** Sonntags 02:00 automatisches Turso-Backup
+- **Pflicht-Backup vor Deployment:** In CLAUDE.md Deployment-Workflow als Step 0 verankert
+
+### Dokumentation
+
+- **Komplette Wissensstruktur reorganisiert:**
+  - 12 verwaiste Root-.md-Dateien verschoben (6 → archiv/, 6 → Cases/06-review/)
+  - Cases/HVPlus/ Legacy-Ordner konsolidiert (Rohdaten → 01-raw/, Ordner gelöscht)
+  - Leerzeichen-Datei (` .md`) umbenannt, Case-Root-Dateien in 06-review/ verschoben
+  - docs/archiv/ auf 22 Dateien erweitert mit INDEX.md
+- **CLAUDE.md erweitert:** Import-Sicherheitsregeln, Backup-Strategie, Turso-DB korrigiert (v2), Arbeitsstand aktualisiert, customer-login dokumentiert
+- **/doku Skill neu geschrieben:** Alle 8 Living Docs abgedeckt, Cleanup für verwaiste Dateien
+- **/liqui Skill korrigiert:** Falsche Dateinamen behoben, 06-review/ Key-Dateien ergänzt
+- **TODO.md + LIMITATIONS.md bereinigt:** Gelöste Items archiviert, aktuelle Bugs übernommen
+
+---
+
 ## Version 2.19.0 – Cell Explanation Panel (Drill-Down)
 
 **Datum:** 10. Februar 2026

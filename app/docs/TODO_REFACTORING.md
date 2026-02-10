@@ -11,7 +11,7 @@
 Code-Struktur verbessern, um Dashboard-Änderungen und Debugging zu erleichtern.
 
 **Hauptprobleme aktuell:**
-1. ❌ Riesige API-Routen (803 Zeilen) → schwer lesbar für Claude Code
+1. ⚠️ API-Routen noch groß, aber Aggregationslogik bereits extrahiert nach `lib/liquidity-matrix/aggregate.ts` (v2.18.0)
 2. ❌ Dashboard-Änderungen aufwendig (Logik verstreut)
 3. ❌ Scope-Logik mehrfach implementiert (5 Stellen)
 4. ❌ Dashboard-Komponenten 3-fach dupliziert (Admin/Portal/View)

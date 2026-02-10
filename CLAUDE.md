@@ -70,6 +70,7 @@ npx prisma db push   # Sync database schema
 - `/app` – Next.js application root
 - `/app/src/app/admin/*` – Internal admin dashboard
 - `/app/src/app/portal/*` – Customer portal for insolvency administrators
+- `/app/src/app/customer-login/*` – Kunden-Login-Seite
 - `/app/src/app/view/*` – External read-only view (share links)
 - `/app/src/app/api/*` – API routes
 - `/app/src/components/*` – React components
@@ -149,10 +150,11 @@ Dies gilt für:
 - **Auto-Deploy:** Push to `main` triggers automatic deployment
 
 ### Turso Database (Production)
-- **Database Name:** `inso-liquiplanung`
-- **URL:** `libsql://inso-liquiplanung-dp-213.aws-eu-west-1.turso.io`
+- **Database Name:** `inso-liquiplanung-v2` (aktive Production-DB)
+- **URL:** `libsql://inso-liquiplanung-v2-dp-213.aws-eu-west-1.turso.io`
 - **Region:** AWS EU West 1 (Frankfurt)
 - **CLI:** `turso db list` zeigt alle Datenbanken
+- **Legacy:** `inso-liquiplanung` (nicht mehr aktiv)
 
 ### Environment Variables (bereits in Vercel konfiguriert)
 | Variable | Beschreibung |
@@ -169,6 +171,18 @@ Dies gilt für:
 - **Lokal:** SQLite (`DATABASE_URL="file:./dev.db"`)
 - **Production:** Turso (automatische Erkennung via `libsql://` Prefix)
 - Code in `src/lib/db.ts` wechselt automatisch basierend auf URL-Format
+
+### Backup-Strategie
+
+| Was | Wie | Wann | Wo |
+|-----|-----|------|-----|
+| **Turso Production** | `./scripts/backup-turso.sh` | Automatisch: Sonntags 02:00 (Cronjob) | `/Backups/turso/` |
+| **Turso vor Deployment** | `./scripts/backup-turso.sh pre-deploy` | Manuell vor jedem Deploy mit Schema-Änderung | `/Backups/turso/` |
+| **Turso vor DB-Reset** | `./scripts/backup-turso.sh pre-reset` | **PFLICHT!** Vor jedem `prisma db push --force-reset` | `/Backups/turso/` |
+
+**Backup-Verzeichnis:** `/Backups/turso/` (max. 30 Backups, älteste werden automatisch gelöscht)
+**Logs:** `/tmp/turso-backup.log`
+**Restore:** `sqlite3` öffnen, `.read backup.sql` oder direkt als dev.db verwenden
 
 ### Für Custom Domain
 In Vercel Dashboard: Settings → Domains → eigene Domain hinzufügen
@@ -262,6 +276,24 @@ cd app && npm run build
 | Build-Fehler "Cannot find module X" | Script in `/app` statt Root → nach Root verschieben |
 | TypeScript-Fehler bei Analyse-Scripts | Scripts gehören nicht in `/app` (werden mit-kompiliert) |
 | "Internal Server Error" Localhost | Mehrere Next.js Dev-Server parallel → alle killen, neu starten |
+| DB-Reset ohne Backup | **IMMER** `./scripts/backup-turso.sh pre-reset` VOR jedem DB-Reset! Incident 07.02: 1.248 Entries verloren! |
+| Duplikate nach Import | VOR Import: `/02-extracted/` auf doppelte JSONs prüfen (z.B. `ISK_Uckerath` + `ISK_uckerath` = Duplikate!) |
+| Opening Balance falsch | Opening Balance = **Eröffnungssaldo** (Monatsbeginn), NICHT Schlusssaldo! Incident 08.02: -235K EUR Fehler! |
+| Import-Script erkennt Duplikate nicht | Script prüft nur exakten String-Match bei Description. Verschiedene JSON-Quellen mit leicht anderen Texten → Duplikate. Immer `(bankAccountId + transactionDate + amountCents)` prüfen! |
+| `importRowNumber === 0` ist falsy | JavaScript: `0` ist falsy! Bei Bedingungen `!== null` oder `!== undefined` verwenden, NICHT `if (value)` |
+
+### Daten-Import Sicherheitsregeln
+
+**VOR jedem Import prüfen:**
+1. Keine doppelten JSON-Dateien in `/02-extracted/` (Naming-Varianten: CamelCase vs. lowercase, Bindestrich vs. Underscore)
+2. Opening Balance = Eröffnungssaldo vom PDF (erster Tag des Monats), NICHT Schlusssaldo
+3. Classification Engine NACH Import ausführen (ADR-028) – Import ohne Klassifikation ist unvollständig
+4. Bei Duplikaten: Clean Slate Re-Import (ADR-020) – NICHT selektiv löschen
+
+**Import-Script Schwächen (bekannt):**
+- Kein File-Level-Tracking (keine ingestion_jobs-Referenz)
+- Nur exakter String-Match bei Description für Duplikat-Erkennung
+- Keine automatische Bankformat-Erkennung
 
 ---
 
@@ -295,6 +327,11 @@ npm run build
 ### Phase 3: Datenbank-Synchronisation (bei Schema-Änderungen)
 
 **Falls Prisma Schema geändert wurde:**
+
+0. **BACKUP ERSTELLEN (PFLICHT!):**
+   ```bash
+   ./scripts/backup-turso.sh pre-deploy
+   ```
 
 1. **Lokal synchronisieren:**
    ```bash
@@ -464,7 +501,7 @@ Alle Falldaten liegen unter `/Cases/<Case-Name>/`:
 ### Fall: Hausärztliche Versorgung PLUS eG (HVPlus)
 
 **Pfad:** `/Cases/Hausärztliche Versorgung PLUS eG/`
-**Vollständiger Kontext:** `case-context.json` (555 Zeilen, alle Details)
+**Vollständiger Kontext:** `case-context.json` (673 Zeilen, alle Details)
 
 #### Eckdaten
 
@@ -505,7 +542,8 @@ Alle Falldaten liegen unter `/Cases/<Case-Name>/`:
 
 #### Arbeitsstand
 
-- IST-Daten: Oktober + November importiert, Dezember teilweise, Januar fehlt
+- IST-Daten: Oktober–Januar importiert und verifiziert (691 Entries, alle 5 Bankkonten)
 - PLAN-Daten: Liquiditätsplanung vom 14.01.2026 analysiert und nachvollzogen
 - Traceability-Matrix: Jede Zahl der Planung zu Quelldatei zurückverfolgt
-- Offene Punkte: ISK-PDF-Extraktion Dez/Jan, apoBank-Vereinbarung klären
+- Klassifikation: IST-Entries zu ~88% klassifiziert (Counterparty, Estate Allocation)
+- Offene Punkte: apoBank-Vereinbarung klären, LANR-Location-Mapping korrigieren, fehlende Dez-Kontoauszüge (3 von 5 Banken)

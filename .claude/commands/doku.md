@@ -4,88 +4,83 @@ description: Dokumentation nach größeren Änderungen aktualisieren
 
 # Dokumentations-Update
 
-Du sollst die Projekt-Dokumentation nach größeren Änderungen aktualisieren.
+Aktualisiere die Projekt-Dokumentation basierend auf den Änderungen in dieser Konversation.
 
-## Deine Aufgaben
-
-### 1. Konversation analysieren
+## Phase 1: Analyse
 
 Lies die bisherige Konversation und identifiziere:
-- **Was wurde geändert?** (Features, Bugfixes, Refactoring)
+- **Was wurde geändert?** (Features, Bugfixes, Refactoring, Schema-Änderungen)
 - **Warum?** (Architektur-Entscheidungen, Begründungen)
 - **Neue Einschränkungen?** (Bekannte Bugs, bewusste Nicht-Implementierungen)
+- **Gelöste Einschränkungen?** (Items die jetzt erledigt sind)
 
-### 2. Dokumentation aktualisieren
+## Phase 2: Living Docs aktualisieren
 
-Prüfe und aktualisiere bei Bedarf:
+Prüfe und aktualisiere JEDE dieser Dateien:
 
-| Datei | Wann aktualisieren |
-|-------|-------------------|
-| `/app/docs/CHANGELOG.md` | Bei jeder funktionalen Änderung |
-| `/app/docs/ARCHITECTURE.md` | Bei strukturellen Änderungen (Datenmodell, APIs) |
-| `/app/docs/DECISIONS.md` | Bei wichtigen Design-Entscheidungen |
-| `/app/docs/LIMITATIONS.md` | Bei neuen Einschränkungen oder bekannten Bugs |
-| `/CLAUDE.md` | Bei neuen Patterns oder Konventionen |
+### `/app/docs/CHANGELOG.md`
+**Wann:** Bei jeder funktionalen Änderung.
+- Neue Version oben einfügen (Version hochzählen, Format: `## Version X.Y.Z – [Kurztitel]`)
+- Abschnitte: Neue Funktionen, Änderungen, Bugfixes, Entfernte Features
+- Nur funktionale Änderungen, keine reinen Doku-Updates
 
-### 3. Format-Vorgaben
+### `/app/docs/ARCHITECTURE.md`
+**Wann:** Bei strukturellen Änderungen (Datenmodell, APIs, neue Module).
+- Versionsnummer aktualisieren
+- Neue Dateien/Module in Verzeichnisstruktur aufnehmen
+- Datenfluss-Diagramme bei Bedarf anpassen
 
-#### CHANGELOG.md
-```markdown
-## Version X.Y.Z – [Kurztitel]
+### `/app/docs/DECISIONS.md`
+**Wann:** Bei wichtigen Design-Entscheidungen.
+- Format: `## ADR-XXX: [Titel]` mit Kontext, Entscheidung, Begründung, Konsequenzen
+- ADR-Nummer: Nächste freie Nummer nehmen (letzte prüfen!)
+- Bestehende ADRs NIE ändern (historisches Protokoll)
 
-**Datum:** [Datum]
+### `/app/docs/LIMITATIONS.md`
+**Wann:** Bei neuen Einschränkungen ODER wenn Einschränkungen gelöst wurden.
+- Neue Einschränkungen in passende Sektion einfügen
+- Gelöste Items in "Gelöste Einschränkungen (Archiv)" Sektion verschieben
 
-### Neue Funktionen
-- **Feature:** Beschreibung
+### `/app/docs/TODO.md`
+**Wann:** Wenn sich der Status offener Tasks ändert.
+- Erledigte Items entfernen oder als gelöst markieren
+- Neue bekannte Bugs/TODOs eintragen
 
-### Änderungen
-- **Komponente:** Was geändert wurde
+### `/app/docs/TODO_REFACTORING.md`
+**Wann:** Bei Refactoring-Arbeiten oder wenn technische Schulden entstehen/abgebaut werden.
+- Status ZURÜCKGESTELLT nur ändern wenn aktiv dran gearbeitet wird
 
-### Bugfixes
-- **Bug:** Was behoben wurde
-```
+### `/app/docs/ADMIN_SYSTEM.md`
+**Wann:** Bei Änderungen am Admin-Dashboard, Daten-Import-Pipeline oder Kunden-Portal.
+- Neue API-Routen, Komponenten, Datenflüsse dokumentieren
 
-#### DECISIONS.md
-```markdown
-## ADR-XXX: [Titel]
+### `/app/docs/DASHBOARD_BEST_PRACTICES.md`
+**Wann:** Selten. Nur bei grundlegenden Änderungen am Dashboard-Reporting-Konzept.
 
-**Datum:** [Datum]
-**Status:** Akzeptiert
+## Phase 3: Cleanup
 
-### Kontext
-[Warum?]
+**Verwaiste Dateien finden:**
+- Prüfe ob .md-Dateien im **Projekt-Root** entstanden sind (dort gehört nur `CLAUDE.md`)
+- Prüfe ob .md-Dateien im **Case-Root** entstanden sind (dort gehört nur `case-context.json`)
+- System-Docs → `docs/archiv/` verschieben + `archiv/INDEX.md` aktualisieren
+- Case-Docs → `Cases/.../06-review/` verschieben
 
-### Entscheidung
-[Was?]
+**One-Off-Dokumente archivieren:**
+- Incident-Berichte, Analysedokumente, Deployment-Checklisten → `docs/archiv/`
+- Living Docs bleiben in `docs/` (CHANGELOG, ARCHITECTURE, DECISIONS, LIMITATIONS, TODO, TODO_REFACTORING, ADMIN_SYSTEM, DASHBOARD_BEST_PRACTICES)
 
-### Begründung
-[Warum diese Option?]
+## Phase 4: Zusammenfassung
 
-### Konsequenzen
-[Was folgt daraus?]
-```
+Zeige dem User:
+1. Welche Dateien wurden aktualisiert
+2. Was wurde hinzugefügt/geändert (Kurzfassung)
+3. Ob CLAUDE.md angepasst werden sollte (neue Patterns, Konventionen, Häufige Fehler)
 
-#### LIMITATIONS.md
-```markdown
-### [Kurztitel]
+## Regeln
 
-**Beschreibung:** Was ist eingeschränkt?
-**Begründung:** Warum?
-**Workaround:** Wie umgehen?
-```
-
-## Wichtige Regeln
-
-1. **Deutsche Sprache** – Alle Dokumentation ist auf Deutsch
-2. **Echte Umlaute** – ä, ö, ü statt ae, oe, ue
-3. **Konkret** – Keine vagen Beschreibungen, sondern präzise
-4. **Keine Duplikate** – Bestehende Einträge aktualisieren statt neue anlegen
-
-## Ablauf
-
-1. Lies die relevanten Dokumentationsdateien
-2. Vergleiche mit den Änderungen aus der Konversation
-3. Erstelle konkrete Updates für jede relevante Datei
-4. Zeige dem User eine Zusammenfassung der Änderungen
+- **Deutsche Sprache** mit echten Umlauten (ä, ö, ü, ß)
+- **Konkret** – Keine vagen Beschreibungen
+- **Keine Duplikate** – Bestehende Einträge aktualisieren statt neue anlegen
+- **Nichts löschen** – Veraltetes in Archiv verschieben, nicht löschen
 
 $ARGUMENTS

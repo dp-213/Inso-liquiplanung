@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.19.0
+**Version:** 2.20.0
 **Stand:** 10. Februar 2026
 
 ---
@@ -474,10 +474,16 @@ LedgerEntry (UNREVIEWED)
 │   ├── create-hvplus-service-date-rules.ts  # ServiceDate-Regeln erstellen
 │   └── run-classification.ts         # Klassifikation auf Einträge anwenden
 └── docs/                             # Dokumentation
-    ├── CHANGELOG.md
+    ├── CHANGELOG.md                  # Versionshistorie
     ├── ARCHITECTURE.md               # Diese Datei
-    ├── DECISIONS.md
-    └── LIMITATIONS.md
+    ├── DECISIONS.md                  # ADRs (Architektur-Entscheidungen)
+    ├── LIMITATIONS.md                # Bekannte Einschränkungen
+    ├── TODO.md                       # Offene Features + Bugs
+    ├── TODO_REFACTORING.md           # Refactoring-Plan (zurückgestellt)
+    ├── ADMIN_SYSTEM.md               # Vollständige Admin-Doku
+    ├── DASHBOARD_BEST_PRACTICES.md   # W&P-Report Analyse
+    └── archiv/                       # Archivierte One-Off-Docs
+        └── INDEX.md                  # Inhaltsverzeichnis
 ```
 
 ---

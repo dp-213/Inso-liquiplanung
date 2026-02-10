@@ -9,14 +9,23 @@ const nextConfig: NextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  // Server-only Packages: Nicht bundlen, sondern als externe Module laden.
-  // Verhindert Turbopack/Webpack-Fehler mit .md/.node Dateien in diesen Paketen.
+  // Server-only Packages
   serverExternalPackages: [
     '@prisma/client',
     '@prisma/adapter-libsql',
     '@libsql/client',
     '@libsql/isomorphic-fetch',
   ],
+
+  // Turbopack (für `next dev --turbopack`)
+  turbopack: {
+    rules: {
+      '*.md': {
+        loaders: ['raw-loader'],
+        as: '*.js',
+      },
+    },
+  },
 
   // Webpack (für `next build` / Production)
   webpack: (config, { isServer }) => {
@@ -27,6 +36,17 @@ const nextConfig: NextConfig = {
         '@libsql/client': false,
       };
     }
+
+    config.module.rules.push({
+      test: /\.(md|txt)$/,
+      type: 'asset/source',
+    });
+
+    config.module.rules.push({
+      test: /\.(LICENSE|\.node)$/,
+      type: 'asset/resource',
+    });
+
     return config;
   },
 };

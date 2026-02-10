@@ -1,185 +1,98 @@
 # TODO: Offene Features & Verbesserungen
 
-## 🔴 P0 - Kritisch
+## P0 - Kritisch
 
 ### Scope-Support für RevenueTable + BankAccountsTab
 
-**Status:** Quick-Fix implementiert (Tabs werden ausgeblendet bei Scope ≠ GLOBAL)
-**Nächster Schritt:** Proper Scope-Support implementieren
+**Status:** Quick-Fix implementiert (Tabs werden ausgeblendet bei Scope != GLOBAL)
 
 **Problem:**
-- RevenueTable und BankAccountsTab respektieren aktuell den Scope-Toggle nicht
-- Quick-Fix: Tabs werden ausgeblendet wenn Scope ≠ GLOBAL → verhindert Verwirrung
-- Langfristig: Tabs sollen Scope-Support bekommen
+- RevenueTable und BankAccountsTab respektieren den Scope-Toggle nicht
+- Quick-Fix: Tabs werden ausgeblendet wenn Scope != GLOBAL
 
 **Betroffene Komponenten:**
-
-1. **RevenueTable** (`/components/dashboard/RevenueTable.tsx`)
-   - Aktuell: `/api/cases/${caseId}/ledger/revenue` (global)
-   - Benötigt: `?scope=${scope}` Parameter
-   - Props erweitern: `scope: LiquidityScope`
-
-2. **BankAccountsTab** (`/components/dashboard/BankAccountsTab.tsx`)
-   - Aktuell: `/api/cases/${caseId}/bank-accounts` (alle Konten)
-   - Benötigt: Filterung nach locationId basierend auf scope
-   - Props erweitern: `scope: LiquidityScope`
+1. **RevenueTable** (`/components/dashboard/RevenueTable.tsx`) - braucht `scope`-Parameter
+2. **BankAccountsTab** (`/components/dashboard/BankAccountsTab.tsx`) - braucht Filterung nach locationId
 
 **Betroffene API-Routes:**
+1. `/api/cases/[id]/ledger/revenue/route.ts` - Scope-Parameter lesen + filtern
+2. `/api/cases/[id]/bank-accounts/route.ts` - Scope-Parameter lesen + filtern
 
-1. **`/api/cases/[id]/ledger/revenue/route.ts`**
-   - Erweitern: `searchParams.get("scope")` lesen
-   - Filtern: LedgerEntries nach locationId
-   - Scope-Mapping:
-     - `GLOBAL` → keine Filterung
-     - `LOCATION_VELBERT` → locationId = "loc-velbert"
-     - `LOCATION_UCKERATH_EITORF` → locationId IN ("loc-uckerath", "loc-eitorf")
-
-2. **`/api/cases/[id]/bank-accounts/route.ts`**
-   - Erweitern: `searchParams.get("scope")` lesen
-   - Filtern: BankAccounts nach locationId
-   - Zusätzlich: Nur Transaktionen des jeweiligen Standorts berücksichtigen
-
-**Implementierungsschritte:**
-
-1. API-Routes erweitern:
-   ```typescript
-   const scope = searchParams.get("scope") || "GLOBAL";
-   let locationFilter = {};
-   if (scope === "LOCATION_VELBERT") {
-     locationFilter = { locationId: "loc-velbert" };
-   } else if (scope === "LOCATION_UCKERATH_EITORF") {
-     locationFilter = { locationId: { in: ["loc-uckerath", "loc-eitorf"] } };
-   }
-   ```
-
-2. Komponenten erweitern:
-   ```typescript
-   interface RevenueTableProps {
-     caseId: string;
-     months?: number;
-     showSummary?: boolean;
-     scope?: LiquidityScope;  // ← NEU
-   }
-   ```
-
-3. UnifiedCaseDashboard: scope an Komponenten übergeben:
-   ```typescript
-   <RevenueTable caseId={caseId} months={6} showSummary={true} scope={scope} />
-   <BankAccountsTab caseId={caseId} scope={scope} />
-   ```
-
-4. Quick-Fix entfernen:
-   - `tabsWithoutScopeSupport` Set löschen
-   - Filter-Logik entfernen
-
-**Testing:**
-- Toggle zwischen GLOBAL/VELBERT/UCKERATH
-- Prüfen: Revenue-Zahlen ändern sich konsistent
-- Prüfen: Nur relevante Bankkonten sichtbar
-- Prüfen: Summen stimmen überein mit Matrix/Forecast
-
-**Zeitaufwand:** ~30-45 Min
-**Kritikalität:** Mittel (UX-Problem, aktuell mit Quick-Fix abgesichert)
+**Kritikalität:** Mittel (Quick-Fix verhindert falsche Darstellung)
 
 ---
 
-## 🟡 P1 - Wichtig
+### Virtuelles Konto "Insolvenzmasse (Pre-ISK)"
 
-### IST-Vorrang Feature implementieren
+**Status:** Analysiert, Implementierungsplan vorhanden
+**Dokumentation:** `docs/archiv/PLAN_VIRTUAL_ACCOUNT.md`, `docs/archiv/IMPACT_VIRTUAL_ACCOUNT.md`
 
-**Status:** Dokumentiert, Workaround via Workflow
-**Nächster Schritt:** Architektur-Design + Implementierung
-
-**Problem:**
-- Aggregation in `ledger-aggregation.ts` summiert IST und PLAN parallel
-- Führt zu Überdeckung/Doppelzählung wenn für dieselbe Periode beide vorhanden sind
-- Aktueller Workaround: Workflow soll sicherstellen, dass PLAN gelöscht wird bei IST-Import
-
-**IST-Vorrang bedeutet:**
-- Für jede Kombination aus (periodIndex, categoryKey, bankAccount, counterparty)
-- WENN IST-Eintrag existiert: Nur IST summieren, PLAN ignorieren
-- WENN kein IST-Eintrag: PLAN verwenden
-
-**Betroffene Dateien:**
-- `/app/src/lib/ledger-aggregation.ts` (Zeile 374-487)
-- `/app/src/lib/ledger/aggregation.ts` (falls verwendet)
-
-**Architektur-Entscheidungen nötig:**
-
-1. **Gruppierungs-Schlüssel:** Was definiert "dieselbe Buchung"?
-   - Option A: `(periodIndex, categoryKey, bankAccountId)`
-   - Option B: `(periodIndex, categoryKey, bankAccountId, counterpartyId)`
-   - Option C: `(periodIndex, description, bankAccountId)` (zu granular?)
-   - **Empfehlung:** Option A (einfach, robust)
-
-2. **Transparenz:** Wie wird IST-Vorrang dokumentiert?
-   - Warning-System: "X PLAN-Einträge übersprungen (IST vorhanden)"
-   - Audit-Trail: Welche PLAN-Einträge wurden ignoriert?
-   - UI-Indikator: Badge "IST überschreibt PLAN"
-
-3. **Performance:**
-   - Bei großen Datenmengen: Pre-Pass Gruppierung erforderlich
-   - Hash-Map für schnelle IST-Lookup: `Map<groupKey, boolean>`
-
-4. **Migration/Backward-Compatibility:**
-   - Feature-Flag: `enableIstVorrang: boolean`
-   - Schrittweise Einführung möglich
-   - A/B-Testing mit/ohne IST-Vorrang
-
-**Implementierungsschritte:**
-
-1. **Pre-Pass: Gruppiere IST-Einträge**
-   ```typescript
-   const istKeys = new Set<string>();
-   for (const entry of entries.filter(e => e.valueType === "IST")) {
-     const key = `${periodIndex}-${categoryKey}-${bankAccountId}`;
-     istKeys.add(key);
-   }
-   ```
-
-2. **Main-Pass: Conditional Addition**
-   ```typescript
-   for (const entry of entries) {
-     const key = `${periodIndex}-${categoryKey}-${bankAccountId}`;
-
-     if (entry.valueType === "PLAN" && istKeys.has(key)) {
-       // SKIP: IST vorhanden für diese Gruppe
-       skippedPlanCount++;
-       continue;
-     }
-
-     // Normale Aggregation...
-   }
-   ```
-
-3. **Statistik & Warnings**
-   ```typescript
-   if (skippedPlanCount > 0) {
-     warnings.push({
-       type: "IST_OVERRIDES_PLAN",
-       severity: "info",
-       message: `${skippedPlanCount} PLAN-Einträge übersprungen (IST-Vorrang)`,
-       count: skippedPlanCount,
-     });
-   }
-   ```
-
-4. **Testing:**
-   - Unit-Tests: Verschiedene IST/PLAN-Kombinationen
-   - Integration-Test: HVPlus Fall mit gemischten Daten
-   - Vergleich: Zahlen mit/ohne IST-Vorrang
-
-**Zeitaufwand:** ~2-3 Stunden
-**Kritikalität:** Mittel-Hoch (führt zu falschen Zahlen bei Überlappung)
+**Ziel:** Virtuelles Konto für Pre-ISK-Phase (Oktober 2025) einführen, das alle Schuldner-Konten konsolidiert.
 
 ---
 
-## 🟢 P2 - Nice-to-have
+### LANR-Location-Mapping korrigieren (HVPlus)
 
-### Weitere Verbesserungen
+**Status:** Bug identifiziert, nicht behoben
 
-(Hier können später weitere TODOs ergänzt werden)
+**Problem:** 4 von 8 Ärzten falschem Standort zugeordnet (alle zu Uckerath statt Velbert/Eitorf).
+
+**Impact:** ~50% der HZV-Einnahmen am falschen Standort, Standort-Analyse unbrauchbar.
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-08
+### ~~Bank-spezifische Zeilen in Liqui-Matrix zeigen 0 EUR~~ ERLEDIGT 2026-02-09
+
+Bankkonten-Details (Opening/Closing Balance pro Bank) bewusst aus Liquidity Matrix entfernt (ADR-030). Bankkonten-Tab im Dashboard zeigt diese Informationen.
+
+---
+
+### categoryTags nach Import ausführen
+
+**Status:** Pflicht-Regel eingeführt (ADR-028), muss bei jedem Import beachtet werden
+
+---
+
+## P1 - Wichtig
+
+### Refactoring: Service Layer für API-Routen
+
+**Status:** ZURÜCKGESTELLT
+**Dokumentation:** `docs/TODO_REFACTORING.md`
+
+**Ziel:** API-Routen in testbare Services aufteilen. Teilweise begonnen: Aggregationslogik aus `liquidity-matrix/route.ts` nach `lib/liquidity-matrix/aggregate.ts` extrahiert (v2.18.0).
+
+---
+
+### Fehlende Dezember-Kontoauszüge (HVPlus)
+
+**Status:** Offene Datenanforderung an IV
+
+3 von 5 Bankkonten haben keine Dezember-Kontoauszüge. Über 250K EUR Bewegungen nicht nachvollziehbar.
+
+---
+
+### ~~Cases/HVPlus/ Legacy-Ordner konsolidieren~~ ERLEDIGT 2026-02-10
+
+Legacy-Ordner aufgelöst: 4 unique Dateien nach `01-raw/` verschoben, 2 ältere Versionen mit `_V1-legacy` Suffix behalten, 1 identisches Duplikat + 2 Temp-Dateien entfernt, Ordner gelöscht.
+
+---
+
+## P2 - Nice-to-have
+
+### Planung-Seite migrieren
+
+**Status:** Zeigt aktuell Placeholder. PLAN-Entries über Ledger einsehbar.
+
+### Finanzierung-Seite implementieren
+
+**Status:** Placeholder. Massekreditvertrag und Darlehens-Details noch nicht in DB.
+
+### Zahlungsverifikation (SOLL vs. IST)
+
+**Status:** Placeholder. SOLL-IST-Vergleich noch nicht implementiert.
+
+---
+
+**Letzte Aktualisierung:** 2026-02-10
+

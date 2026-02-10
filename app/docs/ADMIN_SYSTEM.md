@@ -972,6 +972,13 @@ Zusätzlich am Plan hängend:
 - `GET /api/cases/[id]/insolvency-effects` - Insolvenzeffekte
 - `GET /api/cases/[id]/bank-accounts` - Bankenspiegel
 
+### Liquiditätsmatrix
+- `GET /api/cases/[id]/dashboard/liquidity-matrix` - Berechnete Matrix-Daten
+- `GET /api/cases/[id]/matrix/explain-cell` - Zellen-Erklärung (Drill-Down)
+  - Parameter: `rowId`, `periodIndex`, `scope`, `includeUnreviewed`
+  - Response: 4-Ebenen-Erklärung (Zusammenfassung, Zuordnungsregeln, Rechenweg, Einzelbuchungen)
+  - Nutzt dieselbe Aggregationslogik wie die Matrix-API (`lib/liquidity-matrix/aggregate.ts`)
+
 ### Share-Links
 - `GET /api/cases/[id]/share-links` - Alle Links
 - `POST /api/cases/[id]/share-links` - Neuen Link erstellen

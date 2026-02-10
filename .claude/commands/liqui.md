@@ -67,17 +67,21 @@ cd app && npx prisma db push  # DB-Schema sync
 ```
 /Cases/Hausärztliche Versorgung PLUS eG/
     02-extracted/
-        Annahme_Einnahmen_bis_Juni26.json          # Einnahme-Prognosen
-        Velbert_Annahme_Einnahmen_bis_31.03.2026.json  # Velbert-Detail
-        AN_Liste_mit_Gehalt.json                    # Personalliste
-        HVPLUS_GuV_und_Liquiplanung.json            # GuV + Betriebskosten
-        HZV_Ausbezahlung_der_Abschlaege.json        # HZV-Zahlungstermine
-        KVNO_Zahlungstermine_2025.json               # KV-Zahlungstermine
-        2025-11-19_Kontoauszug.json                  # ISK-Kontoauszug November
+        Annahme_Einnahmen_bis_Juni26.json                    # Einnahme-Prognosen
+        Velbert_Annahme_Einnahmen_bis_31.03.2026.json        # Velbert-Detail
+        AN Liste mit Gehalt.json                             # Personalliste (ACHTUNG: Leerzeichen im Namen!)
+        HVPLUS_GuV- und Liquiplanung 10-2025 bis 12-2028... # GuV + Betriebskosten (langer Dateiname)
+        HZV_Ausbezahlung_der_Abschlaege.json                # HZV-Zahlungstermine
+        KVNO_Zahlungstermine_2025.json                       # KV-Zahlungstermine
+        *_VERIFIED.json                                      # IST-Kontoauszüge (pro Bank/Monat)
     03-classified/
-        IST/    # Kontoauszüge (reale Buchungen)
-        PLAN/   # Liquiditätspläne
+        IST/       # Kontoauszüge (reale Buchungen)
+        PLAN/      # Liquiditätspläne
         ANNAHMEN/  # Planungsprämissen
+    06-review/
+        plan-traceability-matrix.md                          # Herleitung jeder Planungszahl
+        FRAGEN_AN_IV.md                                      # Offene Fragen an Insolvenzverwalter
+        OFFENE_FRAGEN_IV.md                                  # Aktuelle Fragenliste
 ```
 
 $ARGUMENTS
