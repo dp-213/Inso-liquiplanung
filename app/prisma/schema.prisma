@@ -53,6 +53,8 @@ model Case {
   bankAgreements       BankAgreement[]      // Vereinbarungen mit Banken (Globalzession, etc.)
   ivNotes              IVNote[]             // IV-Kommunikation (Notizen an Insolvenzverwalter)
   casePlanning         CasePlanning?        // Strukturierte Liquiditätsplanung (JSON)
+  orders               Order[]              // Bestell- und Zahlfreigaben
+  companyTokens        CompanyToken[]       // Token-Zugänge für externe Firmen
 
   @@index([ownerId])
   @@map("cases")
@@ -857,6 +859,7 @@ model LedgerEntry {
   counterparty      Counterparty? @relation(fields: [counterpartyId], references: [id])
   location          Location? @relation(fields: [locationId], references: [id])
   sourceEffect      InsolvencyEffect? @relation(fields: [sourceEffectId], references: [id], onDelete: SetNull)
+  order             Order?            // Rückrelation: Wurde aus einer Freigabe erstellt?
   auditLogs         LedgerAuditLog[]
 
   // Self-referential relation für Split-Tracking
@@ -1002,6 +1005,72 @@ model CasePlanning {
   updatedAt     DateTime @updatedAt
   
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  
+
   @@map("case_planning")
+}
+
+// =============================================================================
+// ORDER MODULE - Bestell- und Zahlfreigabe
+// =============================================================================
+
+// Order - Eingereichte Bestell-/Zahlungsanfragen zur Freigabe durch IV
+model Order {
+  id              String   @id @default(uuid())
+  caseId          String
+
+  // Typ-Unterscheidung
+  type            String   @default("ZAHLUNG")  // BESTELLUNG | ZAHLUNG
+
+  // Eingabedaten
+  requestDate     DateTime @default(now())
+  invoiceDate     DateTime // Bei ZAHLUNG: Rechnungsdatum, bei BESTELLUNG: erwartetes Zahlungsdatum
+  amountCents     BigInt
+  creditor        String   // Name des Gläubigers/Lieferanten
+  description     String
+  notes           String?  // Ergänzende Informationen (z.B. Kontext, Dringlichkeit)
+
+  // Dokument-Upload (Base64-gespeichert)
+  documentName      String?  // Originaler Dateiname
+  documentMimeType  String?  // z.B. "application/pdf"
+  documentSizeBytes BigInt?  // Dateigröße in Bytes
+  documentContent   String?  // Base64-encoded Dateiinhalt
+
+  // Status
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+
+  // IV kann abweichenden Betrag genehmigen
+  approvedAmountCents BigInt?
+
+  // Approval/Rejection Info
+  approvedAt      DateTime?
+  approvedBy      String?  // UserId
+  rejectedAt      DateTime? // Separates Feld für Ablehnungszeitpunkt
+  rejectionReason String?
+
+  // Integration mit LedgerEntry
+  ledgerEntryId   String?  @unique
+  ledgerEntry     LedgerEntry? @relation(fields: [ledgerEntryId], references: [id], onDelete: SetNull)
+
+  case            Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+
+  @@index([caseId])
+  @@index([caseId, status])
+  @@map("orders")
+}
+
+// CompanyToken - Token-basierter Zugang für externe Firmen (Buchhaltung, Lieferanten)
+model CompanyToken {
+  id          String   @id @default(uuid())
+  caseId      String
+  token       String   @unique // Zufälliger Access Token für URL
+  label       String   // z.B. "Buchhaltung Müller GmbH"
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("company_tokens")
 }

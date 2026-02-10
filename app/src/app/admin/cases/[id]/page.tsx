@@ -10,60 +10,65 @@ interface PageProps {
 }
 
 async function getCaseData(id: string) {
-  const caseData = await prisma.case.findUnique({
-    where: { id },
-    include: {
-      owner: { select: { id: true, name: true, company: true } },
-      plans: {
-        where: { isActive: true },
-        include: {
-          versions: {
-            orderBy: { versionNumber: "desc" },
-            take: 1,
-          },
-          categories: {
-            include: {
-              lines: {
-                include: {
-                  periodValues: true,
+  const [caseData, pendingOrderCount] = await Promise.all([
+    prisma.case.findUnique({
+      where: { id },
+      include: {
+        owner: { select: { id: true, name: true, company: true } },
+        plans: {
+          where: { isActive: true },
+          include: {
+            versions: {
+              orderBy: { versionNumber: "desc" },
+              take: 1,
+            },
+            categories: {
+              include: {
+                lines: {
+                  include: {
+                    periodValues: true,
+                  },
+                  orderBy: { displayOrder: "asc" },
                 },
-                orderBy: { displayOrder: "asc" },
+              },
+              orderBy: { displayOrder: "asc" },
+            },
+          },
+        },
+        shareLinks: {
+          orderBy: { createdAt: "desc" },
+        },
+        ingestionJobs: {
+          orderBy: { startedAt: "desc" },
+          take: 5,
+        },
+        customerAccess: {
+          include: {
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                company: true,
+                isActive: true,
               },
             },
-            orderBy: { displayOrder: "asc" },
           },
+          orderBy: { grantedAt: "desc" },
         },
       },
-      shareLinks: {
-        orderBy: { createdAt: "desc" },
-      },
-      ingestionJobs: {
-        orderBy: { startedAt: "desc" },
-        take: 5,
-      },
-      customerAccess: {
-        include: {
-          customer: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              company: true,
-              isActive: true,
-            },
-          },
-        },
-        orderBy: { grantedAt: "desc" },
-      },
-    },
-  });
+    }),
+    prisma.order.count({
+      where: { caseId: id, status: "PENDING" },
+    }),
+  ]);
 
-  return caseData;
+  return { caseData, pendingOrderCount };
 }
 
 export default async function CaseDetailPage({ params }: PageProps) {
   const { id } = await params;
-  const caseData = await getCaseData(id);
+  const { caseData, pendingOrderCount } = await getCaseData(id);
 
   if (!caseData) {
     notFound();
@@ -196,6 +201,20 @@ export default async function CaseDetailPage({ params }: PageProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 IST
+              </Link>
+              <Link
+                href={`/admin/cases/${id}/orders`}
+                className="btn-secondary text-sm py-1.5 px-3 flex items-center bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 relative"
+              >
+                <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                Freigaben
+                {pendingOrderCount > 0 && (
+                  <span className="ml-1.5 inline-flex items-center justify-center h-5 min-w-[1.25rem] px-1 rounded-full text-xs font-bold bg-red-500 text-white">
+                    {pendingOrderCount}
+                  </span>
+                )}
               </Link>
             </div>
           </div>
