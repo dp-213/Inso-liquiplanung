@@ -4,6 +4,54 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-031: Selbstbeschreibende Matching-Regeln (A+B+C)
+
+**Datum:** 10. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Die Zellerklärung (Explain-Cell) brauchte menschenlesbare Beschreibungen der Matching-Regeln. Erste Implementierung nutzte eine separate Übersetzungstabelle (`MATCH_TYPE_LABELS`) in `explain.ts`, die Match-Typen wie `COUNTERPARTY_PATTERN` in Labels wie "Gegenpartei-Muster" übersetzte.
+
+**Problem:** Drei getrennte Wissensquellen ohne Verbindung:
+1. `matrix-config.ts` – Die Regeln selbst (Typ + Value)
+2. `explain.ts` – Hardcodierte Label-Maps (fragile Übersetzungsschicht)
+3. LedgerEntry DB-Felder – `allocationSource`, `categoryTagSource`
+
+Neue Match-Typen oder Zeilen erforderten Änderungen an zwei Stellen (Config + Label-Map). Die Label-Map konnte veralten ohne dass es auffällt.
+
+### Entscheidung
+
+**Drei Maßnahmen (A+B+C):**
+
+**A: Typ-Erweiterungen**
+- `MatrixRowMatch.description` – Menschenlesbare Beschreibung pro Matching-Regel
+- `MatrixRowConfig.matchDescription` – Gesamtbeschreibung was die Zeile erfasst
+- `MatchResult.matchDescription` – Wird von `findMatchingRowWithTrace()` befüllt
+
+**B: Config trägt eigene Beschreibungen**
+- Alle ~26 Daten-Zeilen in `HVPLUS_MATRIX_ROWS` mit Beschreibungen versehen
+- Beschreibungen fachlich formuliert (z.B. "Einnahmen der Kassenärztlichen Vereinigung")
+
+**C: explain.ts wird zum Leser**
+- `MATCH_TYPE_LABELS` entfernt
+- Alle Funktionen lesen Beschreibungen aus Config/MatchResult statt selbst zu übersetzen
+- `ALLOCATION_SOURCE_LABELS` und `TAG_SOURCE_LABELS` bleiben (übersetzen DB-Felder, nicht Config)
+
+### Begründung
+
+**Single Source of Truth:** Regeln und ihre Beschreibungen leben am selben Ort.
+**Skalierbarkeit:** Neue Zeilen/Regeln nur an einer Stelle pflegen.
+**Determinismus:** Beschreibungen sind Teil der Config, nicht generiert.
+
+### Konsequenzen
+
+- Neue Zeilen MÜSSEN `matchDescription` und `matches[].description` angeben
+- `explain.ts` hat keinen eigenen Wissensbestand über Regel-Labels mehr
+- Fallback bei fehlender description: `"${match.type} = '${match.value}'"` (technisch, aber funktional)
+
+---
+
 ## ADR-030: Bankkonten-Details aus Liquidity Matrix entfernt
 
 **Datum:** 09. Februar 2026

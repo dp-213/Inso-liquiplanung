@@ -4,6 +4,76 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.19.0 – Cell Explanation Panel (Drill-Down)
+
+**Datum:** 10. Februar 2026
+
+### Neue Funktionen
+
+- **Cell Explanation Panel:** Klick auf jede Zelle der Liquiditätsmatrix öffnet ein Modal mit 4-Ebenen-Erklärung
+  - Ebene 1: Zusammenfassung (Betrag, Anzahl Buchungen, IST/PLAN-Status)
+  - Ebene 2: Zuordnungsregeln (Zeilen-Zuordnung, Perioden, IST-Vorrang, Alt/Neu-Split, Kategorie-Tag)
+  - Ebene 3: Rechenweg (Original-Beträge → Split → Ergebnis)
+  - Ebene 4: Einzelbuchungen (sortierbar nach Datum, Betrag, Anteil)
+
+- **Sortierbare Buchungstabelle:** Einzelbuchungen im Explanation-Modal nach Datum, Betrag oder Anteil sortierbar
+  - Klick auf aktiven Sort-Button wechselt Richtung (aufsteigend/absteigend)
+  - Standard: Datum aufsteigend
+
+### Architektur-Änderungen
+
+- **Shared Aggregation Layer:** Aggregationslogik aus der Matrix-API in wiederverwendbare Module extrahiert
+  - `lib/liquidity-matrix/aggregate.ts` – Aggregationsfunktion mit optionalem Trace-Modus
+  - `lib/liquidity-matrix/explain.ts` – Deterministischer Explanation-Builder (4 Ebenen)
+  - `lib/liquidity-matrix/types.ts` – Shared Types (EntryTrace, AggregateResult, CellExplanation)
+  - Matrix-API und Explain-Cell-API nutzen exakt dieselbe Aggregationslogik
+
+- **Selbstbeschreibende Matching-Regeln (ADR-031):**
+  - `MatrixRowMatch.description` – Menschenlesbare Beschreibung pro Regel
+  - `MatrixRowConfig.matchDescription` – Gesamtbeschreibung pro Zeile
+  - `MatchResult.matchDescription` – Beschreibung des greifenden Matches
+  - `explain.ts` liest Beschreibungen aus der Config statt sie selbst zu generieren
+  - Alle ~26 Daten-Zeilen mit deutschen Beschreibungen versehen
+
+- **Explain-Cell API:** `GET /api/cases/{id}/matrix/explain-cell`
+  - Parameter: `rowId`, `periodIndex`, `scope`, `includeUnreviewed`
+  - Nutzt `aggregateEntries({ traceMode: true })` für vollständige Nachvollziehbarkeit
+  - Response: CellExplanation mit Kontext, Regeln, Rechenweg und Einzelbuchungen
+
+### Bugfixes
+
+- **CATEGORY_TAG Multi-Match Bug:** `findMatchingRowWithTrace` prüfte nur den ersten CATEGORY_TAG einer Zeile
+  - Betroffen: Betriebskosten-Zeile mit 9 CATEGORY_TAG-Matches (BETRIEBSKOSTEN, MIETE, STROM, etc.)
+  - Ein Entry mit `categoryTag='MIETE'` hätte die Zeile in Stufe 1 nie getroffen
+  - Fix: `find` prüft jetzt direkt auf `m.value === entry.categoryTag`
+
+- **PLAN-Traces Filter:** Übersprungene PLAN-Entries wurden fälschlich als aktive Traces gelistet
+  - `wasSkippedByIstVorrang: true` wurde mit `return true` statt `return false` behandelt
+  - Führte zu falschen Daten in der Zellerklärung (z.B. EINNAHME_SONSTIGE in KV-Zelle)
+
+- **Estate-Badge Sichtbarkeit:** NEUMASSE-Einträge zeigten kein Badge, nur ALTMASSE war sichtbar
+  - Fix: Jeder Eintrag zeigt jetzt sein Estate-Badge (Neumasse=blau, Altmasse=gelb, Gemischt=orange)
+
+### Neue Dateien
+
+| Datei | Beschreibung |
+|-------|--------------|
+| `lib/liquidity-matrix/aggregate.ts` | Extrahierte Aggregationslogik mit Trace-Modus |
+| `lib/liquidity-matrix/explain.ts` | Deterministischer Explanation-Builder |
+| `lib/liquidity-matrix/types.ts` | Shared Types (EntryTrace, CellExplanation, etc.) |
+| `api/cases/[id]/matrix/explain-cell/route.ts` | Explain-Cell API |
+| `components/admin/CellExplanationModal.tsx` | Modal-Komponente mit 4 Ebenen |
+
+### Geänderte Dateien
+
+| Datei | Änderung |
+|-------|----------|
+| `lib/cases/haevg-plus/matrix-config.ts` | `findMatchingRowWithTrace()`, description-Felder, CATEGORY_TAG Bug-Fix |
+| `api/cases/[id]/dashboard/liquidity-matrix/route.ts` | Aggregation ausgelagert → `aggregate.ts` |
+| `components/dashboard/LiquidityMatrixTable.tsx` | Zellen klickbar + Modal-Integration |
+
+---
+
 ## Version 2.18.0 – Vollständige IST-Klassifizierung & Liqui-Matrix-Integration
 
 **Datum:** 09. Februar 2026

@@ -18,21 +18,17 @@ import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { getCustomerSession, checkCaseAccess } from '@/lib/customer-auth';
 import {
-  HVPLUS_MATRIX_CONFIG,
   HVPLUS_MATRIX_BLOCKS,
   HVPLUS_MATRIX_ROWS,
-  findMatchingRow,
   getRowsForBlock,
   getRowsForScope,
   filterEntriesByScope,
   getScopeHintText,
-  getAltforderungCategoryTag,
   LIQUIDITY_SCOPE_LABELS,
   type MatrixBlockId,
-  type MatrixRowConfig,
   type LiquidityScope,
 } from '@/lib/cases/haevg-plus/matrix-config';
-import { calculateBankAccountBalances } from '@/lib/bank-accounts/calculate-balances';
+import { aggregateEntries } from '@/lib/liquidity-matrix/aggregate';
 
 // =============================================================================
 // TYPES
@@ -105,18 +101,6 @@ export interface LiquidityMatrixData {
 // HELPER FUNCTIONS
 // =============================================================================
 
-function getPeriodIndex(date: Date, startDate: Date, periodType: string): number {
-  if (periodType === 'MONTHLY') {
-    const startMonth = startDate.getFullYear() * 12 + startDate.getMonth();
-    const dateMonth = date.getFullYear() * 12 + date.getMonth();
-    return dateMonth - startMonth;
-  } else {
-    // WEEKLY
-    const diffMs = date.getTime() - startDate.getTime();
-    return Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
-  }
-}
-
 function getPeriodLabel(periodIndex: number, startDate: Date, periodType: string): string {
   const periodDate = new Date(startDate);
   if (periodType === 'MONTHLY') {
@@ -175,7 +159,6 @@ export async function GET(
     }
 
     // Query Parameters
-    const estateFilter = searchParams.get('estateFilter') || 'GESAMT';
     const showDetails = searchParams.get('showDetails') !== 'false';
     const scopeParam = searchParams.get('scope') || 'GLOBAL';
     const scope: LiquidityScope = ['GLOBAL', 'LOCATION_VELBERT', 'LOCATION_UCKERATH_EITORF'].includes(scopeParam)
@@ -270,195 +253,19 @@ export async function GET(
     // 6. Get rows for current scope (filters out scope-specific rows like Velbert details in GLOBAL)
     const scopeRows = getRowsForScope(HVPLUS_MATRIX_ROWS, scope);
 
-    // 6b. Initialize row aggregations
-    const rowAggregations = new Map<string, Map<number, { amount: bigint; count: number }>>();
-    for (const row of scopeRows) {
-      const periodMap = new Map<number, { amount: bigint; count: number }>();
-      for (let i = 0; i < periodCount; i++) {
-        periodMap.set(i, { amount: BigInt(0), count: 0 });
-      }
-      rowAggregations.set(row.id, periodMap);
-    }
+    // 7+8. Aggregation via shared aggregate function
+    const aggregation = aggregateEntries({
+      entries: entries as Parameters<typeof aggregateEntries>[0]['entries'],
+      rows: scopeRows,
+      periodCount,
+      startDate,
+      periodType,
+      bankAccountMap,
+      traceMode: false,
+    });
 
-    // 7. VORANALYSE: Ermittle welche Perioden IST-Daten haben
-    // IST hat Vorrang vor PLAN - wenn IST existiert, wird PLAN für diese Periode ignoriert
-    const periodsWithIst = new Set<number>();
-    for (const entry of entries) {
-      if (entry.transferPartnerEntryId) continue; // Transfers ignorieren
-      if (entry.valueType === 'IST') {
-        const periodIdx = getPeriodIndex(entry.transactionDate, startDate, periodType);
-        if (periodIdx >= 0 && periodIdx < periodCount) {
-          periodsWithIst.add(periodIdx);
-        }
-      }
-    }
-
-    // 7b. Track IST/PLAN per period (für Statistik)
-    const periodValueTypes = new Map<number, { ist: number; plan: number; planIgnored: number }>();
-    for (let i = 0; i < periodCount; i++) {
-      periodValueTypes.set(i, { ist: 0, plan: 0, planIgnored: 0 });
-    }
-
-    // 8. Aggregate entries (IST hat Vorrang!)
-    let totalEntries = 0;
-    let istCount = 0;
-    let planCount = 0;
-    let planIgnoredCount = 0;  // PLAN-Buchungen die wegen IST-Vorrang ignoriert wurden
-    let unklearCount = 0;
-    let unreviewedCount = 0;
-
-    for (const entry of entries) {
-      // Transfers aus konsolidierten Summen ausschließen
-      if (entry.transferPartnerEntryId) continue;
-
-      const periodIdx = getPeriodIndex(entry.transactionDate, startDate, periodType);
-      if (periodIdx < 0 || periodIdx >= periodCount) continue;
-
-      // IST-VORRANG: Wenn diese Periode IST-Daten hat UND dieser Entry PLAN ist → überspringen
-      if (entry.valueType === 'PLAN' && periodsWithIst.has(periodIdx)) {
-        planIgnoredCount++;
-        const pvt = periodValueTypes.get(periodIdx)!;
-        pvt.planIgnored++;
-        continue;  // PLAN-Entry ignorieren, da IST existiert
-      }
-
-      totalEntries++;
-      const amount = entry.amountCents;
-      const flowType = amount >= 0 ? 'INFLOW' : 'OUTFLOW';
-
-      // Track IST/PLAN (nur für tatsächlich verwendete Entries)
-      if (entry.valueType === 'IST') {
-        istCount++;
-        const pvt = periodValueTypes.get(periodIdx)!;
-        pvt.ist++;
-      } else {
-        planCount++;
-        const pvt = periodValueTypes.get(periodIdx)!;
-        pvt.plan++;
-      }
-
-      // Track UNKLAR
-      if (entry.estateAllocation === 'UNKLAR') {
-        unklearCount++;
-      }
-
-      // Track UNREVIEWED (nur relevant wenn includeUnreviewed=true)
-      if (entry.reviewStatus === 'UNREVIEWED') {
-        unreviewedCount++;
-      }
-
-      // estateRatio-Splitting: Berechne Neu-Anteil und Alt-Anteil
-      const estateRatio = entry.estateRatio !== null ? Number(entry.estateRatio) : 1.0;
-      const estateAllocation = entry.estateAllocation || 'NEUMASSE';
-
-      // Guard estateRatio to [0,1] range für Rundungssicherheit
-      const safeRatio = Math.min(Math.max(estateRatio, 0), 1);
-
-      // Berechne Anteile
-      let neuAnteilCents = BigInt(0);
-      let altAnteilCents = BigInt(0);
-
-      switch (estateAllocation) {
-        case 'NEUMASSE':
-          neuAnteilCents = amount;
-          break;
-        case 'ALTMASSE':
-          altAnteilCents = amount;
-          break;
-        case 'MIXED':
-          neuAnteilCents = BigInt(Math.round(Number(amount) * safeRatio));
-          altAnteilCents = amount - neuAnteilCents;
-          break;
-        case 'UNKLAR':
-          neuAnteilCents = amount; // Default: UNKLAR zählt als Neumasse
-          break;
-      }
-
-      // Track entry aggregation to ensure count++ only once per LedgerEntry
-      let entryWasAggregated = false;
-
-      // Match Neu-Anteil (independent)
-      if (neuAnteilCents !== BigInt(0)) {
-        const neuRow = findMatchingRow(
-          {
-            description: entry.description,
-            amountCents: neuAnteilCents,
-            counterpartyId: entry.counterpartyId,
-            counterpartyName: entry.counterparty?.name,
-            locationId: entry.locationId,
-            bankAccountId: entry.bankAccountId ? bankAccountMap.get(entry.bankAccountId) : undefined,
-            legalBucket: entry.legalBucket,
-            categoryTag: entry.categoryTag,
-          },
-          scopeRows,
-          flowType
-        );
-
-        if (neuRow) {
-          const rowPeriods = rowAggregations.get(neuRow.id);
-          if (rowPeriods) {
-            const periodData = rowPeriods.get(periodIdx);
-            if (periodData) {
-              periodData.amount += neuAnteilCents;
-              if (!entryWasAggregated) {
-                periodData.count++;
-                entryWasAggregated = true;
-              }
-            }
-          }
-        }
-      }
-
-      // Match Alt-Anteil (independent of neuRow!)
-      if (altAnteilCents !== BigInt(0)) {
-        // Find Alt-Zeile via categoryTag mapping
-        const altCategoryTag = getAltforderungCategoryTag(entry.categoryTag);
-
-        const altRow = findMatchingRow(
-          {
-            description: entry.description,
-            amountCents: altAnteilCents,
-            counterpartyId: entry.counterpartyId,
-            counterpartyName: entry.counterparty?.name,
-            locationId: entry.locationId,
-            bankAccountId: entry.bankAccountId ? bankAccountMap.get(entry.bankAccountId) : undefined,
-            legalBucket: entry.legalBucket,
-            categoryTag: altCategoryTag,
-          },
-          scopeRows,
-          flowType
-        );
-
-        if (!altRow) {
-          // Warnung: Alt-Match fehlgeschlagen
-          console.error(
-            `[ALT-MATCH FAILED] Entry ${entry.id}: ${Number(altAnteilCents) / 100}€ Alt-Anteil konnte nicht zugeordnet werden. ` +
-            `CategoryTag: ${entry.categoryTag}, Alt-Tag: ${altCategoryTag}`
-          );
-        } else {
-          const rowPeriods = rowAggregations.get(altRow.id);
-          if (rowPeriods) {
-            const periodData = rowPeriods.get(periodIdx);
-            if (periodData) {
-              periodData.amount += altAnteilCents;
-              if (!entryWasAggregated) {
-                periodData.count++;
-                entryWasAggregated = true;
-              }
-            }
-          }
-        }
-      }
-
-      // Also track by bank account for balance rows
-      if (entry.bankAccountId) {
-        const bankKey = bankAccountMap.get(entry.bankAccountId);
-        if (bankKey) {
-          // This will be used for bank-specific balance tracking
-          // (simplified for now - just aggregate into cash-in/out)
-        }
-      }
-    }
+    const { rowAggregations, periodsWithIst, periodValueTypes, stats } = aggregation;
+    const { totalEntries, istCount, planCount, planIgnoredCount, unklearCount, unreviewedCount } = stats;
 
     // 9. Determine period value types
     for (const [periodIdx, { ist, plan }] of periodValueTypes) {

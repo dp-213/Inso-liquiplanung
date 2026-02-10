@@ -1,7 +1,7 @@
 # System-Architektur
 
-**Version:** 2.13.0
-**Stand:** 08. Februar 2026
+**Version:** 2.19.0
+**Stand:** 10. Februar 2026
 
 ---
 
@@ -42,10 +42,16 @@
            v
 ┌─────────────────────────────────────────────────────────────────────┐
 │                      CALCULATION ENGINE                              │
-│                      (Aggregation Layer)                            │
+│                      (Shared Aggregation Layer)                     │
 │                                                                      │
+│   lib/liquidity-matrix/aggregate.ts                                │
 │   - Aggregiert LedgerEntries nach Dimensionen                      │
-│   - Berechnet Liquiditätsübersicht (13 Wochen/Monate)              │
+│   - traceMode=false → Matrix-API (nur Zahlen)                     │
+│   - traceMode=true  → Explain-Cell-API (Zahlen + EntryTrace[])    │
+│                                                                      │
+│   lib/liquidity-matrix/explain.ts                                  │
+│   - Baut 4-Ebenen-Erklärung aus Trace-Daten                       │
+│   - Liest Beschreibungen aus matrix-config.ts (ADR-031)            │
 │   - Deterministisch, auditierbar, unveränderlich                   │
 └─────────────────────────────────────────────────────────────────────┘
            │

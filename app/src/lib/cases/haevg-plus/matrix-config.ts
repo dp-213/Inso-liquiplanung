@@ -64,6 +64,7 @@ export type MatrixRowMatchType =
 export interface MatrixRowMatch {
   type: MatrixRowMatchType;
   value: string;
+  description?: string;  // Menschenlesbare Beschreibung dieser Regel
 }
 
 export interface MatrixRowConfig {
@@ -76,6 +77,7 @@ export interface MatrixRowConfig {
   isSummary: boolean;
   isSectionHeader?: boolean;  // Visuelle Gruppierung ohne Werte (z.B. "Umsatz", "Altforderungen")
   matches: MatrixRowMatch[];
+  matchDescription?: string;  // Menschenlesbare Erklärung, was diese Zeile erfasst
   flowType?: 'INFLOW' | 'OUTFLOW';
   bankAccountId?: string;
   visibleInScopes?: LiquidityScope[];
@@ -208,9 +210,10 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
+    matchDescription: 'Einnahmen aus Hausarztzentrierter Versorgung (HZV/HAVG). Zuordnung primär über Kategorie-Tag, sekundär über Gegenpartei-Name.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'HZV' },
-      { type: 'COUNTERPARTY_PATTERN', value: '(HZV|HAVG|HAEVG|Hausarzt)' },
+      { type: 'CATEGORY_TAG', value: 'HZV', description: 'Buchungen mit Kategorie-Tag „HZV"' },
+      { type: 'COUNTERPARTY_PATTERN', value: '(HZV|HAVG|HAEVG|Hausarzt)', description: 'Gegenpartei enthält „HZV", „HAVG", „HAEVG" oder „Hausarzt"' },
     ],
   },
   {
@@ -222,9 +225,10 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
+    matchDescription: 'Einnahmen der Kassenärztlichen Vereinigung (KVNO). Zuordnung primär über Kategorie-Tag, sekundär über Gegenpartei-Name.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'KV' },
-      { type: 'COUNTERPARTY_PATTERN', value: '(KV|KVNO|Kassenärztliche)' },
+      { type: 'CATEGORY_TAG', value: 'KV', description: 'Buchungen mit Kategorie-Tag „KV"' },
+      { type: 'COUNTERPARTY_PATTERN', value: '(KV|KVNO|Kassenärztliche)', description: 'Gegenpartei enthält „KV", „KVNO" oder „Kassenärztliche"' },
     ],
   },
   {
@@ -236,9 +240,10 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
+    matchDescription: 'Einnahmen über Privatärztliche Verrechnungsstelle (PVS). Zuordnung primär über Kategorie-Tag, sekundär über Gegenpartei-Name.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'PVS' },
-      { type: 'COUNTERPARTY_PATTERN', value: '(PVS|Privat|Privatpatient)' },
+      { type: 'CATEGORY_TAG', value: 'PVS', description: 'Buchungen mit Kategorie-Tag „PVS"' },
+      { type: 'COUNTERPARTY_PATTERN', value: '(PVS|Privat|Privatpatient)', description: 'Gegenpartei enthält „PVS", „Privat" oder „Privatpatient"' },
     ],
   },
 
@@ -263,8 +268,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
+    matchDescription: 'HZV-Altforderungen: Vor Insolvenzeröffnung erbrachte Leistungen, nach Eröffnung bezahlt. Entstehen durch Alt/Neu-Split.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'ALTFORDERUNG_HZV' },
+      { type: 'CATEGORY_TAG', value: 'ALTFORDERUNG_HZV', description: 'Buchungen mit Kategorie-Tag „ALTFORDERUNG_HZV"' },
     ],
   },
   {
@@ -276,8 +282,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
+    matchDescription: 'KV-Altforderungen: Vor Insolvenzeröffnung erbrachte Leistungen, nach Eröffnung bezahlt. Entstehen durch Alt/Neu-Split.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'ALTFORDERUNG_KV' },
+      { type: 'CATEGORY_TAG', value: 'ALTFORDERUNG_KV', description: 'Buchungen mit Kategorie-Tag „ALTFORDERUNG_KV"' },
     ],
   },
   {
@@ -289,8 +296,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
+    matchDescription: 'PVS-Altforderungen: Vor Insolvenzeröffnung erbrachte Leistungen, nach Eröffnung bezahlt. Entstehen durch Alt/Neu-Split.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'ALTFORDERUNG_PVS' },
+      { type: 'CATEGORY_TAG', value: 'ALTFORDERUNG_PVS', description: 'Buchungen mit Kategorie-Tag „ALTFORDERUNG_PVS"' },
     ],
   },
 
@@ -316,9 +324,10 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSummary: false,
     flowType: 'INFLOW',
     visibleInScopes: ['GLOBAL'],
+    matchDescription: 'Insolvenzspezifische Einzahlungen (z.B. Massekredit-Auszahlungen). Nur in Gesamtansicht sichtbar.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'INSO_EINZAHLUNG' },
-      { type: 'DESCRIPTION_PATTERN', value: '(insolvenzspezifisch.*Einzahlung)' },
+      { type: 'CATEGORY_TAG', value: 'INSO_EINZAHLUNG', description: 'Buchungen mit Kategorie-Tag „INSO_EINZAHLUNG"' },
+      { type: 'DESCRIPTION_PATTERN', value: '(insolvenzspezifisch.*Einzahlung)', description: 'Buchungstext enthält „insolvenzspezifisch" und „Einzahlung"' },
     ],
   },
   {
@@ -330,8 +339,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
+    matchDescription: 'Auskehrungen von alten Bankkonten auf das Anderkonto/Massekonto.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'AUSKEHRUNG_ALTKONTEN' },
+      { type: 'CATEGORY_TAG', value: 'AUSKEHRUNG_ALTKONTEN', description: 'Buchungen mit Kategorie-Tag „AUSKEHRUNG_ALTKONTEN"' },
     ],
   },
   {
@@ -343,8 +353,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
+    matchDescription: 'Sonstige Einnahmen wie Gutachten, Privatpatienten-Direktzahlungen und ähnliches.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'EINNAHME_SONSTIGE' },
+      { type: 'CATEGORY_TAG', value: 'EINNAHME_SONSTIGE', description: 'Buchungen mit Kategorie-Tag „EINNAHME_SONSTIGE"' },
     ],
   },
   {
@@ -356,7 +367,8 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
-    matches: [{ type: 'FALLBACK', value: 'INFLOW' }],
+    matchDescription: 'Auffangzeile für alle Einzahlungen, die keiner spezifischeren Zeile zugeordnet werden konnten.',
+    matches: [{ type: 'FALLBACK', value: 'INFLOW', description: 'Alle übrigen Einzahlungen ohne spezifische Zuordnung' }],
   },
 
   // ─── BLOCK C: BETRIEBLICHE AUSZAHLUNGEN ─────────────────────────────
@@ -381,9 +393,10 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSummary: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
+    matchDescription: 'Personalaufwand (Löhne, Gehälter). Zuordnung über Kategorie-Tag oder Buchungstext. Nur in Gesamtansicht sichtbar.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'PERSONAL' },
-      { type: 'DESCRIPTION_PATTERN', value: '(Lohn|Gehalt|Personal|SV-Beitrag|Sozialversicherung)' },
+      { type: 'CATEGORY_TAG', value: 'PERSONAL', description: 'Buchungen mit Kategorie-Tag „PERSONAL"' },
+      { type: 'DESCRIPTION_PATTERN', value: '(Lohn|Gehalt|Personal|SV-Beitrag|Sozialversicherung)', description: 'Buchungstext enthält Lohn, Gehalt, Personal, SV-Beitrag oder Sozialversicherung' },
     ],
   },
   {
@@ -396,8 +409,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSummary: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
+    matchDescription: 'Arbeitgeber-Anteile zur Sozialversicherung. Nur in Gesamtansicht sichtbar.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'SOZIALABGABEN' },
+      { type: 'CATEGORY_TAG', value: 'SOZIALABGABEN', description: 'Buchungen mit Kategorie-Tag „SOZIALABGABEN"' },
     ],
   },
   {
@@ -409,17 +423,18 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
+    matchDescription: 'Laufende Betriebskosten (Miete, Strom, IT, Versicherungen, etc.). Zuordnung über diverse Kategorie-Tags oder Buchungstext.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'BETRIEBSKOSTEN' },
-      { type: 'CATEGORY_TAG', value: 'MIETE' },
-      { type: 'CATEGORY_TAG', value: 'STROM' },
-      { type: 'CATEGORY_TAG', value: 'KOMMUNIKATION' },
-      { type: 'CATEGORY_TAG', value: 'LEASING' },
-      { type: 'CATEGORY_TAG', value: 'VERSICHERUNG_BETRIEBLICH' },
-      { type: 'CATEGORY_TAG', value: 'RUNDFUNK' },
-      { type: 'CATEGORY_TAG', value: 'BANKGEBUEHREN' },
-      { type: 'CATEGORY_TAG', value: 'BUERO_IT' },
-      { type: 'DESCRIPTION_PATTERN', value: '(Miete|Strom|Gas|Energie|Telefon|Software|Versicherung|Material|Praxisbedarf|EDV|IT|Wartung|Nebenkosten|Raumkosten)' },
+      { type: 'CATEGORY_TAG', value: 'BETRIEBSKOSTEN', description: 'Allgemeine Betriebskosten' },
+      { type: 'CATEGORY_TAG', value: 'MIETE', description: 'Mietkosten' },
+      { type: 'CATEGORY_TAG', value: 'STROM', description: 'Strom- und Energiekosten' },
+      { type: 'CATEGORY_TAG', value: 'KOMMUNIKATION', description: 'Telefon und Internet' },
+      { type: 'CATEGORY_TAG', value: 'LEASING', description: 'Leasing-Raten' },
+      { type: 'CATEGORY_TAG', value: 'VERSICHERUNG_BETRIEBLICH', description: 'Betriebliche Versicherungen' },
+      { type: 'CATEGORY_TAG', value: 'RUNDFUNK', description: 'Rundfunkgebühren' },
+      { type: 'CATEGORY_TAG', value: 'BANKGEBUEHREN', description: 'Bankgebühren' },
+      { type: 'CATEGORY_TAG', value: 'BUERO_IT', description: 'Büro- und IT-Kosten' },
+      { type: 'DESCRIPTION_PATTERN', value: '(Miete|Strom|Gas|Energie|Telefon|Software|Versicherung|Material|Praxisbedarf|EDV|IT|Wartung|Nebenkosten|Raumkosten)', description: 'Buchungstext enthält betriebskostentypische Begriffe' },
     ],
   },
 
@@ -444,8 +459,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
+    matchDescription: 'Personal-Altverbindlichkeiten: Lohnforderungen von vor Insolvenzeröffnung. Entstehen durch Alt/Neu-Split.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_PERSONAL' },
+      { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_PERSONAL', description: 'Buchungen mit Kategorie-Tag „ALTVERBINDLICHKEIT_PERSONAL"' },
     ],
   },
   {
@@ -457,8 +473,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
+    matchDescription: 'Sozialabgaben-Altverbindlichkeiten: Beiträge von vor Insolvenzeröffnung. Entstehen durch Alt/Neu-Split.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_SOZIALABGABEN' },
+      { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_SOZIALABGABEN', description: 'Buchungen mit Kategorie-Tag „ALTVERBINDLICHKEIT_SOZIALABGABEN"' },
     ],
   },
   {
@@ -470,8 +487,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
+    matchDescription: 'Betriebskosten-Altverbindlichkeiten: Rechnungen von vor Insolvenzeröffnung. Entstehen durch Alt/Neu-Split.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN' },
+      { type: 'CATEGORY_TAG', value: 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN', description: 'Buchungen mit Kategorie-Tag „ALTVERBINDLICHKEIT_BETRIEBSKOSTEN"' },
     ],
   },
 
@@ -484,7 +502,8 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
-    matches: [{ type: 'FALLBACK', value: 'OUTFLOW_OPERATIVE' }],
+    matchDescription: 'Auffangzeile für alle betrieblichen Auszahlungen, die keiner spezifischeren Zeile zugeordnet werden konnten.',
+    matches: [{ type: 'FALLBACK', value: 'OUTFLOW_OPERATIVE', description: 'Alle übrigen betrieblichen Auszahlungen ohne spezifische Zuordnung' }],
   },
 
   // ─── BLOCK D: STEUERLICHER CASH-OUT ──────────────────────────────────
@@ -507,8 +526,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
+    matchDescription: 'Umsatzsteuer-Zahlungen an das Finanzamt. Zuordnung über Buchungstext.',
     matches: [
-      { type: 'DESCRIPTION_PATTERN', value: '(Umsatzsteuer|USt|MwSt|Vorsteuer|Finanzamt)' },
+      { type: 'DESCRIPTION_PATTERN', value: '(Umsatzsteuer|USt|MwSt|Vorsteuer|Finanzamt)', description: 'Buchungstext enthält Umsatzsteuer, USt, MwSt, Vorsteuer oder Finanzamt' },
     ],
   },
   {
@@ -520,9 +540,10 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'OUTFLOW',
+    matchDescription: 'Sonstige Steuerzahlungen (Gewerbesteuer, Lohnsteuer, etc.). Zuordnung über Kategorie-Tag oder Buchungstext.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'STEUERN' },
-      { type: 'DESCRIPTION_PATTERN', value: '(Gewerbesteuer|Körperschaftsteuer|Lohnsteuer)' },
+      { type: 'CATEGORY_TAG', value: 'STEUERN', description: 'Buchungen mit Kategorie-Tag „STEUERN"' },
+      { type: 'DESCRIPTION_PATTERN', value: '(Gewerbesteuer|Körperschaftsteuer|Lohnsteuer)', description: 'Buchungstext enthält Gewerbesteuer, Körperschaftsteuer oder Lohnsteuer' },
     ],
   },
 
@@ -549,9 +570,10 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSummary: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
+    matchDescription: 'Rückzahlung von Insolvenzgeld an die Agentur für Arbeit.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'INSO_RUECKZAHLUNG' },
-      { type: 'DESCRIPTION_PATTERN', value: '(Rückzahlung.*Insolvenzgeld|Insolvenzgeld.*Rückzahlung)' },
+      { type: 'CATEGORY_TAG', value: 'INSO_RUECKZAHLUNG', description: 'Buchungen mit Kategorie-Tag „INSO_RUECKZAHLUNG"' },
+      { type: 'DESCRIPTION_PATTERN', value: '(Rückzahlung.*Insolvenzgeld|Insolvenzgeld.*Rückzahlung)', description: 'Buchungstext enthält „Rückzahlung Insolvenzgeld"' },
     ],
   },
   {
@@ -564,9 +586,10 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSummary: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
+    matchDescription: 'Vorfinanzierung von Insolvenzgeld durch den Insolvenzverwalter.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'INSO_VORFINANZIERUNG' },
-      { type: 'DESCRIPTION_PATTERN', value: '(Vorfinanzierung.*Insolvenzgeld|Insolvenzgeld.*Vorfinanzierung)' },
+      { type: 'CATEGORY_TAG', value: 'INSO_VORFINANZIERUNG', description: 'Buchungen mit Kategorie-Tag „INSO_VORFINANZIERUNG"' },
+      { type: 'DESCRIPTION_PATTERN', value: '(Vorfinanzierung.*Insolvenzgeld|Insolvenzgeld.*Vorfinanzierung)', description: 'Buchungstext enthält „Vorfinanzierung Insolvenzgeld"' },
     ],
   },
   {
@@ -579,9 +602,10 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSummary: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
+    matchDescription: 'Kosten für die Sachaufnahme im Insolvenzverfahren.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'INSO_SACHAUFNAHME' },
-      { type: 'DESCRIPTION_PATTERN', value: '(Sachaufnahme)' },
+      { type: 'CATEGORY_TAG', value: 'INSO_SACHAUFNAHME', description: 'Buchungen mit Kategorie-Tag „INSO_SACHAUFNAHME"' },
+      { type: 'DESCRIPTION_PATTERN', value: '(Sachaufnahme)', description: 'Buchungstext enthält „Sachaufnahme"' },
     ],
   },
   {
@@ -594,8 +618,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSummary: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
+    matchDescription: 'Tilgung des Massekredits (Sparkasse HRV, max. 137.000 EUR).',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'DARLEHEN_TILGUNG' },
+      { type: 'CATEGORY_TAG', value: 'DARLEHEN_TILGUNG', description: 'Buchungen mit Kategorie-Tag „DARLEHEN_TILGUNG"' },
     ],
   },
   {
@@ -608,8 +633,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSummary: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
+    matchDescription: 'Verfahrenskosten und sonstige Kosten des Insolvenzverfahrens.',
     matches: [
-      { type: 'CATEGORY_TAG', value: 'VERFAHRENSKOSTEN' },
+      { type: 'CATEGORY_TAG', value: 'VERFAHRENSKOSTEN', description: 'Buchungen mit Kategorie-Tag „VERFAHRENSKOSTEN"' },
     ],
   },
   {
@@ -622,9 +648,10 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSummary: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
+    matchDescription: 'Gerichts- und Verfahrenskosten. Zuordnung über Rechtsstatus oder Buchungstext.',
     matches: [
-      { type: 'LEGAL_BUCKET', value: 'ABSONDERUNG' },
-      { type: 'DESCRIPTION_PATTERN', value: '(Verfahren|Gericht|Insolvenz|Verwalter)' },
+      { type: 'LEGAL_BUCKET', value: 'ABSONDERUNG', description: 'Buchungen mit Rechtsstatus „ABSONDERUNG"' },
+      { type: 'DESCRIPTION_PATTERN', value: '(Verfahren|Gericht|Insolvenz|Verwalter)', description: 'Buchungstext enthält Verfahren, Gericht, Insolvenz oder Verwalter' },
     ],
   },
   {
@@ -637,8 +664,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSummary: false,
     flowType: 'OUTFLOW',
     visibleInScopes: ['GLOBAL'],
+    matchDescription: 'Beratungskosten (Rechtsanwälte, Steuerberater, Unternehmensberater, Gutachter).',
     matches: [
-      { type: 'DESCRIPTION_PATTERN', value: '(Berater|Rechtsanwalt|Steuerberater|Gutachter|Unternehmensberater)' },
+      { type: 'DESCRIPTION_PATTERN', value: '(Berater|Rechtsanwalt|Steuerberater|Gutachter|Unternehmensberater)', description: 'Buchungstext enthält Berater, Rechtsanwalt, Steuerberater, Gutachter oder Unternehmensberater' },
     ],
   },
 
@@ -707,17 +735,26 @@ export const HVPLUS_MATRIX_CONFIG: LiquidityMatrixConfig = {
 // =============================================================================
 
 /**
- * Findet die passende Zeile für einen LedgerEntry.
+ * Ergebnis eines Zeilen-Matchings mit Trace-Information.
+ * Enthält neben der Zeile auch Angaben darüber, WELCHER Match gegriffen hat.
+ */
+export interface MatchResult {
+  row: MatrixRowConfig;
+  matchType: MatrixRowMatchType;
+  matchValue: string;
+  matchStage: 'CATEGORY_TAG' | 'OTHER_CRITERIA' | 'FALLBACK';
+  matchDescription: string;  // Menschenlesbare Beschreibung des greifenden Matches
+}
+
+/**
+ * Findet die passende Zeile für einen LedgerEntry MIT Trace-Information.
  *
  * Zweistufiges Matching:
  * 1. Wenn Entry ein categoryTag hat → NUR CATEGORY_TAG-Matches prüfen.
- *    Das stellt sicher, dass PLAN-Daten exakt der richtigen Zeile zugeordnet
- *    werden, unabhängig von der Anzeige-Reihenfolge.
- * 2. Wenn kein categoryTag (IST-Daten) → andere Kriterien (COUNTERPARTY_PATTERN,
- *    DESCRIPTION_PATTERN, etc.).
+ * 2. Wenn kein categoryTag (IST-Daten) → andere Kriterien.
  * 3. Fallback-Zeilen greifen in beiden Fällen als letzte Option.
  */
-export function findMatchingRow(
+export function findMatchingRowWithTrace(
   entry: {
     description: string;
     amountCents: bigint | string;
@@ -730,7 +767,7 @@ export function findMatchingRow(
   },
   rows: MatrixRowConfig[],
   flowType: 'INFLOW' | 'OUTFLOW'
-): MatrixRowConfig | null {
+): MatchResult | null {
   const eligibleRows = rows.filter(row =>
     row.flowType === flowType &&
     !row.isSummary &&
@@ -740,9 +777,15 @@ export function findMatchingRow(
   // --- Stufe 1: CATEGORY_TAG (für PLAN-Daten) ---
   if (entry.categoryTag) {
     for (const row of eligibleRows) {
-      const tagMatch = row.matches.find(m => m.type === 'CATEGORY_TAG');
-      if (tagMatch && tagMatch.value === entry.categoryTag) {
-        return row;
+      const tagMatch = row.matches.find(m => m.type === 'CATEGORY_TAG' && m.value === entry.categoryTag);
+      if (tagMatch) {
+        return {
+          row,
+          matchType: 'CATEGORY_TAG',
+          matchValue: tagMatch.value,
+          matchStage: 'CATEGORY_TAG',
+          matchDescription: tagMatch.description ?? `Kategorie-Tag = '${tagMatch.value}'`,
+        };
       }
     }
     // categoryTag gesetzt aber keine passende Zeile → weiter zu Stufe 2/Fallback
@@ -760,6 +803,10 @@ export function findMatchingRow(
 
   for (const row of sortedRows) {
     let matchCount = 0;
+    let firstMatchType: MatrixRowMatchType | null = null;
+    let firstMatchValue = '';
+    let firstMatchDescription = '';
+
     // Zähle nur Nicht-CATEGORY_TAG und Nicht-FALLBACK Matches
     const otherMatches = row.matches.filter(
       m => m.type !== 'FALLBACK' && m.type !== 'CATEGORY_TAG'
@@ -767,41 +814,83 @@ export function findMatchingRow(
     const requiredMatches = otherMatches.length;
 
     for (const match of row.matches) {
+      let matched = false;
       switch (match.type) {
         case 'CATEGORY_TAG':
           break; // Bereits in Stufe 1 geprüft
         case 'COUNTERPARTY_ID':
-          if (entry.counterpartyId === match.value) matchCount++;
+          matched = entry.counterpartyId === match.value;
           break;
         case 'COUNTERPARTY_PATTERN':
-          if (entry.counterpartyName && new RegExp(match.value, 'i').test(entry.counterpartyName)) matchCount++;
+          matched = !!(entry.counterpartyName && new RegExp(match.value, 'i').test(entry.counterpartyName));
           break;
         case 'LOCATION_ID':
-          if (entry.locationId === match.value) matchCount++;
+          matched = entry.locationId === match.value;
           break;
         case 'BANK_ACCOUNT_ID':
-          if (entry.bankAccountId === match.value) matchCount++;
+          matched = entry.bankAccountId === match.value;
           break;
         case 'DESCRIPTION_PATTERN':
-          if (new RegExp(match.value, 'i').test(entry.description)) matchCount++;
+          matched = new RegExp(match.value, 'i').test(entry.description);
           break;
         case 'LEGAL_BUCKET':
-          if (entry.legalBucket === match.value) matchCount++;
+          matched = entry.legalBucket === match.value;
           break;
         case 'FALLBACK':
           if (match.value === flowType || match.value === `${flowType}_OPERATIVE`) {
-            return row;
+            return {
+              row,
+              matchType: 'FALLBACK',
+              matchValue: match.value,
+              matchStage: 'FALLBACK',
+              matchDescription: match.description ?? 'Auffangzeile für nicht zugeordnete Buchungen',
+            };
           }
           break;
       }
+      if (matched) {
+        matchCount++;
+        if (!firstMatchType) {
+          firstMatchType = match.type;
+          firstMatchValue = match.value;
+          firstMatchDescription = match.description ?? `${match.type} = '${match.value}'`;
+        }
+      }
     }
 
-    if (requiredMatches > 0 && matchCount > 0) {
-      return row;
+    if (requiredMatches > 0 && matchCount > 0 && firstMatchType) {
+      return {
+        row,
+        matchType: firstMatchType,
+        matchValue: firstMatchValue,
+        matchStage: 'OTHER_CRITERIA',
+        matchDescription: firstMatchDescription,
+      };
     }
   }
 
   return null;
+}
+
+/**
+ * Findet die passende Zeile für einen LedgerEntry.
+ * Wrapper um findMatchingRowWithTrace() für Rückwärtskompatibilität.
+ */
+export function findMatchingRow(
+  entry: {
+    description: string;
+    amountCents: bigint | string;
+    counterpartyId?: string | null;
+    counterpartyName?: string | null;
+    locationId?: string | null;
+    bankAccountId?: string | null;
+    legalBucket?: string | null;
+    categoryTag?: string | null;
+  },
+  rows: MatrixRowConfig[],
+  flowType: 'INFLOW' | 'OUTFLOW'
+): MatrixRowConfig | null {
+  return findMatchingRowWithTrace(entry, rows, flowType)?.row ?? null;
 }
 
 /**

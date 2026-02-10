@@ -17,6 +17,7 @@
  */
 
 import { useState, useEffect, useCallback, Fragment } from "react";
+import CellExplanationModal from "@/components/admin/CellExplanationModal";
 
 // =============================================================================
 // TYPES (from API)
@@ -221,6 +222,9 @@ export default function LiquidityMatrixTable({
   const [showLocationBreakdown, setShowLocationBreakdown] = useState(false);
   const [locationData, setLocationData] = useState<Record<string, LiquidityMatrixData>>({});
   const [locationLoading, setLocationLoading] = useState(false);
+
+  // Cell Explanation Modal
+  const [selectedCell, setSelectedCell] = useState<{ rowId: string; periodIndex: number } | null>(null);
 
   // Collapsible Bank Rows - standardmäßig AUSgeklappt (für IV-Meeting Übersichtlichkeit)
   const [collapsedBankBlocks, setCollapsedBankBlocks] = useState<Set<string>>(
@@ -718,12 +722,19 @@ export default function LiquidityMatrixTable({
                           const isError = data.validation.errorPeriods.includes(value.periodIndex) && row.isSummary && block.id === "CLOSING_BALANCE";
                           const hasNoData = value.entryCount === -1;
 
+                          // Klickbar: Nur Datenzeilen (nicht summary, sectionHeader, balance)
+                          const isClickable = !row.isSummary && !row.isSectionHeader &&
+                            !row.id.startsWith("opening_balance_") && !row.id.startsWith("closing_balance_") &&
+                            amount !== BigInt(0);
+
                           return (
                             <td
                               key={`${row.id}-${value.periodIndex}`}
                               className={`px-2 py-2 text-right tabular-nums ${
                                 hasNoData ? "text-gray-300" : isValueNegative ? "text-red-600" : row.flowType === "INFLOW" ? "text-green-600" : ""
-                              } ${isError ? "bg-red-100" : ""}`}
+                              } ${isError ? "bg-red-100" : ""} ${isClickable ? "cursor-pointer hover:bg-blue-50/50 transition-colors" : ""}`}
+                              onClick={isClickable ? () => setSelectedCell({ rowId: row.id, periodIndex: value.periodIndex }) : undefined}
+                              title={isClickable ? "Klicken für Details" : undefined}
                             >
                               {hasNoData ? "–" : formatCurrency(amount.toString())}
                             </td>
@@ -809,6 +820,18 @@ export default function LiquidityMatrixTable({
           Beträge in EUR (gerundet)
         </span>
       </div>
+
+      {/* Cell Explanation Modal */}
+      {selectedCell && (
+        <CellExplanationModal
+          caseId={caseId}
+          rowId={selectedCell.rowId}
+          periodIndex={selectedCell.periodIndex}
+          scope={scope}
+          includeUnreviewed={includeUnreviewed}
+          onClose={() => setSelectedCell(null)}
+        />
+      )}
     </div>
   );
 }
