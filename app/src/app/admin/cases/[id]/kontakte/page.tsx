@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useTableControls } from "@/hooks/useTableControls";
+import { TableToolbar, SortableHeader } from "@/components/admin/TableToolbar";
 
 interface CaseContact {
   id: string;
@@ -153,6 +155,11 @@ export default function KontaktePage() {
     });
   }
 
+  const { search, setSearch, sortKey, sortDir, toggleSort, result } = useTableControls(contacts, {
+    searchFields: ["name", "organization", "role", "email", "phone"],
+    defaultSort: { key: "displayOrder", dir: "asc" },
+  });
+
   const getRoleConfig = (role: string) => {
     return ROLE_OPTIONS.find((r) => r.value === role) || ROLE_OPTIONS[ROLE_OPTIONS.length - 1];
   };
@@ -288,31 +295,32 @@ export default function KontaktePage() {
 
       {/* Contacts Table */}
       <div className="admin-card">
-        <div className="px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">
-            Übersicht ({contacts.length})
-          </h2>
-        </div>
-        {contacts.length === 0 ? (
+        <TableToolbar
+          search={search}
+          onSearchChange={setSearch}
+          resultCount={result.length}
+          totalCount={contacts.length}
+        />
+        {result.length === 0 ? (
           <div className="p-8 text-center text-[var(--muted)]">
-            Noch keine Kontakte erfasst
+            {contacts.length === 0 ? "Noch keine Kontakte erfasst" : "Keine Treffer"}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[var(--border)]">
               <thead>
                 <tr>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Rolle</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Organisation</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">E-Mail</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Telefon</th>
+                  <SortableHeader label="Rolle" sortKey="role" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof CaseContact)} className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase" />
+                  <SortableHeader label="Name" sortKey="name" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof CaseContact)} />
+                  <SortableHeader label="Organisation" sortKey="organization" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof CaseContact)} />
+                  <SortableHeader label="E-Mail" sortKey="email" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof CaseContact)} />
+                  <SortableHeader label="Telefon" sortKey="phone" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof CaseContact)} />
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Notizen</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Aktionen</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {contacts.map((contact) => {
+                {result.map((contact) => {
                   const roleConfig = getRoleConfig(contact.role);
                   return (
                     <tr key={contact.id} className="hover:bg-[var(--accent)]">

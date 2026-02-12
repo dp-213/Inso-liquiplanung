@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
+import { useTableControls } from "@/hooks/useTableControls";
+import { TableToolbar, SortableHeader } from "@/components/admin/TableToolbar";
 
 interface SalaryMonth {
   id: string;
@@ -146,13 +148,18 @@ export default function PersonalPage() {
     });
   }, [employees, filterLocation, filterActive]);
 
-  // Totals per month
+  const { search, setSearch, sortKey, sortDir, toggleSort, result: sortedEmployees } = useTableControls(filteredEmployees, {
+    searchFields: ["lastName", "firstName", "personnelNumber", "role", "lanr"],
+    defaultSort: { key: "lastName", dir: "asc" },
+  });
+
+  // Totals per month (based on sorted/filtered)
   const monthlyTotals = useMemo(() => {
     const totals: Record<string, { gross: number; count: number }> = {};
     for (const col of salaryColumns) {
       totals[col.key] = { gross: 0, count: 0 };
     }
-    for (const emp of filteredEmployees) {
+    for (const emp of sortedEmployees) {
       for (const sm of emp.salaryMonths) {
         const key = `${sm.year}-${String(sm.month).padStart(2, "0")}`;
         if (totals[key]) {
@@ -162,7 +169,7 @@ export default function PersonalPage() {
       }
     }
     return totals;
-  }, [filteredEmployees, salaryColumns]);
+  }, [sortedEmployees, salaryColumns]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -478,12 +485,23 @@ export default function PersonalPage() {
       {/* Filter Bar */}
       <div className="admin-card p-4">
         <div className="flex flex-wrap gap-4 items-center">
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Suchen..."
+              className="input w-full pl-9 py-1.5 text-sm"
+            />
+          </div>
           <div>
-            <label className="text-xs font-medium text-[var(--muted)] uppercase mr-2">Standort</label>
             <select
               value={filterLocation}
               onChange={(e) => setFilterLocation(e.target.value)}
-              className="input text-sm"
+              className="input text-sm py-1.5"
             >
               <option value="ALL">Alle Standorte</option>
               {locations.map((loc) => (
@@ -492,19 +510,20 @@ export default function PersonalPage() {
             </select>
           </div>
           <div>
-            <label className="text-xs font-medium text-[var(--muted)] uppercase mr-2">Status</label>
             <select
               value={filterActive}
               onChange={(e) => setFilterActive(e.target.value)}
-              className="input text-sm"
+              className="input text-sm py-1.5"
             >
               <option value="ACTIVE">Nur aktive</option>
               <option value="ALL">Alle</option>
               <option value="INACTIVE">Nur inaktive</option>
             </select>
           </div>
-          <span className="text-sm text-[var(--muted)]">
-            {filteredEmployees.length} von {employees.length} Mitarbeitern
+          <span className="text-xs text-[var(--muted)] ml-auto whitespace-nowrap">
+            {sortedEmployees.length === employees.length
+              ? `${employees.length} Mitarbeiter`
+              : `${sortedEmployees.length} von ${employees.length} Mitarbeitern`}
           </span>
         </div>
       </div>
@@ -513,10 +532,10 @@ export default function PersonalPage() {
       <div className="admin-card">
         <div className="px-6 py-4 border-b border-[var(--border)]">
           <h2 className="text-lg font-semibold text-[var(--foreground)]">
-            Mitarbeiter ({filteredEmployees.length})
+            Mitarbeiter ({sortedEmployees.length})
           </h2>
         </div>
-        {filteredEmployees.length === 0 ? (
+        {sortedEmployees.length === 0 ? (
           <div className="p-8 text-center text-[var(--muted)]">
             {employees.length === 0 ? "Noch keine Mitarbeiter erfasst" : "Keine Mitarbeiter für diesen Filter"}
           </div>
@@ -525,11 +544,11 @@ export default function PersonalPage() {
             <table className="min-w-full divide-y divide-[var(--border)]">
               <thead>
                 <tr>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase sticky left-0 bg-[var(--card)] z-10">Nr.</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase sticky left-10 bg-[var(--card)] z-10">Name</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Funktion</th>
+                  <SortableHeader label="Nr." sortKey="personnelNumber" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof Employee)} className="px-3 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase sticky left-0 bg-[var(--card)] z-10" />
+                  <SortableHeader label="Name" sortKey="lastName" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof Employee)} className="px-3 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase sticky left-10 bg-[var(--card)] z-10" />
+                  <SortableHeader label="Funktion" sortKey="role" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof Employee)} className="px-3 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase" />
                   <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Standort</th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">LANR</th>
+                  <SortableHeader label="LANR" sortKey="lanr" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof Employee)} className="px-3 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase" />
                   {salaryColumns.map((col) => (
                     <th key={col.key} className="px-3 py-3 text-right text-xs font-semibold text-[var(--secondary)] uppercase whitespace-nowrap">
                       {col.label}
@@ -539,7 +558,7 @@ export default function PersonalPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {filteredEmployees.map((emp) => (
+                {sortedEmployees.map((emp) => (
                   <tr key={emp.id} className={`hover:bg-[var(--accent)] ${!emp.isActive ? "opacity-50" : ""}`}>
                     <td className="px-3 py-2 text-sm text-[var(--muted)] font-mono sticky left-0 bg-[var(--card)]">
                       {emp.personnelNumber || "-"}

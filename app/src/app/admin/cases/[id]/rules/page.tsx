@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback, use } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTableControls } from "@/hooks/useTableControls";
+import { TableToolbar, SortableHeader } from "@/components/admin/TableToolbar";
 
 interface ClassificationRule {
   id: string;
@@ -232,6 +234,11 @@ export default function CaseRulesPage({
       router.replace(`/admin/cases/${id}/rules`, { scroll: false });
     }
   }, [searchParams, id, router]);
+
+  const { search, setSearch, sortKey, sortDir, toggleSort, result: filteredRules } = useTableControls(rules, {
+    searchFields: ["name", "matchValue"],
+    defaultSort: { key: "priority", dir: "asc" },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -675,13 +682,14 @@ export default function CaseRulesPage({
 
       {/* Rules List */}
       <div className="admin-card">
-        <div className="p-4 border-b border-[var(--border)]">
-          <h2 className="text-lg font-medium text-[var(--foreground)]">
-            Rules ({rules.length})
-          </h2>
-        </div>
+        <TableToolbar
+          search={search}
+          onSearchChange={setSearch}
+          resultCount={filteredRules.length}
+          totalCount={rules.length}
+        />
 
-        {rules.length === 0 ? (
+        {filteredRules.length === 0 ? (
           <div className="p-8 text-center text-[var(--secondary)]">
             <svg className="w-12 h-12 mx-auto mb-4 text-[var(--muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -695,14 +703,14 @@ export default function CaseRulesPage({
               <thead>
                 <tr>
                   <th>Aktiv</th>
-                  <th>Name</th>
+                  <SortableHeader label="Name" sortKey="name" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof ClassificationRule)} className="text-left px-4 py-3 text-xs font-semibold text-[var(--secondary)] uppercase" />
                   <th>Wenn...</th>
-                  <th>Dann →</th>
+                  <th>Dann &rarr;</th>
                   <th>Aktionen</th>
                 </tr>
               </thead>
               <tbody>
-                {rules.map((rule) => (
+                {filteredRules.map((rule) => (
                   <tr key={rule.id} className={!rule.isActive ? "opacity-50" : ""}>
                     <td>
                       <button

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useTableControls } from "@/hooks/useTableControls";
+import { TableToolbar, SortableHeader } from "@/components/admin/TableToolbar";
 
 interface BankAccount {
   id: string;
@@ -49,7 +51,7 @@ export default function BankAccountsPage() {
 
   async function fetchData() {
     try {
-      const res = await fetch(`/api/cases/${caseId}/bank-accounts`);
+      const res = await fetch(`/api/cases/${caseId}/bank-accounts`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setAccounts(data.accounts || []);
@@ -71,6 +73,7 @@ export default function BankAccountsPage() {
       const method = formData.accountId ? "PUT" : "POST";
       const res = await fetch(`/api/cases/${caseId}/bank-accounts`, {
         method,
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           accountId: formData.accountId,
@@ -105,6 +108,7 @@ export default function BankAccountsPage() {
     try {
       const res = await fetch(`/api/cases/${caseId}/bank-accounts?accountId=${accountId}`, {
         method: "DELETE",
+        credentials: "include",
       });
 
       if (!res.ok) {
@@ -161,6 +165,11 @@ export default function BankAccountsPage() {
   const getStatusConfig = (status: string) => {
     return STATUS_OPTIONS.find((s) => s.value === status) || STATUS_OPTIONS[0];
   };
+
+  const { search, setSearch, sortKey, sortDir, toggleSort, result } = useTableControls(accounts, {
+    searchFields: ["accountName", "iban", "bankName"],
+    defaultSort: { key: "accountName", dir: "asc" },
+  });
 
   // Calculate totals from currentBalanceCents
   const totalBalance = accounts.reduce((sum, acc) => sum + Number(acc.currentBalanceCents), 0);
@@ -337,32 +346,33 @@ export default function BankAccountsPage() {
 
       {/* Accounts Table */}
       <div className="admin-card">
-        <div className="px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">
-            Kontenübersicht ({accounts.length})
-          </h2>
-        </div>
-        {accounts.length === 0 ? (
+        <TableToolbar
+          search={search}
+          onSearchChange={setSearch}
+          resultCount={result.length}
+          totalCount={accounts.length}
+        />
+        {result.length === 0 ? (
           <div className="p-8 text-center text-[var(--muted)]">
-            Noch keine Bankkonten erfasst
+            {accounts.length === 0 ? "Noch keine Bankkonten erfasst" : "Keine Treffer"}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[var(--border)]">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Kreditinstitut</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Konto</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">IBAN</th>
+                  <SortableHeader label="Kreditinstitut" sortKey="bankName" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof BankAccount)} />
+                  <SortableHeader label="Konto" sortKey="accountName" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof BankAccount)} />
+                  <SortableHeader label="IBAN" sortKey="iban" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof BankAccount)} />
                   <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--secondary)] uppercase">Anfangssaldo</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-[var(--secondary)] uppercase">Aktueller Saldo</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Sicherungsnehmer</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Status</th>
+                  <SortableHeader label="Status" sortKey="status" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof BankAccount)} className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase" />
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Aktionen</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {accounts.map((account) => {
+                {result.map((account) => {
                   const statusConfig = getStatusConfig(account.status);
                   return (
                     <tr key={account.id} className="hover:bg-gray-50">

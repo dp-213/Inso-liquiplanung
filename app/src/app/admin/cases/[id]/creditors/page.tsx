@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useTableControls } from "@/hooks/useTableControls";
+import { TableToolbar, SortableHeader } from "@/components/admin/TableToolbar";
 
 interface CostCategoryRef {
   id: string;
@@ -23,10 +25,10 @@ interface Creditor {
 }
 
 const CATEGORY_OPTIONS = [
-  { value: "LIEFERANT", label: "Lieferant", color: "bg-blue-100 text-blue-700" },
-  { value: "DIENSTLEISTER", label: "Dienstleister", color: "bg-purple-100 text-purple-700" },
-  { value: "BEHOERDE", label: "Behörde", color: "bg-amber-100 text-amber-700" },
-  { value: "SONSTIGE", label: "Sonstige", color: "bg-gray-100 text-gray-700" },
+  { value: "LIEFERANT", label: "Lieferant", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  { value: "DIENSTLEISTER", label: "Dienstleister", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
+  { value: "BEHOERDE", label: "Behörde", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" },
+  { value: "SONSTIGE", label: "Sonstige", color: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400" },
 ];
 
 export default function CreditorsPage() {
@@ -167,6 +169,17 @@ export default function CreditorsPage() {
       notes: "",
     });
   }
+
+  const [filterCategory, setFilterCategory] = useState<string>("ALL");
+
+  const preFiltered = filterCategory === "ALL"
+    ? creditors
+    : creditors.filter((c) => c.category === filterCategory);
+
+  const { search, setSearch, sortKey, sortDir, toggleSort, result } = useTableControls(preFiltered, {
+    searchFields: ["name", "shortName", "iban", "category"],
+    defaultSort: { key: "name", dir: "asc" },
+  });
 
   const getCategoryConfig = (cat: string | null) => {
     return CATEGORY_OPTIONS.find((c) => c.value === cat) || CATEGORY_OPTIONS[3];
@@ -342,29 +355,41 @@ export default function CreditorsPage() {
 
       {/* Creditors Table */}
       <div className="admin-card">
-        <div className="px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">
-            Übersicht ({creditors.length})
-          </h2>
-        </div>
-        {creditors.length === 0 ? (
+        <TableToolbar
+          search={search}
+          onSearchChange={setSearch}
+          resultCount={result.length}
+          totalCount={creditors.length}
+        >
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="input text-sm py-1.5"
+          >
+            <option value="ALL">Alle Kategorien</option>
+            {CATEGORY_OPTIONS.map((c) => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+        </TableToolbar>
+        {result.length === 0 ? (
           <div className="p-8 text-center text-[var(--muted)]">
-            Noch keine Kreditoren erfasst
+            {creditors.length === 0 ? "Noch keine Kreditoren erfasst" : "Keine Treffer"}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[var(--border)]">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Name</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Kategorie</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">IBAN</th>
+                  <SortableHeader label="Name" sortKey="name" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof Creditor)} />
+                  <SortableHeader label="Kategorie" sortKey="category" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof Creditor)} className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase" />
+                  <SortableHeader label="IBAN" sortKey="iban" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof Creditor)} />
                   <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Kostenart</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Aktionen</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {creditors.map((creditor) => {
+                {result.map((creditor) => {
                   const catConfig = getCategoryConfig(creditor.category);
                   return (
                     <tr key={creditor.id} className="hover:bg-gray-50">

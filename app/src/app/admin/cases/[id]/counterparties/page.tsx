@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { useTableControls } from "@/hooks/useTableControls";
+import { TableToolbar, SortableHeader } from "@/components/admin/TableToolbar";
 
 interface Counterparty {
   id: string;
@@ -15,10 +17,10 @@ interface Counterparty {
 }
 
 const TYPE_OPTIONS = [
-  { value: "PAYER", label: "Zahler", color: "bg-green-100 text-green-700" },
-  { value: "SUPPLIER", label: "Lieferant", color: "bg-blue-100 text-blue-700" },
-  { value: "AUTHORITY", label: "Behörde", color: "bg-purple-100 text-purple-700" },
-  { value: "OTHER", label: "Sonstige", color: "bg-gray-100 text-gray-700" },
+  { value: "PAYER", label: "Zahler", color: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" },
+  { value: "SUPPLIER", label: "Lieferant", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" },
+  { value: "AUTHORITY", label: "Behörde", color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" },
+  { value: "OTHER", label: "Sonstige", color: "bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400" },
 ];
 
 export default function CounterpartiesPage() {
@@ -47,7 +49,7 @@ export default function CounterpartiesPage() {
 
   async function fetchData() {
     try {
-      const res = await fetch(`/api/cases/${caseId}/counterparties`);
+      const res = await fetch(`/api/cases/${caseId}/counterparties`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setCounterparties(data.counterparties || []);
@@ -73,6 +75,7 @@ export default function CounterpartiesPage() {
 
       const res = await fetch(url, {
         method,
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name,
@@ -105,6 +108,7 @@ export default function CounterpartiesPage() {
     try {
       const res = await fetch(`/api/cases/${caseId}/counterparties/${counterpartyId}`, {
         method: "DELETE",
+        credentials: "include",
       });
 
       if (!res.ok) {
@@ -142,6 +146,17 @@ export default function CounterpartiesPage() {
       notes: "",
     });
   }
+
+  const [filterType, setFilterType] = useState<string>("ALL");
+
+  const preFiltered = filterType === "ALL"
+    ? counterparties
+    : counterparties.filter((c) => c.type === filterType);
+
+  const { search, setSearch, sortKey, sortDir, toggleSort, result } = useTableControls(preFiltered, {
+    searchFields: ["name", "shortName", "matchPattern", "type"],
+    defaultSort: { key: "name", dir: "asc" },
+  });
 
   const getTypeConfig = (type: string | null) => {
     return TYPE_OPTIONS.find((t) => t.value === type) || TYPE_OPTIONS[3];
@@ -311,30 +326,42 @@ export default function CounterpartiesPage() {
 
       {/* Counterparties Table */}
       <div className="admin-card">
-        <div className="px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">
-            Übersicht ({counterparties.length})
-          </h2>
-        </div>
-        {counterparties.length === 0 ? (
+        <TableToolbar
+          search={search}
+          onSearchChange={setSearch}
+          resultCount={result.length}
+          totalCount={counterparties.length}
+        >
+          <select
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+            className="input text-sm py-1.5"
+          >
+            <option value="ALL">Alle Typen</option>
+            {TYPE_OPTIONS.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </TableToolbar>
+        {result.length === 0 ? (
           <div className="p-8 text-center text-[var(--muted)]">
-            Noch keine Gegenparteien erfasst
+            {counterparties.length === 0 ? "Noch keine Gegenparteien erfasst" : "Keine Treffer"}
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[var(--border)]">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Kurzname</th>
-                  <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Typ</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase">Match-Pattern</th>
+                  <SortableHeader label="Name" sortKey="name" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof Counterparty)} />
+                  <SortableHeader label="Kurzname" sortKey="shortName" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof Counterparty)} />
+                  <SortableHeader label="Typ" sortKey="type" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof Counterparty)} className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase" />
+                  <SortableHeader label="Match-Pattern" sortKey="matchPattern" currentSortKey={sortKey as string} currentSortDir={sortDir} onToggle={(k) => toggleSort(k as keyof Counterparty)} />
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Top-Zahler</th>
                   <th className="px-4 py-3 text-center text-xs font-semibold text-[var(--secondary)] uppercase">Aktionen</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
-                {counterparties.map((counterparty) => {
+                {result.map((counterparty) => {
                   const typeConfig = getTypeConfig(counterparty.type);
                   return (
                     <tr key={counterparty.id} className="hover:bg-gray-50">
