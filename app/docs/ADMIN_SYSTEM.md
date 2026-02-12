@@ -1269,6 +1269,19 @@ const entries = await prisma.ledgerEntry.findMany({
 
 **NICHT gefiltert:** Ledger-Ansicht (zeigt alles), Classification Engine, Audit-Trail, Hash-Berechnung.
 
+**API-Endpunkte:**
+
+| Endpunkt | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/ledger/[entryId]/split` | POST | Entry in Einzelposten aufspalten (Body: `children[]` mit Beträgen) |
+| `/ledger/[entryId]/unsplit` | POST | Aufspaltung rückgängig machen (Children löschen, Parent reaktivieren) |
+| `/ledger/validate-splits` | GET | Konsistenz aller Splits prüfen (Betrags-Summen, verwaiste Children) |
+
+**Ledger GET-Response erweitert:**
+- `isBatchParent: boolean` – Hat der Entry Children?
+- `splitChildren: Array` – Zusammenfassung der Children (id, Beschreibung, Betrag, Counterparty, Location)
+- `parentEntryId: string | null` – Verweis auf Parent (bei Children)
+
 ---
 
 ## 5. Datenmodell-Diagramm

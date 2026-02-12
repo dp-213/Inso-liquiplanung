@@ -282,10 +282,24 @@ export async function GET(
     // Stats-Where: Transfers aus Summen ausschließen
     const statsWhere = { ...where, transferPartnerEntryId: null };
 
-    // Fetch entries and stats
+    // Fetch entries and stats (inkl. splitChildren für Batch-Erkennung)
     const [entries, total, inflowStats, outflowStats, transferVolumeStats] = await Promise.all([
       prisma.ledgerEntry.findMany({
         where,
+        include: {
+          splitChildren: {
+            select: {
+              id: true,
+              description: true,
+              amountCents: true,
+              counterpartyId: true,
+              locationId: true,
+              categoryTag: true,
+              reviewStatus: true,
+              note: true,
+            },
+          },
+        },
         orderBy: { transactionDate: 'asc' },
         take: limit,
         skip: offset,
@@ -311,8 +325,22 @@ export async function GET(
     const netAmount = totalInflows + totalOutflows;
     const transferVolume = transferVolumeStats._sum.amountCents || BigInt(0);
 
-    // Transform to response format
-    const response: LedgerEntryResponse[] = entries.map(serializeLedgerEntry);
+    // Transform to response format (inkl. splitChildren + isBatchParent)
+    const response = entries.map((entry) => ({
+      ...serializeLedgerEntry(entry),
+      parentEntryId: entry.parentEntryId,
+      isBatchParent: entry.splitChildren.length > 0,
+      splitChildren: entry.splitChildren.map(c => ({
+        id: c.id,
+        description: c.description,
+        amountCents: c.amountCents.toString(),
+        counterpartyId: c.counterpartyId,
+        locationId: c.locationId,
+        categoryTag: c.categoryTag,
+        reviewStatus: c.reviewStatus,
+        note: c.note,
+      })),
+    }));
 
     return NextResponse.json({
       entries: response,

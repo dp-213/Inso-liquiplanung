@@ -44,6 +44,10 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 - **SPLIT/UNSPLIT Audit-Actions:** Neue Audit-Aktionen „Aufgespalten" und „Zusammengeführt" für lückenlose Nachvollziehbarkeit im Änderungsprotokoll.
 - **Split-Parent-Guard:** PUT auf Ledger-Entries mit Children verbietet Änderungen an `amountCents`, `transactionDate`, `bankAccountId`. Erst Aufspaltung rückgängig machen.
 - **Flächendeckende Integration:** Filter in 12 Dateien integriert – alle Dashboard-APIs, Massekredit-Berechnung, Bankkonto-Salden, Forecast-Engine, Standort-Auswertung.
+- **Split-API:** POST `/ledger/[entryId]/split` zum Aufspalten eines Entries in Einzelposten mit Betrags-Validierung (Summe Children = Parent).
+- **Unsplit-API:** POST `/ledger/[entryId]/unsplit` zum Rückgängigmachen einer Aufspaltung (Children löschen, Parent reaktivieren).
+- **Validate-Splits-API:** GET `/ledger/validate-splits` prüft Konsistenz aller Splits eines Case (Betrags-Summen, verwaiste Children).
+- **Ledger-API erweitert:** GET `/ledger` gibt `splitChildren`, `isBatchParent` und `parentEntryId` mit zurück für Frontend-Darstellung.
 
 ### Bugfixes
 
@@ -74,6 +78,9 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 - `app/src/app/api/customers/check-slug/route.ts` – Slug-Verfügbarkeits-API
 - `app/src/app/admin/cases/[id]/kundenzugaenge/page.tsx` – Redirect auf `/freigaben`
 - `app/docs/FORECAST-ARCHITECTURE.md` – Architektur-Dokumentation Forecast-Modul
+- `app/src/app/api/cases/[id]/ledger/[entryId]/split/route.ts` – Split-API
+- `app/src/app/api/cases/[id]/ledger/[entryId]/unsplit/route.ts` – Unsplit-API
+- `app/src/app/api/cases/[id]/ledger/validate-splits/route.ts` – Split-Validierungs-API
 
 ### Geänderte Dateien
 
@@ -102,6 +109,7 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 - `app/src/app/api/cases/[id]/kontobewegungen/route.ts` – EXCLUDE_SPLIT_PARENTS
 - `app/src/app/api/cases/[id]/massekredit/route.ts` – EXCLUDE_SPLIT_PARENTS
 - `app/src/app/api/cases/[id]/ledger/[entryId]/route.ts` – Split-Parent-Guard auf PUT
+- `app/src/app/api/cases/[id]/ledger/route.ts` – splitChildren/isBatchParent im GET-Response
 
 ---
 

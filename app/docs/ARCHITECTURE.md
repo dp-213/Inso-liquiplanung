@@ -408,6 +408,9 @@ LedgerEntry (UNREVIEWED)
 | `/api/cases/[id]/ledger` | GET | Alle LedgerEntries (mit Filtern) |
 | `/api/cases/[id]/ledger` | POST | Neuen Eintrag erstellen |
 | `/api/cases/[id]/ledger/[entryId]` | GET/PUT/DELETE | Einzelner Eintrag |
+| `/api/cases/[id]/ledger/[entryId]/split` | POST | Entry in Einzelposten aufspalten |
+| `/api/cases/[id]/ledger/[entryId]/unsplit` | POST | Aufspaltung rückgängig machen |
+| `/api/cases/[id]/ledger/validate-splits` | GET | Split-Konsistenz prüfen |
 | `/api/cases/[id]/ledger/bulk-review` | POST | Massen-Review |
 | `/api/cases/[id]/intake` | POST | Vereinfachter Import |
 
