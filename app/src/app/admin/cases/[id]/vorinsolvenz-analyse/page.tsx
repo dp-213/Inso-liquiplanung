@@ -1,8 +1,47 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useCallback } from "react";
 
 // === Types ===
+
+interface LocationBreakdown {
+  locationId: string;
+  locationName: string;
+  totalCents: string;
+  monthly: Record<string, string>;
+}
+
+interface CounterpartyRow {
+  counterpartyId: string | null;
+  counterpartyName: string;
+  counterpartyType: string | null;
+  flowType: "INFLOW" | "OUTFLOW" | "MIXED";
+  totalCents: string;
+  matchCount: number;
+  monthly: Record<string, string>;
+  byLocation: LocationBreakdown[];
+}
+
+interface MonthlySummaryRow {
+  month: string;
+  inflowsCents: string;
+  outflowsCents: string;
+  netCents: string;
+  count: number;
+}
+
+interface UnclassifiedEntry {
+  id: string;
+  description: string;
+  note: string | null;
+  amountCents: string;
+  transactionDate: string;
+}
+
+interface LocationInfo {
+  id: string;
+  name: string;
+}
 
 interface VorinsolvenzData {
   summary: {
@@ -17,46 +56,58 @@ interface VorinsolvenzData {
   };
   counterpartyMonthly: CounterpartyRow[];
   monthlySummary: MonthlySummaryRow[];
-  byBankAccount: BankAccountRow[];
+  byBankAccount: Array<{
+    accountId: string;
+    accountName: string;
+    bankName: string;
+    inflowsCents: string;
+    outflowsCents: string;
+    count: number;
+  }>;
   unclassified: UnclassifiedEntry[];
+  locations: LocationInfo[];
 }
 
-interface CounterpartyRow {
-  counterpartyId: string | null;
-  counterpartyName: string;
-  counterpartyType: string | null;
-  flowType: "INFLOW" | "OUTFLOW" | "MIXED";
-  totalCents: string;
-  matchCount: number;
-  monthly: Record<string, string>;
+// === Helpers ===
+
+function formatCompact(cents: string): string {
+  const val = parseInt(cents) / 100;
+  const abs = Math.abs(val);
+  if (abs >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000) return `${Math.round(val / 1_000)}K`;
+  if (abs === 0) return "0";
+  return val.toFixed(0);
 }
 
-interface MonthlySummaryRow {
-  month: string;
-  inflowsCents: string;
-  outflowsCents: string;
-  netCents: string;
-  count: number;
+function formatCurrency(cents: string): string {
+  const value = parseInt(cents);
+  const euros = value / 100;
+  return new Intl.NumberFormat("de-DE", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(euros);
 }
 
-interface BankAccountRow {
-  accountId: string;
-  accountName: string;
-  bankName: string;
-  inflowsCents: string;
-  outflowsCents: string;
-  count: number;
+function formatMonth(monthKey: string): string {
+  const [year, month] = monthKey.split("-");
+  const names = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+  return `${names[parseInt(month) - 1]} ${year.slice(2)}`;
 }
 
-interface UnclassifiedEntry {
-  id: string;
-  description: string;
-  note: string | null;
-  amountCents: string;
-  transactionDate: string;
+function formatMonthLong(monthKey: string): string {
+  const [year, month] = monthKey.split("-");
+  const names = [
+    "Januar", "Februar", "März", "April", "Mai", "Juni",
+    "Juli", "August", "September", "Oktober", "November", "Dezember",
+  ];
+  return `${names[parseInt(month) - 1]} ${year}`;
 }
 
-type TabView = "matrix" | "top" | "bank";
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString("de-DE", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+  });
+}
 
 // === Component ===
 
@@ -69,7 +120,6 @@ export default function VorinsolvenzAnalysePage({
   const [data, setData] = useState<VorinsolvenzData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabView>("matrix");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -93,82 +143,22 @@ export default function VorinsolvenzAnalysePage({
     fetchData();
   }, [id]);
 
-  // === Helpers ===
-
-  const formatCurrency = (cents: string): string => {
-    const amount = parseInt(cents) / 100;
-    return amount.toLocaleString("de-DE", { style: "currency", currency: "EUR" });
-  };
-
-  const formatCompact = (cents: string): string => {
-    const val = parseInt(cents) / 100;
-    const abs = Math.abs(val);
-    if (abs >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
-    if (abs >= 1_000) return `${(val / 1_000).toFixed(1)}K`;
-    return val.toFixed(0);
-  };
-
-  const formatMonth = (monthKey: string): string => {
-    const [year, month] = monthKey.split("-");
-    const names = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
-    return `${names[parseInt(month) - 1]} ${year.slice(2)}`;
-  };
-
-  const formatMonthLong = (monthKey: string): string => {
-    const [year, month] = monthKey.split("-");
-    const names = [
-      "Januar", "Februar", "März", "April", "Mai", "Juni",
-      "Juli", "August", "September", "Oktober", "November", "Dezember",
-    ];
-    return `${names[parseInt(month) - 1]} ${year}`;
-  };
-
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString("de-DE", {
-      day: "2-digit", month: "2-digit", year: "numeric",
+  const toggleRow = useCallback((key: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
     });
-  };
-
-  const toggleRow = (key: string) => {
-    const next = new Set(expandedRows);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    setExpandedRows(next);
-  };
-
-  const getTypeBadge = (type: string | null) => {
-    if (!type) return null;
-    const styles: Record<string, string> = {
-      PAYER: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300",
-      SUPPLIER: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
-      AUTHORITY: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300",
-      OTHER: "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300",
-    };
-    const labels: Record<string, string> = {
-      PAYER: "Zahler", SUPPLIER: "Lieferant", AUTHORITY: "Behörde", OTHER: "Sonstige",
-    };
-    return (
-      <span className={`px-1.5 py-0.5 text-[10px] rounded ${styles[type] || styles.OTHER}`}>
-        {labels[type] || type}
-      </span>
-    );
-  };
-
-  const ChevronIcon = ({ expanded }: { expanded: boolean }) => (
-    <svg
-      className={`w-4 h-4 text-[var(--muted)] transition-transform ${expanded ? "rotate-90" : ""}`}
-      fill="none" stroke="currentColor" viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-    </svg>
-  );
+  }, []);
 
   // === Loading/Error states ===
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--primary)]"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-3 text-gray-500">Vorinsolvenz-Analyse wird berechnet...</span>
       </div>
     );
   }
@@ -176,7 +166,7 @@ export default function VorinsolvenzAnalysePage({
   if (error || !data) {
     return (
       <div className="admin-card p-8 text-center">
-        <p className="text-[var(--danger)]">{error || "Keine Daten"}</p>
+        <p className="text-red-600">{error || "Keine Daten"}</p>
       </div>
     );
   }
@@ -184,10 +174,10 @@ export default function VorinsolvenzAnalysePage({
   if (data.summary.totalCount === 0) {
     return (
       <div className="space-y-6">
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">Vorinsolvenz-Analyse</h1>
+        <h1 className="text-2xl font-bold text-gray-900">Vorinsolvenz-Analyse</h1>
         <div className="admin-card p-8 text-center">
-          <p className="text-[var(--muted)]">Keine Vorinsolvenz-Daten vorhanden.</p>
-          <p className="text-sm text-[var(--muted)] mt-2">
+          <p className="text-gray-500">Keine Vorinsolvenz-Daten vorhanden.</p>
+          <p className="text-sm text-gray-400 mt-2">
             Dieser Fall hat keine Einträge mit allocationSource = PRE_INSOLVENCY.
           </p>
         </div>
@@ -200,9 +190,10 @@ export default function VorinsolvenzAnalysePage({
   const { months } = data.summary;
   const firstMonth = formatMonthLong(months[0]);
   const lastMonth = formatMonthLong(months[months.length - 1]);
-  const classRate = ((data.summary.classifiedCount / data.summary.totalCount) * 100).toFixed(1);
+  const classRate = ((data.summary.classifiedCount / data.summary.totalCount) * 100).toFixed(0);
+  const locationCount = data.locations.length;
 
-  // Einnahmen/Ausgaben getrennt für Matrix
+  // Einnahmen/Ausgaben getrennt
   const inflowRows = data.counterpartyMonthly.filter(
     (r) => r.flowType === "INFLOW" || (r.flowType === "MIXED" && parseInt(r.totalCents) >= 0)
   );
@@ -210,18 +201,7 @@ export default function VorinsolvenzAnalysePage({
     (r) => r.flowType === "OUTFLOW" || (r.flowType === "MIXED" && parseInt(r.totalCents) < 0)
   );
 
-  // Top 20 für Tab 2
-  const topInflows = data.counterpartyMonthly
-    .filter((r) => r.flowType === "INFLOW" || r.flowType === "MIXED")
-    .sort((a, b) => parseInt(b.totalCents) - parseInt(a.totalCents))
-    .slice(0, 20);
-  const topOutflows = data.counterpartyMonthly
-    .filter((r) => r.flowType === "OUTFLOW" || r.flowType === "MIXED")
-    .sort((a, b) => parseInt(a.totalCents) - parseInt(b.totalCents))
-    .slice(0, 20);
-
-  const totalInflowAbs = Math.abs(parseInt(data.summary.totalInflowsCents));
-  const totalOutflowAbs = Math.abs(parseInt(data.summary.totalOutflowsCents));
+  const netCents = parseInt(data.summary.netCents);
 
   // === Render ===
 
@@ -229,462 +209,346 @@ export default function VorinsolvenzAnalysePage({
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">
-          Vorinsolvenz-Analyse ({firstMonth}–{lastMonth})
+        <h1 className="text-2xl font-bold text-gray-900">
+          Vorinsolvenz-Analyse
         </h1>
-        <p className="text-[var(--secondary)] mt-1">
-          {data.summary.totalCount} Buchungen über {months.length} Monate
+        <p className="text-sm text-gray-500 mt-1">
+          {firstMonth} – {lastMonth} · {data.summary.totalCount.toLocaleString("de-DE")} Buchungen · {locationCount > 0 ? `${locationCount} Standorte · ` : ""}{months.length} Monate
         </p>
       </div>
 
-      {/* KPI-Karten */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="admin-card p-4">
-          <p className="text-xs text-[var(--muted)]">Einnahmen</p>
-          <p className="text-xl font-bold text-[var(--success)]">
-            {formatCurrency(data.summary.totalInflowsCents)}
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Einnahmen</p>
+          <p className="text-xl font-bold text-green-600 mt-1">
+            {formatCurrency(data.summary.totalInflowsCents)} €
           </p>
         </div>
         <div className="admin-card p-4">
-          <p className="text-xs text-[var(--muted)]">Ausgaben</p>
-          <p className="text-xl font-bold text-[var(--danger)]">
-            {formatCurrency(data.summary.totalOutflowsCents)}
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Ausgaben</p>
+          <p className="text-xl font-bold text-red-600 mt-1">
+            {formatCurrency(data.summary.totalOutflowsCents)} €
           </p>
         </div>
         <div className="admin-card p-4">
-          <p className="text-xs text-[var(--muted)]">Netto</p>
-          <p className={`text-xl font-bold ${parseInt(data.summary.netCents) >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
-            {formatCurrency(data.summary.netCents)}
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Netto-Cashflow</p>
+          <p className={`text-xl font-bold mt-1 ${netCents >= 0 ? "text-green-600" : "text-red-600"}`}>
+            {formatCurrency(data.summary.netCents)} €
           </p>
         </div>
         <div className="admin-card p-4">
-          <p className="text-xs text-[var(--muted)]">Klassifiziert</p>
-          <p className="text-xl font-bold text-[var(--foreground)]">
+          <p className="text-xs text-gray-500 uppercase tracking-wider">Klassifiziert</p>
+          <p className="text-xl font-bold text-gray-900 mt-1">
             {classRate}%
           </p>
-          <p className="text-[10px] text-[var(--muted)]">
+          <p className="text-xs text-gray-400">
             {data.summary.classifiedCount} / {data.summary.totalCount}
           </p>
         </div>
-        <div className="admin-card p-4">
-          <p className="text-xs text-[var(--muted)]">Ø monatl. Cashflow</p>
-          <p className="text-lg font-bold text-[var(--success)]">
-            +{formatCompact(data.summary.avgMonthlyInflowsCents)}
-          </p>
-          <p className="text-lg font-bold text-[var(--danger)]">
-            {formatCompact(data.summary.avgMonthlyOutflowsCents)}
-          </p>
+      </div>
+
+      {/* === Matrix Table === */}
+      <div className="admin-card overflow-hidden">
+        <div className="overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-20">
+              {/* Period Labels */}
+              <tr className="border-b border-gray-300 bg-gray-50">
+                <th className="px-4 py-2.5 text-left font-semibold text-gray-900 sticky left-0 bg-gray-50 z-30 min-w-[240px]">
+                  Position
+                </th>
+                {months.map((m) => (
+                  <th key={m} className="px-2 py-2.5 text-right font-semibold text-gray-900 min-w-[80px] bg-gray-50">
+                    {formatMonth(m)}
+                  </th>
+                ))}
+                <th className="px-4 py-2.5 text-right font-semibold text-gray-900 min-w-[100px] border-l border-gray-300 bg-gray-50">
+                  Gesamt
+                </th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {/* ===== BLOCK: EINNAHMEN ===== */}
+              <tr className="bg-green-100/80">
+                <td
+                  colSpan={months.length + 2}
+                  className="px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-green-800"
+                >
+                  Einnahmen ({inflowRows.length} Gegenparteien)
+                </td>
+              </tr>
+
+              {inflowRows.map((row) => {
+                const rowKey = `in-${row.counterpartyId || row.counterpartyName}`;
+                const hasLocations = row.byLocation.length > 1;
+                const isExpanded = expandedRows.has(rowKey);
+
+                return (
+                  <RowWithLocations
+                    key={rowKey}
+                    row={row}
+                    rowKey={rowKey}
+                    months={months}
+                    hasLocations={hasLocations}
+                    isExpanded={isExpanded}
+                    onToggle={toggleRow}
+                    colorClass="text-green-600"
+                    bgClass="bg-white"
+                  />
+                );
+              })}
+
+              {/* Summe Einnahmen */}
+              <tr className="bg-green-50 font-bold border-t-2 border-green-200">
+                <td className="px-4 py-2.5 sticky left-0 bg-green-50 z-10 text-green-800">
+                  Summe Einnahmen
+                </td>
+                {months.map((m) => {
+                  const mData = data.monthlySummary.find((ms) => ms.month === m);
+                  return (
+                    <td key={m} className="px-2 py-2.5 text-right tabular-nums text-green-600">
+                      {mData ? formatCompact(mData.inflowsCents) : "–"}
+                    </td>
+                  );
+                })}
+                <td className="px-4 py-2.5 text-right tabular-nums font-bold text-green-600 border-l border-green-200">
+                  {formatCompact(data.summary.totalInflowsCents)}
+                </td>
+              </tr>
+
+              {/* Block spacing */}
+              <tr className="h-3 bg-white">
+                <td colSpan={months.length + 2}></td>
+              </tr>
+
+              {/* ===== BLOCK: AUSGABEN ===== */}
+              <tr className="bg-red-100/80">
+                <td
+                  colSpan={months.length + 2}
+                  className="px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-red-800"
+                >
+                  Ausgaben ({outflowRows.length} Gegenparteien)
+                </td>
+              </tr>
+
+              {outflowRows.map((row) => {
+                const rowKey = `out-${row.counterpartyId || row.counterpartyName}`;
+                const hasLocations = row.byLocation.length > 1;
+                const isExpanded = expandedRows.has(rowKey);
+
+                return (
+                  <RowWithLocations
+                    key={rowKey}
+                    row={row}
+                    rowKey={rowKey}
+                    months={months}
+                    hasLocations={hasLocations}
+                    isExpanded={isExpanded}
+                    onToggle={toggleRow}
+                    colorClass="text-red-600"
+                    bgClass="bg-white"
+                  />
+                );
+              })}
+
+              {/* Summe Ausgaben */}
+              <tr className="bg-red-50 font-bold border-t-2 border-red-200">
+                <td className="px-4 py-2.5 sticky left-0 bg-red-50 z-10 text-red-800">
+                  Summe Ausgaben
+                </td>
+                {months.map((m) => {
+                  const mData = data.monthlySummary.find((ms) => ms.month === m);
+                  return (
+                    <td key={m} className="px-2 py-2.5 text-right tabular-nums text-red-600">
+                      {mData ? formatCompact(mData.outflowsCents) : "–"}
+                    </td>
+                  );
+                })}
+                <td className="px-4 py-2.5 text-right tabular-nums font-bold text-red-600 border-l border-red-200">
+                  {formatCompact(data.summary.totalOutflowsCents)}
+                </td>
+              </tr>
+
+              {/* Block spacing */}
+              <tr className="h-3 bg-white">
+                <td colSpan={months.length + 2}></td>
+              </tr>
+
+              {/* ===== BLOCK: NETTO ===== */}
+              <tr className="bg-blue-100/80">
+                <td
+                  colSpan={months.length + 2}
+                  className="px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-blue-800"
+                >
+                  Netto-Cashflow
+                </td>
+              </tr>
+
+              <tr className="font-bold border-b border-blue-200 bg-blue-50">
+                <td className="px-4 py-2.5 sticky left-0 bg-blue-50 z-10 text-gray-900">
+                  Netto-Cashflow
+                </td>
+                {months.map((m) => {
+                  const mData = data.monthlySummary.find((ms) => ms.month === m);
+                  const net = mData ? parseInt(mData.netCents) : 0;
+                  return (
+                    <td
+                      key={m}
+                      className={`px-2 py-2.5 text-right tabular-nums ${
+                        net >= 0 ? "text-green-700" : "text-red-700"
+                      }`}
+                    >
+                      {mData ? formatCompact(mData.netCents) : "–"}
+                    </td>
+                  );
+                })}
+                <td
+                  className={`px-4 py-2.5 text-right tabular-nums font-bold border-l border-blue-200 ${
+                    netCents >= 0 ? "text-green-700" : "text-red-700"
+                  }`}
+                >
+                  {formatCompact(data.summary.netCents)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex items-center justify-between">
+          <span>Beträge in EUR (gerundet, K = Tausend)</span>
+          <span>Ø monatl. Einnahmen: {formatCompact(data.summary.avgMonthlyInflowsCents)} · Ausgaben: {formatCompact(data.summary.avgMonthlyOutflowsCents)}</span>
         </div>
       </div>
 
-      {/* Tab-Toggle */}
-      <div className="flex gap-1 p-1 bg-[var(--background-secondary)] rounded-lg w-fit">
-        {([
-          { key: "matrix" as TabView, label: "Monatsmatrix" },
-          { key: "top" as TabView, label: "Top-Gegenparteien" },
-          { key: "bank" as TabView, label: "Bankkonten" },
-        ]).map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
-              activeTab === tab.key
-                ? "bg-[var(--background)] text-[var(--foreground)] shadow-sm"
-                : "text-[var(--muted)] hover:text-[var(--foreground)]"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* === Tab 1: Monatsmatrix === */}
-      {activeTab === "matrix" && (
-        <div className="space-y-6">
-          {/* Einnahmen-Block */}
-          <div className="admin-card overflow-hidden">
-            <div className="p-4 border-b border-[var(--border)]">
-              <h2 className="text-sm font-semibold text-[var(--success)] uppercase tracking-wider">
-                Einnahmen ({inflowRows.length} Gegenparteien)
-              </h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-[var(--background-secondary)]">
-                  <tr>
-                    <th className="text-left py-2 px-3 font-medium text-[var(--foreground)] sticky left-0 bg-[var(--background-secondary)] min-w-[200px] z-10">
-                      Gegenpartei
-                    </th>
-                    {months.map((m) => (
-                      <th key={m} className="text-right py-2 px-2 font-medium text-[var(--foreground)] min-w-[80px]">
-                        {formatMonth(m)}
-                      </th>
-                    ))}
-                    <th className="text-right py-2 px-3 font-medium text-[var(--foreground)] min-w-[100px] border-l border-[var(--border)]">
-                      Gesamt
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {inflowRows.map((row) => {
-                    const rowKey = `in-${row.counterpartyId || row.counterpartyName}`;
-                    return (
-                      <tr
-                        key={rowKey}
-                        className="border-b border-[var(--border)] hover:bg-[var(--background-secondary)] transition-colors"
-                      >
-                        <td className="py-2 px-3 sticky left-0 bg-[var(--card)] z-10">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-[var(--foreground)] truncate max-w-[180px]" title={row.counterpartyName}>
-                              {row.counterpartyName}
-                            </span>
-                            {getTypeBadge(row.counterpartyType)}
-                          </div>
-                          <span className="text-[10px] text-[var(--muted)]">{row.matchCount}×</span>
-                        </td>
-                        {months.map((m) => {
-                          const val = row.monthly[m];
-                          return (
-                            <td key={m} className="py-2 px-2 text-right font-mono text-xs text-[var(--foreground)]">
-                              {val ? formatCompact(val) : "–"}
-                            </td>
-                          );
-                        })}
-                        <td className="py-2 px-3 text-right font-mono text-sm font-semibold text-[var(--success)] border-l border-[var(--border)]">
-                          {formatCompact(row.totalCents)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {/* Summenzeile Einnahmen */}
-                  <tr className="bg-[var(--background-secondary)] font-semibold border-t-2 border-[var(--border)]">
-                    <td className="py-2 px-3 sticky left-0 bg-[var(--background-secondary)] z-10 text-[var(--foreground)]">
-                      Summe Einnahmen
+      {/* === Nicht zugeordnet === */}
+      {data.unclassified.length > 0 && (
+        <div className="admin-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200 bg-amber-50">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-amber-800">
+              Nicht zugeordnet ({data.unclassified.length} Buchungen)
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="text-left py-2 px-3 font-medium text-gray-700">Datum</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-700">Beschreibung</th>
+                  <th className="text-right py-2 px-3 font-medium text-gray-700">Betrag</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.unclassified.map((entry) => (
+                  <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-2 px-3 whitespace-nowrap text-gray-900">{formatDate(entry.transactionDate)}</td>
+                    <td className="py-2 px-3 text-gray-700">
+                      <div className="max-w-md truncate" title={entry.description}>{entry.description}</div>
+                      {entry.note && <div className="text-xs text-gray-400">{entry.note}</div>}
                     </td>
-                    {months.map((m) => {
-                      const mData = data.monthlySummary.find((ms) => ms.month === m);
-                      return (
-                        <td key={m} className="py-2 px-2 text-right font-mono text-xs text-[var(--success)]">
-                          {mData ? formatCompact(mData.inflowsCents) : "–"}
-                        </td>
-                      );
-                    })}
-                    <td className="py-2 px-3 text-right font-mono text-sm text-[var(--success)] border-l border-[var(--border)]">
-                      {formatCompact(data.summary.totalInflowsCents)}
+                    <td className={`py-2 px-3 text-right font-mono whitespace-nowrap ${parseInt(entry.amountCents) >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {formatCurrency(entry.amountCents)} €
                     </td>
                   </tr>
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
-
-          {/* Ausgaben-Block */}
-          <div className="admin-card overflow-hidden">
-            <div className="p-4 border-b border-[var(--border)]">
-              <h2 className="text-sm font-semibold text-[var(--danger)] uppercase tracking-wider">
-                Ausgaben ({outflowRows.length} Gegenparteien)
-              </h2>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-[var(--background-secondary)]">
-                  <tr>
-                    <th className="text-left py-2 px-3 font-medium text-[var(--foreground)] sticky left-0 bg-[var(--background-secondary)] min-w-[200px] z-10">
-                      Gegenpartei
-                    </th>
-                    {months.map((m) => (
-                      <th key={m} className="text-right py-2 px-2 font-medium text-[var(--foreground)] min-w-[80px]">
-                        {formatMonth(m)}
-                      </th>
-                    ))}
-                    <th className="text-right py-2 px-3 font-medium text-[var(--foreground)] min-w-[100px] border-l border-[var(--border)]">
-                      Gesamt
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {outflowRows.map((row) => {
-                    const rowKey = `out-${row.counterpartyId || row.counterpartyName}`;
-                    return (
-                      <tr
-                        key={rowKey}
-                        className="border-b border-[var(--border)] hover:bg-[var(--background-secondary)] transition-colors"
-                      >
-                        <td className="py-2 px-3 sticky left-0 bg-[var(--card)] z-10">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-[var(--foreground)] truncate max-w-[180px]" title={row.counterpartyName}>
-                              {row.counterpartyName}
-                            </span>
-                            {getTypeBadge(row.counterpartyType)}
-                          </div>
-                          <span className="text-[10px] text-[var(--muted)]">{row.matchCount}×</span>
-                        </td>
-                        {months.map((m) => {
-                          const val = row.monthly[m];
-                          return (
-                            <td key={m} className="py-2 px-2 text-right font-mono text-xs text-[var(--foreground)]">
-                              {val ? formatCompact(val) : "–"}
-                            </td>
-                          );
-                        })}
-                        <td className="py-2 px-3 text-right font-mono text-sm font-semibold text-[var(--danger)] border-l border-[var(--border)]">
-                          {formatCompact(row.totalCents)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {/* Summenzeile Ausgaben */}
-                  <tr className="bg-[var(--background-secondary)] font-semibold border-t-2 border-[var(--border)]">
-                    <td className="py-2 px-3 sticky left-0 bg-[var(--background-secondary)] z-10 text-[var(--foreground)]">
-                      Summe Ausgaben
-                    </td>
-                    {months.map((m) => {
-                      const mData = data.monthlySummary.find((ms) => ms.month === m);
-                      return (
-                        <td key={m} className="py-2 px-2 text-right font-mono text-xs text-[var(--danger)]">
-                          {mData ? formatCompact(mData.outflowsCents) : "–"}
-                        </td>
-                      );
-                    })}
-                    <td className="py-2 px-3 text-right font-mono text-sm text-[var(--danger)] border-l border-[var(--border)]">
-                      {formatCompact(data.summary.totalOutflowsCents)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Netto-Cashflow-Zeile */}
-          <div className="admin-card p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <tbody>
-                  <tr className="font-bold">
-                    <td className="py-2 px-3 text-[var(--foreground)] min-w-[200px]">Netto-Cashflow</td>
-                    {months.map((m) => {
-                      const mData = data.monthlySummary.find((ms) => ms.month === m);
-                      const net = mData ? parseInt(mData.netCents) : 0;
-                      return (
-                        <td key={m} className={`py-2 px-2 text-right font-mono text-xs min-w-[80px] ${net >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
-                          {mData ? formatCompact(mData.netCents) : "–"}
-                        </td>
-                      );
-                    })}
-                    <td className={`py-2 px-3 text-right font-mono text-sm min-w-[100px] border-l border-[var(--border)] ${parseInt(data.summary.netCents) >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
-                      {formatCompact(data.summary.netCents)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Unklassifizierte Entries */}
-          {data.unclassified.length > 0 && (
-            <div className="admin-card overflow-hidden">
-              <div className="p-4 border-b border-[var(--border)]">
-                <h2 className="text-sm font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
-                  Nicht zugeordnet ({data.unclassified.length})
-                </h2>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-[var(--background-secondary)]">
-                    <tr>
-                      <th className="text-left py-2 px-3 font-medium text-[var(--foreground)]">Datum</th>
-                      <th className="text-left py-2 px-3 font-medium text-[var(--foreground)]">Beschreibung</th>
-                      <th className="text-right py-2 px-3 font-medium text-[var(--foreground)]">Betrag</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.unclassified.map((entry) => (
-                      <tr key={entry.id} className="border-b border-[var(--border)] hover:bg-[var(--background-secondary)]">
-                        <td className="py-2 px-3 whitespace-nowrap text-[var(--foreground)]">{formatDate(entry.transactionDate)}</td>
-                        <td className="py-2 px-3 text-[var(--foreground)]">
-                          <div className="max-w-md truncate" title={entry.description}>{entry.description}</div>
-                          {entry.note && <div className="text-xs text-[var(--muted)]">{entry.note}</div>}
-                        </td>
-                        <td className={`py-2 px-3 text-right font-mono whitespace-nowrap ${parseInt(entry.amountCents) >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
-                          {formatCurrency(entry.amountCents)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* === Tab 2: Top-Gegenparteien === */}
-      {activeTab === "top" && (
-        <div className="space-y-6">
-          {/* Top Einnahmen */}
-          <div className="admin-card overflow-hidden">
-            <div className="p-4 border-b border-[var(--border)]">
-              <h2 className="text-sm font-semibold text-[var(--success)] uppercase tracking-wider">
-                Top Einnahmen
-              </h2>
-            </div>
-            <div className="divide-y divide-[var(--border)]">
-              {topInflows.map((row, idx) => {
-                const rowKey = `top-in-${row.counterpartyId || row.counterpartyName}`;
-                const total = parseInt(row.totalCents);
-                const pct = totalInflowAbs > 0 ? (total / totalInflowAbs) * 100 : 0;
-                return (
-                  <div key={rowKey}>
-                    <button
-                      onClick={() => toggleRow(rowKey)}
-                      className="w-full p-4 flex items-center gap-4 hover:bg-[var(--background-secondary)] transition-colors"
-                    >
-                      <span className="text-sm font-mono text-[var(--muted)] w-6">{idx + 1}.</span>
-                      <ChevronIcon expanded={expandedRows.has(rowKey)} />
-                      <div className="flex-1 text-left min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-[var(--foreground)] truncate">{row.counterpartyName}</span>
-                          {getTypeBadge(row.counterpartyType)}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="flex-1 h-1.5 bg-[var(--background-secondary)] rounded-full overflow-hidden max-w-xs">
-                            <div className="h-full bg-[var(--success)] rounded-full" style={{ width: `${Math.min(pct, 100)}%` }} />
-                          </div>
-                          <span className="text-xs text-[var(--muted)]">{pct.toFixed(1)}%</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-[var(--success)]">{formatCurrency(row.totalCents)}</p>
-                        <p className="text-xs text-[var(--muted)]">{row.matchCount} Buchungen</p>
-                      </div>
-                    </button>
-                    {expandedRows.has(rowKey) && (
-                      <div className="px-4 pb-4">
-                        <div className="bg-[var(--background-secondary)] rounded-lg p-3">
-                          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                            {months.map((m) => {
-                              const val = row.monthly[m];
-                              return (
-                                <div key={m} className="text-center">
-                                  <p className="text-[10px] text-[var(--muted)]">{formatMonth(m)}</p>
-                                  <p className="text-xs font-mono text-[var(--foreground)]">
-                                    {val ? formatCompact(val) : "–"}
-                                  </p>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Top Ausgaben */}
-          <div className="admin-card overflow-hidden">
-            <div className="p-4 border-b border-[var(--border)]">
-              <h2 className="text-sm font-semibold text-[var(--danger)] uppercase tracking-wider">
-                Top Ausgaben
-              </h2>
-            </div>
-            <div className="divide-y divide-[var(--border)]">
-              {topOutflows.map((row, idx) => {
-                const rowKey = `top-out-${row.counterpartyId || row.counterpartyName}`;
-                const total = Math.abs(parseInt(row.totalCents));
-                const pct = totalOutflowAbs > 0 ? (total / totalOutflowAbs) * 100 : 0;
-                return (
-                  <div key={rowKey}>
-                    <button
-                      onClick={() => toggleRow(rowKey)}
-                      className="w-full p-4 flex items-center gap-4 hover:bg-[var(--background-secondary)] transition-colors"
-                    >
-                      <span className="text-sm font-mono text-[var(--muted)] w-6">{idx + 1}.</span>
-                      <ChevronIcon expanded={expandedRows.has(rowKey)} />
-                      <div className="flex-1 text-left min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-[var(--foreground)] truncate">{row.counterpartyName}</span>
-                          {getTypeBadge(row.counterpartyType)}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="flex-1 h-1.5 bg-[var(--background-secondary)] rounded-full overflow-hidden max-w-xs">
-                            <div className="h-full bg-[var(--danger)] rounded-full" style={{ width: `${Math.min(pct, 100)}%` }} />
-                          </div>
-                          <span className="text-xs text-[var(--muted)]">{pct.toFixed(1)}%</span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-[var(--danger)]">{formatCurrency(row.totalCents)}</p>
-                        <p className="text-xs text-[var(--muted)]">{row.matchCount} Buchungen</p>
-                      </div>
-                    </button>
-                    {expandedRows.has(rowKey) && (
-                      <div className="px-4 pb-4">
-                        <div className="bg-[var(--background-secondary)] rounded-lg p-3">
-                          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-                            {months.map((m) => {
-                              const val = row.monthly[m];
-                              return (
-                                <div key={m} className="text-center">
-                                  <p className="text-[10px] text-[var(--muted)]">{formatMonth(m)}</p>
-                                  <p className="text-xs font-mono text-[var(--foreground)]">
-                                    {val ? formatCompact(val) : "–"}
-                                  </p>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* === Tab 3: Bankkonten === */}
-      {activeTab === "bank" && (
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">Bankkonten-Verteilung</h2>
-          {data.byBankAccount.map((ba) => {
-            const net = parseInt(ba.inflowsCents) + parseInt(ba.outflowsCents);
-            return (
-              <div key={ba.accountId} className="admin-card p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-semibold text-[var(--foreground)]">
-                      {ba.accountName}
-                      {ba.bankName && <span className="font-normal text-[var(--muted)] ml-2">– {ba.bankName}</span>}
-                    </h3>
-                    <p className="text-sm text-[var(--muted)]">{ba.count} Buchungen</p>
-                  </div>
-                  <div className="flex gap-8 text-right">
-                    <div>
-                      <p className="text-xs text-[var(--muted)]">Einzahlungen</p>
-                      <p className="font-semibold text-[var(--success)]">{formatCurrency(ba.inflowsCents)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[var(--muted)]">Auszahlungen</p>
-                      <p className="font-semibold text-[var(--danger)]">{formatCurrency(ba.outflowsCents)}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-[var(--muted)]">Netto</p>
-                      <p className={`font-semibold ${net >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
-                        {formatCurrency(String(net))}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
         </div>
       )}
     </div>
+  );
+}
+
+// === Sub-Component: Row with Location Breakdown ===
+
+function RowWithLocations({
+  row,
+  rowKey,
+  months,
+  hasLocations,
+  isExpanded,
+  onToggle,
+  colorClass,
+  bgClass,
+}: {
+  row: CounterpartyRow;
+  rowKey: string;
+  months: string[];
+  hasLocations: boolean;
+  isExpanded: boolean;
+  onToggle: (key: string) => void;
+  colorClass: string;
+  bgClass: string;
+}) {
+  const typeBadge = row.counterpartyType ? (
+    <span className={`px-1.5 py-0.5 text-[10px] rounded ${
+      row.counterpartyType === "PAYER" ? "bg-green-100 text-green-800" :
+      row.counterpartyType === "SUPPLIER" ? "bg-blue-100 text-blue-800" :
+      row.counterpartyType === "AUTHORITY" ? "bg-purple-100 text-purple-800" :
+      "bg-gray-100 text-gray-600"
+    }`}>
+      {row.counterpartyType === "PAYER" ? "Zahler" :
+       row.counterpartyType === "SUPPLIER" ? "Lieferant" :
+       row.counterpartyType === "AUTHORITY" ? "Behörde" : "Sonstige"}
+    </span>
+  ) : null;
+
+  return (
+    <>
+      {/* Parent Row */}
+      <tr
+        className={`border-b border-gray-100 ${hasLocations ? "cursor-pointer" : ""} hover:bg-gray-50`}
+        onClick={hasLocations ? () => onToggle(rowKey) : undefined}
+      >
+        <td className={`px-4 py-2 sticky left-0 z-10 ${bgClass}`}>
+          <div className="flex items-center gap-2">
+            {hasLocations && (
+              <span className={`text-gray-400 text-xs transition-transform inline-block ${isExpanded ? "rotate-90" : ""}`}>
+                &#9654;
+              </span>
+            )}
+            <span className="font-medium text-gray-900 truncate max-w-[180px]" title={row.counterpartyName}>
+              {row.counterpartyName}
+            </span>
+            {typeBadge}
+            <span className="text-[10px] text-gray-400">{row.matchCount}×</span>
+          </div>
+        </td>
+        {months.map((m) => {
+          const val = row.monthly[m];
+          return (
+            <td key={m} className={`px-2 py-2 text-right tabular-nums text-xs ${val ? "" : "text-gray-300"}`}>
+              {val ? formatCompact(val) : "–"}
+            </td>
+          );
+        })}
+        <td className={`px-4 py-2 text-right tabular-nums font-semibold ${colorClass} border-l border-gray-200`}>
+          {formatCompact(row.totalCents)}
+        </td>
+      </tr>
+
+      {/* Location Children */}
+      {isExpanded && row.byLocation.map((loc) => (
+        <tr key={`${rowKey}-${loc.locationId}`} className="border-b border-gray-50 hover:bg-gray-50">
+          <td className={`px-4 py-1.5 pl-12 sticky left-0 z-10 ${bgClass} text-gray-500 text-xs`}>
+            davon {loc.locationName}
+          </td>
+          {months.map((m) => {
+            const val = loc.monthly[m];
+            return (
+              <td key={m} className={`px-2 py-1.5 text-right tabular-nums text-xs ${val ? "text-gray-400" : "text-gray-300"}`}>
+                {val ? formatCompact(val) : "–"}
+              </td>
+            );
+          })}
+          <td className="px-4 py-1.5 text-right tabular-nums text-xs text-gray-400 border-l border-gray-200">
+            {formatCompact(loc.totalCents)}
+          </td>
+        </tr>
+      ))}
+    </>
   );
 }

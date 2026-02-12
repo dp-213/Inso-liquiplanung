@@ -18,8 +18,12 @@ export async function GET(
     const caseData = await prisma.case.findUnique({
       where: { id },
       include: {
-        bankAccounts: { orderBy: { displayOrder: 'asc' } },
+        bankAccounts: {
+          orderBy: { displayOrder: 'asc' },
+          include: { location: true },
+        },
         counterparties: { orderBy: { displayOrder: 'asc' } },
+        locations: { orderBy: { displayOrder: 'asc' } },
       },
     });
 
@@ -53,6 +57,7 @@ export async function GET(
         monthlySummary: [],
         byBankAccount: [],
         unclassified: [],
+        locations: [],
       });
     }
 
@@ -62,10 +67,21 @@ export async function GET(
       counterpartyMap.set(cp.id, { name: cp.shortName || cp.name, type: cp.type });
     }
 
-    // BankAccount-Lookup aufbauen
-    const bankAccountMap = new Map<string, { accountName: string; bankName: string }>();
+    // BankAccount → Location Mapping
+    const bankAccountMap = new Map<string, { accountName: string; bankName: string; locationId: string | null; locationName: string | null }>();
     for (const ba of caseData.bankAccounts) {
-      bankAccountMap.set(ba.id, { accountName: ba.accountName, bankName: ba.bankName });
+      bankAccountMap.set(ba.id, {
+        accountName: ba.accountName,
+        bankName: ba.bankName,
+        locationId: ba.locationId,
+        locationName: ba.location?.shortName || ba.location?.name || null,
+      });
+    }
+
+    // Location Lookup
+    const locationMap = new Map<string, string>();
+    for (const loc of caseData.locations) {
+      locationMap.set(loc.id, loc.shortName || loc.name);
     }
 
     // === Aggregation in JS (wegen Turso Date-Bug) ===
@@ -82,6 +98,8 @@ export async function GET(
       monthly: Map<string, bigint>;
       hasInflows: boolean;
       hasOutflows: boolean;
+      // Location breakdown: locationId → { totalCents, monthly }
+      byLocation: Map<string, { totalCents: bigint; monthly: Map<string, bigint> }>;
     }>();
 
     // Monat → Summen
@@ -106,6 +124,9 @@ export async function GET(
       amountCents: string;
       transactionDate: string;
     }> = [];
+
+    // Track locations that actually have data
+    const activeLocationIds = new Set<string>();
 
     for (const entry of entries) {
       const amount = entry.amountCents;
@@ -138,6 +159,13 @@ export async function GET(
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       monthSet.add(monthKey);
 
+      // Location via bankAccountId → locationId
+      const baInfo = entry.bankAccountId ? bankAccountMap.get(entry.bankAccountId) : null;
+      const locationId = baInfo?.locationId || '_zentral';
+      if (baInfo?.locationId) {
+        activeLocationIds.add(baInfo.locationId);
+      }
+
       // Counterparty-Monthly aggregieren (akzeptiert > vorgeschlagen)
       const cpKey = effectiveCpId || '_unclassified';
       if (!cpMonthly.has(cpKey)) {
@@ -148,6 +176,7 @@ export async function GET(
           monthly: new Map(),
           hasInflows: false,
           hasOutflows: false,
+          byLocation: new Map(),
         });
       }
       const cpData = cpMonthly.get(cpKey)!;
@@ -156,6 +185,14 @@ export async function GET(
       cpData.monthly.set(monthKey, (cpData.monthly.get(monthKey) || BigInt(0)) + amount);
       if (isInflow) cpData.hasInflows = true;
       else cpData.hasOutflows = true;
+
+      // Location breakdown within counterparty
+      if (!cpData.byLocation.has(locationId)) {
+        cpData.byLocation.set(locationId, { totalCents: BigInt(0), monthly: new Map() });
+      }
+      const locData = cpData.byLocation.get(locationId)!;
+      locData.totalCents += amount;
+      locData.monthly.set(monthKey, (locData.monthly.get(monthKey) || BigInt(0)) + amount);
 
       // Monthly aggregieren
       if (!monthlyAgg.has(monthKey)) {
@@ -208,6 +245,29 @@ export async function GET(
         for (const [m, v] of data.monthly) {
           monthly[m] = v.toString();
         }
+
+        // Location breakdown
+        const byLocation = Array.from(data.byLocation.entries())
+          .sort((a, b) => {
+            const absA = a[1].totalCents < BigInt(0) ? -a[1].totalCents : a[1].totalCents;
+            const absB = b[1].totalCents < BigInt(0) ? -b[1].totalCents : b[1].totalCents;
+            if (absB > absA) return 1;
+            if (absB < absA) return -1;
+            return 0;
+          })
+          .map(([locId, locData]) => {
+            const locMonthly: Record<string, string> = {};
+            for (const [m, v] of locData.monthly) {
+              locMonthly[m] = v.toString();
+            }
+            return {
+              locationId: locId,
+              locationName: locId === '_zentral' ? 'HVPlus eG (zentral)' : (locationMap.get(locId) || locId),
+              totalCents: locData.totalCents.toString(),
+              monthly: locMonthly,
+            };
+          });
+
         return {
           counterpartyId: data.counterpartyId,
           counterpartyName: cpInfo?.name || (key === '_unclassified' ? 'Nicht zugeordnet' : key),
@@ -216,6 +276,7 @@ export async function GET(
           totalCents: data.totalCents.toString(),
           matchCount: data.matchCount,
           monthly,
+          byLocation,
         };
       });
 
@@ -247,12 +308,19 @@ export async function GET(
         };
       });
 
+    // Locations mit Daten
+    const locations = Array.from(activeLocationIds).map((locId) => ({
+      id: locId,
+      name: locationMap.get(locId) || locId,
+    }));
+
     return NextResponse.json({
       summary,
       counterpartyMonthly,
       monthlySummary,
       byBankAccount,
       unclassified,
+      locations,
     });
   } catch (error) {
     console.error('Error fetching vorinsolvenz-analyse:', error);
