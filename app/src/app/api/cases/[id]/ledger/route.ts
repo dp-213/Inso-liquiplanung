@@ -131,24 +131,31 @@ export async function GET(
     const { id: caseId } = await params;
     const { searchParams } = new URL(request.url);
 
-    // Parse query parameters
-    const valueType = searchParams.get('valueType') as ValueType | null;
-    const legalBucket = searchParams.get('legalBucket') as LegalBucket | null;
+    // Helper: Parse comma-separated multi-value parameter
+    const parseMulti = (key: string): string[] => {
+      const val = searchParams.get(key);
+      if (!val) return [];
+      return val.split(',').filter(Boolean);
+    };
+
+    // Parse query parameters (support comma-separated multi-values)
+    const valueTypes = parseMulti('valueType');
+    const legalBuckets = parseMulti('legalBucket');
     const bookingSource = searchParams.get('bookingSource') as BookingSource | null;
-    const reviewStatus = searchParams.get('reviewStatus') as ReviewStatus | null;
+    const reviewStatuses = parseMulti('reviewStatus');
     const suggestedLegalBucket = searchParams.get('suggestedLegalBucket');
-    // Dimensions-Filter
-    const bankAccountId = searchParams.get('bankAccountId');
-    const counterpartyId = searchParams.get('counterpartyId');
-    const locationId = searchParams.get('locationId');
+    // Dimensions-Filter (multi-value)
+    const bankAccountIds = parseMulti('bankAccountId');
+    const counterpartyIds = parseMulti('counterpartyId');
+    const locationIds = parseMulti('locationId');
     const hasDimensionSuggestions = searchParams.get('hasDimensionSuggestions');
     const hasServiceDateSuggestion = searchParams.get('hasServiceDateSuggestion');
-    // Import-Filter
-    const importJobId = searchParams.get('importJobId');
-    // Estate Allocation Filter (Alt-/Neumasse)
-    const estateAllocation = searchParams.get('estateAllocation');
-    // Category Tag Filter (Matrix-Zuordnung)
-    const categoryTag = searchParams.get('categoryTag');
+    // Import-Filter (multi-value)
+    const importJobIds = parseMulti('importJobId');
+    // Estate Allocation Filter (multi-value)
+    const estateAllocations = parseMulti('estateAllocation');
+    // Category Tag Filter (multi-value)
+    const categoryTags = parseMulti('categoryTag');
     const hasCategoryTagSuggestion = searchParams.get('hasCategoryTagSuggestion');
     // Transfer-Filter (Umbuchungen)
     const isTransfer = searchParams.get('isTransfer');
@@ -166,23 +173,56 @@ export async function GET(
       return NextResponse.json({ error: 'Fall nicht gefunden' }, { status: 404 });
     }
 
+    // Helper: Build multi-value filter with null support
+    // Returns Prisma condition for single value, { in: [...] }, or OR with null
+    const buildMultiFilter = (values: string[]): unknown => {
+      if (values.length === 0) return undefined;
+      const hasNull = values.includes('null');
+      const realValues = values.filter(v => v !== 'null');
+
+      if (hasNull && realValues.length === 0) return null; // Only null selected
+      if (!hasNull && realValues.length === 1) return realValues[0]; // Single value
+      if (!hasNull) return { in: realValues }; // Multiple values, no null
+
+      // Null + real values: need OR
+      return undefined; // Handled specially below
+    };
+
+    const buildMultiFilterWithOr = (field: string, values: string[]): Record<string, unknown>[] | null => {
+      if (values.length === 0) return null;
+      const hasNull = values.includes('null');
+      const realValues = values.filter(v => v !== 'null');
+
+      if (hasNull && realValues.length > 0) {
+        return [
+          { [field]: null },
+          { [field]: realValues.length === 1 ? realValues[0] : { in: realValues } },
+        ];
+      }
+      return null; // No OR needed
+    };
+
     // Build where clause
     const where: Record<string, unknown> = { caseId };
+    const andConditions: Record<string, unknown>[] = [];
 
-    if (valueType && Object.values(VALUE_TYPES).includes(valueType)) {
-      where.valueType = valueType;
+    if (valueTypes.length > 0) {
+      const filter = buildMultiFilter(valueTypes);
+      if (filter !== undefined) where.valueType = filter;
     }
 
-    if (legalBucket && Object.values(LEGAL_BUCKETS).includes(legalBucket)) {
-      where.legalBucket = legalBucket;
+    if (legalBuckets.length > 0) {
+      const filter = buildMultiFilter(legalBuckets);
+      if (filter !== undefined) where.legalBucket = filter;
     }
 
     if (bookingSource && Object.values(BOOKING_SOURCES).includes(bookingSource)) {
       where.bookingSource = bookingSource;
     }
 
-    if (reviewStatus && Object.values(REVIEW_STATUS).includes(reviewStatus)) {
-      where.reviewStatus = reviewStatus;
+    if (reviewStatuses.length > 0) {
+      const filter = buildMultiFilter(reviewStatuses);
+      if (filter !== undefined) where.reviewStatus = filter;
     }
 
     if (suggestedLegalBucket !== null) {
@@ -193,68 +233,83 @@ export async function GET(
       }
     }
 
-    // Dimensions-Filter (finale Werte)
-    if (bankAccountId) {
-      if (bankAccountId === 'null') {
-        where.bankAccountId = null;
+    // Dimensions-Filter (multi-value with null support)
+    if (bankAccountIds.length > 0) {
+      const orCond = buildMultiFilterWithOr('bankAccountId', bankAccountIds);
+      if (orCond) {
+        andConditions.push({ OR: orCond });
       } else {
-        where.bankAccountId = bankAccountId;
+        const filter = buildMultiFilter(bankAccountIds);
+        if (filter !== undefined) where.bankAccountId = filter;
       }
     }
 
-    if (counterpartyId) {
-      if (counterpartyId === 'null') {
-        where.counterpartyId = null;
+    if (counterpartyIds.length > 0) {
+      const orCond = buildMultiFilterWithOr('counterpartyId', counterpartyIds);
+      if (orCond) {
+        andConditions.push({ OR: orCond });
       } else {
-        where.counterpartyId = counterpartyId;
+        const filter = buildMultiFilter(counterpartyIds);
+        if (filter !== undefined) where.counterpartyId = filter;
       }
     }
 
-    if (locationId) {
-      if (locationId === 'null') {
-        where.locationId = null;
+    if (locationIds.length > 0) {
+      const orCond = buildMultiFilterWithOr('locationId', locationIds);
+      if (orCond) {
+        andConditions.push({ OR: orCond });
       } else {
-        where.locationId = locationId;
+        const filter = buildMultiFilter(locationIds);
+        if (filter !== undefined) where.locationId = filter;
       }
     }
 
     // Filter: Nur Einträge mit Dimensions-Vorschlägen
     if (hasDimensionSuggestions === 'true') {
-      where.OR = [
-        { suggestedBankAccountId: { not: null } },
-        { suggestedCounterpartyId: { not: null } },
-        { suggestedLocationId: { not: null } },
-      ];
+      andConditions.push({
+        OR: [
+          { suggestedBankAccountId: { not: null } },
+          { suggestedCounterpartyId: { not: null } },
+          { suggestedLocationId: { not: null } },
+        ],
+      });
     }
 
     // Filter: Nur Einträge mit ServiceDate-Vorschlägen (für Bulk-Accept Preview)
     if (hasServiceDateSuggestion === 'true') {
-      where.OR = [
-        { suggestedServiceDate: { not: null } },
-        { suggestedServicePeriodStart: { not: null } },
-      ];
+      andConditions.push({
+        OR: [
+          { suggestedServiceDate: { not: null } },
+          { suggestedServicePeriodStart: { not: null } },
+        ],
+      });
     }
 
-    // Import-Filter
-    if (importJobId) {
-      where.importJobId = importJobId;
+    // Import-Filter (multi-value)
+    if (importJobIds.length > 0) {
+      const filter = buildMultiFilter(importJobIds);
+      if (filter !== undefined) where.importJobId = filter;
     }
 
-    // Estate Allocation Filter
-    if (estateAllocation) {
-      if (estateAllocation === 'null') {
-        where.estateAllocation = null;
+    // Estate Allocation Filter (multi-value with null support)
+    if (estateAllocations.length > 0) {
+      const orCond = buildMultiFilterWithOr('estateAllocation', estateAllocations);
+      if (orCond) {
+        andConditions.push({ OR: orCond });
       } else {
-        where.estateAllocation = estateAllocation;
+        const filter = buildMultiFilter(estateAllocations);
+        if (filter !== undefined) where.estateAllocation = filter;
       }
     }
 
-    // Category Tag Filter
-    if (categoryTag) {
-      if (categoryTag === 'null') {
-        where.categoryTag = null;
+    // Category Tag Filter (multi-value with null support)
+    if (categoryTags.length > 0) {
+      const orCond = buildMultiFilterWithOr('categoryTag', categoryTags);
+      if (orCond) {
+        andConditions.push({ OR: orCond });
       } else {
-        where.categoryTag = categoryTag;
+        const filter = buildMultiFilter(categoryTags);
+        if (filter !== undefined) where.categoryTag = filter;
       }
     }
 
@@ -268,6 +323,11 @@ export async function GET(
       where.transferPartnerEntryId = { not: null };
     } else if (isTransfer === 'false') {
       where.transferPartnerEntryId = null;
+    }
+
+    // Combine AND conditions
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     // NOTE: Date filter is applied in JS, NOT in Prisma query.

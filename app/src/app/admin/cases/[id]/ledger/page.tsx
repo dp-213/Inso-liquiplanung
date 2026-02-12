@@ -17,6 +17,7 @@ import {
 } from "@/lib/ledger";
 import { formatAllocationSource, formatCategoryTagSource } from "@/lib/ledger/format-helpers";
 import { ColumnFilter, ColumnFilterValue } from "@/components/ledger/ColumnFilter";
+import { MultiSelectFilter } from "@/components/ledger/MultiSelectFilter";
 import BatchSplitModal from "@/components/admin/BatchSplitModal";
 import PaymentBreakdownPanel from "@/components/admin/PaymentBreakdownPanel";
 
@@ -181,8 +182,11 @@ export default function CaseLedgerPage({
   const tabParam = searchParams.get("tab") as TabType | null;
   const activeTab: TabType = tabParam === "review" || tabParam === "rules" || tabParam === "sources" ? tabParam : "all";
 
-  // Read estate filter from URL (supports both 'estate' and 'estateAllocation')
-  const initialEstateAllocation = (searchParams.get("estateAllocation") || searchParams.get("estate") || "") as EstateAllocation;
+  // Read filters from URL
+  const parseUrlMulti = (key: string, ...altKeys: string[]): string[] => {
+    const val = searchParams.get(key) || altKeys.map(k => searchParams.get(k)).find(Boolean) || "";
+    return val ? val.split(",").filter(Boolean) : [];
+  };
 
   const [caseData, setCaseData] = useState<CaseData | null>(null);
   const [entries, setEntries] = useState<LedgerEntryResponse[]>([]);
@@ -249,8 +253,6 @@ export default function CaseLedgerPage({
     });
   }, []);
 
-  // Global search
-  const [globalSearch, setGlobalSearch] = useState("");
   // Advanced filters toggle
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   // Active column preset
@@ -298,34 +300,38 @@ export default function CaseLedgerPage({
     router.push(`/admin/cases/${id}/ledger${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false });
   };
 
-  // Filter state - review tab auto-sets reviewStatus filter
-  const [filterValueType, setFilterValueType] = useState<ValueType | "">("");
-  const [filterLegalBucket, setFilterLegalBucket] = useState<LegalBucket | "">("");
-  const [filterReviewStatus, setFilterReviewStatus] = useState<ReviewStatus | "">("");
-  const [filterSuggestedBucket, setFilterSuggestedBucket] = useState<string>("");
-  const [filterFrom, setFilterFrom] = useState<string>("");
-  const [filterTo, setFilterTo] = useState<string>("");
-  // Dimensions-Filter
-  const [filterBankAccountId, setFilterBankAccountId] = useState<string>("");
-  const [filterCounterpartyId, setFilterCounterpartyId] = useState<string>("");
-  const [filterLocationId, setFilterLocationId] = useState<string>("");
-  // Import-Filter
-  const [filterImportJobId, setFilterImportJobId] = useState<string>("");
-  // Estate Allocation Filter (Alt-/Neumasse) - initialized from URL
-  const [filterEstateAllocation, setFilterEstateAllocation] = useState<EstateAllocation>(initialEstateAllocation);
-  // Category Tag Filter (Matrix-Kategorie)
-  const [filterCategoryTag, setFilterCategoryTag] = useState<string>("");
-  // Transfer-Filter (Umbuchungen)
-  const [filterIsTransfer, setFilterIsTransfer] = useState<string>("");
+  // Filter state - multi-select arrays (initialized from URL)
+  const [filterValueTypes, setFilterValueTypes] = useState<string[]>(() => parseUrlMulti("vt", "valueType"));
+  const [filterLegalBuckets, setFilterLegalBuckets] = useState<string[]>(() => parseUrlMulti("lb", "legalBucket"));
+  const [filterReviewStatuses, setFilterReviewStatuses] = useState<string[]>(() => parseUrlMulti("rs", "reviewStatus"));
+  const [filterSuggestedBucket, setFilterSuggestedBucket] = useState<string>(searchParams.get("sb") || "");
+  const [filterFrom, setFilterFrom] = useState<string>(searchParams.get("from") || "");
+  const [filterTo, setFilterTo] = useState<string>(searchParams.get("to") || "");
+  // Dimensions-Filter (multi-select)
+  const [filterBankAccountIds, setFilterBankAccountIds] = useState<string[]>(() => parseUrlMulti("bank", "bankAccountId"));
+  const [filterCounterpartyIds, setFilterCounterpartyIds] = useState<string[]>(() => parseUrlMulti("cp", "counterpartyId"));
+  const [filterLocationIds, setFilterLocationIds] = useState<string[]>(() => parseUrlMulti("loc", "locationId"));
+  // Import-Filter (multi-select)
+  const [filterImportJobIds, setFilterImportJobIds] = useState<string[]>(() => parseUrlMulti("imp", "importJobId"));
+  // Estate Allocation Filter (multi-select) - initialized from URL
+  const [filterEstateAllocations, setFilterEstateAllocations] = useState<string[]>(() => parseUrlMulti("ea", "estateAllocation", "estate"));
+  // Category Tag Filter (multi-select)
+  const [filterCategoryTags, setFilterCategoryTags] = useState<string[]>(() => parseUrlMulti("ct", "categoryTag"));
+  // Transfer-Filter (Umbuchungen) - bleibt Einfachauswahl
+  const [filterIsTransfer, setFilterIsTransfer] = useState<string>(searchParams.get("transfer") || "");
   const [pairingTransfer, setPairingTransfer] = useState(false);
+  // Globale Suche aus URL
+  const [globalSearch, setGlobalSearch] = useState(searchParams.get("q") || "");
+  // Debounce-Ref für Suchfeld
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get("q") || "");
 
   // Auto-set review filter when tab changes
   useEffect(() => {
     if (activeTab === "review") {
-      setFilterReviewStatus("UNREVIEWED");
-    } else if (filterReviewStatus === "UNREVIEWED" && activeTab === "all") {
-      // Clear the auto-set filter when switching back to "all"
-      setFilterReviewStatus("");
+      setFilterReviewStatuses(["UNREVIEWED"]);
+    } else if (filterReviewStatuses.length === 1 && filterReviewStatuses[0] === "UNREVIEWED" && activeTab === "all") {
+      setFilterReviewStatuses([]);
     }
   }, [activeTab]);
 
@@ -338,24 +344,24 @@ export default function CaseLedgerPage({
     try {
       setLoading(true);
 
-      // Build query params
+      // Build query params (comma-separated for multi-value)
       const queryParams = new URLSearchParams();
-      if (filterValueType) queryParams.set("valueType", filterValueType);
-      if (filterLegalBucket) queryParams.set("legalBucket", filterLegalBucket);
-      if (filterReviewStatus) queryParams.set("reviewStatus", filterReviewStatus);
+      if (filterValueTypes.length > 0) queryParams.set("valueType", filterValueTypes.join(","));
+      if (filterLegalBuckets.length > 0) queryParams.set("legalBucket", filterLegalBuckets.join(","));
+      if (filterReviewStatuses.length > 0) queryParams.set("reviewStatus", filterReviewStatuses.join(","));
       if (filterSuggestedBucket) queryParams.set("suggestedLegalBucket", filterSuggestedBucket);
       if (filterFrom) queryParams.set("from", filterFrom);
       if (filterTo) queryParams.set("to", filterTo);
       // Dimensions-Filter
-      if (filterBankAccountId) queryParams.set("bankAccountId", filterBankAccountId);
-      if (filterCounterpartyId) queryParams.set("counterpartyId", filterCounterpartyId);
-      if (filterLocationId) queryParams.set("locationId", filterLocationId);
+      if (filterBankAccountIds.length > 0) queryParams.set("bankAccountId", filterBankAccountIds.join(","));
+      if (filterCounterpartyIds.length > 0) queryParams.set("counterpartyId", filterCounterpartyIds.join(","));
+      if (filterLocationIds.length > 0) queryParams.set("locationId", filterLocationIds.join(","));
       // Import-Filter
-      if (filterImportJobId) queryParams.set("importJobId", filterImportJobId);
+      if (filterImportJobIds.length > 0) queryParams.set("importJobId", filterImportJobIds.join(","));
       // Estate Allocation Filter
-      if (filterEstateAllocation) queryParams.set("estateAllocation", filterEstateAllocation);
+      if (filterEstateAllocations.length > 0) queryParams.set("estateAllocation", filterEstateAllocations.join(","));
       // Category Tag Filter
-      if (filterCategoryTag) queryParams.set("categoryTag", filterCategoryTag);
+      if (filterCategoryTags.length > 0) queryParams.set("categoryTag", filterCategoryTags.join(","));
       // Transfer-Filter
       if (filterIsTransfer) queryParams.set("isTransfer", filterIsTransfer);
 
@@ -441,11 +447,49 @@ export default function CaseLedgerPage({
     } finally {
       setLoading(false);
     }
-  }, [id, filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountId, filterCounterpartyId, filterLocationId, filterImportJobId, filterEstateAllocation, filterCategoryTag, filterIsTransfer]);
+  }, [id, filterValueTypes, filterLegalBuckets, filterReviewStatuses, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountIds, filterCounterpartyIds, filterLocationIds, filterImportJobIds, filterEstateAllocations, filterCategoryTags, filterIsTransfer]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Debounce für globale Suche (300ms)
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setDebouncedSearch(globalSearch);
+    }, 300);
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [globalSearch]);
+
+  // URL-Sync: Filter-State in URL persistieren
+  useEffect(() => {
+    const params = new URLSearchParams();
+    // Tab beibehalten
+    if (activeTab !== "all") params.set("tab", activeTab);
+    // Multi-Select Filter
+    if (filterValueTypes.length > 0) params.set("vt", filterValueTypes.join(","));
+    if (filterLegalBuckets.length > 0) params.set("lb", filterLegalBuckets.join(","));
+    if (filterReviewStatuses.length > 0) params.set("rs", filterReviewStatuses.join(","));
+    if (filterSuggestedBucket) params.set("sb", filterSuggestedBucket);
+    if (filterBankAccountIds.length > 0) params.set("bank", filterBankAccountIds.join(","));
+    if (filterCounterpartyIds.length > 0) params.set("cp", filterCounterpartyIds.join(","));
+    if (filterLocationIds.length > 0) params.set("loc", filterLocationIds.join(","));
+    if (filterImportJobIds.length > 0) params.set("imp", filterImportJobIds.join(","));
+    if (filterEstateAllocations.length > 0) params.set("ea", filterEstateAllocations.join(","));
+    if (filterCategoryTags.length > 0) params.set("ct", filterCategoryTags.join(","));
+    if (filterIsTransfer) params.set("transfer", filterIsTransfer);
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    if (filterFrom) params.set("from", filterFrom);
+    if (filterTo) params.set("to", filterTo);
+
+    const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
+    if (newUrl !== `${window.location.pathname}${window.location.search}`) {
+      window.history.replaceState(null, "", newUrl);
+    }
+  }, [activeTab, filterValueTypes, filterLegalBuckets, filterReviewStatuses, filterSuggestedBucket, filterBankAccountIds, filterCounterpartyIds, filterLocationIds, filterImportJobIds, filterEstateAllocations, filterCategoryTags, filterIsTransfer, debouncedSearch, filterFrom, filterTo]);
 
   // Click-Outside: Spalten-Menü schließen
   useEffect(() => {
@@ -540,48 +584,86 @@ export default function CaseLedgerPage({
 
   const clearFilters = () => {
     setGlobalSearch("");
-    setFilterValueType("");
-    setFilterLegalBucket("");
-    setFilterReviewStatus("");
+    setDebouncedSearch("");
+    setFilterValueTypes([]);
+    setFilterLegalBuckets([]);
+    setFilterReviewStatuses([]);
     setFilterSuggestedBucket("");
     setFilterFrom("");
     setFilterTo("");
-    setFilterBankAccountId("");
-    setFilterCounterpartyId("");
-    setFilterLocationId("");
-    setFilterImportJobId("");
-    setFilterEstateAllocation("");
-    setFilterCategoryTag("");
+    setFilterBankAccountIds([]);
+    setFilterCounterpartyIds([]);
+    setFilterLocationIds([]);
+    setFilterImportJobIds([]);
+    setFilterEstateAllocations([]);
+    setFilterCategoryTags([]);
     setFilterIsTransfer("");
   };
 
-  const hasActiveFilters = globalSearch || filterValueType || filterLegalBucket || filterReviewStatus || filterSuggestedBucket || filterFrom || filterTo || filterBankAccountId || filterCounterpartyId || filterLocationId || filterImportJobId || filterEstateAllocation || filterCategoryTag || filterIsTransfer;
+  const hasActiveFilters = debouncedSearch || filterValueTypes.length > 0 || filterLegalBuckets.length > 0 || filterReviewStatuses.length > 0 || filterSuggestedBucket || filterFrom || filterTo || filterBankAccountIds.length > 0 || filterCounterpartyIds.length > 0 || filterLocationIds.length > 0 || filterImportJobIds.length > 0 || filterEstateAllocations.length > 0 || filterCategoryTags.length > 0 || filterIsTransfer;
 
   // Aktive Filter als Chips für die Anzeige
   const activeFilterChips = useMemo(() => {
     const chips: { label: string; onRemove: () => void }[] = [];
-    if (globalSearch) chips.push({ label: `"${globalSearch}"`, onRemove: () => setGlobalSearch("") });
-    if (filterValueType) chips.push({ label: VALUE_TYPE_LABELS[filterValueType], onRemove: () => setFilterValueType("") });
-    if (filterLegalBucket) chips.push({ label: LEGAL_BUCKET_LABELS[filterLegalBucket], onRemove: () => setFilterLegalBucket("" as LegalBucket | "") });
-    if (filterReviewStatus) chips.push({ label: REVIEW_STATUS_LABELS[filterReviewStatus], onRemove: () => setFilterReviewStatus("" as ReviewStatus | "") });
+    if (debouncedSearch) chips.push({ label: `"${debouncedSearch}"`, onRemove: () => { setGlobalSearch(""); setDebouncedSearch(""); } });
+
+    // Multi-select chips: show label(s) of selected values
+    const multiChip = (
+      values: string[],
+      labelMap: Record<string, string>,
+      setter: (v: string[]) => void,
+      prefix?: string,
+      nameMap?: Map<string, string>,
+    ) => {
+      if (values.length === 0) return;
+      const labels = values.map(v => {
+        if (v === "null") return prefix ? `Ohne ${prefix}` : "(Leer)";
+        return nameMap?.get(v) || labelMap[v] || v;
+      });
+      const label = prefix
+        ? `${prefix}: ${labels.join(", ")}`
+        : labels.join(", ");
+      chips.push({ label, onRemove: () => setter([]) });
+    };
+
+    multiChip(filterValueTypes, VALUE_TYPE_LABELS, setFilterValueTypes);
+    multiChip(filterLegalBuckets, LEGAL_BUCKET_LABELS, setFilterLegalBuckets);
+    multiChip(filterReviewStatuses, REVIEW_STATUS_LABELS, setFilterReviewStatuses);
     if (filterSuggestedBucket) chips.push({ label: filterSuggestedBucket === "null" ? "Ohne Vorschlag" : `Vorschlag: ${filterSuggestedBucket}`, onRemove: () => setFilterSuggestedBucket("") });
-    if (filterBankAccountId) chips.push({ label: filterBankAccountId === "null" ? "Ohne Bankkonto" : (bankAccountsMap.get(filterBankAccountId) || filterBankAccountId), onRemove: () => setFilterBankAccountId("") });
-    if (filterCounterpartyId) chips.push({ label: filterCounterpartyId === "null" ? "Ohne Gegenpartei" : (counterpartiesMap.get(filterCounterpartyId) || filterCounterpartyId), onRemove: () => setFilterCounterpartyId("") });
-    if (filterLocationId) chips.push({ label: filterLocationId === "null" ? "Ohne Standort" : (locationsMap.get(filterLocationId) || filterLocationId), onRemove: () => setFilterLocationId("") });
-    if (filterImportJobId) {
-      const job = importJobs.find(j => j.importJobId === filterImportJobId);
-      chips.push({ label: `Import: ${job?.importSource || filterImportJobId.slice(0, 8)}`, onRemove: () => setFilterImportJobId("") });
+    multiChip(filterBankAccountIds, {}, setFilterBankAccountIds, "Bankkonto", bankAccountsMap);
+    multiChip(filterCounterpartyIds, {}, setFilterCounterpartyIds, "Gegenpartei", counterpartiesMap);
+    multiChip(filterLocationIds, {}, setFilterLocationIds, "Standort", locationsMap);
+    if (filterImportJobIds.length > 0) {
+      const labels = filterImportJobIds.map(jid => {
+        const job = importJobs.find(j => j.importJobId === jid);
+        return job?.importSource || jid.slice(0, 8);
+      });
+      chips.push({ label: `Import: ${labels.join(", ")}`, onRemove: () => setFilterImportJobIds([]) });
     }
-    if (filterEstateAllocation) chips.push({ label: ESTATE_ALLOCATION_LABELS[filterEstateAllocation] || filterEstateAllocation, onRemove: () => setFilterEstateAllocation("" as EstateAllocation) });
-    if (filterCategoryTag) chips.push({ label: filterCategoryTag === "null" ? "Nicht zugeordnet" : (CATEGORY_TAG_LABELS[filterCategoryTag] || filterCategoryTag), onRemove: () => setFilterCategoryTag("") });
+    multiChip(filterEstateAllocations, ESTATE_ALLOCATION_LABELS, setFilterEstateAllocations);
+    multiChip(filterCategoryTags, CATEGORY_TAG_LABELS, setFilterCategoryTags, "Kategorie");
     if (filterIsTransfer) chips.push({ label: filterIsTransfer === "true" ? "Nur Umbuchungen" : "Ohne Umbuchungen", onRemove: () => setFilterIsTransfer("") });
     if (filterFrom) chips.push({ label: `ab ${filterFrom}`, onRemove: () => setFilterFrom("") });
     if (filterTo) chips.push({ label: `bis ${filterTo}`, onRemove: () => setFilterTo("") });
     return chips;
-  }, [globalSearch, filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterBankAccountId, filterCounterpartyId, filterLocationId, filterImportJobId, filterEstateAllocation, filterCategoryTag, filterIsTransfer, filterFrom, filterTo, bankAccountsMap, counterpartiesMap, locationsMap, importJobs]);
+  }, [debouncedSearch, filterValueTypes, filterLegalBuckets, filterReviewStatuses, filterSuggestedBucket, filterBankAccountIds, filterCounterpartyIds, filterLocationIds, filterImportJobIds, filterEstateAllocations, filterCategoryTags, filterIsTransfer, filterFrom, filterTo, bankAccountsMap, counterpartiesMap, locationsMap, importJobs]);
 
   // Anzahl der aktiven erweiterten Filter (ohne globale Suche)
-  const activeAdvancedFilterCount = [filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountId, filterCounterpartyId, filterLocationId, filterImportJobId, filterEstateAllocation, filterCategoryTag, filterIsTransfer].filter(Boolean).length;
+  const activeAdvancedFilterCount = [
+    filterValueTypes.length > 0,
+    filterLegalBuckets.length > 0,
+    filterReviewStatuses.length > 0,
+    !!filterSuggestedBucket,
+    !!filterFrom,
+    !!filterTo,
+    filterBankAccountIds.length > 0,
+    filterCounterpartyIds.length > 0,
+    filterLocationIds.length > 0,
+    filterImportJobIds.length > 0,
+    filterEstateAllocations.length > 0,
+    filterCategoryTags.length > 0,
+    !!filterIsTransfer,
+  ].filter(Boolean).length;
 
   // Bulk Actions
   const handleBulkConfirm = async (filter?: { suggestedLegalBucket?: string; minConfidence?: number }) => {
@@ -848,8 +930,8 @@ export default function CaseLedgerPage({
 
       setSuccessMessage(data.message);
       // Clear import filter if we just deleted the filtered import
-      if (filterImportJobId === importJobId) {
-        setFilterImportJobId("");
+      if (filterImportJobIds.includes(importJobId)) {
+        setFilterImportJobIds(filterImportJobIds.filter(id => id !== importJobId));
       }
       fetchData();
     } catch (err) {
@@ -982,8 +1064,8 @@ export default function CaseLedgerPage({
     const entryAny = entry as any;
 
     // Globale Suche: VOR den Spalten-Filtern prüfen
-    if (globalSearch.trim()) {
-      const q = globalSearch.toLowerCase().trim();
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase().trim();
       const categoryLabel = entryAny.categoryTag ? (CATEGORY_TAG_LABELS[entryAny.categoryTag] || '').toLowerCase() : '';
       const matchesSearch =
         entry.description.toLowerCase().includes(q) ||
@@ -1035,7 +1117,7 @@ export default function CaseLedgerPage({
     }
 
     return true;
-  }), [entries, columnFilters, locationsMap, bankAccountsMap, counterpartiesMap, globalSearch]);
+  }), [entries, columnFilters, locationsMap, bankAccountsMap, counterpartiesMap, debouncedSearch]);
 
   // Sort entries (memoized)
   const sortedEntries = useMemo(() => [...filteredEntries].sort((a, b) => {
@@ -1102,6 +1184,19 @@ export default function CaseLedgerPage({
     </div>
   );
 
+
+  // Quick-Filter: Klick auf Wert in Tabelle → zum Multi-Select-Filter hinzufügen
+  const toggleQuickFilter = useCallback((
+    current: string[],
+    setter: (v: string[]) => void,
+    value: string,
+  ) => {
+    if (current.includes(value)) {
+      setter(current.filter(v => v !== value));
+    } else {
+      setter([...current, value]);
+    }
+  }, []);
 
   // Filter Options (memoized)
   const categoryTagOptions = useMemo(() => Object.entries(CATEGORY_TAG_LABELS).map(([value, label]) => ({ value, label })), []);
@@ -1490,7 +1585,7 @@ export default function CaseLedgerPage({
                                 // Filter to this source
                                 const sourceEntries = entries.filter(e => (e.importSource || "Manuell eingegeben") === source);
                                 if (sourceEntries.length > 0 && sourceEntries[0].importJobId) {
-                                  setFilterImportJobId(sourceEntries[0].importJobId);
+                                  setFilterImportJobIds([sourceEntries[0].importJobId]);
                                   setActiveTab("all");
                                   router.push(`/admin/cases/${id}/ledger?tab=all`);
                                 }
@@ -1647,7 +1742,7 @@ export default function CaseLedgerPage({
           <div className="space-y-2">
             {importJobs.map((job) => {
               const importDate = new Date(job.createdAt);
-              const isFiltered = filterImportJobId === job.importJobId;
+              const isFiltered = filterImportJobIds.includes(job.importJobId);
               return (
                 <div
                   key={job.importJobId}
@@ -1670,7 +1765,7 @@ export default function CaseLedgerPage({
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setFilterImportJobId(isFiltered ? "" : job.importJobId)}
+                      onClick={() => setFilterImportJobIds(isFiltered ? filterImportJobIds.filter(id => id !== job.importJobId) : [...filterImportJobIds, job.importJobId])}
                       className={`text-xs px-2 py-1 rounded ${
                         isFiltered
                           ? "bg-blue-500 text-white"
@@ -1849,11 +1944,14 @@ export default function CaseLedgerPage({
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
               placeholder="Suche in Beschreibung, Gegenpartei, Notiz, IBAN..."
-              className="input-field w-full pl-10 pr-8"
+              className="input-field w-full pl-10 pr-24"
             />
+            <span className="absolute right-10 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+              {debouncedSearch ? `${visibleTopLevelEntries.length} von ${totalTopLevelCount}` : ""}
+            </span>
             {globalSearch && (
               <button
-                onClick={() => setGlobalSearch("")}
+                onClick={() => { setGlobalSearch(""); setDebouncedSearch(""); }}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1897,231 +1995,109 @@ export default function CaseLedgerPage({
           {/* Erweiterte Filter (collapsible) */}
           {showAdvancedFilters && (
             <div className="pt-2 border-t border-[var(--border)]">
-              <div className="flex flex-wrap items-end gap-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <MultiSelectFilter
+                  label="Werttyp"
+                  options={Object.entries(VALUE_TYPE_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                  selected={filterValueTypes}
+                  onChange={setFilterValueTypes}
+                />
+                <MultiSelectFilter
+                  label="Rechtsstatus"
+                  options={Object.entries(LEGAL_BUCKET_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                  selected={filterLegalBuckets}
+                  onChange={setFilterLegalBuckets}
+                />
+                <MultiSelectFilter
+                  label="Review"
+                  options={Object.entries(REVIEW_STATUS_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                  selected={filterReviewStatuses}
+                  onChange={setFilterReviewStatuses}
+                />
                 <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                    Werttyp
-                  </label>
-                  <select
-                    value={filterValueType}
-                    onChange={(e) => setFilterValueType(e.target.value as ValueType | "")}
-                    className="input-field min-w-[120px]"
-                  >
-                    <option value="">Alle</option>
-                    {Object.entries(VALUE_TYPE_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                    Rechtsstatus
-                  </label>
-                  <select
-                    value={filterLegalBucket}
-                    onChange={(e) => setFilterLegalBucket(e.target.value as LegalBucket | "")}
-                    className="input-field min-w-[150px]"
-                  >
-                    <option value="">Alle</option>
-                    {Object.entries(LEGAL_BUCKET_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                    Review-Status
-                  </label>
-                  <select
-                    value={filterReviewStatus}
-                    onChange={(e) => setFilterReviewStatus(e.target.value as ReviewStatus | "")}
-                    className="input-field min-w-[150px]"
-                  >
-                    <option value="">Alle</option>
-                    {Object.entries(REVIEW_STATUS_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                    Vorschlag
-                  </label>
                   <select
                     value={filterSuggestedBucket}
                     onChange={(e) => setFilterSuggestedBucket(e.target.value)}
-                    className="input-field min-w-[150px]"
+                    className="input-field min-w-[120px] text-sm"
                   >
-                    <option value="">Alle</option>
+                    <option value="">Vorschlag</option>
                     <option value="MASSE">MASSE</option>
                     <option value="ABSONDERUNG">ABSONDERUNG</option>
                     <option value="NEUTRAL">NEUTRAL</option>
                     <option value="null">Ohne Vorschlag</option>
                   </select>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                    Von
-                  </label>
-                  <input
-                    type="date"
-                    value={filterFrom}
-                    onChange={(e) => setFilterFrom(e.target.value)}
-                    className="input-field"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                    Bis
-                  </label>
-                  <input
-                    type="date"
-                    value={filterTo}
-                    onChange={(e) => setFilterTo(e.target.value)}
-                    className="input-field"
-                  />
-                </div>
-
-                {/* Dimensions-Filter */}
+                <MultiSelectFilter
+                  label="Alt/Neu"
+                  options={Object.entries(ESTATE_ALLOCATION_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                  selected={filterEstateAllocations}
+                  onChange={setFilterEstateAllocations}
+                  allowNull
+                  nullLabel="Nicht zugeordnet"
+                />
+                <MultiSelectFilter
+                  label="Kategorie"
+                  options={Object.entries(CATEGORY_TAG_LABELS).map(([v, l]) => ({ value: v, label: l }))}
+                  selected={filterCategoryTags}
+                  onChange={setFilterCategoryTags}
+                  allowNull
+                  nullLabel="Nicht zugeordnet"
+                />
                 {bankAccountsList.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                      Bankkonto
-                    </label>
-                    <select
-                      value={filterBankAccountId}
-                      onChange={(e) => setFilterBankAccountId(e.target.value)}
-                      className="input-field min-w-[150px]"
-                    >
-                      <option value="">Alle</option>
-                      <option value="null">Ohne Bankkonto</option>
-                      {bankAccountsList.map((acc) => (
-                        <option key={acc.id} value={acc.id}>
-                          {acc.bankName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <MultiSelectFilter
+                    label="Bankkonto"
+                    options={bankAccountsList.map(a => ({ value: a.id, label: a.bankName }))}
+                    selected={filterBankAccountIds}
+                    onChange={setFilterBankAccountIds}
+                    allowNull
+                    nullLabel="Ohne Bankkonto"
+                  />
                 )}
-
                 {counterpartiesList.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                      Gegenpartei
-                    </label>
-                    <select
-                      value={filterCounterpartyId}
-                      onChange={(e) => setFilterCounterpartyId(e.target.value)}
-                      className="input-field min-w-[150px]"
-                    >
-                      <option value="">Alle</option>
-                      <option value="null">Ohne Gegenpartei</option>
-                      {counterpartiesList.map((cp) => (
-                        <option key={cp.id} value={cp.id}>
-                          {cp.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <MultiSelectFilter
+                    label="Gegenpartei"
+                    options={counterpartiesList.map(c => ({ value: c.id, label: c.name }))}
+                    selected={filterCounterpartyIds}
+                    onChange={setFilterCounterpartyIds}
+                    allowNull
+                    nullLabel="Ohne Gegenpartei"
+                  />
                 )}
-
                 {locationsList.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                      Standort
-                    </label>
-                    <select
-                      value={filterLocationId}
-                      onChange={(e) => setFilterLocationId(e.target.value)}
-                      className="input-field min-w-[150px]"
-                    >
-                      <option value="">Alle</option>
-                      <option value="null">Ohne Standort</option>
-                      {locationsList.map((loc) => (
-                        <option key={loc.id} value={loc.id}>
-                          {loc.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <MultiSelectFilter
+                    label="Standort"
+                    options={locationsList.map(l => ({ value: l.id, label: l.name }))}
+                    selected={filterLocationIds}
+                    onChange={setFilterLocationIds}
+                    allowNull
+                    nullLabel="Ohne Standort"
+                  />
                 )}
-
                 {importJobs.length > 0 && (
-                  <div>
-                    <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                      Import
-                    </label>
-                    <select
-                      value={filterImportJobId}
-                      onChange={(e) => setFilterImportJobId(e.target.value)}
-                      className="input-field min-w-[200px]"
-                    >
-                      <option value="">Alle Importe</option>
-                      {importJobs.map((job) => (
-                        <option key={job.importJobId} value={job.importJobId}>
-                          {job.importSource || job.importJobId.slice(0, 8)} ({job.entryCount} Einträge)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  <MultiSelectFilter
+                    label="Import"
+                    options={importJobs.map(j => ({ value: j.importJobId, label: `${j.importSource || j.importJobId.slice(0, 8)} (${j.entryCount})` }))}
+                    selected={filterImportJobIds}
+                    onChange={setFilterImportJobIds}
+                  />
                 )}
-
-                {/* Alt-/Neumasse Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                    Alt-/Neumasse
-                  </label>
-                  <select
-                    value={filterEstateAllocation}
-                    onChange={(e) => setFilterEstateAllocation(e.target.value as EstateAllocation)}
-                    className="input-field min-w-[130px]"
-                  >
-                    <option value="">Alle</option>
-                    <option value="ALTMASSE">Altmasse</option>
-                    <option value="NEUMASSE">Neumasse</option>
-                    <option value="MIXED">Gemischt</option>
-                    <option value="UNKLAR">Unklar</option>
-                  </select>
+                <div className="flex items-end gap-2">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Von</label>
+                    <input type="date" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} className="input-field text-sm" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Bis</label>
+                    <input type="date" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} className="input-field text-sm" />
+                  </div>
                 </div>
-
-                {/* Matrix-Kategorie Filter */}
                 <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                    Matrix-Kat.
-                  </label>
-                  <select
-                    value={filterCategoryTag}
-                    onChange={(e) => setFilterCategoryTag(e.target.value)}
-                    className="input-field min-w-[150px]"
-                  >
-                    <option value="">Alle</option>
-                    <option value="null">Nicht zugeordnet</option>
-                    {CATEGORY_TAG_OPTIONS.map(group => (
-                      <optgroup key={group.group} label={group.group}>
-                        {group.tags.map(tag => (
-                          <option key={tag} value={tag}>{CATEGORY_TAG_LABELS[tag]}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Umbuchungs-Filter */}
-                <div>
-                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                    Umbuchungen
-                  </label>
                   <select
                     value={filterIsTransfer}
                     onChange={(e) => setFilterIsTransfer(e.target.value)}
-                    className="input-field min-w-[150px]"
+                    className="input-field min-w-[130px] text-sm"
                   >
-                    <option value="">Alle Einträge</option>
+                    <option value="">Umbuchungen</option>
                     <option value="false">Ohne Umbuchungen</option>
                     <option value="true">Nur Umbuchungen</option>
                   </select>
@@ -2220,7 +2196,7 @@ export default function CaseLedgerPage({
               )}
             </div>
             <span className="text-sm text-[var(--muted)]">
-              {(Object.keys(columnFilters).length > 0 || globalSearch) && visibleTopLevelEntries.length !== totalTopLevelCount
+              {(Object.keys(columnFilters).length > 0 || debouncedSearch) && visibleTopLevelEntries.length !== totalTopLevelCount
                 ? `${visibleTopLevelEntries.length} von ${totalTopLevelCount} Einträgen`
                 : `${totalTopLevelCount} Einträge`
               }
@@ -2624,10 +2600,12 @@ export default function CaseLedgerPage({
                             if (tag) {
                               const label = CATEGORY_TAG_LABELS[tag] || tag;
                               const sourceLabel = source ? CATEGORY_TAG_SOURCE_LABELS[source as keyof typeof CATEGORY_TAG_SOURCE_LABELS] || source : '';
+                              const isActive = filterCategoryTags.includes(tag);
                               return (
                                 <span
-                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-300 max-w-full truncate"
-                                  title={`${label}${sourceLabel ? ` (${sourceLabel})` : ''}${note ? ` | ${note}` : ''}`}
+                                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 border border-green-300 max-w-full truncate cursor-pointer hover:ring-1 hover:ring-blue-300 ${isActive ? "ring-2 ring-blue-400" : ""}`}
+                                  title={`${label}${sourceLabel ? ` (${sourceLabel})` : ''}${note ? ` | ${note}` : ''}\nKlicken zum Filtern`}
+                                  onClick={(e) => { e.stopPropagation(); toggleQuickFilter(filterCategoryTags, setFilterCategoryTags, tag); }}
                                 >
                                   {label}
                                   {source === 'AUTO' && <span className="text-[9px] opacity-60 shrink-0">A</span>}
@@ -2714,10 +2692,9 @@ export default function CaseLedgerPage({
                               className="import-filter-trigger cursor-pointer hover:text-[var(--primary)] hover:underline truncate block"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setFilterImportJobId(entryWithExtras.importJobId || "");
+                                if (entryWithExtras.importJobId) toggleQuickFilter(filterImportJobIds, setFilterImportJobIds, entryWithExtras.importJobId);
                               }}
-                              title={`${entryWithExtras.importSource}
-Klicken zum Filtern`}
+                              title={`${entryWithExtras.importSource}\nKlicken zum Filtern`}
                             >
                               {entryWithExtras.importSource}
                             </span>
@@ -2729,11 +2706,13 @@ Klicken zum Filtern`}
 
                       {/* 7. Standort */}
                       {columnVisibility.location && (
-                        <td
-                          className="text-xs truncate"
-                        >
+                        <td className="text-xs truncate">
                           {entryWithExtras.locationId ? (
-                            <span title={locationsMap.get(entryWithExtras.locationId) || entryWithExtras.locationId}>
+                            <span
+                              className={`cursor-pointer hover:text-[var(--primary)] hover:underline ${filterLocationIds.includes(entryWithExtras.locationId) ? "text-blue-700 font-medium" : ""}`}
+                              title={`${locationsMap.get(entryWithExtras.locationId) || entryWithExtras.locationId}\nKlicken zum Filtern`}
+                              onClick={(e) => { e.stopPropagation(); toggleQuickFilter(filterLocationIds, setFilterLocationIds, entryWithExtras.locationId!); }}
+                            >
                               {locationsMap.get(entryWithExtras.locationId) || entryWithExtras.locationId}
                             </span>
                           ) : (
@@ -2744,11 +2723,13 @@ Klicken zum Filtern`}
 
                       {/* 8. Bankkonto */}
                       {columnVisibility.bankAccount && (
-                        <td
-                          className="text-xs truncate"
-                        >
+                        <td className="text-xs truncate">
                           {entryWithExtras.bankAccountId ? (
-                            <span title={bankAccountsMap.get(entryWithExtras.bankAccountId) || entryWithExtras.bankAccountId}>
+                            <span
+                              className={`cursor-pointer hover:text-[var(--primary)] hover:underline ${filterBankAccountIds.includes(entryWithExtras.bankAccountId) ? "text-blue-700 font-medium" : ""}`}
+                              title={`${bankAccountsMap.get(entryWithExtras.bankAccountId) || entryWithExtras.bankAccountId}\nKlicken zum Filtern`}
+                              onClick={(e) => { e.stopPropagation(); toggleQuickFilter(filterBankAccountIds, setFilterBankAccountIds, entryWithExtras.bankAccountId!); }}
+                            >
                               {bankAccountsMap.get(entryWithExtras.bankAccountId) || entryWithExtras.bankAccountId}
                             </span>
                           ) : (
@@ -2759,11 +2740,13 @@ Klicken zum Filtern`}
 
                       {/* 9. Gegenpartei */}
                       {columnVisibility.counterparty && (
-                        <td
-                          className="text-xs truncate"
-                        >
+                        <td className="text-xs truncate">
                           {entryWithExtras.counterpartyId ? (
-                            <span title={counterpartiesMap.get(entryWithExtras.counterpartyId) || entryWithExtras.counterpartyId}>
+                            <span
+                              className={`cursor-pointer hover:text-[var(--primary)] hover:underline ${filterCounterpartyIds.includes(entryWithExtras.counterpartyId) ? "text-blue-700 font-medium" : ""}`}
+                              title={`${counterpartiesMap.get(entryWithExtras.counterpartyId) || entryWithExtras.counterpartyId}\nKlicken zum Filtern`}
+                              onClick={(e) => { e.stopPropagation(); toggleQuickFilter(filterCounterpartyIds, setFilterCounterpartyIds, entryWithExtras.counterpartyId!); }}
+                            >
                               {counterpartiesMap.get(entryWithExtras.counterpartyId) || entryWithExtras.counterpartyId}
                             </span>
                           ) : (
@@ -2775,7 +2758,11 @@ Klicken zum Filtern`}
                       {/* 10. Typ */}
                       {columnVisibility.valueType && (
                         <td>
-                          <span className={`badge ${getValueTypeBadgeClass(entry.valueType)}`}>
+                          <span
+                            className={`badge cursor-pointer ${getValueTypeBadgeClass(entry.valueType)} ${filterValueTypes.includes(entry.valueType) ? "ring-2 ring-blue-400" : ""}`}
+                            onClick={(e) => { e.stopPropagation(); toggleQuickFilter(filterValueTypes, setFilterValueTypes, entry.valueType); }}
+                            title="Klicken zum Filtern"
+                          >
                             {VALUE_TYPE_LABELS[entry.valueType]}
                           </span>
                         </td>
@@ -2786,8 +2773,9 @@ Klicken zum Filtern`}
                         <td>
                           {entryWithExtras.estateAllocation ? (
                             <span
-                              className={`badge text-xs ${getEstateAllocationBadgeClass(entryWithExtras.estateAllocation)}`}
-                              title={`${formatAllocationSource(entryWithExtras.allocationSource)}: ${entryWithExtras.allocationNote || '-'}`}
+                              className={`badge text-xs cursor-pointer ${getEstateAllocationBadgeClass(entryWithExtras.estateAllocation)} ${filterEstateAllocations.includes(entryWithExtras.estateAllocation) ? "ring-2 ring-blue-400" : ""}`}
+                              title={`${formatAllocationSource(entryWithExtras.allocationSource)}: ${entryWithExtras.allocationNote || '-'}\nKlicken zum Filtern`}
+                              onClick={(e) => { e.stopPropagation(); toggleQuickFilter(filterEstateAllocations, setFilterEstateAllocations, entryWithExtras.estateAllocation!); }}
                             >
                               {ESTATE_ALLOCATION_LABELS[entryWithExtras.estateAllocation] || entryWithExtras.estateAllocation}
                             </span>
@@ -2800,7 +2788,11 @@ Klicken zum Filtern`}
                       {/* 12. Rechtsstatus */}
                       {columnVisibility.legalBucket && (
                         <td>
-                          <span className={`badge ${getBucketBadgeClass(entry.legalBucket)}`}>
+                          <span
+                            className={`badge cursor-pointer ${getBucketBadgeClass(entry.legalBucket)} ${filterLegalBuckets.includes(entry.legalBucket) ? "ring-2 ring-blue-400" : ""}`}
+                            onClick={(e) => { e.stopPropagation(); toggleQuickFilter(filterLegalBuckets, setFilterLegalBuckets, entry.legalBucket); }}
+                            title="Klicken zum Filtern"
+                          >
                             {LEGAL_BUCKET_LABELS[entry.legalBucket]}
                           </span>
                         </td>
@@ -2809,7 +2801,11 @@ Klicken zum Filtern`}
                       {/* 13. Review */}
                       {columnVisibility.reviewStatus && (
                         <td>
-                          <span className={`badge ${getReviewStatusBadgeClass(entry.reviewStatus as ReviewStatus)}`}>
+                          <span
+                            className={`badge cursor-pointer ${getReviewStatusBadgeClass(entry.reviewStatus as ReviewStatus)} ${filterReviewStatuses.includes(entry.reviewStatus) ? "ring-2 ring-blue-400" : ""}`}
+                            onClick={(e) => { e.stopPropagation(); toggleQuickFilter(filterReviewStatuses, setFilterReviewStatuses, entry.reviewStatus); }}
+                            title="Klicken zum Filtern"
+                          >
                             {REVIEW_STATUS_LABELS[entry.reviewStatus as ReviewStatus] || entry.reviewStatus}
                           </span>
                         </td>
