@@ -107,5 +107,27 @@ SOLL/IST-Abgleich implementiert mit Ampelsystem (v2.25.0). PLAN vs. IST pro Peri
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.25.0)
+### Dark Mode: Hardcodierte Farben in Dashboard-Tabs
+
+**Status:** Identifiziert, nicht behoben
+
+**Problem:** `MasseCreditTab.tsx` und `BankAccountsTab.tsx` verwenden hardcodierte Tailwind-Farben (z.B. `bg-green-100 text-green-800`) ohne `dark:`-Varianten. Status-Badges, KPI-Cards und Warning-Banner sind im Dark Mode schlecht lesbar.
+
+**Betroffene Komponenten:**
+1. `MasseCreditTab.tsx` – Status-Badges, KPI-Cards, Warning/Error-Banner
+2. `BankAccountsTab.tsx` – STATUS_COLORS, Gradient-Header, Perioden-Tabelle
+
+**Kritikalität:** Niedrig (funktional korrekt, nur visuell suboptimal im Dark Mode)
+
+---
+
+### Portal Security-Tab: Echte Daten statt Demo-Daten
+
+**Status:** Bekannt
+
+**Problem:** `/portal/cases/[id]/security` zeigt hardcodierte Demo-Bankkonten und Sicherungsrechte statt Daten aus der API.
+
+---
+
+**Letzte Aktualisierung:** 2026-02-12 (v2.26.0)
 

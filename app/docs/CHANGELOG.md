@@ -4,6 +4,53 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.26.0 – apoBank Massekreditvertrag, HZV-Split-Korrektur & Dashboard-Audit
+
+**Datum:** 12. Februar 2026
+
+### Bugfixes (Kritisch)
+
+- **apoBank Massekreditvertrag: OFFEN → VEREINBART:** Massekreditvertrag mit apoBank war seit Januar 2026 unterschrieben, aber in DB und Code noch als OFFEN hinterlegt. Aktualisiert: agreementStatus=VEREINBART, 10% Fortführungsbeitrag, 19% USt, Cap 100.000 EUR. Betrifft lokale DB, Turso Production und `haevg-plus/config.ts`.
+- **HZV Oktober Split: 29/31 → 28/31 Alt:** Stichtag 29.10.2025 (Insolvenzeröffnung) wurde fälschlich als Altmasse-Tag gezählt. Korrektur: 28 Tage Alt (1.-28.10.), 3 Tage Neu (29.-31.10.). Gem. Massekreditvertrag §1(2)b und bestätigter Premise prem-003.
+- **Sparkasse creditCapCents in config.ts ergänzt:** Cap von 137.000 EUR war in DB korrekt, fehlte aber in `config.ts` als Referenz-Konfiguration.
+- **Auth-Check in Massekredit API:** `getSession()`-Prüfung fehlte in `/api/cases/[id]/massekredit` – Sicherheitslücke geschlossen.
+- **apoBank Kontostatus:** `ba-apobank-uckerath` von DISPUTED auf SECURED geändert (lokal + Turso).
+
+### Änderungen
+
+- **"WORK IN PROGRESS" → "IN BEARBEITUNG":** WIP-Banner im Dashboard auf Deutsch umgestellt.
+- **Debug console.logs entfernt:** 6 Debug-Logging-Statements aus `BankAccountsTab.tsx` und `bank-accounts/route.ts` entfernt (Datenschutz in Production).
+- **BusinessLogicContent: apoBank-Status aktualisiert:** "Keine Massekreditvereinbarung, blockiert KV-Auszahlungen" → "Massekreditvertrag vereinbart (Jan 2026)".
+- **BankAccountsTab: Kontextinfos aktualisiert:** apoBank-Kontonamen und Hinweise an tatsächliche DB-Bezeichnungen angepasst.
+
+### Umlaute-Fixes (15 Stellen)
+
+- `compare/page.tsx`: Übererfüllung, Untererfüllung, früheren, ermöglicht, ältere, Planstände
+- `estate/page.tsx`: Verfügung
+- `revenue/page.tsx`: Jährliche (2×), KV-Abschläge, HZV-Abschläge, Kassenärztlichen
+- `security/page.tsx`: Geschäftskonto, Köln-Bonn (2×), Sämtliche, Geräte, Röntgen, Praxisräume
+
+### Dokumentation
+
+- CLAUDE.md: Massekredit-Zeile um apoBank ergänzt, "apoBank-Vereinbarung klären" aus offenen Punkten entfernt
+
+### Geänderte Dateien
+
+- `app/src/lib/cases/haevg-plus/config.ts` – apoBank VEREINBART + Sparkasse Cap + HZV 28/31
+- `app/src/app/api/cases/[id]/massekredit/route.ts` – Auth-Check
+- `app/src/app/api/cases/[id]/bank-accounts/route.ts` – Debug-Logs entfernt
+- `app/src/app/admin/cases/[id]/dashboard/page.tsx` – WIP → IN BEARBEITUNG
+- `app/src/components/dashboard/BankAccountsTab.tsx` – Kontextinfos + Logs entfernt
+- `app/src/components/business-logic/BusinessLogicContent.tsx` – apoBank-Status
+- `app/src/app/portal/cases/[id]/compare/page.tsx` – Umlaute (5×)
+- `app/src/app/portal/cases/[id]/estate/page.tsx` – Umlaute (1×)
+- `app/src/app/portal/cases/[id]/revenue/page.tsx` – Umlaute (4×)
+- `app/src/app/portal/cases/[id]/security/page.tsx` – Umlaute (5×)
+- `CLAUDE.md` – Massekredit-Doku + offene Punkte
+- Turso Production DB: 2 UPDATE-Statements (bank_agreements + bank_accounts)
+
+---
+
 ## Version 2.25.0 – Kontobewegungen ISK/Gläubiger-Trennung + Zahlungsverifikation SOLL/IST
 
 **Datum:** 12. Februar 2026

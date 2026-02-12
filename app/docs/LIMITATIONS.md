@@ -57,10 +57,10 @@ PLAN-Daten bleiben bewusst für Vergleich und Audit erhalten.
 Ein LedgerEntry kann nur einer Gegenpartei/einem Bankkonto zugeordnet werden.
 **Workaround:** Separate Entries für verschiedene Dimensionen.
 
-### Keine Prognosen/Forecasts
+### Forecast-Modul in Entwicklung
 
-Keine automatische Extrapolation oder Trendberechnung. Determinismus-Prinzip: Prognosen wären spekulativ und nicht gerichtsfest.
-**Workaround:** Manuelle PLAN-Werte.
+Vorwärtsgerichtete Liquiditätsprognose als separates Modul (Schema + Sidebar-Link vorhanden, Logik in Entwicklung).
+**Aktuell:** Manuelle PLAN-Werte über Freie Planung.
 
 ---
 
@@ -76,6 +76,11 @@ Keine automatische Extrapolation oder Trendberechnung. Determinismus-Prinzip: Pr
 
 3 von 5 Bankkonten ohne Dezember-Daten (Sparkasse, apoBank HVPlus, apoBank Uckerath). ISK-Einzahlungsliste (Nov-Dez) liegt jetzt vor und deckt ISK-Seite ab.
 **Status:** Offene Datenanforderung an IV für Geschäftskonten-Auszüge.
+
+### Portal Security-Tab zeigt Demo-Daten
+
+Die Sicherungsrechte-Seite im Kundenportal (`/portal/cases/[id]/security`) zeigt hardcodierte Demo-Daten statt reale Daten aus der API.
+**Status:** Bekannt, nicht kritisch (Admin-Dashboard zeigt korrekte Daten).
 
 ## Freigabe-Modul (Orders)
 

@@ -4,6 +4,41 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-038: apoBank Massekreditvertrag-Update & HZV-Split-Korrektur
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Gründlicher Abgleich von case-context.json (Ground Truth aus Originaldokumenten) gegen Dashboard-Daten, Code-Konfiguration und Datenbank ergab drei kritische Diskrepanzen:
+
+1. **apoBank Massekreditvertrag:** In case-context.json seit 20.01.2026 als unterschrieben dokumentiert (Status: ERHALTEN_UND_ANALYSIERT), aber in DB und config.ts noch als OFFEN hinterlegt.
+2. **HZV Oktober Split:** case-context.json und Premise prem-003 bestätigen 28/31 Alt, 3/31 Neu. Code hatte 29/31 Alt, 2/31 Neu (Stichtag 29.10. fälschlich als Altmasse-Tag gezählt).
+3. **Massekredit API ohne Auth:** Sensible Finanzdaten (Bankvereinbarungen, Kreditlimits) waren ohne Authentifizierung abrufbar.
+
+### Entscheidung
+
+**A) apoBank:** DB und config.ts auf VEREINBART aktualisiert mit: `contributionRate=0.1`, `contributionVatRate=0.19`, `creditCapCents=10000000` (100K EUR). Turso-Migration durchgeführt.
+
+**B) HZV Oktober:** VERTRAGSREGEL in config.ts korrigiert auf `altRatio=28/31`, `neuRatio=3/31`. AllocationSource von PERIOD_PRORATA auf VERTRAGSREGEL geändert (ist vertragliche Vorgabe gem. §1(2)b, nicht reine Berechnung).
+
+**C) Massekredit API:** `getSession()`-Check hinzugefügt.
+
+### Begründung
+
+- case-context.json ist die akkumulierte Wissensbasis aus Originaldokumenten und hat Vorrang vor Code-Konfiguration
+- Der Eröffnungstag (29.10.) gehört nach §27 InsO zur Neumasse – die dynamische `calculatePeriodProrata` berechnet dies korrekt (exklusiv Cutoff), aber die hardcodierte VERTRAGSREGEL hatte Priorität und überschrieb das korrekte Ergebnis
+- API-Endpunkte mit Finanzdaten müssen immer authentifiziert sein
+
+### Konsequenzen
+
+- Massekredit-Dashboard zeigt jetzt korrekte Werte für beide Banken
+- HZV-Zahlungen für Oktober werden korrekt mit 3/31 Neumasse berechnet statt 2/31
+- Alle sensiblen API-Endpunkte sind authentifiziert
+
+---
+
 ## ADR-037: Defensives Alt-Tag-Mapping & ABSONDERUNG-Match-Bereinigung
 
 **Datum:** 12. Februar 2026
