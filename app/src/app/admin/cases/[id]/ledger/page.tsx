@@ -271,6 +271,7 @@ export default function CaseLedgerPage({
   });
   const [resizingColumn, setResizingColumn] = useState<string | null>(null);
   const [showColumnMenu, setShowColumnMenu] = useState(false);
+  const columnMenuRef = useRef<HTMLDivElement>(null);
   const [detailsEntry, setDetailsEntry] = useState<LedgerEntryResponse | null>(null);
   const [detailsImportData, setDetailsImportData] = useState<Record<string, unknown> | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
@@ -446,6 +447,18 @@ export default function CaseLedgerPage({
     fetchData();
   }, [fetchData]);
 
+  // Click-Outside: Spalten-Menü schließen
+  useEffect(() => {
+    if (!showColumnMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (columnMenuRef.current && !columnMenuRef.current.contains(e.target as Node)) {
+        setShowColumnMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showColumnMenu]);
+
   // Column resize handlers
   const handleResizeStart = (e: React.MouseEvent, columnId: string) => {
     e.preventDefault();
@@ -551,7 +564,7 @@ export default function CaseLedgerPage({
     if (filterValueType) chips.push({ label: VALUE_TYPE_LABELS[filterValueType], onRemove: () => setFilterValueType("") });
     if (filterLegalBucket) chips.push({ label: LEGAL_BUCKET_LABELS[filterLegalBucket], onRemove: () => setFilterLegalBucket("" as LegalBucket | "") });
     if (filterReviewStatus) chips.push({ label: REVIEW_STATUS_LABELS[filterReviewStatus], onRemove: () => setFilterReviewStatus("" as ReviewStatus | "") });
-    if (filterSuggestedBucket) chips.push({ label: `Vorschlag: ${filterSuggestedBucket}`, onRemove: () => setFilterSuggestedBucket("") });
+    if (filterSuggestedBucket) chips.push({ label: filterSuggestedBucket === "null" ? "Ohne Vorschlag" : `Vorschlag: ${filterSuggestedBucket}`, onRemove: () => setFilterSuggestedBucket("") });
     if (filterBankAccountId) chips.push({ label: filterBankAccountId === "null" ? "Ohne Bankkonto" : (bankAccountsMap.get(filterBankAccountId) || filterBankAccountId), onRemove: () => setFilterBankAccountId("") });
     if (filterCounterpartyId) chips.push({ label: filterCounterpartyId === "null" ? "Ohne Gegenpartei" : (counterpartiesMap.get(filterCounterpartyId) || filterCounterpartyId), onRemove: () => setFilterCounterpartyId("") });
     if (filterLocationId) chips.push({ label: filterLocationId === "null" ? "Ohne Standort" : (locationsMap.get(filterLocationId) || filterLocationId), onRemove: () => setFilterLocationId("") });
@@ -1053,6 +1066,10 @@ export default function CaseLedgerPage({
   // Sichtbare Entries (ohne Children – die werden unter Parents gerendert)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const visibleTopLevelEntries = useMemo(() => sortedEntries.filter(e => !(e as any).parentEntryId), [sortedEntries]);
+
+  // Gesamt-Top-Level-Entries (für konsistenten Zähler "X von Y")
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const totalTopLevelCount = useMemo(() => entries.filter(e => !(e as any).parentEntryId).length, [entries]);
 
   // Calculate selection summary
   const selectedEntriesData = entries.filter(e => selectedEntries.has(e.id));
@@ -2138,7 +2155,7 @@ export default function CaseLedgerPage({
           </h2>
           <div className="flex items-center gap-3">
             {/* Column Visibility Dropdown */}
-            <div className="relative">
+            <div className="relative" ref={columnMenuRef}>
               <button
                 onClick={() => setShowColumnMenu(!showColumnMenu)}
                 className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5"
@@ -2203,9 +2220,9 @@ export default function CaseLedgerPage({
               )}
             </div>
             <span className="text-sm text-[var(--muted)]">
-              {(Object.keys(columnFilters).length > 0 || globalSearch)
-                ? `${visibleTopLevelEntries.length} von ${entries.length} Einträgen`
-                : `${entries.length} Einträge`
+              {(Object.keys(columnFilters).length > 0 || globalSearch) && visibleTopLevelEntries.length !== totalTopLevelCount
+                ? `${visibleTopLevelEntries.length} von ${totalTopLevelCount} Einträgen`
+                : `${totalTopLevelCount} Einträge`
               }
               {Object.keys(columnFilters).length > 0 && (
                 <button

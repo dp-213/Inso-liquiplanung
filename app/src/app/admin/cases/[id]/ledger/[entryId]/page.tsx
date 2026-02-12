@@ -113,6 +113,14 @@ interface Location {
   shortName: string | null;
 }
 
+// Extended type für Felder die die API liefert, aber nicht im Base-Type stehen
+type EntryWithSuggestions = LedgerEntryResponse & {
+  suggestedLegalBucket?: string;
+  suggestedConfidence?: number;
+  suggestedReason?: string;
+  suggestedRuleId?: string;
+};
+
 export default function LedgerEntryEditPage({
   params,
 }: {
@@ -935,9 +943,9 @@ export default function LedgerEntryEditPage({
                               {entry.suggestedServiceDateRule === "PREVIOUS_QUARTER" && "Vorquartal (KV)"}
                             </span>
                           )}
-                          {(entry as LedgerEntryResponse & { suggestedRuleId?: string }).suggestedRuleId && (
+                          {(entry as EntryWithSuggestions).suggestedRuleId && (
                             <Link
-                              href={`/admin/cases/${id}/rules?highlight=${(entry as LedgerEntryResponse & { suggestedRuleId?: string }).suggestedRuleId}`}
+                              href={`/admin/cases/${id}/rules?highlight=${(entry as EntryWithSuggestions).suggestedRuleId}`}
                               className="text-xs text-purple-600 hover:text-purple-800 underline"
                             >
                               Regel anzeigen →
@@ -952,9 +960,9 @@ export default function LedgerEntryEditPage({
                             <>Leistungszeitraum: <strong>{new Date(entry.suggestedServicePeriodStart).toLocaleDateString("de-DE")} - {new Date(entry.suggestedServicePeriodEnd).toLocaleDateString("de-DE")}</strong></>
                           )}
                         </p>
-                        {(entry as LedgerEntryResponse & { suggestedReason?: string }).suggestedReason && (
+                        {(entry as EntryWithSuggestions).suggestedReason && (
                           <p className="text-xs text-purple-600 mt-1">
-                            {(entry as LedgerEntryResponse & { suggestedReason?: string }).suggestedReason}
+                            {(entry as EntryWithSuggestions).suggestedReason}
                           </p>
                         )}
                         <button
@@ -1057,26 +1065,26 @@ export default function LedgerEntryEditPage({
                 </h3>
 
                 {/* Aktuelle Zuordnung anzeigen */}
-                {entry && (entry as LedgerEntryResponse & { estateAllocation?: string; allocationSource?: string; allocationNote?: string }).estateAllocation && (
+                {entry?.estateAllocation && (
                   <div className="mb-4 p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="text-sm text-[var(--muted)]">Aktuell:</span>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-                        ESTATE_ALLOCATION_BADGE_CLASSES[(entry as LedgerEntryResponse & { estateAllocation?: string }).estateAllocation || ''] || 'badge-neutral'
+                        ESTATE_ALLOCATION_BADGE_CLASSES[entry.estateAllocation || ''] || 'badge-neutral'
                       }`}>
-                        {ESTATE_ALLOCATION_OPTIONS.find(o => o.value === (entry as LedgerEntryResponse & { estateAllocation?: string }).estateAllocation)?.label || (entry as LedgerEntryResponse & { estateAllocation?: string }).estateAllocation}
+                        {ESTATE_ALLOCATION_OPTIONS.find(o => o.value === entry.estateAllocation)?.label || entry.estateAllocation}
                       </span>
                     </div>
-                    {(entry as LedgerEntryResponse & { allocationSource?: string }).allocationSource && (
+                    {entry.allocationSource && (
                       <p className="text-xs text-[var(--muted)]">
                         <span className="font-medium">Quelle:</span>{' '}
-                        {ALLOCATION_SOURCE_LABELS[(entry as LedgerEntryResponse & { allocationSource?: string }).allocationSource || ''] || (entry as LedgerEntryResponse & { allocationSource?: string }).allocationSource}
+                        {ALLOCATION_SOURCE_LABELS[entry.allocationSource || ''] || entry.allocationSource}
                       </p>
                     )}
-                    {(entry as LedgerEntryResponse & { allocationNote?: string }).allocationNote && (
+                    {entry.allocationNote && (
                       <p className="text-xs text-[var(--muted)] mt-1">
                         <span className="font-medium">Begründung:</span>{' '}
-                        {(entry as LedgerEntryResponse & { allocationNote?: string }).allocationNote}
+                        {entry.allocationNote}
                       </p>
                     )}
                   </div>
@@ -1099,7 +1107,7 @@ export default function LedgerEntryEditPage({
                     ))}
                   </select>
                   <p className="text-xs text-[var(--muted)] mt-1">
-                    {(entry as LedgerEntryResponse & { estateAllocation?: string })?.estateAllocation === 'UNKLAR'
+                    {entry?.estateAllocation === 'UNKLAR'
                       ? '⚠️ Automatische Zuordnung war nicht möglich - bitte manuell prüfen'
                       : 'Manuelle Änderung überschreibt automatische Zuordnung'
                     }
@@ -1159,7 +1167,7 @@ export default function LedgerEntryEditPage({
                           Blatt: {meta.sheetName}
                         </span>
                       )}
-                      {meta.rowNumber && (
+                      {meta.rowNumber != null && (
                         <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded">
                           Zeile {meta.rowNumber}
                         </span>
@@ -1437,35 +1445,38 @@ export default function LedgerEntryEditPage({
           )}
 
           {/* Classification Suggestion (if available) */}
-          {(entry as LedgerEntryResponse & { suggestedLegalBucket?: string; suggestedConfidence?: number; suggestedReason?: string }).suggestedLegalBucket && (
+          {(() => {
+            const ext = entry as EntryWithSuggestions;
+            if (!ext.suggestedLegalBucket) return null;
+            return (
             <div className="admin-card p-6 bg-purple-50 border-purple-200">
               <h2 className="text-lg font-semibold text-purple-800 mb-4">Klassifikations-Vorschlag</h2>
               <div className="space-y-3 text-sm">
                 <div className="flex items-center gap-2">
                   <span className="text-purple-600">Vorgeschlagen:</span>
                   <span className="font-semibold text-purple-800">
-                    {(entry as LedgerEntryResponse & { suggestedLegalBucket?: string }).suggestedLegalBucket}
+                    {ext.suggestedLegalBucket}
                   </span>
                 </div>
-                {(entry as LedgerEntryResponse & { suggestedConfidence?: number }).suggestedConfidence && (
+                {ext.suggestedConfidence && (
                   <div className="flex items-center gap-2">
                     <span className="text-purple-600">Konfidenz:</span>
                     <div className="flex-1 bg-purple-100 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-purple-600 h-full"
-                        style={{ width: `${Math.round((entry as LedgerEntryResponse & { suggestedConfidence?: number }).suggestedConfidence! * 100)}%` }}
+                        style={{ width: `${Math.round(ext.suggestedConfidence * 100)}%` }}
                       />
                     </div>
                     <span className="font-mono text-purple-800">
-                      {Math.round((entry as LedgerEntryResponse & { suggestedConfidence?: number }).suggestedConfidence! * 100)}%
+                      {Math.round(ext.suggestedConfidence * 100)}%
                     </span>
                   </div>
                 )}
-                {(entry as LedgerEntryResponse & { suggestedReason?: string }).suggestedReason && (
+                {ext.suggestedReason && (
                   <div>
                     <span className="text-purple-600">Begründung:</span>
                     <p className="text-purple-800 mt-1 text-xs italic">
-                      {(entry as LedgerEntryResponse & { suggestedReason?: string }).suggestedReason}
+                      {ext.suggestedReason}
                     </p>
                   </div>
                 )}
@@ -1473,7 +1484,7 @@ export default function LedgerEntryEditPage({
                   <div className="pt-3 border-t border-purple-200">
                     <button
                       onClick={() => {
-                        setFormLegalBucket((entry as LedgerEntryResponse & { suggestedLegalBucket?: string }).suggestedLegalBucket as LegalBucket);
+                        setFormLegalBucket(ext.suggestedLegalBucket as LegalBucket);
                       }}
                       className="text-sm text-purple-700 hover:text-purple-900 underline"
                     >
@@ -1483,7 +1494,8 @@ export default function LedgerEntryEditPage({
                 )}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* Rule erstellen */}
           <div className="admin-card p-6 bg-blue-50 border-blue-200">

@@ -227,6 +227,7 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     matches: [
       { type: 'CATEGORY_TAG', value: 'KV', description: 'Buchungen mit Kategorie-Tag „KV"' },
       { type: 'COUNTERPARTY_PATTERN', value: '(KV|KVNO|Kassenärztliche)', description: 'Gegenpartei enthält „KV", „KVNO" oder „Kassenärztliche"' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-kreiskasse-rhein-sieg', description: 'GKV-Zahlungen Kreiskasse Rhein-Sieg' },
     ],
   },
   {
@@ -454,6 +455,7 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     matchDescription: 'Auskehrungen von alten Bankkonten auf das Anderkonto/Massekonto.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'AUSKEHRUNG_ALTKONTEN', description: 'Buchungen mit Kategorie-Tag „AUSKEHRUNG_ALTKONTEN"' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-bw-bank-isk-auskehrung', description: 'Auskehrungen BW-Bank ISK-Konten' },
     ],
   },
   {
@@ -465,9 +467,44 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     isSubRow: true,
     isSummary: false,
     flowType: 'INFLOW',
-    matchDescription: 'Sonstige Einnahmen wie Gutachten, Privatpatienten-Direktzahlungen.',
+    matchDescription: 'Sonstige Einnahmen wie Gutachten, Privatpatienten-Direktzahlungen, Erstattungen.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'EINNAHME_SONSTIGE', description: 'Buchungen mit Kategorie-Tag „EINNAHME_SONSTIGE"' },
+      // Behörden & öffentliche Kassen
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-drv-bund', description: 'DRV Bund – Befundberichte' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-drv-rheinland', description: 'DRV Rheinland – Befundberichte' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-bundesagentur-arbeit', description: 'Bundesagentur für Arbeit – Erstattungen' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-kreis-mettmann-gesundheitsamt', description: 'Gesundheitsamt Kreis Mettmann' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-landeshauptkasse-nrw', description: 'Landeshauptkasse NRW – Beihilfe' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-landesoberkasse', description: 'Landesoberkasse NRW – Beihilfe' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-stadt-hennef', description: 'Stadt Hennef' },
+      // Krankenkassen (Eingangsseite: Erstattungen, Gutschriften)
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-aok', description: 'AOK – Erstattungen' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-barmer', description: 'BARMER – Erstattungen' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-dak', description: 'DAK-Gesundheit – Erstattungen' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-hkk', description: 'hkk Krankenkasse – Erstattungen' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-knappschaft', description: 'Knappschaft – Erstattungen' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-pronova-bkk', description: 'pronova BKK – Erstattungen' },
+      // Versicherungen & Sonstige
+      { type: 'COUNTERPARTY_ID', value: 'cp-barmenia-versicherung', description: 'Barmenia Versicherung' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-bestattung-schottes', description: 'Bestattungshaus Schottes' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-bw-bank', description: 'BW-Bank ISK – Zinsen/Gutschriften' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-kamler', description: 'Dr. Kamler – Einzahlungen' },
+      // Patienten-Direktzahlungen
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-hochfeld', description: 'Patient Hochfeld' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-ottersbach', description: 'Patient Ottersbach' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-roemer', description: 'Patient Römer' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-ritzkatis', description: 'Patient Ritzkatis' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-jansen', description: 'Patient Jansen' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-kuckuck', description: 'Patient Kuckuck' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-greiner', description: 'Patient Greiner' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-dericks', description: 'Patient Dericks' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-ahr', description: 'Patient Ahr' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-lazarova', description: 'Patient Lazarova' },
+      // Mitarbeiter-Rückzahlungen
+      { type: 'COUNTERPARTY_ID', value: 'cp-mitarbeiter-weber-silke', description: 'MA Weber – Rückzahlung' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-mitarbeiter-stiebe-michaela', description: 'MA Stiebe – Rückzahlung' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-mitarbeiter-gaenssler-franz', description: 'MA Gänßler – Rückzahlung' },
     ],
   },
   {
@@ -512,6 +549,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     matches: [
       { type: 'CATEGORY_TAG', value: 'PERSONAL', description: 'Buchungen mit Kategorie-Tag „PERSONAL"' },
       { type: 'DESCRIPTION_PATTERN', value: '(Lohn|Gehalt|Personal|SV-Beitrag|Sozialversicherung)', description: 'Buchungstext enthält Lohn, Gehalt, Personal, SV-Beitrag oder Sozialversicherung' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-mitarbeiter-dupke-anja', description: 'MA Dupke – Gehalt' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-mitarbeiter-steinmetzler-tatjana', description: 'MA Steinmetzler – Gehalt' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-mitarbeiter-gaenssler-franz', description: 'MA Gänßler – Gehalt' },
     ],
   },
   {
@@ -528,6 +568,17 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     matchDescription: 'Arbeitgeber-Anteile zur Sozialversicherung.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'SOZIALABGABEN', description: 'Buchungen mit Kategorie-Tag „SOZIALABGABEN"' },
+      // Krankenkassen (AG-Anteil Sozialversicherung)
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-aok', description: 'AOK – AG-Anteil' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-barmer', description: 'BARMER – AG-Anteil' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-dak', description: 'DAK – AG-Anteil' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-hkk', description: 'hkk – AG-Anteil' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-knappschaft', description: 'Knappschaft – AG-Anteil' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-pronova-bkk', description: 'pronova BKK – AG-Anteil' },
+      // Rentenversicherung & Beihilfe (AG-Anteil)
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-drv-bund', description: 'DRV Bund – AG-Anteil RV' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-drv-rheinland', description: 'DRV Rheinland – AG-Anteil RV' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-landeshauptkasse-nrw', description: 'Landeshauptkasse – AG-Anteil Beihilfe' },
     ],
   },
   {
@@ -568,6 +619,41 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
       { type: 'CATEGORY_TAG', value: 'BANKGEBUEHREN', description: 'Bankgebühren' },
       { type: 'CATEGORY_TAG', value: 'BUERO_IT', description: 'Büro- und IT-Kosten' },
       { type: 'DESCRIPTION_PATTERN', value: '(Miete|Strom|Gas|Energie|Telefon|Software|Versicherung|Material|Praxisbedarf|EDV|IT|Wartung|Nebenkosten|Raumkosten)', description: 'Buchungstext enthält betriebskostentypische Begriffe' },
+      // Kommunikation & Telefonie
+      { type: 'COUNTERPARTY_ID', value: 'cp-telekom', description: 'Deutsche Telekom' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-telekonnekt', description: 'Telekonnekt GmbH' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-peoplefone', description: 'Peoplefone' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-t-systems', description: 'T-Systems' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-eplus', description: 'E-Plus Mobilfunk' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-ionos', description: 'IONOS Hosting' },
+      // IT & Büro
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-micrologic', description: 'MICROLOGIC Praxis-IT' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-office-partner', description: 'Office Partner' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-jaba-gmbh', description: 'JaBa GmbH' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-cardisio-gmbh', description: 'Cardisio GmbH' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-amazon', description: 'Amazon – Bürobedarf' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-i-motion', description: 'I-Motion GmbH' },
+      // Gebäude & Miete
+      { type: 'COUNTERPARTY_ID', value: 'cp-vermieter-michael-krieger', description: 'Vermieter MVZ Velbert' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-vermieter-bernd-kolle', description: 'Vermieter MVZ Uckerath' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-jahn-gebaeudeservice', description: 'Jahn Gebäudeservice' },
+      // Energie & Versorgung
+      { type: 'COUNTERPARTY_ID', value: 'cp-ggew-ag', description: 'GGEW – Strom/Gas' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-eon-energie', description: 'E.ON Energie' },
+      // Leasing
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-allane-se', description: 'Allane SE – Fahrzeugleasing' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-archimedes-leasing', description: 'archimedes – Medizingeräte-Leasing' },
+      // Medizin & Labor
+      { type: 'COUNTERPARTY_ID', value: 'cp-med-laborunion-eitorf', description: 'MED LaborUnion Eitorf' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-promedia-medizintechnik', description: 'Promedia Medizintechnik' },
+      // Sonstige Betriebskosten
+      { type: 'COUNTERPARTY_ID', value: 'cp-sonstige-betriebsausgaben', description: 'Sonstige Betriebsausgaben' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-flaschenpost', description: 'Flaschenpost – Getränke' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-drekopf-recycling', description: 'Drekopf Recycling – Entsorgung' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-wdr', description: 'WDR – Rundfunkgebühren' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-mkg-bank', description: 'MKG Bank – Bankgebühren' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-vertreter-abdul-lababidi', description: 'Vertreterarzt Lababidi' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-arzt-roesing-klaus', description: 'Dr. Rösing – Honorar Eitorf' },
     ],
   },
   {
@@ -621,6 +707,7 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     matches: [
       { type: 'CATEGORY_TAG', value: 'STEUERN', description: 'Buchungen mit Kategorie-Tag „STEUERN"' },
       { type: 'DESCRIPTION_PATTERN', value: '(Umsatzsteuer|USt|MwSt|Vorsteuer|Finanzamt|Gewerbesteuer|Körperschaftsteuer|Lohnsteuer)', description: 'Buchungstext enthält Steuer-Begriffe' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-steuerverwaltung-nrw', description: 'Steuerverwaltung NRW – Lohnsteuer' },
     ],
   },
   {
@@ -710,6 +797,7 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     matchDescription: 'Tilgung des Massekredits.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'DARLEHEN_TILGUNG', description: 'Buchungen mit Kategorie-Tag „DARLEHEN_TILGUNG"' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-servicegesellschaft-hausarztpraxis', description: 'Servicegesellschaft – Massekredit-Tilgung' },
     ],
   },
   {
@@ -726,6 +814,9 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     matches: [
       { type: 'CATEGORY_TAG', value: 'VERFAHRENSKOSTEN', description: 'Buchungen mit Kategorie-Tag „VERFAHRENSKOSTEN"' },
       { type: 'DESCRIPTION_PATTERN', value: '(Verfahren|Gericht|Insolvenz|Verwalter|Berater|Rechtsanwalt|Steuerberater|Gutachter|Unternehmensberater)', description: 'Buchungstext enthält Verfahrens-/Beratungsbegriffe' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-awado', description: 'AWADO – Wirtschaftsberatung' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-sarah-wolf', description: 'Sarah Wolf – Insolvenzverwalterin' },
+      { type: 'COUNTERPARTY_ID', value: 'cp-hvplus-rig', description: 'RiG Rechtsanwaltsgesellschaft' },
     ],
   },
   {
@@ -883,7 +974,8 @@ export function findMatchingRowWithTrace(
     row.flowType === flowType &&
     !row.isSummary &&
     !row.isSubtotal &&
-    !row.parentRowId &&     // Standort-Kinder haben keine eigenen Matches
+    // Standort-Sub-Rows (leere matches) werden durch matches.length > 0 gefiltert.
+    // Sub-Kategorie-Rows (z.B. Sozialabgaben) mit eigenen Matches bleiben erreichbar.
     row.matches.length > 0
   );
 

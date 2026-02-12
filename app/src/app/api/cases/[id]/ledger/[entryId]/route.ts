@@ -518,7 +518,7 @@ export async function PUT(
             where: { id: entryId },
             data: {
               estateAllocation: allocationResult.estateAllocation,
-              estateRatio: allocationResult.estateRatio?.toNumber() || null,
+              estateRatio: allocationResult.estateRatio?.toNumber() ?? null,
               allocationSource: AllocationSource.MANUELL,
               allocationNote: `Manuell zugeordnet. ${allocationResult.allocationNote}`,
             },
@@ -586,12 +586,18 @@ export async function DELETE(
       });
     }
 
+    // Children (Split-Einzelposten) mitlöschen
+    const deletedChildren = await prisma.ledgerEntry.deleteMany({
+      where: { parentEntryId: entryId },
+    });
+
     // Delete entry
     await prisma.ledgerEntry.delete({
       where: { id: entryId },
     });
 
-    return NextResponse.json({ success: true, message: 'Eintrag gelöscht' });
+    const childInfo = deletedChildren.count > 0 ? ` (+ ${deletedChildren.count} Einzelposten)` : '';
+    return NextResponse.json({ success: true, message: `Eintrag gelöscht${childInfo}` });
   } catch (error) {
     console.error('Error deleting ledger entry:', error);
     return NextResponse.json(
