@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   ComposedChart,
   Line,
@@ -159,6 +160,8 @@ export default function RollingForecastChart({
   caseId,
   scope = "GLOBAL",
 }: RollingForecastChartProps) {
+  const pathname = usePathname();
+  const isAdminContext = pathname?.startsWith("/admin");
   const [data, setData] = useState<ForecastData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -289,7 +292,7 @@ export default function RollingForecastChart({
             </span>
           </div>
         )}
-        {hasForecastPeriods && data.forecastMeta && (
+        {hasForecastPeriods && data.forecastMeta && isAdminContext && (
           <Link
             href={`/admin/cases/${caseId}/forecast`}
             className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
@@ -297,6 +300,12 @@ export default function RollingForecastChart({
             <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
             Prognose aktiv ({data.forecastMeta.assumptionCount} Annahmen)
           </Link>
+        )}
+        {hasForecastPeriods && data.forecastMeta && !isAdminContext && (
+          <span className="ml-auto text-xs text-blue-600 font-medium flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            Prognose aktiv ({data.forecastMeta.assumptionCount} Annahmen)
+          </span>
         )}
       </div>
 

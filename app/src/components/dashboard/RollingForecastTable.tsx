@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 interface ForecastPeriod {
   periodIndex: number;
@@ -104,6 +105,8 @@ function SourceIndicator({ source }: { source: "IST" | "PLAN" | "FORECAST" | "MI
 export default function RollingForecastTable({
   caseId,
 }: RollingForecastTableProps) {
+  const pathname = usePathname();
+  const isAdminContext = pathname?.startsWith("/admin");
   const [data, setData] = useState<ForecastData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -172,12 +175,14 @@ export default function RollingForecastTable({
               )}
             </span>
           </div>
-          <Link
-            href={`/admin/cases/${caseId}/forecast`}
-            className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
-          >
-            Annahmen bearbeiten &rarr;
-          </Link>
+          {isAdminContext && (
+            <Link
+              href={`/admin/cases/${caseId}/forecast`}
+              className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+            >
+              Annahmen bearbeiten &rarr;
+            </Link>
+          )}
         </div>
       )}
 
@@ -329,8 +334,8 @@ export default function RollingForecastTable({
           </div>
         </div>
 
-        {/* Forecast link */}
-        {data.hasForecast && (
+        {/* Forecast link (nur für Admins) */}
+        {data.hasForecast && isAdminContext && (
           <Link
             href={`/admin/cases/${caseId}/forecast`}
             className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
