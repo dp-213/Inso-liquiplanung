@@ -6,16 +6,54 @@ import { StatusSteps } from "./StatusSteps";
 
 type OrderType = "BESTELLUNG" | "ZAHLUNG";
 
-interface OrderSubmissionFormProps {
-    token: string;
+interface CreditorOption {
+    id: string;
+    name: string;
+    shortName: string | null;
+    defaultCostCategoryId: string | null;
 }
 
-export function OrderSubmissionForm({ token }: OrderSubmissionFormProps) {
+interface CostCategoryOption {
+    id: string;
+    name: string;
+    shortName: string | null;
+}
+
+interface OrderSubmissionFormProps {
+    token: string;
+    creditors?: CreditorOption[];
+    costCategories?: CostCategoryOption[];
+}
+
+export function OrderSubmissionForm({ token, creditors = [], costCategories = [] }: OrderSubmissionFormProps) {
     const [orderType, setOrderType] = useState<OrderType | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string | null>(null);
+    const [selectedCreditorId, setSelectedCreditorId] = useState<string>("");
+    const [selectedCostCategoryId, setSelectedCostCategoryId] = useState<string>("");
+    const [creditorName, setCreditorName] = useState<string>("");
+
+    const hasCreditors = creditors.length > 0;
+    const hasCostCategories = costCategories.length > 0;
+    const creditorLocked = hasCreditors && selectedCreditorId !== "" && selectedCreditorId !== "__other__";
+
+    function handleCreditorSelect(value: string) {
+        const wasLocked = creditorLocked;
+        setSelectedCreditorId(value);
+        if (value && value !== "__other__") {
+            const cred = creditors.find((c) => c.id === value);
+            setCreditorName(cred?.name || "");
+            // Auto-Fill Kostenart NUR wenn noch keine manuell gewählt wurde
+            if (cred?.defaultCostCategoryId && hasCostCategories && !selectedCostCategoryId) {
+                setSelectedCostCategoryId(cred.defaultCostCategoryId);
+            }
+        } else if (wasLocked) {
+            // Nur leeren wenn vorher ein Kreditor ausgewählt war (nicht User-Freitext überschreiben)
+            setCreditorName("");
+        }
+    }
 
     async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -36,6 +74,15 @@ export function OrderSubmissionForm({ token }: OrderSubmissionFormProps) {
             formData.append("amountCents", amountCents.toString());
             formData.append("token", token);
             formData.append("type", orderType);
+
+            // Kreditor-ID mitsenden wenn aus Dropdown gewählt
+            if (selectedCreditorId && selectedCreditorId !== "__other__") {
+                formData.append("creditorId", selectedCreditorId);
+            }
+            // Kostenart mitsenden wenn gewählt
+            if (selectedCostCategoryId) {
+                formData.append("costCategoryId", selectedCostCategoryId);
+            }
 
             const response = await fetch("/api/company/orders", {
                 method: "POST",
@@ -168,19 +215,43 @@ export function OrderSubmissionForm({ token }: OrderSubmissionFormProps) {
                         <label htmlFor="creditor" className="block text-sm font-medium text-gray-700 mb-1">
                             Gläubiger / Lieferant
                         </label>
-                        <div className="relative rounded-md shadow-sm">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <FileText className="h-5 w-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                        {hasCreditors && (
+                            <select
+                                value={selectedCreditorId}
+                                onChange={(e) => handleCreditorSelect(e.target.value)}
+                                className={`block w-full sm:text-sm border-gray-300 rounded-lg py-3 pl-3 pr-10 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow ${!creditorLocked ? "mb-2" : ""}`}
+                            >
+                                <option value="">— Gläubiger wählen —</option>
+                                {creditors.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}{c.shortName ? ` (${c.shortName})` : ""}
+                                    </option>
+                                ))}
+                                <option value="__other__">Anderer Gläubiger...</option>
+                            </select>
+                        )}
+                        {/* Freitext-Feld nur wenn kein Kreditor aus Dropdown gewählt (oder kein Dropdown vorhanden) */}
+                        {!creditorLocked && (
+                            <div className="relative rounded-md shadow-sm">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <FileText className="h-5 w-5 text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                                </div>
+                                <input
+                                    id="creditor"
+                                    name="creditor"
+                                    type="text"
+                                    required
+                                    value={creditorName}
+                                    onChange={(e) => setCreditorName(e.target.value)}
+                                    className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-lg py-3 transition-shadow"
+                                    placeholder="Firmenname"
+                                />
                             </div>
-                            <input
-                                id="creditor"
-                                name="creditor"
-                                type="text"
-                                required
-                                className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-10 sm:text-sm border-gray-300 rounded-lg py-3 transition-shadow"
-                                placeholder="Firmenname"
-                            />
-                        </div>
+                        )}
+                        {/* Hidden input damit FormData den Kreditor-Namen auch bei Dropdown-Auswahl hat */}
+                        {creditorLocked && (
+                            <input type="hidden" name="creditor" value={creditorName} />
+                        )}
                     </div>
 
                     <div className="relative group">
@@ -196,6 +267,27 @@ export function OrderSubmissionForm({ token }: OrderSubmissionFormProps) {
                             placeholder={isBestellung ? "Was soll bestellt werden, für welchen Zweck..." : "Rechnungsnummer, Leistungszeitraum..."}
                         />
                     </div>
+
+                    {hasCostCategories && (
+                        <div className="relative group">
+                            <label htmlFor="costCategory" className="block text-sm font-medium text-gray-700 mb-1">
+                                Kostenart <span className="text-gray-400 font-normal">(optional)</span>
+                            </label>
+                            <select
+                                id="costCategory"
+                                value={selectedCostCategoryId}
+                                onChange={(e) => setSelectedCostCategoryId(e.target.value)}
+                                className="block w-full sm:text-sm border-gray-300 rounded-lg py-3 pl-3 pr-10 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow"
+                            >
+                                <option value="">— Kostenart (optional) —</option>
+                                {costCategories.map((cc) => (
+                                    <option key={cc.id} value={cc.id}>
+                                        {cc.name}{cc.shortName ? ` (${cc.shortName})` : ""}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
                         <div className="relative group">

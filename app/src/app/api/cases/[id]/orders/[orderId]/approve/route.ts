@@ -63,6 +63,17 @@ export async function POST(req: NextRequest, { params }: RouteProps) {
         // 2. Transaktion: Order updaten + LedgerEntry erstellen
         const result = await prisma.$transaction(async (tx) => {
             const typeLabel = order.type === "BESTELLUNG" ? "Bestellfreigabe" : "Zahlungsfreigabe";
+
+            // categoryTag aus CostCategory lesen
+            let categoryTag: string | null = null;
+            if (order.costCategoryId) {
+                const costCat = await tx.costCategory.findUnique({
+                    where: { id: order.costCategoryId },
+                    select: { categoryTag: true },
+                });
+                categoryTag = costCat?.categoryTag || null;
+            }
+
             const ledgerEntry = await tx.ledgerEntry.create({
                 data: {
                     caseId,
@@ -78,6 +89,7 @@ export async function POST(req: NextRequest, { params }: RouteProps) {
                     bookingReference: `ORDER-${order.id.slice(0, 8)}`,
                     note: `Freigegebene ${typeLabel}${approvedAmountCents !== null ? " (Betrag angepasst)" : ""}`,
                     createdBy: userId || "system",
+                    ...(categoryTag && { categoryTag }),
                 },
             });
 

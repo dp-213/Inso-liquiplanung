@@ -112,6 +112,16 @@ export async function POST(req: NextRequest) {
       const result = await prisma.$transaction(async (tx) => {
         const typeLabel = type === "BESTELLUNG" ? "Bestellfreigabe" : "Zahlungsfreigabe";
 
+        // categoryTag aus CostCategory lesen
+        let categoryTag: string | null = null;
+        if (costCategoryId) {
+          const costCat = await tx.costCategory.findUnique({
+            where: { id: costCategoryId },
+            select: { categoryTag: true },
+          });
+          categoryTag = costCat?.categoryTag || null;
+        }
+
         const ledgerEntry = await tx.ledgerEntry.create({
           data: {
             caseId: companyToken.caseId,
@@ -126,6 +136,7 @@ export async function POST(req: NextRequest) {
             bookingSource: "MANUAL",
             note: `Automatisch freigegebene ${typeLabel}`,
             createdBy: "system",
+            ...(categoryTag && { categoryTag }),
           },
         });
 

@@ -29,6 +29,20 @@ export default async function SubmitOrderPage({ params }: PageProps) {
         notFound();
     }
 
+    // Kreditoren + Kostenarten für Dropdowns laden
+    const [creditors, costCategories] = await Promise.all([
+        prisma.creditor.findMany({
+            where: { caseId: companyToken.caseId },
+            select: { id: true, name: true, shortName: true, defaultCostCategoryId: true },
+            orderBy: { name: "asc" },
+        }),
+        prisma.costCategory.findMany({
+            where: { caseId: companyToken.caseId, isActive: true },
+            select: { id: true, name: true, shortName: true },
+            orderBy: { name: "asc" },
+        }),
+    ]);
+
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col items-center py-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-md w-full space-y-8">
@@ -46,7 +60,11 @@ export default async function SubmitOrderPage({ params }: PageProps) {
                 </div>
 
                 <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10 border border-gray-100">
-                    <OrderSubmissionForm token={token} />
+                    <OrderSubmissionForm
+                        token={token}
+                        creditors={creditors}
+                        costCategories={costCategories}
+                    />
                 </div>
 
                 <div className="text-center text-xs text-gray-400">
