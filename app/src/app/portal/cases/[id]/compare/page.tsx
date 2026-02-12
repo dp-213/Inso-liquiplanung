@@ -55,7 +55,7 @@ export default function CompareViewPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const response = await fetch(`/api/customer/cases/${caseId}`);
+        const response = await fetch(`/api/customer/cases/${caseId}`, { credentials: "include" });
         if (!response.ok) {
           const errorData = await response.json();
           setError(errorData.error || "Fehler beim Laden der Daten");
@@ -84,12 +84,6 @@ export default function CompareViewPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     });
-  };
-
-  const getVarianceClass = (variance: number): string => {
-    if (variance > 10) return "text-green-600 bg-green-50";
-    if (variance < -10) return "text-red-600 bg-red-50";
-    return "text-[var(--secondary)] bg-gray-50";
   };
 
   if (loading) {
@@ -125,38 +119,6 @@ export default function CompareViewPage() {
       </div>
     );
   }
-
-  // For demo purposes, create simulated IST data with some variance
-  const simulateIstData = () => {
-    return data.calculation.weeks.map((week, idx) => {
-      // Add some random variance for demo (in real app, this would come from actual IST data)
-      const varianceFactor = 0.85 + Math.random() * 0.3; // 85% to 115% of plan
-      const planInflows = BigInt(week.totalInflowsCents);
-      const planOutflows = BigInt(week.totalOutflowsCents);
-      const istInflows = BigInt(Math.floor(Number(planInflows) * varianceFactor));
-      const istOutflows = BigInt(Math.floor(Number(planOutflows) * (0.9 + Math.random() * 0.2)));
-
-      return {
-        label: week.weekLabel,
-        plan: {
-          inflows: planInflows,
-          outflows: planOutflows,
-          net: planInflows - planOutflows,
-        },
-        ist: {
-          inflows: istInflows,
-          outflows: istOutflows,
-          net: istInflows - istOutflows,
-        },
-        variance: {
-          inflows: Number(istInflows - planInflows) / Number(planInflows) * 100 || 0,
-          outflows: Number(istOutflows - planOutflows) / Number(planOutflows) * 100 || 0,
-        },
-      };
-    });
-  };
-
-  const comparisonData = simulateIstData();
 
   return (
     <div className="space-y-6">
@@ -221,90 +183,21 @@ export default function CompareViewPage() {
 
       {compareMode === "ist_plan" ? (
         <>
-          {/* IST vs PLAN Comparison */}
-          <div className="admin-card p-6">
-            <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
+          {/* IST vs PLAN – In Vorbereitung */}
+          <div className="admin-card p-8 text-center">
+            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">
               IST vs PLAN Vergleich
             </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--border)]">
-                    <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Periode</th>
-                    <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">PLAN Einnahmen</th>
-                    <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">IST Einnahmen</th>
-                    <th className="text-center py-3 px-4 font-medium text-[var(--secondary)]">Abw. %</th>
-                    <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">PLAN Ausgaben</th>
-                    <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">IST Ausgaben</th>
-                    <th className="text-center py-3 px-4 font-medium text-[var(--secondary)]">Abw. %</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparisonData.slice(0, 5).map((row, idx) => (
-                    <tr key={idx} className="border-b border-[var(--border)] hover:bg-gray-50">
-                      <td className="py-3 px-4 font-medium text-[var(--foreground)]">{row.label}</td>
-                      <td className="py-3 px-4 text-right text-[var(--secondary)]">
-                        {formatCurrency(row.plan.inflows)}
-                      </td>
-                      <td className="py-3 px-4 text-right text-[var(--foreground)]">
-                        {formatCurrency(row.ist.inflows)}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${getVarianceClass(row.variance.inflows)}`}>
-                          {row.variance.inflows >= 0 ? "+" : ""}{row.variance.inflows.toFixed(1)}%
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right text-[var(--secondary)]">
-                        -{formatCurrency(row.plan.outflows)}
-                      </td>
-                      <td className="py-3 px-4 text-right text-[var(--foreground)]">
-                        -{formatCurrency(row.ist.outflows)}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${getVarianceClass(-row.variance.outflows)}`}>
-                          {row.variance.outflows >= 0 ? "+" : ""}{row.variance.outflows.toFixed(1)}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Variance Legend */}
-          <div className="admin-card p-4">
-            <h3 className="text-sm font-medium text-[var(--foreground)] mb-2">Legende Abweichungen</h3>
-            <div className="flex flex-wrap gap-4 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-1 rounded bg-green-50 text-green-600">&gt; +10%</span>
-                <span className="text-[var(--secondary)]">Übererfüllung</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-1 rounded bg-gray-50 text-[var(--secondary)]">-10% bis +10%</span>
-                <span className="text-[var(--secondary)]">Im Rahmen</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-1 rounded bg-red-50 text-red-600">&lt; -10%</span>
-                <span className="text-[var(--secondary)]">Untererfüllung</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Info Note */}
-          <div className="admin-card p-4 bg-blue-50 border-blue-200">
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div>
-                <h3 className="text-sm font-medium text-blue-800">Hinweis</h3>
-                <p className="text-sm text-blue-700 mt-1">
-                  Die IST-Daten in dieser Demo sind simuliert. In der produktiven Umgebung werden
-                  tatsächliche Ist-Werte aus dem Buchhaltungssystem oder manuellen Eingaben importiert.
-                </p>
-              </div>
-            </div>
+            <p className="text-sm text-[var(--secondary)] max-w-md mx-auto">
+              Der SOLL/IST-Abgleich für Ihr Verfahren wird vorbereitet.
+              Sobald ausreichend verifizierte IST-Daten vorliegen, wird hier die
+              Abweichungsanalyse angezeigt.
+            </p>
           </div>
         </>
       ) : (

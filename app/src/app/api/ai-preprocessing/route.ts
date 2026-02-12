@@ -503,7 +503,7 @@ export async function POST(request: NextRequest) {
     if (invalidFiles.length > 0) {
       return NextResponse.json(
         {
-          error: `Nicht unterstuetzte Dateitypen: ${invalidFiles.join(", ")}. Erlaubt sind CSV, Excel und PDF.`,
+          error: `Nicht unterstützte Dateitypen: ${invalidFiles.join(", ")}. Erlaubt sind CSV, Excel und PDF.`,
         },
         { status: 400 }
       );
@@ -1160,14 +1160,14 @@ ${descColumn ? `Beschreibungs-Spalte: ${descColumn}` : ''}
 8. EINMALIGE_SONDERABFLUESSE - Einmalige Sonderzahlungen
 
 === SEMANTISCHE ERKENNUNGSREGELN (WICHTIG!) ===
-Diese Begriffe im Text MUESSEN zu folgenden Kategorien fuehren:
+Diese Begriffe im Text MÜSSEN zu folgenden Kategorien führen:
 - "Umsatz", "Erloese", "Einnahmen" → NEUFORDERUNGEN oder SONSTIGE_ERLOESE (Einzahlung)
 - "Personal", "Gehalt", "Lohn", "Abfindung" → PERSONALKOSTEN (Auszahlung)
 - "Miete", "Leasing", "Pacht" → MIETE_LEASING (Auszahlung)
 - "Lieferant", "Material", "Ware" → LIEFERANTEN (Auszahlung)
 - "Steuer", "Sozialversicherung", "Finanzamt" → SOZIALABGABEN_STEUERN (Auszahlung)
 - "Versicherung", "Strom", "Telefon" → SONSTIGE_LAUFENDE_KOSTEN (Auszahlung)
-- Bei Kontoauszuegen: Positiv = Einzahlung, Negativ = Auszahlung
+- Bei Kontoauszügen: Positiv = Einzahlung, Negativ = Auszahlung
 
 === DATEN (Zeilen ${i + 1} bis ${i + batch.length}) ===
 ${batch.map((row, idx) => `Zeile ${i + idx + 1}: ${JSON.stringify(row)}`).join("\n")}

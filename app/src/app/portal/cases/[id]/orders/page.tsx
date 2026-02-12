@@ -70,23 +70,23 @@ export default async function PortalOrdersPage({ params }: PageProps) {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center text-sm text-gray-500 mb-4">
-                <Link href="/portal" className="hover:text-indigo-600">Meine Fälle</Link>
+            <div className="flex items-center text-sm text-[var(--muted)] mb-4">
+                <Link href="/portal" className="hover:text-[var(--primary)]">Meine Fälle</Link>
                 <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                <Link href={`/portal/cases/${caseId}`} className="hover:text-indigo-600">{caseData.debtorName}</Link>
+                <Link href={`/portal/cases/${caseId}`} className="hover:text-[var(--primary)]">{caseData.debtorName}</Link>
                 <svg className="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                <span className="text-gray-900">Freigaben</span>
+                <span className="text-[var(--foreground)]">Freigaben</span>
             </div>
 
             <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-gray-900">Bestell- & Zahlfreigaben</h1>
+                <h1 className="text-2xl font-bold text-[var(--foreground)]">Bestell- & Zahlfreigaben</h1>
             </div>
 
             <CompanyTokenManager caseId={caseId} />
 
-            <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-100">
-                <div className="px-4 py-5 sm:px-6 border-b border-gray-200 bg-white">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 flex items-center">
+            <div className="admin-card overflow-hidden">
+                <div className="px-4 py-5 sm:px-6 border-b border-[var(--border)]">
+                    <h3 className="text-lg leading-6 font-medium text-[var(--foreground)] flex items-center">
                         <span className="bg-amber-100 text-amber-800 py-0.5 px-2.5 rounded-full text-xs font-medium mr-2">{pendingOrders.length}</span>
                         Offene Anfragen
                     </h3>
@@ -97,9 +97,9 @@ export default async function PortalOrdersPage({ params }: PageProps) {
             </div>
 
             {historyOrders.length > 0 && (
-                <div className="bg-white shadow rounded-lg overflow-hidden opacity-90 border border-gray-100">
-                    <div className="px-4 py-5 sm:px-6 border-b border-gray-200 bg-gray-50">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">
+                <div className="admin-card overflow-hidden opacity-90">
+                    <div className="px-4 py-5 sm:px-6 border-b border-[var(--border)] bg-[var(--accent)]">
+                        <h3 className="text-lg leading-6 font-medium text-[var(--foreground)]">
                             Historie ({historyOrders.length})
                         </h3>
                     </div>

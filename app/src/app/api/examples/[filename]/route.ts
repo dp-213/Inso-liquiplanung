@@ -19,11 +19,11 @@ import * as XLSX from "xlsx";
 
 // Minimal example - only required fields
 const MINIMAL_DATA = [
-  { Datum: "15.01.2026", Betrag: "5.000,00", Bezeichnung: "Umsatzerloese Januar" },
+  { Datum: "15.01.2026", Betrag: "5.000,00", Bezeichnung: "Umsatzerlöse Januar" },
   { Datum: "22.01.2026", Betrag: "-1.500,00", Bezeichnung: "Lohnzahlung KW4" },
   { Datum: "29.01.2026", Betrag: "-800,00", Bezeichnung: "Miete Februar" },
   { Datum: "05.02.2026", Betrag: "3.200,00", Bezeichnung: "Kundenzahlung Meier" },
-  { Datum: "12.02.2026", Betrag: "-450,00", Bezeichnung: "Versicherungsbeitraege" },
+  { Datum: "12.02.2026", Betrag: "-450,00", Bezeichnung: "Versicherungsbeiträge" },
   { Datum: "19.02.2026", Betrag: "-2.100,00", Bezeichnung: "Lieferantenrechnung Schmidt" },
   { Datum: "26.02.2026", Betrag: "1.800,00", Bezeichnung: "Teilzahlung Projekt A" },
   { Datum: "05.03.2026", Betrag: "-950,00", Bezeichnung: "Energiekosten" },
@@ -33,45 +33,45 @@ const MINIMAL_DATA = [
 
 // Standard structure - required fields plus common optional fields
 const STANDARD_DATA = [
-  { Datum: "15.01.2026", Betrag: "5.000,00", Bezeichnung: "Umsatzerloese Januar", Kategorie: "Umsatzerloese", Konto: "DE89370400440532013000", Gegenpartei: "Diverse Kunden", Referenz: "RE-2026-001", Kommentar: "Sammelzahlung" },
-  { Datum: "22.01.2026", Betrag: "-1.500,00", Bezeichnung: "Lohnzahlung KW4", Kategorie: "Loehne und Gehaelter", Konto: "DE89370400440532013000", Gegenpartei: "Mitarbeiter", Referenz: "LN-2026-004", Kommentar: "4 Mitarbeiter" },
-  { Datum: "29.01.2026", Betrag: "-800,00", Bezeichnung: "Miete Februar", Kategorie: "Raumkosten", Konto: "DE89370400440532013000", Gegenpartei: "Immobilien GmbH", Referenz: "MI-2026-02", Kommentar: "Bueromiete" },
-  { Datum: "05.02.2026", Betrag: "3.200,00", Bezeichnung: "Kundenzahlung Meier", Kategorie: "Umsatzerloese", Konto: "DE89370400440532013000", Gegenpartei: "Meier AG", Referenz: "RE-2025-089", Kommentar: "Restzahlung" },
-  { Datum: "12.02.2026", Betrag: "-450,00", Bezeichnung: "Versicherungsbeitraege", Kategorie: "Versicherungen", Konto: "DE89370400440532013000", Gegenpartei: "Allianz", Referenz: "VS-2026-Q1", Kommentar: "Quartalsbeitrag" },
+  { Datum: "15.01.2026", Betrag: "5.000,00", Bezeichnung: "Umsatzerlöse Januar", Kategorie: "Umsatzerlöse", Konto: "DE89370400440532013000", Gegenpartei: "Diverse Kunden", Referenz: "RE-2026-001", Kommentar: "Sammelzahlung" },
+  { Datum: "22.01.2026", Betrag: "-1.500,00", Bezeichnung: "Lohnzahlung KW4", Kategorie: "Löhne und Gehälter", Konto: "DE89370400440532013000", Gegenpartei: "Mitarbeiter", Referenz: "LN-2026-004", Kommentar: "4 Mitarbeiter" },
+  { Datum: "29.01.2026", Betrag: "-800,00", Bezeichnung: "Miete Februar", Kategorie: "Raumkosten", Konto: "DE89370400440532013000", Gegenpartei: "Immobilien GmbH", Referenz: "MI-2026-02", Kommentar: "Büromiete" },
+  { Datum: "05.02.2026", Betrag: "3.200,00", Bezeichnung: "Kundenzahlung Meier", Kategorie: "Umsatzerlöse", Konto: "DE89370400440532013000", Gegenpartei: "Meier AG", Referenz: "RE-2025-089", Kommentar: "Restzahlung" },
+  { Datum: "12.02.2026", Betrag: "-450,00", Bezeichnung: "Versicherungsbeiträge", Kategorie: "Versicherungen", Konto: "DE89370400440532013000", Gegenpartei: "Allianz", Referenz: "VS-2026-Q1", Kommentar: "Quartalsbeitrag" },
   { Datum: "19.02.2026", Betrag: "-2.100,00", Bezeichnung: "Lieferantenrechnung Schmidt", Kategorie: "Wareneinkauf", Konto: "DE89370400440532013000", Gegenpartei: "Schmidt GmbH", Referenz: "LI-2026-023", Kommentar: "Materiallieferung" },
-  { Datum: "26.02.2026", Betrag: "1.800,00", Bezeichnung: "Teilzahlung Projekt A", Kategorie: "Umsatzerloese", Konto: "DE89370400440532013000", Gegenpartei: "Projekt A GmbH", Referenz: "PR-A-003", Kommentar: "2. Rate" },
+  { Datum: "26.02.2026", Betrag: "1.800,00", Bezeichnung: "Teilzahlung Projekt A", Kategorie: "Umsatzerlöse", Konto: "DE89370400440532013000", Gegenpartei: "Projekt A GmbH", Referenz: "PR-A-003", Kommentar: "2. Rate" },
   { Datum: "05.03.2026", Betrag: "-950,00", Bezeichnung: "Energiekosten", Kategorie: "Betriebskosten", Konto: "DE89370400440532013000", Gegenpartei: "Stadtwerke", Referenz: "EN-2026-03", Kommentar: "Strom + Gas" },
-  { Datum: "12.03.2026", Betrag: "4.500,00", Bezeichnung: "Schlusszahlung Mueller", Kategorie: "Umsatzerloese", Konto: "DE89370400440532013000", Gegenpartei: "Mueller KG", Referenz: "RE-2025-102", Kommentar: "Projektabschluss" },
-  { Datum: "19.03.2026", Betrag: "-1.200,00", Bezeichnung: "Lohnzahlung KW12", Kategorie: "Loehne und Gehaelter", Konto: "DE89370400440532013000", Gegenpartei: "Mitarbeiter", Referenz: "LN-2026-012", Kommentar: "4 Mitarbeiter" },
+  { Datum: "12.03.2026", Betrag: "4.500,00", Bezeichnung: "Schlusszahlung Mueller", Kategorie: "Umsatzerlöse", Konto: "DE89370400440532013000", Gegenpartei: "Mueller KG", Referenz: "RE-2025-102", Kommentar: "Projektabschluss" },
+  { Datum: "19.03.2026", Betrag: "-1.200,00", Bezeichnung: "Lohnzahlung KW12", Kategorie: "Löhne und Gehälter", Konto: "DE89370400440532013000", Gegenpartei: "Mitarbeiter", Referenz: "LN-2026-012", Kommentar: "4 Mitarbeiter" },
 ];
 
 // Extended structure - includes additional custom columns (demonstrating extensibility)
 // CRITICAL: These extra columns should NOT cause import errors - they are preserved as metadata
 const EXTENDED_DATA = [
-  { Datum: "15.01.2026", Betrag: "5.000,00", Bezeichnung: "Umsatzerloese Januar", Kategorie: "Umsatzerloese", Konto: "DE89370400440532013000", Gegenpartei: "Diverse Kunden", Referenz: "RE-2026-001", Kommentar: "Sammelzahlung", Alt_Neu: "Neu", Quelle: "Buchhaltung", Unsicherheit: "Nein", Zahlungsart: "Ueberweisung", Kostenstelle: "100", Projekt: "PRJ-001", Buchungskreis: "BK01", Sachbearbeiter: "Mueller" },
-  { Datum: "22.01.2026", Betrag: "-1.500,00", Bezeichnung: "Lohnzahlung KW4", Kategorie: "Loehne und Gehaelter", Konto: "DE89370400440532013000", Gegenpartei: "Mitarbeiter", Referenz: "LN-2026-004", Kommentar: "4 Mitarbeiter", Alt_Neu: "Neu", Quelle: "HR", Unsicherheit: "Nein", Zahlungsart: "Ueberweisung", Kostenstelle: "200", Projekt: "ALLG", Buchungskreis: "BK01", Sachbearbeiter: "Schmidt" },
-  { Datum: "29.01.2026", Betrag: "-800,00", Bezeichnung: "Miete Februar", Kategorie: "Raumkosten", Konto: "DE89370400440532013000", Gegenpartei: "Immobilien GmbH", Referenz: "MI-2026-02", Kommentar: "Bueromiete", Alt_Neu: "Alt", Quelle: "Buchhaltung", Unsicherheit: "Nein", Zahlungsart: "Lastschrift", Kostenstelle: "300", Projekt: "ALLG", Buchungskreis: "BK01", Sachbearbeiter: "Mueller" },
-  { Datum: "05.02.2026", Betrag: "3.200,00", Bezeichnung: "Kundenzahlung Meier", Kategorie: "Umsatzerloese", Konto: "DE89370400440532013000", Gegenpartei: "Meier AG", Referenz: "RE-2025-089", Kommentar: "Restzahlung", Alt_Neu: "Alt", Quelle: "Mahnwesen", Unsicherheit: "Nein", Zahlungsart: "Ueberweisung", Kostenstelle: "100", Projekt: "PRJ-002", Buchungskreis: "BK01", Sachbearbeiter: "Weber" },
-  { Datum: "12.02.2026", Betrag: "-450,00", Bezeichnung: "Versicherungsbeitraege", Kategorie: "Versicherungen", Konto: "DE89370400440532013000", Gegenpartei: "Allianz", Referenz: "VS-2026-Q1", Kommentar: "Quartalsbeitrag", Alt_Neu: "Neu", Quelle: "Buchhaltung", Unsicherheit: "Nein", Zahlungsart: "Lastschrift", Kostenstelle: "400", Projekt: "ALLG", Buchungskreis: "BK01", Sachbearbeiter: "Mueller" },
-  { Datum: "19.02.2026", Betrag: "-2.100,00", Bezeichnung: "Lieferantenrechnung Schmidt", Kategorie: "Wareneinkauf", Konto: "DE89370400440532013000", Gegenpartei: "Schmidt GmbH", Referenz: "LI-2026-023", Kommentar: "Materiallieferung", Alt_Neu: "Neu", Quelle: "Einkauf", Unsicherheit: "Ja", Zahlungsart: "Ueberweisung", Kostenstelle: "500", Projekt: "PRJ-001", Buchungskreis: "BK01", Sachbearbeiter: "Fischer" },
-  { Datum: "26.02.2026", Betrag: "1.800,00", Bezeichnung: "Teilzahlung Projekt A", Kategorie: "Umsatzerloese", Konto: "DE89370400440532013000", Gegenpartei: "Projekt A GmbH", Referenz: "PR-A-003", Kommentar: "2. Rate", Alt_Neu: "Neu", Quelle: "Vertrieb", Unsicherheit: "Nein", Zahlungsart: "Ueberweisung", Kostenstelle: "100", Projekt: "PRJ-003", Buchungskreis: "BK01", Sachbearbeiter: "Weber" },
+  { Datum: "15.01.2026", Betrag: "5.000,00", Bezeichnung: "Umsatzerlöse Januar", Kategorie: "Umsatzerlöse", Konto: "DE89370400440532013000", Gegenpartei: "Diverse Kunden", Referenz: "RE-2026-001", Kommentar: "Sammelzahlung", Alt_Neu: "Neu", Quelle: "Buchhaltung", Unsicherheit: "Nein", Zahlungsart: "Überweisung", Kostenstelle: "100", Projekt: "PRJ-001", Buchungskreis: "BK01", Sachbearbeiter: "Mueller" },
+  { Datum: "22.01.2026", Betrag: "-1.500,00", Bezeichnung: "Lohnzahlung KW4", Kategorie: "Löhne und Gehälter", Konto: "DE89370400440532013000", Gegenpartei: "Mitarbeiter", Referenz: "LN-2026-004", Kommentar: "4 Mitarbeiter", Alt_Neu: "Neu", Quelle: "HR", Unsicherheit: "Nein", Zahlungsart: "Überweisung", Kostenstelle: "200", Projekt: "ALLG", Buchungskreis: "BK01", Sachbearbeiter: "Schmidt" },
+  { Datum: "29.01.2026", Betrag: "-800,00", Bezeichnung: "Miete Februar", Kategorie: "Raumkosten", Konto: "DE89370400440532013000", Gegenpartei: "Immobilien GmbH", Referenz: "MI-2026-02", Kommentar: "Büromiete", Alt_Neu: "Alt", Quelle: "Buchhaltung", Unsicherheit: "Nein", Zahlungsart: "Lastschrift", Kostenstelle: "300", Projekt: "ALLG", Buchungskreis: "BK01", Sachbearbeiter: "Mueller" },
+  { Datum: "05.02.2026", Betrag: "3.200,00", Bezeichnung: "Kundenzahlung Meier", Kategorie: "Umsatzerlöse", Konto: "DE89370400440532013000", Gegenpartei: "Meier AG", Referenz: "RE-2025-089", Kommentar: "Restzahlung", Alt_Neu: "Alt", Quelle: "Mahnwesen", Unsicherheit: "Nein", Zahlungsart: "Überweisung", Kostenstelle: "100", Projekt: "PRJ-002", Buchungskreis: "BK01", Sachbearbeiter: "Weber" },
+  { Datum: "12.02.2026", Betrag: "-450,00", Bezeichnung: "Versicherungsbeiträge", Kategorie: "Versicherungen", Konto: "DE89370400440532013000", Gegenpartei: "Allianz", Referenz: "VS-2026-Q1", Kommentar: "Quartalsbeitrag", Alt_Neu: "Neu", Quelle: "Buchhaltung", Unsicherheit: "Nein", Zahlungsart: "Lastschrift", Kostenstelle: "400", Projekt: "ALLG", Buchungskreis: "BK01", Sachbearbeiter: "Mueller" },
+  { Datum: "19.02.2026", Betrag: "-2.100,00", Bezeichnung: "Lieferantenrechnung Schmidt", Kategorie: "Wareneinkauf", Konto: "DE89370400440532013000", Gegenpartei: "Schmidt GmbH", Referenz: "LI-2026-023", Kommentar: "Materiallieferung", Alt_Neu: "Neu", Quelle: "Einkauf", Unsicherheit: "Ja", Zahlungsart: "Überweisung", Kostenstelle: "500", Projekt: "PRJ-001", Buchungskreis: "BK01", Sachbearbeiter: "Fischer" },
+  { Datum: "26.02.2026", Betrag: "1.800,00", Bezeichnung: "Teilzahlung Projekt A", Kategorie: "Umsatzerlöse", Konto: "DE89370400440532013000", Gegenpartei: "Projekt A GmbH", Referenz: "PR-A-003", Kommentar: "2. Rate", Alt_Neu: "Neu", Quelle: "Vertrieb", Unsicherheit: "Nein", Zahlungsart: "Überweisung", Kostenstelle: "100", Projekt: "PRJ-003", Buchungskreis: "BK01", Sachbearbeiter: "Weber" },
   { Datum: "05.03.2026", Betrag: "-950,00", Bezeichnung: "Energiekosten", Kategorie: "Betriebskosten", Konto: "DE89370400440532013000", Gegenpartei: "Stadtwerke", Referenz: "EN-2026-03", Kommentar: "Strom + Gas", Alt_Neu: "Neu", Quelle: "Buchhaltung", Unsicherheit: "Ja", Zahlungsart: "Lastschrift", Kostenstelle: "300", Projekt: "ALLG", Buchungskreis: "BK01", Sachbearbeiter: "Mueller" },
-  { Datum: "12.03.2026", Betrag: "4.500,00", Bezeichnung: "Schlusszahlung Mueller", Kategorie: "Umsatzerloese", Konto: "DE89370400440532013000", Gegenpartei: "Mueller KG", Referenz: "RE-2025-102", Kommentar: "Projektabschluss", Alt_Neu: "Alt", Quelle: "Vertrieb", Unsicherheit: "Nein", Zahlungsart: "Ueberweisung", Kostenstelle: "100", Projekt: "PRJ-002", Buchungskreis: "BK01", Sachbearbeiter: "Weber" },
-  { Datum: "19.03.2026", Betrag: "-1.200,00", Bezeichnung: "Lohnzahlung KW12", Kategorie: "Loehne und Gehaelter", Konto: "DE89370400440532013000", Gegenpartei: "Mitarbeiter", Referenz: "LN-2026-012", Kommentar: "4 Mitarbeiter", Alt_Neu: "Neu", Quelle: "HR", Unsicherheit: "Nein", Zahlungsart: "Ueberweisung", Kostenstelle: "200", Projekt: "ALLG", Buchungskreis: "BK01", Sachbearbeiter: "Schmidt" },
+  { Datum: "12.03.2026", Betrag: "4.500,00", Bezeichnung: "Schlusszahlung Mueller", Kategorie: "Umsatzerlöse", Konto: "DE89370400440532013000", Gegenpartei: "Mueller KG", Referenz: "RE-2025-102", Kommentar: "Projektabschluss", Alt_Neu: "Alt", Quelle: "Vertrieb", Unsicherheit: "Nein", Zahlungsart: "Überweisung", Kostenstelle: "100", Projekt: "PRJ-002", Buchungskreis: "BK01", Sachbearbeiter: "Weber" },
+  { Datum: "19.03.2026", Betrag: "-1.200,00", Bezeichnung: "Lohnzahlung KW12", Kategorie: "Löhne und Gehälter", Konto: "DE89370400440532013000", Gegenpartei: "Mitarbeiter", Referenz: "LN-2026-012", Kommentar: "4 Mitarbeiter", Alt_Neu: "Neu", Quelle: "HR", Unsicherheit: "Nein", Zahlungsart: "Überweisung", Kostenstelle: "200", Projekt: "ALLG", Buchungskreis: "BK01", Sachbearbeiter: "Schmidt" },
 ];
 
 // Split amount format - separate columns for Einzahlung and Auszahlung
 const SPLIT_AMOUNT_DATA = [
-  { Datum: "15.01.2026", Einzahlung: "5.000,00", Auszahlung: "", Bezeichnung: "Umsatzerloese Januar", Kategorie: "Umsatzerloese", Kommentar: "Sammelzahlung" },
-  { Datum: "22.01.2026", Einzahlung: "", Auszahlung: "1.500,00", Bezeichnung: "Lohnzahlung KW4", Kategorie: "Loehne und Gehaelter", Kommentar: "4 Mitarbeiter" },
-  { Datum: "29.01.2026", Einzahlung: "", Auszahlung: "800,00", Bezeichnung: "Miete Februar", Kategorie: "Raumkosten", Kommentar: "Bueromiete" },
-  { Datum: "05.02.2026", Einzahlung: "3.200,00", Auszahlung: "", Bezeichnung: "Kundenzahlung Meier", Kategorie: "Umsatzerloese", Kommentar: "Restzahlung" },
-  { Datum: "12.02.2026", Einzahlung: "", Auszahlung: "450,00", Bezeichnung: "Versicherungsbeitraege", Kategorie: "Versicherungen", Kommentar: "Quartalsbeitrag" },
+  { Datum: "15.01.2026", Einzahlung: "5.000,00", Auszahlung: "", Bezeichnung: "Umsatzerlöse Januar", Kategorie: "Umsatzerlöse", Kommentar: "Sammelzahlung" },
+  { Datum: "22.01.2026", Einzahlung: "", Auszahlung: "1.500,00", Bezeichnung: "Lohnzahlung KW4", Kategorie: "Löhne und Gehälter", Kommentar: "4 Mitarbeiter" },
+  { Datum: "29.01.2026", Einzahlung: "", Auszahlung: "800,00", Bezeichnung: "Miete Februar", Kategorie: "Raumkosten", Kommentar: "Büromiete" },
+  { Datum: "05.02.2026", Einzahlung: "3.200,00", Auszahlung: "", Bezeichnung: "Kundenzahlung Meier", Kategorie: "Umsatzerlöse", Kommentar: "Restzahlung" },
+  { Datum: "12.02.2026", Einzahlung: "", Auszahlung: "450,00", Bezeichnung: "Versicherungsbeiträge", Kategorie: "Versicherungen", Kommentar: "Quartalsbeitrag" },
   { Datum: "19.02.2026", Einzahlung: "", Auszahlung: "2.100,00", Bezeichnung: "Lieferantenrechnung Schmidt", Kategorie: "Wareneinkauf", Kommentar: "Materiallieferung" },
-  { Datum: "26.02.2026", Einzahlung: "1.800,00", Auszahlung: "", Bezeichnung: "Teilzahlung Projekt A", Kategorie: "Umsatzerloese", Kommentar: "2. Rate" },
+  { Datum: "26.02.2026", Einzahlung: "1.800,00", Auszahlung: "", Bezeichnung: "Teilzahlung Projekt A", Kategorie: "Umsatzerlöse", Kommentar: "2. Rate" },
   { Datum: "05.03.2026", Einzahlung: "", Auszahlung: "950,00", Bezeichnung: "Energiekosten", Kategorie: "Betriebskosten", Kommentar: "Strom + Gas" },
-  { Datum: "12.03.2026", Einzahlung: "4.500,00", Auszahlung: "", Bezeichnung: "Schlusszahlung Mueller", Kategorie: "Umsatzerloese", Kommentar: "Projektabschluss" },
-  { Datum: "19.03.2026", Einzahlung: "", Auszahlung: "1.200,00", Bezeichnung: "Lohnzahlung KW12", Kategorie: "Loehne und Gehaelter", Kommentar: "4 Mitarbeiter" },
+  { Datum: "12.03.2026", Einzahlung: "4.500,00", Auszahlung: "", Bezeichnung: "Schlusszahlung Mueller", Kategorie: "Umsatzerlöse", Kommentar: "Projektabschluss" },
+  { Datum: "19.03.2026", Einzahlung: "", Auszahlung: "1.200,00", Bezeichnung: "Lohnzahlung KW12", Kategorie: "Löhne und Gehälter", Kommentar: "4 Mitarbeiter" },
 ];
 
 // Bank statement format - uses alternative column names typically found in bank exports
@@ -288,7 +288,7 @@ export async function OPTIONS() {
         "Unsicherheit",
         "Werttyp",
       ],
-      extensibilityNote: "Zusaetzliche Spalten werden akzeptiert und als Metadaten gespeichert.",
+      extensibilityNote: "Zusätzliche Spalten werden akzeptiert und als Metadaten gespeichert.",
     },
   });
 }

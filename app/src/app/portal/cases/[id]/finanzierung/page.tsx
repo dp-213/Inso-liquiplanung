@@ -68,7 +68,6 @@ export default function FinanzierungPage({
 
         setData(result);
       } catch (err) {
-        console.error("Fehler:", err);
         setError(err instanceof Error ? err.message : "Fehler beim Laden");
       } finally {
         setLoading(false);

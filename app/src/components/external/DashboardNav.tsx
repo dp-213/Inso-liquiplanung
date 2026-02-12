@@ -13,6 +13,7 @@ const navItems = [
   { href: "/finanzierung", label: "Finanzierung", icon: "bank" },
   { href: "/security", label: "Sicherungsrechte", icon: "shield" },
   { href: "/estate", label: "Masseübersicht", icon: "folder" },
+  { href: "/orders", label: "Freigaben", icon: "clipboard" },
   { href: "/compare", label: "Vergleich", icon: "compare" },
   { href: "/berechnungsgrundlagen", label: "Methodik", icon: "document" },
 ];
@@ -64,6 +65,12 @@ export default function DashboardNav({ caseId }: DashboardNavProps) {
         return (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+          </svg>
+        );
+      case "clipboard":
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
           </svg>
         );
       case "document":

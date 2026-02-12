@@ -44,9 +44,9 @@ function createDetailedError(
     "SQLITE_BUSY": "Datenbank ist beschaeftigt. Bitte versuchen Sie es erneut",
     "relation": "Datenbankfehler: Tabelle oder Beziehung nicht gefunden",
     // File errors
-    "File corrupted": "Die Datei ist beschaedigt oder in einem ungueltigen Format",
-    "password protected": "Passwortgeschuetzte Excel-Dateien werden nicht unterstuetzt",
-    "encrypted": "Verschluesselte Dateien werden nicht unterstuetzt",
+    "File corrupted": "Die Datei ist beschädigt oder in einem ungültigen Format",
+    "password protected": "Passwortgeschützte Excel-Dateien werden nicht unterstützt",
+    "encrypted": "Verschlüsselte Dateien werden nicht unterstützt",
   };
 
   // Find matching user message
@@ -266,9 +266,9 @@ export async function POST(request: NextRequest) {
         if (errorMsg.includes("password")) {
           parseError = "Die Excel-Datei ist passwortgeschuetzt. Bitte entfernen Sie den Passwortschutz und versuchen Sie es erneut.";
         } else if (errorMsg.includes("encrypt")) {
-          parseError = "Die Excel-Datei ist verschluesselt. Bitte speichern Sie die Datei ohne Verschluesselung.";
+          parseError = "Die Excel-Datei ist verschlüsselt. Bitte speichern Sie die Datei ohne Verschlüsselung.";
         } else if (errorMsg.includes("CFB")) {
-          parseError = "Das Excel-Format wird nicht unterstuetzt. Bitte speichern Sie die Datei im XLSX-Format.";
+          parseError = "Das Excel-Format wird nicht unterstützt. Bitte speichern Sie die Datei im XLSX-Format.";
         } else {
           parseError = `Excel-Datei konnte nicht gelesen werden: ${errorMsg}`;
         }

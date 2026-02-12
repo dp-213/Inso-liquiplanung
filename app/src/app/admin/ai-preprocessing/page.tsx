@@ -124,7 +124,7 @@ export default function AiPreprocessingPage() {
 
     if (invalidFiles.length > 0) {
       setError(
-        `Nicht unterstuetzte Dateien: ${invalidFiles.join(", ")}. Unterstuetzt: CSV, Excel, PDF`
+        `Nicht unterstützte Dateien: ${invalidFiles.join(", ")}. Unterstützt: CSV, Excel, PDF`
       );
     } else {
       setError(null);
@@ -278,7 +278,7 @@ export default function AiPreprocessingPage() {
                 vor der Übernahme manuell geprüft und freigegeben werden.
               </p>
               <ul className="list-disc list-inside ml-2 text-sm">
-                <li>Die KI analysiert Dateien und schlaegt Strukturen vor</li>
+                <li>Die KI analysiert Dateien und schlägt Strukturen vor</li>
                 <li>Jeder Vorschlag zeigt Konfidenzwerte und Erklärungen</li>
                 <li>Sie können jeden Eintrag einzeln prüfen, korrigieren oder ablehnen</li>
                 <li>Keine automatische Übernahme - explizite Freigabe erforderlich</li>
@@ -310,9 +310,9 @@ export default function AiPreprocessingPage() {
             </h3>
             <p className="text-sm text-purple-700 mt-1">
               Ideal für heterogene, unstrukturierte Dateien von Insolvenzverwaltern:
-              gemischte Excel-Dateien, unvollstaendige Kontoauszuege, oder Dateien
+              gemischte Excel-Dateien, unvollständige Kontoauszüge, oder Dateien
               ohne klare Spaltenzuordnung. Die KI versucht, die Daten zu verstehen
-              und schlaegt eine Strukturierung vor.
+              und schlägt eine Strukturierung vor.
             </p>
             <div className="mt-4 p-3 bg-white border border-purple-200 rounded-md">
               <p className="text-sm text-purple-800">
@@ -434,7 +434,7 @@ export default function AiPreprocessingPage() {
                 </span>
               </div>
               <p className="text-xs text-[var(--muted)]">
-                Unterstuetzte Formate: CSV, Excel (XLSX, XLS), PDF
+                Unterstützte Formate: CSV, Excel (XLSX, XLS), PDF
               </p>
             </div>
           </div>

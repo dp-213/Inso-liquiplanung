@@ -148,7 +148,7 @@ export default function CaseIngestionPage({
     const ext = file.name.toLowerCase().slice(file.name.lastIndexOf("."));
 
     if (!validExtensions.includes(ext)) {
-      setError("Nur CSV und Excel-Dateien werden unterstuetzt");
+      setError("Nur CSV und Excel-Dateien werden unterstützt");
       return;
     }
 
@@ -394,7 +394,7 @@ export default function CaseIngestionPage({
                   </span>
                 </div>
                 <p className="text-xs text-[var(--muted)]">
-                  Unterstuetzte Formate: CSV, Excel (XLSX, XLS)
+                  Unterstützte Formate: CSV, Excel (XLSX, XLS)
                 </p>
               </div>
             )}

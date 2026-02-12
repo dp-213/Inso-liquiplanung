@@ -171,8 +171,8 @@ export default function CaseEditPage({
   };
 
   const handlePermanentDelete = async () => {
-    if (deleteInput !== "LOESCHEN") {
-      setError("Bitte geben Sie LOESCHEN ein, um zu bestätigen");
+    if (deleteInput !== "LÖSCHEN") {
+      setError("Bitte geben Sie LÖSCHEN ein, um zu bestätigen");
       return;
     }
 
@@ -549,20 +549,20 @@ export default function CaseEditPage({
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Geben Sie LOESCHEN ein, um zu bestätigen:
+                Geben Sie LÖSCHEN ein, um zu bestätigen:
               </label>
               <input
                 type="text"
                 value={deleteInput}
                 onChange={(e) => setDeleteInput(e.target.value)}
                 className="input-field"
-                placeholder="LOESCHEN"
+                placeholder="LÖSCHEN"
               />
             </div>
             <div className="flex gap-2">
               <button
                 onClick={handlePermanentDelete}
-                disabled={saving || deleteInput !== "LOESCHEN"}
+                disabled={saving || deleteInput !== "LÖSCHEN"}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg disabled:opacity-50"
               >
                 {saving ? "Löschen..." : "Permanent löschen"}

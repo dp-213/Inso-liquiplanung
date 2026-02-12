@@ -90,14 +90,14 @@ const REQUIRED_FIELDS = [
 
 // Optional standard fields
 const OPTIONAL_FIELDS = [
-  { name: "Kategorie", description: "Liquiditaetskategorie", example: "Miete" },
-  { name: "Zahlungsart", description: "Ueberweisung, Lastschrift, Bar", example: "Ueberweisung" },
+  { name: "Kategorie", description: "Liquiditätskategorie", example: "Miete" },
+  { name: "Zahlungsart", description: "Überweisung, Lastschrift, Bar", example: "Überweisung" },
   { name: "Alt_Neu / Massetyp", description: "Altmasse oder Neumasse", example: "Neumasse" },
   { name: "Konto", description: "Kontobezeichnung oder IBAN", example: "1200" },
-  { name: "Gegenpartei", description: "Geschaeftspartner", example: "Meier GmbH" },
+  { name: "Gegenpartei", description: "Geschäftspartner", example: "Meier GmbH" },
   { name: "Referenz", description: "Rechnungs- oder Belegnummer", example: "RE-2026-001" },
   { name: "Kommentar", description: "Freitext-Anmerkung", example: "Anzahlung" },
-  { name: "Unsicherheit", description: "Kennzeichen für geschaetzte Werte", example: "geschaetzt" },
+  { name: "Unsicherheit", description: "Kennzeichen für geschätzte Werte", example: "geschätzt" },
   { name: "Quelle", description: "Datenherkunft", example: "Kontoauszug" },
   { name: "Werttyp", description: "IST oder PLAN", example: "IST" },
 ];
@@ -139,13 +139,13 @@ export default function DataRequirementsPage() {
                   <svg className="w-4 h-4 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <strong>Zusaetzliche Spalten</strong> werden akzeptiert und gespeichert
+                  <strong>Zusätzliche Spalten</strong> werden akzeptiert und gespeichert
                 </li>
                 <li className="flex items-center">
                   <svg className="w-4 h-4 mr-2 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <strong>Keine Fehler</strong> durch unbekannte oder zusaetzliche Daten
+                  <strong>Keine Fehler</strong> durch unbekannte oder zusätzliche Daten
                 </li>
               </ul>
             </div>
@@ -240,7 +240,7 @@ export default function DataRequirementsPage() {
                     <svg className="w-4 h-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                     </svg>
-                    Kontoauszuege und Banktransaktionen
+                    Kontoauszüge und Banktransaktionen
                   </li>
                   <li className="flex items-start">
                     <svg className="w-4 h-4 text-green-600 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -329,7 +329,7 @@ export default function DataRequirementsPage() {
             </h2>
           </div>
           <p className="text-sm text-[var(--secondary)] mt-2">
-            Diese Felder müssen vorhanden sein. Der Import schlaegt nur fehl, wenn diese fehlen.
+            Diese Felder müssen vorhanden sein. Der Import schlägt nur fehl, wenn diese fehlen.
           </p>
         </div>
         <div className="p-6">
@@ -423,11 +423,11 @@ export default function DataRequirementsPage() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
             </svg>
             <h2 className="text-lg font-medium text-[var(--foreground)]">
-              Erweiterbarkeit: Zusaetzliche Spalten
+              Erweiterbarkeit: Zusätzliche Spalten
             </h2>
           </div>
           <p className="text-sm text-purple-700 mt-2">
-            <strong>Wichtig:</strong> Ihre Dateien können beliebige zusaetzliche Spalten enthalten!
+            <strong>Wichtig:</strong> Ihre Dateien können beliebige zusätzliche Spalten enthalten!
           </p>
         </div>
         <div className="p-6 space-y-4">
@@ -435,11 +435,11 @@ export default function DataRequirementsPage() {
             <div className="p-4 bg-white border border-purple-200 rounded-lg">
               <div className="font-medium text-purple-800 mb-2">Nie abgelehnt</div>
               <p className="text-sm text-purple-600">
-                Unbekannte Spalten fuehren niemals zu einem Fehler
+                Unbekannte Spalten führen niemals zu einem Fehler
               </p>
             </div>
             <div className="p-4 bg-white border border-purple-200 rounded-lg">
-              <div className="font-medium text-purple-800 mb-2">Vollstaendig gespeichert</div>
+              <div className="font-medium text-purple-800 mb-2">Vollständig gespeichert</div>
               <p className="text-sm text-purple-600">
                 Alle Daten werden als Metadaten erhalten
               </p>
@@ -469,7 +469,7 @@ export default function DataRequirementsPage() {
       <section className="admin-card">
         <div className="p-6 border-b border-[var(--border)]">
           <h2 className="text-lg font-medium text-[var(--foreground)]">
-            Unterstuetzte Dateiformate
+            Unterstützte Dateiformate
           </h2>
         </div>
         <div className="p-6 space-y-4">
@@ -504,7 +504,7 @@ export default function DataRequirementsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <div>
-                <p className="font-medium text-amber-800">Flexibilitaet:</p>
+                <p className="font-medium text-amber-800">Flexibilität:</p>
                 <ul className="text-sm text-amber-700 mt-1 list-disc list-inside space-y-1">
                   <li>Spaltenreihenfolge ist <strong>nicht</strong> wichtig</li>
                   <li>Spaltennamen werden <strong>nicht</strong> case-sensitiv erkannt</li>
@@ -525,7 +525,7 @@ export default function DataRequirementsPage() {
         </div>
         <div className="p-6 space-y-4">
           <p className="text-sm text-[var(--secondary)]">
-            Fehlermeldungen beziehen sich <strong>ausschliesslich</strong> auf fehlende Pflichtfelder:
+            Fehlermeldungen beziehen sich <strong>ausschließlich</strong> auf fehlende Pflichtfelder:
           </p>
 
           <div className="space-y-3">
@@ -549,7 +549,7 @@ export default function DataRequirementsPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span className="font-medium text-green-800">
-                Unbekannte oder zusaetzliche Spalten erzeugen niemals Fehler!
+                Unbekannte oder zusätzliche Spalten erzeugen niemals Fehler!
               </span>
             </div>
           </div>
@@ -565,7 +565,7 @@ export default function DataRequirementsPage() {
             </svg>
             <div>
               <h3 className="font-medium text-[var(--foreground)]">
-                Weitere Hilfe benoetigt?
+                Weitere Hilfe benötigt?
               </h3>
               <p className="text-sm text-[var(--secondary)] mt-1">
                 Laden Sie die Beispieldateien herunter und passen Sie Ihre Daten entsprechend an.

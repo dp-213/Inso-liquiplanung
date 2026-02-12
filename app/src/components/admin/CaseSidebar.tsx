@@ -110,7 +110,7 @@ export default function CaseSidebar({
   };
 
   return (
-    <aside className="w-56 shrink-0 bg-white border-r border-[var(--border)] overflow-y-auto h-[calc(100vh-3.5rem)]">
+    <aside className="w-56 shrink-0 bg-[var(--card)] border-r border-[var(--border)] overflow-y-auto h-[calc(100vh-3.5rem)]">
       {/* Case Header */}
       <div className="px-4 py-4 border-b border-[var(--border)]">
         <Link href={base} className="block group">
@@ -134,7 +134,7 @@ export default function CaseSidebar({
           className={`flex items-center px-3 py-2 rounded-md text-sm transition-colors ${
             pathname === base
               ? "bg-[var(--primary)]/10 text-[var(--primary)] font-medium border-l-2 border-[var(--primary)] -ml-px"
-              : "text-[var(--secondary)] hover:bg-gray-50 hover:text-[var(--foreground)]"
+              : "text-[var(--secondary)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
           }`}
         >
           Übersicht
@@ -158,7 +158,7 @@ export default function CaseSidebar({
                   className={`flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-colors ${
                     isActive(item.href)
                       ? "bg-[var(--primary)]/10 text-[var(--primary)] font-medium border-l-2 border-[var(--primary)] -ml-px"
-                      : "text-[var(--secondary)] hover:bg-gray-50 hover:text-[var(--foreground)]"
+                      : "text-[var(--secondary)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
                   }`}
                 >
                   <span className="truncate">{item.name}</span>
@@ -181,7 +181,7 @@ export default function CaseSidebar({
           className={`flex items-center px-3 py-1.5 rounded-md text-sm transition-colors ${
             isActive(`${base}/edit`)
               ? "bg-[var(--primary)]/10 text-[var(--primary)] font-medium"
-              : "text-[var(--secondary)] hover:bg-gray-50 hover:text-[var(--foreground)]"
+              : "text-[var(--secondary)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
           }`}
         >
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

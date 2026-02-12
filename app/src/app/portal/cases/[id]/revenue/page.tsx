@@ -89,7 +89,7 @@ export default function RevenueAnalysisPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const response = await fetch(`/api/customer/cases/${caseId}`);
+        const response = await fetch(`/api/customer/cases/${caseId}`, { credentials: "include" });
         if (!response.ok) {
           const errorData = await response.json();
           setError(errorData.error || "Fehler beim Laden der Daten");

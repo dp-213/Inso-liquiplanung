@@ -3,22 +3,25 @@ import prisma from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { getCustomerSession, checkCaseAccess } from '@/lib/customer-auth';
 import { aggregateRollingForecast } from '@/lib/ledger/aggregation';
+import { loadAndCalculateForecast } from '@/lib/forecast/load-and-calculate';
 
 /**
  * GET /api/cases/[id]/ledger/rolling-forecast
  *
- * Rolling Forecast: IST für Vergangenheit, PLAN für Zukunft
+ * Rolling Forecast: IST für Vergangenheit, FORECAST/PLAN für Zukunft
  *
  * Logic:
- * - Perioden vor heute: IST-Werte (echte Bankbuchungen)
- * - Perioden nach heute: PLAN-Werte (Prognose)
- * - Sobald IST-Daten für eine Periode existieren, ersetzen sie PLAN
+ * - Perioden mit IST-Daten: IST-Werte (echte Bankbuchungen)
+ * - Perioden ohne IST-Daten: FORECAST (aus Annahmen) oder PLAN (Legacy-Fallback)
+ * - Wenn ForecastScenario mit aktiven Annahmen existiert: FORECAST ersetzt PLAN
  *
  * Response: {
  *   openingBalanceCents: string;
  *   todayPeriodIndex: number;
  *   totalIstPeriods: number;
  *   totalPlanPeriods: number;
+ *   hasForecast: boolean;
+ *   forecastMeta: { scenarioName, assumptionCount, creditLineCents, reservesTotalCents } | null;
  *   periods: Array<{
  *     periodIndex: number;
  *     periodLabel: string;
@@ -29,7 +32,7 @@ import { aggregateRollingForecast } from '@/lib/ledger/aggregation';
  *     outflowsCents: string;
  *     netCashflowCents: string;
  *     closingBalanceCents: string;
- *     source: 'IST' | 'PLAN' | 'MIXED';
+ *     source: 'IST' | 'PLAN' | 'FORECAST' | 'MIXED';
  *     istCount: number;
  *     planCount: number;
  *     isPast: boolean;
@@ -80,17 +83,100 @@ export async function GET(
       );
     }
 
-    // Aggregate rolling forecast with filter option
+    // Aggregate rolling forecast with filter option (IST + PLAN wie bisher)
     const result = await aggregateRollingForecast(prisma, caseId, plan.id, {
       includeUnreviewed,
       scope,
-      excludeSteeringTags: ['INTERNE_UMBUCHUNG'],  // Umbuchungen ausblenden
+      excludeSteeringTags: ['INTERNE_UMBUCHUNG'],
     });
 
     // DESIGN RULE: Planning code must never use BankAccount opening balances
     // Liquiditätsplanung ist cashflow-basiert und startet immer bei 0 EUR.
-    // Reale Kontostände werden separat im Bankenspiegel angezeigt.
     result.openingBalanceCents = BigInt(0);
+
+    // ================================================================
+    // FORECAST-INTEGRATION: Für PLAN-Perioden Forecast-Daten einspeisen
+    // ================================================================
+
+    let hasForecast = false;
+    let forecastMeta: {
+      scenarioName: string;
+      assumptionCount: number;
+      creditLineCents: string;
+      reservesTotalCents: string;
+    } | null = null;
+
+    // Nur für GLOBAL-Scope: Forecast laden (Standort-Scopes nutzen weiterhin PLAN)
+    if (scope === 'GLOBAL') {
+      try {
+        const forecast = await loadAndCalculateForecast(caseId);
+
+        if (forecast) {
+          hasForecast = true;
+          forecastMeta = {
+            scenarioName: forecast.meta.scenarioName,
+            assumptionCount: forecast.meta.assumptionCount,
+            creditLineCents: forecast.meta.creditLineCents,
+            reservesTotalCents: forecast.meta.reservesTotalCents,
+          };
+
+          // Forecast-Perioden als Map: periodIndex → { cashIn, cashOut }
+          const forecastPeriodMap = new Map<number, { cashIn: bigint; cashOut: bigint }>();
+          for (const fp of forecast.result.periods) {
+            if (fp.dataSource === 'FORECAST') {
+              forecastPeriodMap.set(fp.periodIndex, {
+                cashIn: fp.cashInTotalCents,
+                cashOut: fp.cashOutTotalCents,  // Bereits negativ
+              });
+            }
+          }
+
+          // PLAN-Perioden durch FORECAST ersetzen
+          // Running balance muss neu berechnet werden ab dem ersten ersetzten Punkt
+          let needsRebalance = false;
+
+          for (const period of result.periods) {
+            // Nur PLAN-Perioden ersetzen (nicht IST oder MIXED)
+            if (period.source === 'PLAN' && forecastPeriodMap.has(period.periodIndex)) {
+              const fc = forecastPeriodMap.get(period.periodIndex)!;
+
+              period.inflowsCents = fc.cashIn;
+              period.outflowsCents = fc.cashOut;
+              period.planInflowsCents = BigInt(0);
+              period.planOutflowsCents = BigInt(0);
+              period.planCount = 0;
+              (period as Record<string, unknown>).source = 'FORECAST';
+
+              needsRebalance = true;
+            }
+          }
+
+          // Running balance neu berechnen wenn FORECAST-Daten eingesetzt wurden
+          if (needsRebalance) {
+            let runningBalance = result.openingBalanceCents;
+            for (const period of result.periods) {
+              period.openingBalanceCents = runningBalance;
+              period.netCashflowCents = period.inflowsCents + period.outflowsCents;
+              period.closingBalanceCents = period.openingBalanceCents + period.netCashflowCents;
+              runningBalance = period.closingBalanceCents;
+            }
+          }
+        }
+      } catch (err) {
+        // Forecast-Fehler sollten nicht die gesamte API blockieren
+        console.error('[Rolling Forecast] Forecast-Integration fehlgeschlagen:', err);
+      }
+    }
+
+    // Recount IST/PLAN/FORECAST totals
+    let totalIstPeriods = 0;
+    let totalPlanPeriods = 0;
+    let totalForecastPeriods = 0;
+    for (const p of result.periods) {
+      if (p.source === 'IST' || p.source === 'MIXED') totalIstPeriods++;
+      else if ((p as Record<string, unknown>).source === 'FORECAST') totalForecastPeriods++;
+      else totalPlanPeriods++;
+    }
 
     // Serialize BigInt values
     const serialized = {
@@ -99,10 +185,14 @@ export async function GET(
       calculatedAt: result.calculatedAt,
       openingBalanceCents: result.openingBalanceCents.toString(),
       todayPeriodIndex: result.todayPeriodIndex,
-      totalIstPeriods: result.totalIstPeriods,
-      totalPlanPeriods: result.totalPlanPeriods,
+      totalIstPeriods,
+      totalPlanPeriods,
+      totalForecastPeriods,
       periodType: plan.periodType,
       periodCount: plan.periodCount,
+      // Forecast info
+      hasForecast,
+      forecastMeta,
       // Filter info for UI
       includeUnreviewed: result.includeUnreviewed,
       unreviewedCount: result.unreviewedCount,

@@ -26,7 +26,7 @@ export default function PortalDashboard() {
   useEffect(() => {
     async function fetchCases() {
       try {
-        const response = await fetch("/api/customer/cases");
+        const response = await fetch("/api/customer/cases", { credentials: "include" });
         if (!response.ok) {
           throw new Error("Failed to fetch cases");
         }

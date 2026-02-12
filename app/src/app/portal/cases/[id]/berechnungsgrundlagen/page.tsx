@@ -12,20 +12,24 @@ export default function BerechnungsgrundlagenPage({
   const { id } = use(params);
 
   const [caseName, setCaseName] = useState<string>("");
+  const [openingDate, setOpeningDate] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchCaseData() {
       try {
-        const response = await fetch(`/api/cases/${id}`, {
+        const response = await fetch(`/api/customer/cases/${id}`, {
           credentials: "include",
         });
         if (response.ok) {
           const data = await response.json();
           setCaseName(data.debtorName || data.name || "");
+          if (data.insolvencyOpeningDate) {
+            setOpeningDate(new Date(data.insolvencyOpeningDate).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }));
+          }
         }
-      } catch (error) {
-        console.error("Fehler beim Laden der Falldaten:", error);
+      } catch {
+        // Fehler beim Laden werden durch fehlende Daten im UI sichtbar
       } finally {
         setLoading(false);
       }
@@ -184,7 +188,7 @@ export default function BerechnungsgrundlagenPage({
                 </p>
                 <ul className="space-y-1 text-[var(--muted)]">
                   <li>
-                    • Leistungen vor dem {new Date().toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
+                    • Leistungen vor dem {openingDate || "Eröffnungstag"}
                   </li>
                   <li>• Behandlung vor Insolvenzeröffnung</li>
                   <li>• Fließt in Insolvenzmasse (Quotenverteilung)</li>

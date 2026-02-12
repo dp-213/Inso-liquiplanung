@@ -20,8 +20,8 @@ export default function CustomerHeader({
     try {
       await fetch("/api/portal/auth/logout", { method: "POST" });
       router.push("/customer-login");
-    } catch (error) {
-      console.error("Logout failed:", error);
+    } catch {
+      // Logout-Fehler werden durch den Redirect behandelt
     }
   };
 

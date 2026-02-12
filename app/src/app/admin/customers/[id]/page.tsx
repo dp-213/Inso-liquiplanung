@@ -182,8 +182,8 @@ export default function CustomerDetailPage({
   };
 
   const handlePermanentDelete = async () => {
-    if (deleteInput !== "LOESCHEN") {
-      setError("Bitte geben Sie LOESCHEN ein, um zu bestätigen");
+    if (deleteInput !== "LÖSCHEN") {
+      setError("Bitte geben Sie LÖSCHEN ein, um zu bestätigen");
       return;
     }
 
@@ -317,20 +317,20 @@ export default function CustomerDetailPage({
             </div>
             <div className="mb-4">
               <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Geben Sie LOESCHEN ein, um zu bestätigen:
+                Geben Sie LÖSCHEN ein, um zu bestätigen:
               </label>
               <input
                 type="text"
                 value={deleteInput}
                 onChange={(e) => setDeleteInput(e.target.value)}
                 className="input-field"
-                placeholder="LOESCHEN"
+                placeholder="LÖSCHEN"
               />
             </div>
             <div className="flex gap-2">
               <button
                 onClick={handlePermanentDelete}
-                disabled={saving || deleteInput !== "LOESCHEN" || customer.ownedCases.length > 0}
+                disabled={saving || deleteInput !== "LÖSCHEN" || customer.ownedCases.length > 0}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg disabled:opacity-50"
               >
                 {saving ? "Löschen..." : "Permanent löschen"}
@@ -591,7 +591,7 @@ export default function CustomerDetailPage({
       {/* Active Case Access */}
       <div className="admin-card">
         <div className="px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">Zusaetzliche Fallzugriffe</h2>
+          <h2 className="text-lg font-semibold text-[var(--foreground)]">Zusätzliche Fallzugriffe</h2>
           <p className="text-sm text-[var(--muted)]">Zugriffe auf Fälle anderer Kunden</p>
         </div>
 
