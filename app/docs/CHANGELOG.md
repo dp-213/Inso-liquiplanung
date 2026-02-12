@@ -4,6 +4,80 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.38.0 – Rebranding, Dark Mode & Professionalitäts-Audit
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Rebranding "Gradify Cases":** Gesamte Plattform von "Inso-Liquiplanung" zu "Gradify Cases | Structured Case Management" umbenannt. Alle Meta-Tags, Login-Seiten, Header und OG-Tags aktualisiert.
+- **Open Graph Image:** Dynamisch generiertes Social-Preview-Bild (1200x630px) für WhatsApp, LinkedIn, Slack via Next.js Edge Runtime (`opengraph-image.tsx`).
+- **Dark Mode:** Vollständiges CSS-Variablen-System mit Light/Dark-Theme. ThemeProvider mit System-Preference-Erkennung und manuellem 3-Stufen-Toggle (Hell/Dunkel/System). Anti-Flash-Script im `<head>` verhindert weißes Aufblitzen. Globale CSS-Overrides fangen alle hardcoded Tailwind-Klassen ab.
+- **Cookie-Banner:** DSGVO-konformer Hinweis zu technisch notwendigen Cookies. Nur bei Erstbesuch, localStorage-basiert.
+- **Web Manifest:** PWA-Support für "Zur Startseite hinzufügen" auf Mobilgeräten.
+- **Custom 404-Seite:** Deutsche not-found.tsx mit Gradify-Branding statt Next.js-Standard.
+- **robots.txt:** `/admin`, `/api`, `/portal` für Suchmaschinen-Crawler gesperrt.
+
+### Sicherheit
+
+- **Debug-Routes abgesichert:** `/api/debug/db` und `/api/debug/cases` waren ohne Auth-Check öffentlich erreichbar (E-Mail-Adressen, DB-Diagnostik). Jetzt `getSession().isAdmin`-Pflicht.
+- **Demo-Zugangsdaten entfernt:** Klartext-Credentials von Admin-Login-Seite entfernt.
+- **Stack-Traces entfernt:** Debug-Routes geben keine Stack-Traces mehr zurück.
+
+### Verbesserungen
+
+- **Apple Touch Icon:** 180x180px Icon für iOS Home-Screen.
+- **Login-Seiten:** Gradify-Logo auf Admin- und Kunden-Login.
+- **AdminShell:** `bg-white` → `bg-[var(--card)]` (Dark-Mode-kompatibel), ThemeToggle im Header.
+- **package.json:** Name von "app" zu "gradify-cases".
+- **Umlaut-Fix:** "spater" → "später" in error.tsx.
+
+### Entfernt
+
+- Next.js Placeholder-SVGs aus `/public/` (file.svg, vercel.svg, next.svg, globe.svg, window.svg).
+
+---
+
+## Version 2.37.0 – Nachhaltige Klassifikation via COUNTERPARTY_ID-Matches
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **~50 COUNTERPARTY_ID-Matches in matrix-config.ts:** Counterparties zu 9 Matrix-Zeilen zugeordnet (Krankenkassen, DRV, Mitarbeiter, IT/Telekom, Vermieter, Leasing, Labor, IV-Berater, etc.). `suggestCategoryTags()` klassifiziert IST-Entries jetzt automatisch anhand der Gegenpartei.
+- **Engine-Fix: Sub-Zeilen als Match-Target:** `parentRowId`-Filter in `findMatchingRowWithTrace()` entfernt. Sub-Zeilen mit eigenen Matches (Sozialabgaben, Altverbindlichkeiten) sind jetzt für Stage 2 Matching erreichbar. Standort-Sub-Rows (leere matches) weiterhin korrekt gefiltert.
+
+### Bugfixes
+
+- **Krankenkassen-Outflows falsch klassifiziert:** AOK, BARMER, DAK, hkk, Knappschaft etc. wurden als BETRIEBSKOSTEN statt SOZIALABGABEN vorgeschlagen, weil `cash_out_personal_sozial` (parentRowId) unerreichbar war.
+- **0-as-falsy Bugs:** `importRowNumber === 0` und `estateRatio === 0` wurden als falsy behandelt. Fix: explizite `!== null`-Prüfung.
+- **Click-outside Handler Spalten-Menü:** Menü schließt jetzt korrekt bei Klick außerhalb.
+- **DELETE Children-Cleanup:** Beim Löschen eines Parent-Entries werden verwaiste Children bereinigt.
+- **Type-Cast Cleanup:** `EntryWithSuggestions` Type sauber definiert, unnötige `as any`-Casts entfernt.
+
+### Ergebnis
+
+594 von 747 ADJUSTED Entries (79,5%) werden automatisch klassifiziert. Verbleibende 89: 28 Sammelüberweisungen (Split nötig), 22 ISK ohne Counterparty (Fallback), 31 non-ISK (gefiltert), 8 interne Umbuchungen.
+
+---
+
+## Version 2.36.0 – Kreditoren/Kostenarten-Dropdowns im Bestellformular
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Kreditor-Dropdown im Bestellformular:** `/submit/[token]` zeigt Kreditoren-Auswahl mit Auto-Fill der Standard-Kostenart. Fallback auf Freitext-Eingabe für unbekannte Gläubiger.
+- **Kostenart-Dropdown:** Optionale Auswahl der Kostenart bei Bestellungen/Zahlungen.
+- **categoryTag-Übernahme bei Freigabe:** `approve/route.ts` und `company/orders/route.ts` lesen `categoryTag` aus `CostCategory` und setzen es automatisch auf dem erzeugten LedgerEntry.
+
+### Bugfixes
+
+- **Build-Config:** `distDir`-Logik korrigiert – Vercel nutzt `.next`, lokal `/tmp/next-build-inso-liqui/.next` (Leerzeichen im Projektpfad).
+- **tsconfig.json:** Build-Pfad-Referenz aktualisiert.
+
+---
+
 ## Version 2.35.0 – Mobile-Ready Case-Navigation
 
 **Datum:** 12. Februar 2026

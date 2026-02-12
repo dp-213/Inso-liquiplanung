@@ -1,6 +1,6 @@
 # Hilfe & Anleitungen
 
-> Zuletzt aktualisiert: 2026-02-12 | Version 2.34.0
+> Zuletzt aktualisiert: 2026-02-12 | Version 2.37.0
 
 Dieses Dokument ist die **Source-of-Truth** für die Hilfe-Seite im Admin-Dashboard.
 Bei Änderungen am System wird diese Datei über `/doku` mit-aktualisiert.
@@ -83,8 +83,9 @@ Das Dashboard zeigt die Cashflow-Entwicklung ab 0 EUR. Die Prognose-Seite zeigt 
 **Wo:** ANALYSE → Klassifikation
 
 1. Automatische Vorschläge prüfen (Gegenpartei, Masse-Zuordnung)
-2. Vorschläge akzeptieren oder manuell anpassen
-3. Buchungen bestätigen (`CONFIRMED`)
+2. **CategoryTag-Vorschläge generieren:** Button „Tags vorschlagen" im Zahlungsregister ordnet Buchungen automatisch Matrix-Kategorien zu (basierend auf Gegenpartei-ID, Namens-Muster oder Buchungstext)
+3. Vorschläge akzeptieren oder manuell anpassen
+4. Buchungen bestätigen (`CONFIRMED`)
 
 ### Schritt 3: Prämissen dokumentieren
 

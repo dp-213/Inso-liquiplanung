@@ -49,6 +49,12 @@ Bankkonten-Details (Opening/Closing Balance pro Bank) bewusst aus Liquidity Matr
 
 **Status:** Pflicht-Regel eingeführt (ADR-028), muss bei jedem Import beachtet werden
 
+### Sammelüberweisungen splitten (28 auf ISK)
+
+**Status:** 9 mit UPLOADED Zahlbelegen (Split-Workflow triggern), ~19 warten auf Zahlbelege vom IV
+
+**Impact:** -195K EUR in FALLBACK „Sonstige Auszahlungen". Nach Split landen Einzelposten in korrekten Matrix-Zeilen.
+
 ---
 
 ## P1 - Wichtig
@@ -158,5 +164,5 @@ Leere Seiten (z.B. Zahlungsregister ohne Entries, Prognose ohne Annahmen) zeigen
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.33.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.37.0)
 

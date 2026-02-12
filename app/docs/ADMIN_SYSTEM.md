@@ -839,6 +839,7 @@ model LedgerEntry {
 1. **Beim Import:** Bankkonto optional vorauswählbar
 2. **Im Review:** Manuell pro Eintrag zuweisbar
 3. **Per Klassifikationsregel:** Automatisch basierend auf Mustern
+4. **Per CategoryTag-Vorschlag:** `suggestCategoryTags()` matched Entries über COUNTERPARTY_ID, COUNTERPARTY_PATTERN oder DESCRIPTION_PATTERN gegen matrix-config Zeilen (ADR-049)
 
 #### Beispiel: Auswertung nach Gegenpartei
 

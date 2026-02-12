@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.35.0
+**Version:** 2.37.0
 **Stand:** 12. Februar 2026
 
 ---
@@ -443,6 +443,7 @@ LedgerEntry (UNREVIEWED)
 | `/api/cases/[id]/ledger/[entryId]/unsplit` | POST | Aufspaltung rückgängig machen |
 | `/api/cases/[id]/ledger/validate-splits` | GET | Split-Konsistenz prüfen |
 | `/api/cases/[id]/ledger/bulk-review` | POST | Massen-Review |
+| `/api/cases/[id]/ledger/suggest-category-tags` | POST | CategoryTag-Vorschläge via Matrix-Matching |
 | `/api/cases/[id]/intake` | POST | Vereinfachter Import |
 
 ### Stammdaten APIs
@@ -466,6 +467,33 @@ LedgerEntry (UNREVIEWED)
 |----------|---------|--------------|
 | `/api/cases/[id]/rules` | GET/POST | Klassifikationsregeln |
 | `/api/cases/[id]/classify` | POST | Manuell neu klassifizieren |
+
+### CategoryTag-Klassifikation (Matrix-basiert)
+
+```
+LedgerEntry (ohne categoryTag)
+        │
+        v
+  suggestCategoryTags()  ← engine.ts
+        │
+        ├── findMatchingRow(entry, categoryTag=null)
+        │       ← Erzwingt Stage 2 (OTHER_CRITERIA)
+        │
+        ├── Match-Typen in matrix-config.ts:
+        │   ├── COUNTERPARTY_ID → exakte Gegenpartei-ID  (bevorzugt)
+        │   ├── COUNTERPARTY_PATTERN → Regex auf Counterparty-Name
+        │   └── DESCRIPTION_PATTERN → Regex auf Buchungstext
+        │
+        ├── Erste CATEGORY_TAG-Match der Zeile → suggestedCategoryTag
+        │
+        └── FALLBACK-Zeile (ohne Matches) → kein Vorschlag
+
+Workflow:
+  1. API: POST /ledger/suggest-category-tags
+  2. Engine matched Entries gegen matrix-config Zeilen
+  3. Vorschläge als suggestedCategoryTag gespeichert
+  4. User akzeptiert/verwirft über Bulk-Review UI
+```
 
 ---
 

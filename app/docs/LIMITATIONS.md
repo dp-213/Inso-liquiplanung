@@ -43,6 +43,11 @@ Alle Beträge in EUR. Deutsche Insolvenzverfahren sind EUR-basiert.
 `matchCounterpartyPatterns()` matched nur Entries mit `reviewStatus = 'UNREVIEWED'`. Bestätigte Entries werden übersprungen.
 **Workaround:** Explizite Entry-IDs übergeben.
 
+### suggestCategoryTags() schlägt nur Parent-Tags vor
+
+Für Entries die über COUNTERPARTY_ID auf eine Zeile mit mehreren CATEGORY_TAGs matchen (z.B. `cash_out_betriebskosten`), wird immer der ERSTE Tag vorgeschlagen (BETRIEBSKOSTEN). Feinere Tags (KOMMUNIKATION, BUERO_IT, LEASING) erfordern manuelle Anpassung nach Accept.
+**Workaround:** Nach Bulk-Accept gezielt Sub-Tags über Ledger-Detail-Seite setzen.
+
 ### Privatpatienten-Rechnungen ohne einheitliches Format
 
 ~60 Privatpatienten-Rechnungen mit sehr unterschiedlichen Formaten. Ein einzelnes Pattern würde False Positives erzeugen.
@@ -53,10 +58,15 @@ Alle Beträge in EUR. Deutsche Insolvenzverfahren sind EUR-basiert.
 `BANK_ACCOUNT_MAPPING` in `breakdown/route.ts` kennt nur BW-Bank ISK-Konten (Uckerath + Velbert). Neue Bankkonten müssen manuell ergänzt werden.
 **Betrifft:** Nur den Zahlbeleg-Upload; Splitting selbst ist bank-agnostisch.
 
-### Sammelüberweisungen: Verbleibende ohne Zahlbelege
+### Sammelüberweisungen: 28 ohne Split auf ISK-Konten
 
-Von 29 Sammelüberweisungen im Ledger sind 9 gesplittet (47 Einzelposten, ISK BW-Bank). 9 weitere sind Einzelzahlungen (von BW-Bank als „SAMMELÜBERWEISUNG" gelabelt, brauchen keinen Split). 1 apoBank-Sammelüberweisung und ~10 Januar-Sammelüberweisungen (15.–29.01.) haben noch keine Zahlbelege.
+28 Sammelüberweisungen auf ISK-Konten (Dez + Jan) haben keine Children und landen im Matrix-FALLBACK „Sonstige Auszahlungen" (-195K EUR). 9 davon haben UPLOADED Zahlbelege (Split-Workflow noch nicht getriggert), ~19 haben noch keine Zahlbelege.
 **Workaround:** Zahlbelege vom IV nachliefern, über PaymentBreakdownPanel hochladen und splitten.
+
+### 22 ISK-Entries ohne Counterparty
+
+22 ISK-Entries (Patientenzahlungen, Befundberichte) ohne zugewiesene Counterparty-ID. Total ~1.051 EUR, landen im FALLBACK „Sonstige Einzahlungen". Counterparty-Zuweisung über `matchCounterpartyPatterns()` oder manuell nötig.
+**Impact:** Gering (Kleinstbeträge, korrekt im Fallback).
 
 ### IST-Vorrang ist nicht umkehrbar
 
@@ -263,4 +273,4 @@ Einnahmen-Tabelle und neuer Trend-Chart gruppieren jetzt nach `categoryTag` (HZV
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.35.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.37.0)

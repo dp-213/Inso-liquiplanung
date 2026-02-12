@@ -4,6 +4,38 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-049: Nachhaltige Klassifikation über COUNTERPARTY_ID-Matches in Matrix-Config
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Die Classification Engine (`suggestCategoryTags()`) konnte IST-Entries nur über `CATEGORY_TAG` (Stage 1, für PLAN), `COUNTERPARTY_PATTERN`, `DESCRIPTION_PATTERN` und `FALLBACK` zuordnen. ~50 Counterparties (Krankenkassen, DRV, Mitarbeiter, IT-Dienstleister, Vermieter etc.) hatten keine passenden Pattern-Matches. Manuelle SQL-Klassifikation (MANUAL_BATCH) war nötig – nicht nachhaltig und bei Re-Import verloren.
+
+Zusätzlich: Sub-Zeilen mit `parentRowId` (z.B. `cash_out_personal_sozial` für SOZIALABGABEN) waren durch den Filter `!row.parentRowId` in `findMatchingRowWithTrace()` unerreichbar. Krankenkassen-Outflows landeten in `cash_out_betriebskosten` statt `cash_out_personal_sozial`.
+
+### Entscheidung
+
+1. **COUNTERPARTY_ID als Match-Typ nutzen** – Exakte Matches auf bekannte Counterparty-IDs direkt in den Matrix-Zeilen-Definitionen. ~50 IDs auf 9 Zeilen verteilt.
+2. **parentRowId-Filter entfernen** – Standort-Sub-Rows (leere matches) werden durch `row.matches.length > 0` gefiltert. Sub-Kategorie-Rows mit eigenen Matches sind jetzt erreichbar.
+3. **Duale Zuordnung über flowType** – Gleiche Counterparty-ID kann in INFLOW-Zeile (z.B. EINNAHME_SONSTIGE) UND OUTFLOW-Zeile (z.B. SOZIALABGABEN) stehen. Engine filtert über `row.flowType`.
+
+### Begründung
+
+- Config-only Änderung: keine Code-Änderung in der Engine nötig (bis auf den Filter-Fix)
+- Nachhaltig: Neue Counterparties werden einmal in matrix-config.ts ergänzt → Pipeline erledigt den Rest
+- Zweistufiges Matching bleibt intakt: PLAN-Daten nutzen CATEGORY_TAG (Stage 1), IST-Daten nutzen COUNTERPARTY_ID (Stage 2)
+- FALLBACK fängt weiterhin unbekannte Entries auf
+
+### Konsequenzen
+
+- Bei neuen Counterparties: COUNTERPARTY_ID in passende Matrix-Zeile eintragen
+- `suggestCategoryTags()` schlägt jetzt den ERSTEN CATEGORY_TAG der gematchten Zeile vor (z.B. BETRIEBSKOSTEN für alle Betriebskosten-Subtypen)
+- Sub-Zeilen-Tags (SOZIALABGABEN, ALTVERBINDLICHKEIT_*) sind jetzt direkt vorschlagbar
+
+---
+
 ## ADR-048: Mobile Case-Navigation – Server/Client Split + Drawer
 
 **Datum:** 12. Februar 2026
