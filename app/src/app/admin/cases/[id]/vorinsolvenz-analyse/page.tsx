@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use, useCallback } from "react";
+import { useEffect, useState, use, useCallback, useMemo } from "react";
 
 // === Types ===
 
@@ -89,6 +89,15 @@ function formatCurrency(cents: string): string {
   }).format(euros);
 }
 
+function formatCurrencyExact(cents: string): string {
+  const value = parseInt(cents);
+  const euros = value / 100;
+  return new Intl.NumberFormat("de-DE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(euros);
+}
+
 function formatMonth(monthKey: string): string {
   const [year, month] = monthKey.split("-");
   const names = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
@@ -110,14 +119,76 @@ function formatDate(dateString: string): string {
   });
 }
 
-/** Gibt true zurück wenn dieser Monat der erste Insolvenz-Monat ist (für Trennlinie) */
-function isInsolvencyBorder(month: string, insolvencyMonth: string | null): boolean {
-  return insolvencyMonth !== null && month === insolvencyMonth;
+function insolvencyBorderClass(month: string, insolvencyMonth: string | null): string {
+  return insolvencyMonth !== null && month === insolvencyMonth ? "border-l-2 border-l-orange-400" : "";
 }
 
-/** CSS-Klasse für Insolvenz-Trennlinie (border-left) */
-function insolvencyBorderClass(month: string, insolvencyMonth: string | null): string {
-  return isInsolvencyBorder(month, insolvencyMonth) ? "border-l-2 border-l-orange-400" : "";
+/** Trend-Indikator: Abweichung vom Durchschnitt */
+function trendIndicator(value: number, avg: number): { symbol: string; className: string } | null {
+  if (avg === 0 || Math.abs(value) < 1000) return null; // Ignoriere Kleinstbeträge (<10€)
+  const deviation = (value - avg) / Math.abs(avg);
+  if (deviation > 0.3) return { symbol: "▲", className: "text-green-500" };
+  if (deviation < -0.3) return { symbol: "▼", className: "text-red-400" };
+  return null;
+}
+
+// === CSV Export ===
+
+function exportCSV(
+  months: string[],
+  inflowRows: CounterpartyRow[],
+  outflowRows: CounterpartyRow[],
+  monthlySummary: MonthlySummaryRow[],
+  summary: VorinsolvenzData["summary"],
+) {
+  const header = ["Position", ...months.map(formatMonth), "Gesamt", "Ø/Mon"].join(";");
+  const monthCount = months.length || 1;
+
+  function rowToCSV(label: string, monthly: Record<string, string>, total: string): string {
+    const avg = String(Math.round(parseInt(total) / monthCount));
+    const cells = months.map(m => {
+      const val = monthly[m];
+      return val ? formatCurrencyExact(val) : "";
+    });
+    return [label, ...cells, formatCurrencyExact(total), formatCurrencyExact(avg)].join(";");
+  }
+
+  const lines: string[] = [header, ""];
+
+  // Einnahmen
+  lines.push("EINNAHMEN");
+  for (const row of inflowRows) {
+    lines.push(rowToCSV(row.counterpartyName, row.monthly, row.totalCents));
+  }
+  const inflowMonthly: Record<string, string> = {};
+  for (const ms of monthlySummary) inflowMonthly[ms.month] = ms.inflowsCents;
+  lines.push(rowToCSV("Summe Einnahmen", inflowMonthly, summary.totalInflowsCents));
+  lines.push("");
+
+  // Ausgaben
+  lines.push("AUSGABEN");
+  for (const row of outflowRows) {
+    lines.push(rowToCSV(row.counterpartyName, row.monthly, row.totalCents));
+  }
+  const outflowMonthly: Record<string, string> = {};
+  for (const ms of monthlySummary) outflowMonthly[ms.month] = ms.outflowsCents;
+  lines.push(rowToCSV("Summe Ausgaben", outflowMonthly, summary.totalOutflowsCents));
+  lines.push("");
+
+  // Netto
+  lines.push("NETTO");
+  const nettoMonthly: Record<string, string> = {};
+  for (const ms of monthlySummary) nettoMonthly[ms.month] = ms.netCents;
+  lines.push(rowToCSV("Netto-Cashflow", nettoMonthly, summary.netCents));
+
+  const csv = "\uFEFF" + lines.join("\n"); // BOM for Excel
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `geschaeftskonten-analyse-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // === Component ===
@@ -132,6 +203,7 @@ export default function VorinsolvenzAnalysePage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [locationFilter, setLocationFilter] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchData() {
@@ -163,6 +235,74 @@ export default function VorinsolvenzAnalysePage({
     });
   }, []);
 
+  // === Gefilterte Daten nach Standort ===
+  const filtered = useMemo(() => {
+    if (!data) return null;
+    if (!locationFilter) return data;
+
+    // Counterparty-Rows auf Location filtern
+    const filteredCpMonthly = data.counterpartyMonthly
+      .map(row => {
+        const locData = row.byLocation.find(l => l.locationId === locationFilter);
+        if (!locData) return null;
+        return {
+          ...row,
+          monthly: locData.monthly,
+          totalCents: locData.totalCents,
+          byLocation: [locData],
+        };
+      })
+      .filter((r): r is CounterpartyRow => r !== null);
+
+    // Monthly Summary neu berechnen
+    const monthlySummary = data.summary.months.map(month => {
+      let inflowsCents = 0;
+      let outflowsCents = 0;
+      let count = 0;
+      for (const row of filteredCpMonthly) {
+        const val = parseInt(row.monthly[month] || "0");
+        if (val >= 0) inflowsCents += val;
+        else outflowsCents += val;
+        if (row.monthly[month]) count++;
+      }
+      return {
+        month,
+        inflowsCents: String(inflowsCents),
+        outflowsCents: String(outflowsCents),
+        netCents: String(inflowsCents + outflowsCents),
+        count,
+      };
+    });
+
+    // Summary neu berechnen
+    let totalInflows = 0;
+    let totalOutflows = 0;
+    let totalCount = 0;
+    for (const row of filteredCpMonthly) {
+      const val = parseInt(row.totalCents);
+      if (val >= 0) totalInflows += val;
+      else totalOutflows += val;
+      totalCount += row.matchCount;
+    }
+    const mc = data.summary.months.length || 1;
+
+    return {
+      ...data,
+      summary: {
+        ...data.summary,
+        totalInflowsCents: String(totalInflows),
+        totalOutflowsCents: String(totalOutflows),
+        netCents: String(totalInflows + totalOutflows),
+        avgMonthlyInflowsCents: String(Math.round(totalInflows / mc)),
+        avgMonthlyOutflowsCents: String(Math.round(totalOutflows / mc)),
+        totalCount,
+        classifiedCount: totalCount,
+      },
+      counterpartyMonthly: filteredCpMonthly,
+      monthlySummary,
+    } satisfies VorinsolvenzData;
+  }, [data, locationFilter]);
+
   // === Loading/Error states ===
 
   if (loading) {
@@ -174,7 +314,7 @@ export default function VorinsolvenzAnalysePage({
     );
   }
 
-  if (error || !data) {
+  if (error || !data || !filtered) {
     return (
       <div className="admin-card p-8 text-center">
         <p className="text-red-600">{error || "Keine Daten"}</p>
@@ -193,71 +333,120 @@ export default function VorinsolvenzAnalysePage({
     );
   }
 
-  // === Derived data ===
+  // === Derived data (aus gefiltertem Datensatz) ===
 
-  const { months } = data.summary;
-  const insolvencyMonth = data.insolvencyMonth;
+  const { months } = filtered.summary;
+  const insolvencyMonth = filtered.insolvencyMonth;
   const firstMonth = formatMonthLong(months[0]);
   const lastMonth = formatMonthLong(months[months.length - 1]);
-  const classRate = ((data.summary.classifiedCount / data.summary.totalCount) * 100).toFixed(0);
+  const classRate = filtered.summary.totalCount > 0
+    ? ((filtered.summary.classifiedCount / filtered.summary.totalCount) * 100).toFixed(0)
+    : "0";
   const locationCount = data.locations.length;
 
-  // Einnahmen/Ausgaben getrennt
-  const inflowRows = data.counterpartyMonthly.filter(
+  const inflowRows = filtered.counterpartyMonthly.filter(
     (r) => r.flowType === "INFLOW" || (r.flowType === "MIXED" && parseInt(r.totalCents) >= 0)
   );
-  const outflowRows = data.counterpartyMonthly.filter(
+  const outflowRows = filtered.counterpartyMonthly.filter(
     (r) => r.flowType === "OUTFLOW" || (r.flowType === "MIXED" && parseInt(r.totalCents) < 0)
   );
 
-  const netCents = parseInt(data.summary.netCents);
-
-  // Ø berechnen (Durchschnitt pro Monat)
+  const netCents = parseInt(filtered.summary.netCents);
   const monthCount = months.length || 1;
   const computeAvg = (total: string) => String(Math.round(parseInt(total) / monthCount));
+  const activeLocationName = locationFilter
+    ? data.locations.find(l => l.id === locationFilter)?.name || locationFilter
+    : null;
 
   // === Render ===
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Geschäftskonten-Analyse
-        </h1>
-        <p className="text-sm text-gray-500 mt-1">
-          {firstMonth} – {lastMonth} · {data.summary.totalCount.toLocaleString("de-DE")} Buchungen · {locationCount > 0 ? `${locationCount} Standorte · ` : ""}{months.length} Monate · nur Geschäftskonten (ohne ISK)
-        </p>
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">
+            Geschäftskonten-Analyse
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {firstMonth} – {lastMonth} · {filtered.summary.totalCount.toLocaleString("de-DE")} Buchungen · {locationCount > 0 ? `${locationCount} Standorte · ` : ""}{months.length} Monate
+            {locationFilter && <span className="text-orange-600 font-medium"> · Filter: {activeLocationName}</span>}
+          </p>
+        </div>
+
+        {/* CSV Export Button */}
+        <button
+          onClick={() => exportCSV(months, inflowRows, outflowRows, filtered.monthlySummary, filtered.summary)}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          CSV Export
+        </button>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="admin-card p-4">
-          <p className="text-xs text-gray-500 uppercase tracking-wider">Einnahmen</p>
-          <p className="text-xl font-bold text-green-600 mt-1">
-            {formatCurrency(data.summary.totalInflowsCents)} €
-          </p>
-        </div>
-        <div className="admin-card p-4">
-          <p className="text-xs text-gray-500 uppercase tracking-wider">Ausgaben</p>
-          <p className="text-xl font-bold text-red-600 mt-1">
-            {formatCurrency(data.summary.totalOutflowsCents)} €
-          </p>
-        </div>
-        <div className="admin-card p-4">
-          <p className="text-xs text-gray-500 uppercase tracking-wider">Netto-Cashflow</p>
-          <p className={`text-xl font-bold mt-1 ${netCents >= 0 ? "text-green-600" : "text-red-600"}`}>
-            {formatCurrency(data.summary.netCents)} €
-          </p>
-        </div>
-        <div className="admin-card p-4">
-          <p className="text-xs text-gray-500 uppercase tracking-wider">Klassifiziert</p>
-          <p className="text-xl font-bold text-gray-900 mt-1">
-            {classRate}%
-          </p>
-          <p className="text-xs text-gray-400">
-            {data.summary.classifiedCount} / {data.summary.totalCount}
-          </p>
+      {/* Standort-Filter + KPI Cards */}
+      <div className="space-y-4">
+        {/* Standort-Filter */}
+        {data.locations.length > 1 && (
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+            <span className="px-2 text-xs font-medium text-gray-500">Standort:</span>
+            <button
+              onClick={() => setLocationFilter(null)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                !locationFilter
+                  ? "bg-white shadow-sm text-gray-900"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Alle
+            </button>
+            {data.locations.map(loc => (
+              <button
+                key={loc.id}
+                onClick={() => setLocationFilter(loc.id)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  locationFilter === loc.id
+                    ? "bg-white shadow-sm text-gray-900"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {loc.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="admin-card p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wider">Einnahmen</p>
+            <p className="text-xl font-bold text-green-600 mt-1">
+              {formatCurrency(filtered.summary.totalInflowsCents)} €
+            </p>
+          </div>
+          <div className="admin-card p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wider">Ausgaben</p>
+            <p className="text-xl font-bold text-red-600 mt-1">
+              {formatCurrency(filtered.summary.totalOutflowsCents)} €
+            </p>
+          </div>
+          <div className="admin-card p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wider">Netto-Cashflow</p>
+            <p className={`text-xl font-bold mt-1 ${netCents >= 0 ? "text-green-600" : "text-red-600"}`}>
+              {formatCurrency(filtered.summary.netCents)} €
+            </p>
+          </div>
+          <div className="admin-card p-4">
+            <p className="text-xs text-gray-500 uppercase tracking-wider">Klassifiziert</p>
+            <p className="text-xl font-bold text-gray-900 mt-1">
+              {classRate}%
+            </p>
+            <p className="text-xs text-gray-400">
+              {filtered.summary.classifiedCount} / {filtered.summary.totalCount}
+            </p>
+          </div>
         </div>
       </div>
 
@@ -270,23 +459,20 @@ export default function VorinsolvenzAnalysePage({
               {insolvencyMonth && months.includes(insolvencyMonth) && (
                 <tr className="bg-white border-b border-gray-100">
                   <th className="sticky left-0 bg-white z-30"></th>
-                  {months.map((m) => {
-                    const isPreInsolvency = insolvencyMonth && m < insolvencyMonth;
-                    const isPostInsolvency = insolvencyMonth && m >= insolvencyMonth;
-                    return (
-                      <th
-                        key={m}
-                        className={`px-2 py-1 text-center text-[10px] font-medium min-w-[80px] bg-white ${insolvencyBorderClass(m, insolvencyMonth)}`}
-                      >
-                        {isPreInsolvency && (
-                          <span className="text-gray-400">vor Insolvenz</span>
-                        )}
-                        {isPostInsolvency && (
-                          <span className="text-orange-500">nach Eröffnung</span>
-                        )}
-                      </th>
-                    );
-                  })}
+                  {months.map((m) => (
+                    <th
+                      key={m}
+                      className={`px-2 py-1 text-center text-[10px] font-medium min-w-[80px] bg-white ${insolvencyBorderClass(m, insolvencyMonth)}`}
+                    >
+                      {insolvencyMonth && m < insolvencyMonth && (
+                        <span className="text-gray-400">vor Insolvenz</span>
+                      )}
+                      {insolvencyMonth && m >= insolvencyMonth && (
+                        <span className="text-orange-500">nach Eröffnung</span>
+                      )}
+                    </th>
+                  ))}
+                  <th className="bg-white"></th>
                   <th className="bg-white"></th>
                 </tr>
               )}
@@ -323,7 +509,7 @@ export default function VorinsolvenzAnalysePage({
 
               {inflowRows.map((row) => {
                 const rowKey = `in-${row.counterpartyId || row.counterpartyName}`;
-                const hasLocations = row.byLocation.length > 1;
+                const hasLocations = !locationFilter && row.byLocation.length > 1;
                 const isExpanded = expandedRows.has(rowKey);
 
                 return (
@@ -339,35 +525,27 @@ export default function VorinsolvenzAnalysePage({
                     colorClass="text-green-600"
                     bgClass="bg-white"
                     insolvencyMonth={insolvencyMonth}
+                    showTrend
                   />
                 );
               })}
 
               {/* Summe Einnahmen */}
-              <tr className="bg-green-50 font-bold border-t-2 border-green-200">
-                <td className="px-4 py-2.5 sticky left-0 bg-green-50 z-10 text-green-800">
-                  Summe Einnahmen
-                </td>
-                {months.map((m) => {
-                  const mData = data.monthlySummary.find((ms) => ms.month === m);
-                  return (
-                    <td key={m} className={`px-2 py-2.5 text-right tabular-nums text-green-600 ${insolvencyBorderClass(m, insolvencyMonth)}`}>
-                      {mData ? formatCompact(mData.inflowsCents) : "–"}
-                    </td>
-                  );
-                })}
-                <td className="px-3 py-2.5 text-right tabular-nums font-bold text-green-600 border-l border-green-200">
-                  {formatCompact(data.summary.totalInflowsCents)}
-                </td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-green-500 border-l border-gray-200 text-xs">
-                  {formatCompact(computeAvg(data.summary.totalInflowsCents))}
-                </td>
-              </tr>
+              <SummaryRow
+                label="Summe Einnahmen"
+                months={months}
+                monthCount={monthCount}
+                monthlySummary={filtered.monthlySummary}
+                valueKey="inflowsCents"
+                totalCents={filtered.summary.totalInflowsCents}
+                colorClass="text-green-600"
+                bgClass="bg-green-50"
+                borderClass="border-t-2 border-green-200"
+                borderLClass="border-l border-green-200"
+                insolvencyMonth={insolvencyMonth}
+              />
 
-              {/* Block spacing */}
-              <tr className="h-3 bg-white">
-                <td colSpan={months.length + 3}></td>
-              </tr>
+              <tr className="h-3 bg-white"><td colSpan={months.length + 3}></td></tr>
 
               {/* ===== BLOCK: AUSGABEN ===== */}
               <tr className="bg-red-100/80">
@@ -381,7 +559,7 @@ export default function VorinsolvenzAnalysePage({
 
               {outflowRows.map((row) => {
                 const rowKey = `out-${row.counterpartyId || row.counterpartyName}`;
-                const hasLocations = row.byLocation.length > 1;
+                const hasLocations = !locationFilter && row.byLocation.length > 1;
                 const isExpanded = expandedRows.has(rowKey);
 
                 return (
@@ -397,35 +575,27 @@ export default function VorinsolvenzAnalysePage({
                     colorClass="text-red-600"
                     bgClass="bg-white"
                     insolvencyMonth={insolvencyMonth}
+                    showTrend
                   />
                 );
               })}
 
               {/* Summe Ausgaben */}
-              <tr className="bg-red-50 font-bold border-t-2 border-red-200">
-                <td className="px-4 py-2.5 sticky left-0 bg-red-50 z-10 text-red-800">
-                  Summe Ausgaben
-                </td>
-                {months.map((m) => {
-                  const mData = data.monthlySummary.find((ms) => ms.month === m);
-                  return (
-                    <td key={m} className={`px-2 py-2.5 text-right tabular-nums text-red-600 ${insolvencyBorderClass(m, insolvencyMonth)}`}>
-                      {mData ? formatCompact(mData.outflowsCents) : "–"}
-                    </td>
-                  );
-                })}
-                <td className="px-3 py-2.5 text-right tabular-nums font-bold text-red-600 border-l border-red-200">
-                  {formatCompact(data.summary.totalOutflowsCents)}
-                </td>
-                <td className="px-3 py-2.5 text-right tabular-nums text-red-500 border-l border-gray-200 text-xs">
-                  {formatCompact(computeAvg(data.summary.totalOutflowsCents))}
-                </td>
-              </tr>
+              <SummaryRow
+                label="Summe Ausgaben"
+                months={months}
+                monthCount={monthCount}
+                monthlySummary={filtered.monthlySummary}
+                valueKey="outflowsCents"
+                totalCents={filtered.summary.totalOutflowsCents}
+                colorClass="text-red-600"
+                bgClass="bg-red-50"
+                borderClass="border-t-2 border-red-200"
+                borderLClass="border-l border-red-200"
+                insolvencyMonth={insolvencyMonth}
+              />
 
-              {/* Block spacing */}
-              <tr className="h-3 bg-white">
-                <td colSpan={months.length + 3}></td>
-              </tr>
+              <tr className="h-3 bg-white"><td colSpan={months.length + 3}></td></tr>
 
               {/* ===== BLOCK: NETTO ===== */}
               <tr className="bg-blue-100/80">
@@ -442,8 +612,10 @@ export default function VorinsolvenzAnalysePage({
                   Netto-Cashflow
                 </td>
                 {months.map((m) => {
-                  const mData = data.monthlySummary.find((ms) => ms.month === m);
+                  const mData = filtered.monthlySummary.find((ms) => ms.month === m);
                   const net = mData ? parseInt(mData.netCents) : 0;
+                  const avg = parseInt(filtered.summary.netCents) / monthCount;
+                  const trend = trendIndicator(net, avg);
                   return (
                     <td
                       key={m}
@@ -452,6 +624,7 @@ export default function VorinsolvenzAnalysePage({
                       } ${insolvencyBorderClass(m, insolvencyMonth)}`}
                     >
                       {mData ? formatCompact(mData.netCents) : "–"}
+                      {trend && <span className={`ml-0.5 text-[9px] ${trend.className}`}>{trend.symbol}</span>}
                     </td>
                   );
                 })}
@@ -460,14 +633,14 @@ export default function VorinsolvenzAnalysePage({
                     netCents >= 0 ? "text-green-700" : "text-red-700"
                   }`}
                 >
-                  {formatCompact(data.summary.netCents)}
+                  {formatCompact(filtered.summary.netCents)}
                 </td>
                 <td
                   className={`px-3 py-2.5 text-right tabular-nums border-l border-gray-200 text-xs ${
                     netCents >= 0 ? "text-green-600" : "text-red-600"
                   }`}
                 >
-                  {formatCompact(computeAvg(data.summary.netCents))}
+                  {formatCompact(computeAvg(filtered.summary.netCents))}
                 </td>
               </tr>
             </tbody>
@@ -475,23 +648,30 @@ export default function VorinsolvenzAnalysePage({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex items-center justify-between">
+        <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 text-xs text-gray-500 flex items-center justify-between flex-wrap gap-2">
           <span>Beträge in EUR (gerundet, K = Tausend) · nur Geschäftskonten (ohne ISK)</span>
-          {insolvencyMonth && (
-            <span className="flex items-center gap-1.5">
-              <span className="inline-block w-3 h-0.5 bg-orange-400"></span>
-              Insolvenzeröffnung
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1">
+              <span className="text-green-500 text-[9px]">▲</span>
+              <span className="text-red-400 text-[9px]">▼</span>
+              &gt;30% Abweichung vom Ø
             </span>
-          )}
+            {insolvencyMonth && (
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block w-3 h-0.5 bg-orange-400"></span>
+                Insolvenzeröffnung
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
       {/* === Nicht zugeordnet === */}
-      {data.unclassified.length > 0 && (
+      {filtered.unclassified.length > 0 && (
         <div className="admin-card overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 bg-amber-50">
             <h2 className="text-sm font-bold uppercase tracking-wider text-amber-800">
-              Nicht zugeordnet ({data.unclassified.length} Buchungen)
+              Nicht zugeordnet ({filtered.unclassified.length} Buchungen)
             </h2>
           </div>
           <div className="overflow-x-auto">
@@ -504,7 +684,7 @@ export default function VorinsolvenzAnalysePage({
                 </tr>
               </thead>
               <tbody>
-                {data.unclassified.map((entry) => (
+                {filtered.unclassified.map((entry) => (
                   <tr key={entry.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-2 px-3 whitespace-nowrap text-gray-900">{formatDate(entry.transactionDate)}</td>
                     <td className="py-2 px-3 text-gray-700">
@@ -525,6 +705,58 @@ export default function VorinsolvenzAnalysePage({
   );
 }
 
+// === Sub-Component: Summary Row ===
+
+function SummaryRow({
+  label,
+  months,
+  monthCount,
+  monthlySummary,
+  valueKey,
+  totalCents,
+  colorClass,
+  bgClass,
+  borderClass,
+  borderLClass,
+  insolvencyMonth,
+}: {
+  label: string;
+  months: string[];
+  monthCount: number;
+  monthlySummary: MonthlySummaryRow[];
+  valueKey: "inflowsCents" | "outflowsCents";
+  totalCents: string;
+  colorClass: string;
+  bgClass: string;
+  borderClass: string;
+  borderLClass: string;
+  insolvencyMonth: string | null;
+}) {
+  const avg = String(Math.round(parseInt(totalCents) / monthCount));
+  const avgColorClass = colorClass.replace("600", "500");
+  return (
+    <tr className={`${bgClass} font-bold ${borderClass}`}>
+      <td className={`px-4 py-2.5 sticky left-0 ${bgClass} z-10 ${colorClass.replace("text-", "text-").replace("600", "800")}`}>
+        {label}
+      </td>
+      {months.map((m) => {
+        const mData = monthlySummary.find((ms) => ms.month === m);
+        return (
+          <td key={m} className={`px-2 py-2.5 text-right tabular-nums ${colorClass} ${insolvencyBorderClass(m, insolvencyMonth)}`}>
+            {mData ? formatCompact(mData[valueKey]) : "–"}
+          </td>
+        );
+      })}
+      <td className={`px-3 py-2.5 text-right tabular-nums font-bold ${colorClass} ${borderLClass}`}>
+        {formatCompact(totalCents)}
+      </td>
+      <td className={`px-3 py-2.5 text-right tabular-nums ${avgColorClass} border-l border-gray-200 text-xs`}>
+        {formatCompact(avg)}
+      </td>
+    </tr>
+  );
+}
+
 // === Sub-Component: Row with Location Breakdown ===
 
 function RowWithLocations({
@@ -538,6 +770,7 @@ function RowWithLocations({
   colorClass,
   bgClass,
   insolvencyMonth,
+  showTrend,
 }: {
   row: CounterpartyRow;
   rowKey: string;
@@ -549,8 +782,10 @@ function RowWithLocations({
   colorClass: string;
   bgClass: string;
   insolvencyMonth: string | null;
+  showTrend: boolean;
 }) {
-  const avg = String(Math.round(parseInt(row.totalCents) / monthCount));
+  const avg = parseInt(row.totalCents) / monthCount;
+  const avgStr = String(Math.round(avg));
 
   const typeBadge = row.counterpartyType ? (
     <span className={`px-1.5 py-0.5 text-[10px] rounded ${
@@ -588,9 +823,12 @@ function RowWithLocations({
         </td>
         {months.map((m) => {
           const val = row.monthly[m];
+          const numVal = val ? parseInt(val) : 0;
+          const trend = showTrend && val ? trendIndicator(numVal, avg) : null;
           return (
             <td key={m} className={`px-2 py-2 text-right tabular-nums text-xs ${val ? "" : "text-gray-300"} ${insolvencyBorderClass(m, insolvencyMonth)}`}>
               {val ? formatCompact(val) : "–"}
+              {trend && <span className={`ml-0.5 text-[9px] ${trend.className}`}>{trend.symbol}</span>}
             </td>
           );
         })}
@@ -598,7 +836,7 @@ function RowWithLocations({
           {formatCompact(row.totalCents)}
         </td>
         <td className="px-3 py-2 text-right tabular-nums text-xs text-gray-400 border-l border-gray-200">
-          {formatCompact(avg)}
+          {formatCompact(avgStr)}
         </td>
       </tr>
 

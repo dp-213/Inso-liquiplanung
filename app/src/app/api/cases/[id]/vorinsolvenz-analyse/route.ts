@@ -139,6 +139,7 @@ export async function GET(
     }> = [];
 
     const activeLocationIds = new Set<string>();
+    let hasZentralEntries = false;
 
     for (const entry of entries) {
       const amount = entry.amountCents;
@@ -172,6 +173,8 @@ export async function GET(
       const locationId = baInfo?.locationId || '_zentral';
       if (baInfo?.locationId) {
         activeLocationIds.add(baInfo.locationId);
+      } else {
+        hasZentralEntries = true;
       }
 
       const cpKey = effectiveCpId || '_unclassified';
@@ -306,10 +309,13 @@ export async function GET(
         };
       });
 
-    const locations = Array.from(activeLocationIds).map((locId) => ({
-      id: locId,
-      name: locationMap.get(locId) || locId,
-    }));
+    const locations = [
+      ...Array.from(activeLocationIds).map((locId) => ({
+        id: locId,
+        name: locationMap.get(locId) || locId,
+      })),
+      ...(hasZentralEntries ? [{ id: '_zentral', name: 'HVPlus eG (zentral)' }] : []),
+    ];
 
     return NextResponse.json({
       summary,

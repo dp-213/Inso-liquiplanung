@@ -99,7 +99,7 @@ export default function CaseSidebar({
       label: "ANALYSE",
       items: [
         { name: "IST-Daten", href: `${base}/kontobewegungen` },
-        { name: "Vorinsolvenz", href: `${base}/vorinsolvenz-analyse` },
+        { name: "Geschäftskonten", href: `${base}/vorinsolvenz-analyse` },
         { name: "Klassifikation", href: `${base}/ist-klassifikation` },
         { name: "Verifikation", href: `${base}/zahlungsverifikation` },
         { name: "IV-Kommunikation", href: `${base}/iv-kommunikation` },
