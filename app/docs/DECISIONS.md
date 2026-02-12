@@ -4,6 +4,35 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-052: Geschäftskonten-Analyse filtert über isLiquidityRelevant statt allocationSource
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Die Vorinsolvenz-Analyse (v1) filterte LedgerEntries per `allocationSource: 'PRE_INSOLVENCY'`. Dies erfasste nur Entries, die explizit als vorinsolvenzlich markiert waren – Oktober- und November-Buchungen auf denselben Geschäftskonten mit anderem `allocationSource` fehlten.
+
+### Entscheidung
+
+Statt `allocationSource` wird über `bankAccountId` gefiltert: Alle Entries von Bankkonten mit `isLiquidityRelevant=false` (= Geschäftskonten, keine ISK) werden einbezogen. Die Seite wurde in „Geschäftskonten-Analyse" umbenannt.
+
+Zusätzlich: Rand-Monate mit <5 Entries werden automatisch getrimmt (z.B. 2 Dez-2024-Ausreißer).
+
+### Begründung
+
+1. **Konsistenz:** `isLiquidityRelevant` ist die kanonische Trennung zwischen ISK (Massekonten) und Geschäftskonten. Diese Trennung existiert bereits in der IST-Kontobewegungen-Seite.
+2. **Vollständigkeit:** Okt+Nov 2025 haben 260+69 Entries auf Geschäftskonten – alles relevante operative Buchungen, unabhängig von `allocationSource`.
+3. **Location-Mapping:** `bankAccountId → bankAccount.locationId` liefert die Standort-Zuordnung, da `locationId` auf Entries selbst NULL ist.
+
+### Konsequenzen
+
+- Analyse zeigt jetzt alle Geschäftskonten-Buchungen (Jan–Nov 2025 für HVPlus)
+- Location-Aufschlüsselung funktioniert über BankAccount-Relation (keine Schema-Änderung nötig)
+- Sidebar-Link heißt „Geschäftskonten" statt „Vorinsolvenz"
+
+---
+
 ## ADR-051: FALLDATEN-Sektion als Infrastruktur für fallspezifische Stammdaten
 
 **Datum:** 12. Februar 2026

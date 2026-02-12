@@ -4,6 +4,56 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.41.0 – Geschäftskonten-Analyse v2 (LiquidityMatrix-Style)
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Geschäftskonten-Analyse komplett neu geschrieben:** LiquidityMatrix-Style UI mit Block-Struktur (Einnahmen grün, Ausgaben rot, Netto blau), aufklappbaren Counterparty-Zeilen und „davon {Standort}"-Kindzeilen für Location-Aufschlüsselung.
+- **Standort-Filter:** Toggle-Buttons zum Filtern der gesamten Analyse nach einzelnen Standorten (Velbert, Uckerath, HVPlus zentral). Client-seitig via `useMemo` mit vollständiger Neuberechnung aller Summen.
+- **CSV-Export:** Semicolon-separierter Export mit BOM für deutsche Excel-Kompatibilität. Enthält alle Counterparty-Zeilen mit monatlichen Werten.
+- **Trend-Pfeile:** ▲/▼-Indikatoren bei >30% Abweichung vom Zeilendurchschnitt (Minimum 10 EUR Schwelle).
+- **Insolvenz-Trennlinie:** Orange `border-left` zwischen vor-/nach-Insolvenz-Monaten, bestimmt aus `cutoffDate` oder `openingDate`.
+- **Ø/Monat-Spalte:** Durchschnittswert pro Zeile als letzte Spalte.
+
+### Änderungen
+
+- **API umgestellt:** Filter von `allocationSource: 'PRE_INSOLVENCY'` auf `bankAccountId in geschaeftskontenIds` (alle Konten mit `isLiquidityRelevant=false`). Damit werden Okt+Nov 2025 korrekt einbezogen.
+- **API erweitert:** Neues `byLocation`-Array pro Counterparty-Zeile (Location-Breakdown via `bankAccountId → locationId`) und `locations`-Array in Response.
+- **Sidebar-Link:** „Vorinsolvenz" → „Geschäftskonten" umbenannt.
+- **Rand-Monate-Trimming:** API entfernt automatisch Monate mit <5 Entries am Anfang/Ende des Zeitraums (verhindert Ausreißer wie 2 Dez-2024-Entries).
+
+### Bugfixes
+
+- **CSV-Feldquoting:** Werte mit Semikolons werden jetzt korrekt in Anführungszeichen gesetzt.
+- **Unklassifizierte bei Standort-Filter:** Abschnitt wird ausgeblendet wenn Standort-Filter aktiv (Entries haben keine Location-Zuordnung).
+- **Insolvenz-Labels:** Von pro-Spalte auf colspan-basierte Labels umgestellt (weniger visuelles Rauschen).
+
+---
+
+## Version 2.40.0 – Sortierbare & Durchsuchbare Listenseiten + Dark-Mode-Fixes
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Generischer Table-Hook (`useTableControls`):** Wiederverwendbarer Hook für clientseitige Suche (case-insensitive, über beliebige Felder) und Spalten-Sortierung (Toggle asc/desc, null-safe, numerisch-aware). Wird von allen 7 CRUD-Listenseiten genutzt.
+- **TableToolbar-Komponente:** Kompakte Such-Toolbar mit Lupe-Icon, Ergebniszähler und optionalem Filter-Slot (via `children`). Einheitliches Look-and-Feel über alle Listenseiten.
+- **SortableHeader-Komponente:** Klickbare `<th>` mit Richtungsindikator (▲/▼), subtiles Hover-Feedback.
+- **Suche + Sortierung in 7 Seiten:** Personal, Kontakte, Counterparties, Creditors, Bank Accounts, Locations, Rules – alle haben jetzt Live-Suche und sortierbare Spaltenheader.
+- **Typ-/Kategorie-Filter:** Counterparties-Seite hat Typ-Dropdown-Filter, Creditors-Seite hat Kategorie-Dropdown-Filter.
+
+### Bugfixes
+
+- **`credentials: "include"` nachgerüstet:** Counterparties, Bank Accounts und Locations hatten fehlende `credentials: "include"` bei fetch-Aufrufen → 401 auf Production.
+- **Dark-Mode Badge-Farben:** Alle CRUD-Seiten haben jetzt konsistente `dark:`-Klassen für Badge-Farben (Typ, Kategorie, Rolle, Status).
+- **CSS `--accent` Kollision:** Dark-Mode-Accent-Farbe von `#1e293b` auf `#253347` geändert – Stat-Boxen sind jetzt vom Card-Hintergrund unterscheidbar.
+- **Badge-Overrides in globals.css:** Fehlende Dark-Mode-Overrides für `bg-purple-100`, `bg-blue-100`, `bg-amber-100`, `bg-orange-100`, `bg-indigo-100`, `bg-yellow-100` (+ zugehörige Text-Farben) ergänzt.
+- **Rules Empty State:** Unterscheidet jetzt korrekt zwischen „keine Regeln vorhanden" und „Suche liefert keine Treffer".
+
+---
+
 ## Version 2.39.0 – FALLDATEN-Sektion: Personal & Kontakte
 
 **Datum:** 12. Februar 2026

@@ -32,6 +32,7 @@
    - [4.15 Sammelüberweisungs-Splitting](#415-sammelüberweisungs-splitting)
    - [4.16 Personal (Mitarbeiter)](#416-personal-mitarbeiter-v2390)
    - [4.17 Kontakte (Ansprechpartner)](#417-kontakte-ansprechpartner-v2390)
+   - [4.18 Geschäftskonten-Analyse](#418-geschäftskonten-analyse-v2410)
 5. [Datenmodell-Diagramm](#5-datenmodell-diagramm)
 6. [Datenfluss: Import bis Anzeige](#6-datenfluss-import-bis-anzeige)
 
@@ -1459,6 +1460,80 @@ const entries = await prisma.ledgerEntry.findMany({
 | Rechtsanwalt | Amber |
 | Geschäftsführung | Indigo |
 | Sonstige | Grau |
+
+---
+
+### 4.18 Geschäftskonten-Analyse (v2.41.0)
+
+**Pfad:** `/admin/cases/[id]/vorinsolvenz-analyse`
+**Sidebar-Sektion:** ANALYSE → „Geschäftskonten"
+**API:** `GET /api/cases/[id]/vorinsolvenz-analyse`
+
+#### Funktion
+
+Monatliche Cashflow-Analyse aller Geschäftskonten (Bankkonten mit `isLiquidityRelevant=false`) im LiquidityMatrix-Style. Zeigt Einnahmen und Ausgaben pro Counterparty mit Location-Drill-Down.
+
+#### UI-Struktur (LiquidityMatrix-Style)
+
+| Block | Farbe | Inhalt |
+|-------|-------|--------|
+| **Einnahmen** | Grün (`bg-green-50`) | Alle Counterparties mit positivem Netto |
+| **Ausgaben** | Rot (`bg-red-50`) | Alle Counterparties mit negativem Netto |
+| **Netto** | Blau (`bg-blue-50`) | Netto-Cashflow pro Monat |
+
+#### Features
+
+| Feature | Beschreibung |
+|---------|--------------|
+| **Aufklappbare Zeilen** | `▶` Toggle pro Counterparty → „davon {Standort}"-Kindzeilen |
+| **Standort-Filter** | Toggle-Buttons filtern alle Daten nach Location (client-seitig via `useMemo`) |
+| **CSV-Export** | Semicolon-separiert mit BOM für deutsches Excel |
+| **Trend-Pfeile** | ▲/▼ bei >30% Abweichung vom Zeilendurchschnitt (min. 10 EUR) |
+| **Insolvenz-Trennlinie** | Orange Border zwischen vor-/nach-Insolvenz-Monaten |
+| **Ø/Monat-Spalte** | Durchschnittswert pro Zeile |
+| **Sticky erste Spalte** | Position-Spalte bleibt beim horizontalen Scrollen fixiert |
+| **Rand-Monate-Trimming** | Monate mit <5 Entries am Rand werden API-seitig entfernt |
+
+#### API-Response
+
+```json
+{
+  "summary": {
+    "totalCount": 2631,
+    "classifiedCount": 2500,
+    "totalInflowsCents": "...",
+    "totalOutflowsCents": "...",
+    "netCents": "...",
+    "avgMonthlyInflowsCents": "...",
+    "avgMonthlyOutflowsCents": "...",
+    "months": ["2025-01", "2025-02", ...]
+  },
+  "counterpartyMonthly": [{
+    "counterpartyId": "...",
+    "counterpartyName": "HAEVG",
+    "counterpartyType": "ZAHLER",
+    "flowType": "INFLOW",
+    "totalCents": "...",
+    "matchCount": 42,
+    "monthly": { "2025-01": "...", "2025-02": "..." },
+    "byLocation": [{
+      "locationId": "loc-velbert",
+      "locationName": "Praxis Velbert",
+      "totalCents": "...",
+      "monthly": { "2025-01": "...", "2025-02": "..." }
+    }]
+  }],
+  "monthlySummary": [...],
+  "byBankAccount": [...],
+  "unclassified": [...],
+  "locations": [{ "id": "loc-velbert", "name": "Praxis Velbert" }],
+  "insolvencyMonth": "2025-10"
+}
+```
+
+#### Datenquelle
+
+Alle LedgerEntries von Bankkonten mit `isLiquidityRelevant=false` (Geschäftskonten). Location-Zuordnung über `bankAccountId → bankAccount.locationId`. Kein Schema-spezifischer Filter (`allocationSource` wird ignoriert).
 
 ---
 

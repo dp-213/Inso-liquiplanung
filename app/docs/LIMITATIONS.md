@@ -153,6 +153,11 @@ Kunden ohne Slug können nicht über eine individuelle Subdomain zugreifen. Logi
 
 `/admin/cases/[id]/planung` zeigt Placeholder. PLAN-Entries über Ledger einsehbar.
 
+### Geschäftskonten-Analyse: Unklassifizierte Entries nicht nach Standort filterbar
+
+Bei aktivem Standort-Filter werden unklassifizierte Entries komplett ausgeblendet, da ihnen keine Location-Zuordnung möglich ist (kein `locationId` auf Entry-Ebene, und ohne Counterparty kann kein Location-Bezug hergestellt werden).
+**Workaround:** Standort-Filter deaktivieren um unklassifizierte Entries zu sehen.
+
 ### Zahlungsverifikation: Kein Drill-Down pro Kategorie
 
 SOLL/IST-Abgleich zeigt nur aggregierte Netto-Werte pro Periode. Aufschlüsselung nach einzelnen CashflowCategories oder Einnahmen/Ausgaben getrennt ist nicht verfügbar.
@@ -300,4 +305,4 @@ Rebranding zu "Gradify Cases | Structured Case Management" mit OG-Image für Soc
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.38.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.41.0)

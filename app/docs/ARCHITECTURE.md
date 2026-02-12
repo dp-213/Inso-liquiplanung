@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.39.0
+**Version:** 2.41.0
 **Stand:** 12. Februar 2026
 
 ---
@@ -578,13 +578,15 @@ Workflow:
 │   ├── middleware.ts                 # Subdomain-Routing (Tenant-Erkennung)
 │   ├── hooks/
 │   │   ├── usePortalPaths.ts        # Client-seitiger Subdomain-Pfad-Helper
-│   │   └── useMobileSidebar.ts      # Drawer-State, ESC, Scroll-Lock (v2.35.0)
+│   │   ├── useMobileSidebar.ts      # Drawer-State, ESC, Scroll-Lock (v2.35.0)
+│   │   └── useTableControls.ts      # Generische Suche + Sortierung für Listen (v2.40.0)
 │   ├── components/                   # React-Komponenten
 │   │   ├── admin/
 │   │   │   ├── AdminShell.tsx        # Top-Level Admin Layout
 │   │   │   ├── CaseSidebar.tsx       # Case-Navigation (Desktop + Drawer)
 │   │   │   ├── CaseSidebarDrawer.tsx # Mobile Drawer-Wrapper (v2.35.0)
-│   │   │   └── MobileCaseHeader.tsx  # Sticky Mobile Case-Header (v2.35.0)
+│   │   │   ├── MobileCaseHeader.tsx  # Sticky Mobile Case-Header (v2.35.0)
+│   │   │   └── TableToolbar.tsx      # Such-Toolbar + SortableHeader für CRUD-Listen (v2.40.0)
 │   │   ├── forecast/               # Prognose-Spreadsheet (v2.31.0)
 │   │   │   ├── types.ts            # Shared Types + Helpers (formatEUR, parseCentsFromEUR, cn)
 │   │   │   ├── ForecastSpreadsheet.tsx   # Unified-Tabelle (IST + Prognose)
