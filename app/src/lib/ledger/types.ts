@@ -128,6 +128,8 @@ export const AUDIT_ACTIONS = {
   CONFIRMED: 'CONFIRMED',
   ADJUSTED: 'ADJUSTED',
   DELETED: 'DELETED',
+  SPLIT: 'SPLIT',
+  UNSPLIT: 'UNSPLIT',
 } as const;
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[keyof typeof AUDIT_ACTIONS];
@@ -138,6 +140,8 @@ export const AUDIT_ACTION_LABELS: Record<AuditAction, string> = {
   CONFIRMED: 'Bestätigt',
   ADJUSTED: 'Korrigiert',
   DELETED: 'Gelöscht',
+  SPLIT: 'Aufgespalten',
+  UNSPLIT: 'Zusammengeführt',
 };
 
 /**
@@ -409,6 +413,26 @@ export interface LedgerAggregationResult {
   totalInflows: bigint;
   totalOutflows: bigint;
 }
+
+// =============================================================================
+// SPLIT FILTER (Sammelüberweisungs-Splitting)
+// =============================================================================
+
+/**
+ * Prisma WHERE-Bedingung für aktive LedgerEntries.
+ * Excludiert Parents die in Children aufgelöst wurden.
+ *
+ * Logik: Ein Entry ist "aufgelöst" wenn er mindestens 1 Child hat.
+ * → splitChildren: { none: {} } = "hat KEINE Children"
+ *
+ * Resultat: Normale Entries + Children sind aktiv, Split-Parents nicht.
+ *
+ * NICHT verwenden für: Ledger-Ansicht (zeigt alles), Hash-Berechnung,
+ * Classification Engine, Audit-Queries.
+ */
+export const EXCLUDE_SPLIT_PARENTS = {
+  splitChildren: { none: {} },
+} as const;
 
 // =============================================================================
 // SYNC TYPES

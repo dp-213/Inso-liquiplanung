@@ -15,6 +15,7 @@
 
 import { Decimal } from '@prisma/client/runtime/library';
 import { prisma } from '@/lib/db';
+import { EXCLUDE_SPLIT_PARENTS } from '@/lib/ledger/types';
 import {
   type MassekreditStatus,
   type AssumptionDoc,
@@ -244,12 +245,13 @@ async function sumAltforderungen(
   bankAccountId: string,
   asOfDate?: Date
 ): Promise<bigint> {
-  // Alle positiven Einträge (Einnahmen) für diese Bank mit Altmasse-Zuordnung
+  // Alle positiven Einträge (Einnahmen) für diese Bank mit Altmasse-Zuordnung (exclude split parents)
   const entries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
       bankAccountId,
       valueType: 'IST',
+      ...EXCLUDE_SPLIT_PARENTS,
       amountCents: { gt: 0 }, // Nur Einnahmen
       ...(asOfDate && { transactionDate: { lte: asOfDate } }),
       OR: [
@@ -288,6 +290,7 @@ async function countUnklarEntries(caseId: string): Promise<number> {
     where: {
       caseId,
       valueType: 'IST',
+      ...EXCLUDE_SPLIT_PARENTS,
       OR: [{ estateAllocation: EstateAllocation.UNKLAR }, { estateAllocation: null }],
     },
   });

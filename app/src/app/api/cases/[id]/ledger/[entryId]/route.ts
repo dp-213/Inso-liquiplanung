@@ -175,6 +175,22 @@ export async function PUT(
       return NextResponse.json({ error: 'Eintrag nicht gefunden' }, { status: 404 });
     }
 
+    // Guard: Split-Parents dürfen bestimmte Felder nicht ändern
+    const childCount = await prisma.ledgerEntry.count({
+      where: { parentEntryId: entryId },
+    });
+
+    if (childCount > 0) {
+      const protectedFields = ['amountCents', 'transactionDate', 'bankAccountId'];
+      const attemptedChanges = protectedFields.filter(f => body[f] !== undefined);
+
+      if (attemptedChanges.length > 0) {
+        return NextResponse.json({
+          error: `Felder ${attemptedChanges.join(', ')} können nicht geändert werden – Entry hat ${childCount} Einzelposten. Erst Aufspaltung rückgängig machen.`,
+        }, { status: 400 });
+      }
+    }
+
     // Validierung: serviceDate und servicePeriod dürfen NICHT gleichzeitig gesetzt sein
     if (body.serviceDate && (body.servicePeriodStart || body.servicePeriodEnd)) {
       return NextResponse.json(

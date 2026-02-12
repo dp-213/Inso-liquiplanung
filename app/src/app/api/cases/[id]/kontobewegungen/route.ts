@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/auth';
+import { EXCLUDE_SPLIT_PARENTS } from '@/lib/ledger/types';
 
 export async function GET(
   _request: Request,
@@ -29,11 +30,12 @@ export async function GET(
       return NextResponse.json({ error: 'Fall nicht gefunden' }, { status: 404 });
     }
 
-    // Hole alle IST-Einträge
+    // Hole alle IST-Einträge (exclude split parents)
     const entries = await prisma.ledgerEntry.findMany({
       where: {
         caseId: id,
         valueType: 'IST',
+        ...EXCLUDE_SPLIT_PARENTS,
       },
       orderBy: { transactionDate: 'desc' },
     });

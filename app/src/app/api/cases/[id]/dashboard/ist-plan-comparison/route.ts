@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { EXCLUDE_SPLIT_PARENTS } from '@/lib/ledger/types';
 
 // =============================================================================
 // TYPES
@@ -138,6 +139,7 @@ export async function GET(
     const entries = await prisma.ledgerEntry.findMany({
       where: {
         caseId,
+        ...EXCLUDE_SPLIT_PARENTS,
         reviewStatus: { in: ['CONFIRMED', 'ADJUSTED'] },
       },
       orderBy: { transactionDate: 'asc' },

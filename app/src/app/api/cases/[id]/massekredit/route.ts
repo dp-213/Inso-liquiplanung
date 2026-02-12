@@ -10,6 +10,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
 import { EstateAllocation } from "@/lib/types/allocation";
+import { EXCLUDE_SPLIT_PARENTS } from "@/lib/ledger/types";
 
 interface AssumptionDoc {
   field: string;
@@ -40,6 +41,7 @@ async function sumAltforderungen(
       caseId,
       bankAccountId,
       valueType: "IST",
+      ...EXCLUDE_SPLIT_PARENTS,
       amountCents: { gt: 0 },
       OR: [
         { estateAllocation: EstateAllocation.ALTMASSE },
@@ -79,6 +81,7 @@ async function countUnklarEntries(caseId: string): Promise<number> {
     where: {
       caseId,
       valueType: "IST",
+      ...EXCLUDE_SPLIT_PARENTS,
       OR: [
         { estateAllocation: EstateAllocation.UNKLAR },
         { estateAllocation: null },

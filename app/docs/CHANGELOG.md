@@ -32,26 +32,48 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 - **Alte Route `/kundenzugaenge`** redirected auf `/freigaben`.
 - **`NEXT_PUBLIC_BASE_DOMAIN`:** Neue Umgebungsvariable für Subdomain-Erkennung (Vercel + lokal).
 
+### Neue Funktionen (Forecast)
+
+- **Prognose-Modul (Forecast):** Vollständige Prognose-Seite unter `/admin/cases/[id]/forecast` mit Szenario-Verwaltung, Annahmen-Editor (Laufend/Fix/Einmalig, Wachstumsrate, saisonale Profile), automatischer Cashflow-Berechnung und Dashboard-Integration.
+- **Forecast Engine:** Berechnungslogik in `lib/forecast/` (engine.ts, load-and-calculate.ts, types.ts). Generiert PROGNOSE-Werte aus aktiven Annahmen für zukünftige Perioden.
+- **3 Forecast-APIs:** Szenarien-CRUD (`/forecast/scenarios`), Annahmen-CRUD (`/forecast/assumptions`), Berechnung (`/forecast/calculate`).
+
+### Neue Funktionen (Sammelüberweisungs-Splitting)
+
+- **EXCLUDE_SPLIT_PARENTS Filter:** Zentrale Prisma WHERE-Bedingung (`splitChildren: { none: {} }`) für alle Aggregations-Queries. Parents, die in Einzelposten aufgelöst wurden, werden automatisch aus Summen, Salden und Reports ausgeschlossen.
+- **SPLIT/UNSPLIT Audit-Actions:** Neue Audit-Aktionen „Aufgespalten" und „Zusammengeführt" für lückenlose Nachvollziehbarkeit im Änderungsprotokoll.
+- **Split-Parent-Guard:** PUT auf Ledger-Entries mit Children verbietet Änderungen an `amountCents`, `transactionDate`, `bankAccountId`. Erst Aufspaltung rückgängig machen.
+- **Flächendeckende Integration:** Filter in 12 Dateien integriert – alle Dashboard-APIs, Massekredit-Berechnung, Bankkonto-Salden, Forecast-Engine, Standort-Auswertung.
+
 ### Bugfixes
 
 - **Deutsche Umlaute:** `customer-auth.ts` („Ungültige" statt „Ungueltige"), `customers/route.ts` („Kundenzugänge" statt „Kundenzugaenge", „Ungültiges" statt „Ungueltiges").
 - **Subdomain-Erkennung:** `usePortalPaths` vergleicht jetzt gegen `NEXT_PUBLIC_BASE_DOMAIN` statt Hostname-Punkte zu zählen.
+- **RollingForecast Portal-Fix:** Admin-Links („Annahmen bearbeiten", „Prognose aktiv →") im Portal-/Kundenkontext ausgeblendet. Portal zeigt nur Text-Badge ohne Link.
 
 ### Infrastruktur
 
 - **DNS:** Wildcard CNAME `*.cases.gradify.de → cname.vercel-dns.com` bei IONOS eingerichtet.
 - **Vercel:** `anchor.cases.gradify.de` als Domain hinzugefügt, SSL automatisch.
-- **Turso-Migration:** `slug`-Spalte auf `CustomerUser` + Unique-Index.
+- **Turso-Migration:** `slug`-Spalte auf `CustomerUser` + Unique-Index. `forecast_scenarios` + `forecast_assumptions` Tabellen mit Indizes erstellt.
 
 ### Neue Dateien
 
 - `app/src/middleware.ts` – Subdomain-Routing
 - `app/src/lib/slug-utils.ts` – Slug-Validierung + Vorschläge
 - `app/src/lib/tenant.ts` – Tenant-Helper für Server-Components
+- `app/src/lib/forecast/engine.ts` – Forecast-Berechnungslogik
+- `app/src/lib/forecast/load-and-calculate.ts` – Daten laden + berechnen
+- `app/src/lib/forecast/types.ts` – Forecast-Typdefinitionen
 - `app/src/hooks/usePortalPaths.ts` – Client-seitiger Pfad-Helper
 - `app/src/components/admin/CombinedAccessManager.tsx` – Kombinierte Freigaben-Verwaltung
+- `app/src/app/admin/cases/[id]/forecast/page.tsx` – Prognose-Seite
+- `app/src/app/api/cases/[id]/forecast/scenarios/route.ts` – Szenarien-API
+- `app/src/app/api/cases/[id]/forecast/assumptions/route.ts` – Annahmen-API
+- `app/src/app/api/cases/[id]/forecast/calculate/route.ts` – Berechnungs-API
 - `app/src/app/api/customers/check-slug/route.ts` – Slug-Verfügbarkeits-API
 - `app/src/app/admin/cases/[id]/kundenzugaenge/page.tsx` – Redirect auf `/freigaben`
+- `app/docs/FORECAST-ARCHITECTURE.md` – Architektur-Dokumentation Forecast-Modul
 
 ### Geänderte Dateien
 
@@ -64,8 +86,22 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 - `app/src/app/portal/layout.tsx` – Subdomain-aware Redirects
 - `app/src/app/portal/page.tsx` – Dynamische Pfade via usePortalPaths
 - `app/src/components/portal/CustomerHeader.tsx` – Subdomain-aware Links
+- `app/src/components/dashboard/RollingForecastChart.tsx` – Admin-Links im Portal ausblenden
+- `app/src/components/dashboard/RollingForecastTable.tsx` – Admin-Links im Portal ausblenden
 - `app/src/app/admin/cases/[id]/hilfe/page.tsx` – FAQ aktualisiert (Freigaben, Subdomains)
-- `app/prisma/schema.prisma` – `slug` Feld auf CustomerUser
+- `app/prisma/schema.prisma` – `slug` auf CustomerUser, `ForecastScenario` + `ForecastAssumption` Modelle
+- `app/src/lib/ledger/types.ts` – SPLIT/UNSPLIT Audit-Actions + EXCLUDE_SPLIT_PARENTS Konstante
+- `app/src/lib/ledger/aggregation.ts` – EXCLUDE_SPLIT_PARENTS in 7 Aggregations-Queries
+- `app/src/lib/ledger-aggregation.ts` – EXCLUDE_SPLIT_PARENTS in Hauptaggregation
+- `app/src/lib/credit/calculate-massekredit.ts` – EXCLUDE_SPLIT_PARENTS in Altforderungen + Unklar-Zählung
+- `app/src/lib/forecast/load-and-calculate.ts` – EXCLUDE_SPLIT_PARENTS in Entry-Loading
+- `app/src/app/api/cases/[id]/bank-accounts/route.ts` – EXCLUDE_SPLIT_PARENTS in IST-Abfrage
+- `app/src/app/api/cases/[id]/dashboard/ist-plan-comparison/route.ts` – EXCLUDE_SPLIT_PARENTS
+- `app/src/app/api/cases/[id]/dashboard/liquidity-matrix/route.ts` – EXCLUDE_SPLIT_PARENTS
+- `app/src/app/api/cases/[id]/dashboard/locations/route.ts` – EXCLUDE_SPLIT_PARENTS in 2 Queries
+- `app/src/app/api/cases/[id]/kontobewegungen/route.ts` – EXCLUDE_SPLIT_PARENTS
+- `app/src/app/api/cases/[id]/massekredit/route.ts` – EXCLUDE_SPLIT_PARENTS
+- `app/src/app/api/cases/[id]/ledger/[entryId]/route.ts` – Split-Parent-Guard auf PUT
 
 ---
 

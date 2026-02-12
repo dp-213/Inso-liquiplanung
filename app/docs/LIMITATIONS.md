@@ -57,10 +57,9 @@ PLAN-Daten bleiben bewusst für Vergleich und Audit erhalten.
 Ein LedgerEntry kann nur einer Gegenpartei/einem Bankkonto zugeordnet werden.
 **Workaround:** Separate Entries für verschiedene Dimensionen.
 
-### Forecast-Modul in Entwicklung
+### ~~Forecast-Modul in Entwicklung~~ GELÖST 2026-02-12
 
-Vorwärtsgerichtete Liquiditätsprognose als separates Modul (Schema + Sidebar-Link vorhanden, Logik in Entwicklung).
-**Aktuell:** Manuelle PLAN-Werte über Freie Planung.
+Prognose-Modul vollständig implementiert (v2.28.0): Szenarien, Annahmen-Editor, Forecast Engine, Dashboard-Integration. Admin-Links im Portal-Kontext ausgeblendet.
 
 ---
 
@@ -238,6 +237,10 @@ Neue kombinierte Seite `/portal/cases/[id]/banken-sicherungsrechte` ersetzt Demo
 ### ~~Portal-Navigation inkonsistent mit Admin~~ GELÖST 2026-02-12
 
 "Finanzierung" + "Sicherungsrechte" zu "Banken & Sicherungsrechte" zusammengeführt. Alte Routen redirecten (v2.27.0).
+
+### ~~Forecast-Modul in Entwicklung~~ GELÖST 2026-02-12
+
+Prognose-Modul vollständig implementiert (v2.28.0): Szenarien, Annahmen-Editor, Forecast Engine mit Dashboard-Integration. Turso-Tabellen (`forecast_scenarios`, `forecast_assumptions`) erstellt.
 
 ---
 

@@ -27,6 +27,9 @@
    - [4.10 Planungsart (Horizont)](#410-planungsart-horizont)
    - [4.11 Externe Ansicht](#411-externe-ansicht)
    - [4.12 Freigaben (Orders)](#412-freigaben-orders)
+   - [4.13 Freigaben – Kundenzugänge & Externe Links](#413-freigaben--kundenzugänge--externe-links-v2280)
+   - [4.14 Prognose (Forecast)](#414-prognose-forecast)
+   - [4.15 Sammelüberweisungs-Splitting](#415-sammelüberweisungs-splitting)
 5. [Datenmodell-Diagramm](#5-datenmodell-diagramm)
 6. [Datenfluss: Import bis Anzeige](#6-datenfluss-import-bis-anzeige)
 
@@ -1104,6 +1107,167 @@ Bei neuem Kunden mit Slug:
 | `/api/cases/[id]/customers?accessId=...` | DELETE | Zugriff widerrufen |
 | `/api/customers` | POST | Neuen Kunden anlegen (mit Slug) |
 | `/api/customers/check-slug` | GET | Slug-Verfügbarkeit prüfen |
+
+---
+
+### 4.14 Prognose (Forecast)
+
+**Pfad:** `/admin/cases/[id]/forecast`
+
+#### Funktion
+Vorwärtsgerichtete Liquiditätsprognose mit Annahmen-Editor. Erzeugt PROGNOSE-Werte für zukünftige Perioden, die automatisch ins Dashboard (Rolling Forecast) einfließen.
+
+#### Konzept
+
+```
+IST-Daten (Vergangenheit)     +     Annahmen (Zukunft)
+        │                                  │
+        └──────── Forecast Engine ─────────┘
+                        │
+                  Rolling Forecast
+              (IST + PROGNOSE kombiniert)
+```
+
+#### Szenario-Verwaltung
+
+Ein Fall kann mehrere Szenarien haben (BASE, DOWNSIDE, UPSIDE, CUSTOM). Nur das aktive Szenario fließt ins Dashboard.
+
+| Feld | Beschreibung |
+|------|--------------|
+| `name` | Szenarioname (z.B. „Basisszenario") |
+| `scenarioType` | BASE, DOWNSIDE, UPSIDE, CUSTOM |
+| `periodType` | WEEKLY oder MONTHLY (aus LiquidityPlan) |
+| `periodCount` | Anzahl Perioden |
+| `openingBalanceCents` | Echter Kontostand (IST-Closing der letzten IST-Periode) |
+| `reservesTotalCents` | Rückstellungen für Headroom-Berechnung |
+| `isLocked` | Sperr-Mechanismus für abgeschlossene Szenarien |
+
+#### Annahmen-Editor
+
+Pro Annahme:
+
+| Feld | Beschreibung | Beispiel |
+|------|--------------|----------|
+| `categoryKey` | Technischer Schlüssel | `HZV_UCKERATH` |
+| `categoryLabel` | Anzeigename | „HZV Uckerath" |
+| `flowType` | INFLOW / OUTFLOW | INFLOW |
+| `assumptionType` | RUN_RATE, FIXED, ONE_TIME, PERCENTAGE_OF_REVENUE | RUN_RATE |
+| `baseAmountCents` | Betrag pro Periode | 1500000 (15.000 EUR) |
+| `baseAmountSource` | Quellenangabe (Pflicht) | „Durchschnitt Nov-Jan" |
+| `growthFactorPercent` | Wachstum pro Periode | -5.0 (5% Rückgang) |
+| `startPeriodIndex` / `endPeriodIndex` | Gültigkeitszeitraum | 3 bis 10 |
+| `isActive` | Toggle | true/false |
+
+#### Berechnung (Forecast Engine)
+
+```typescript
+// lib/forecast/engine.ts
+// Pro Periode: Alle aktiven Annahmen summieren
+for (assumption of activeAssumptions) {
+  if (period >= start && period <= end) {
+    amount = baseAmount * (1 + growthFactor)^(period - start)
+    if (seasonal) amount *= seasonalProfile[month]
+    periodCashflows[period] += amount
+  }
+}
+// Closing Balance = Opening + Σ Cashflows
+// Headroom = Closing + Kreditlinie - Rückstellungen
+```
+
+#### Dashboard-Integration
+
+- **RollingForecastChart:** IST (grün) + PROGNOSE (blau gestrichelt) + Headroom-Linie
+- **RollingForecastTable:** Jede Periode mit Quelle-Badge (IST/PROGNOSE/PLAN)
+- **Portal-Kontext:** Admin-Links („Annahmen bearbeiten") ausgeblendet, nur Text-Badge sichtbar
+
+#### APIs
+
+| Endpunkt | Methode | Zweck |
+|----------|---------|-------|
+| `/api/cases/[id]/forecast/scenarios` | GET/POST/PUT | Szenarien verwalten |
+| `/api/cases/[id]/forecast/assumptions` | GET/POST/PUT/DELETE | Annahmen CRUD |
+| `/api/cases/[id]/forecast/calculate` | GET | Berechnung ausführen |
+
+#### Datenmodell
+
+```prisma
+model ForecastScenario {
+  id                      String    @id @default(uuid())
+  caseId                  String
+  name                    String
+  scenarioType            String    @default("BASE")
+  isActive                Boolean   @default(true)
+  isLocked                Boolean   @default(false)
+  periodType              String    // WEEKLY, MONTHLY
+  periodCount             Int
+  planStartDate           DateTime
+  openingBalanceCents     BigInt
+  openingBalanceSource    String
+  reservesTotalCents      BigInt    @default(0)
+
+  assumptions ForecastAssumption[]
+  @@map("forecast_scenarios")
+}
+
+model ForecastAssumption {
+  id                    String    @id @default(uuid())
+  scenarioId            String
+  caseId                String
+  categoryKey           String
+  categoryLabel         String
+  flowType              String    // INFLOW, OUTFLOW
+  assumptionType        String    // RUN_RATE, FIXED, ONE_TIME
+  baseAmountCents       BigInt
+  baseAmountSource      String
+  growthFactorPercent   Decimal?
+  seasonalProfile       String?   // JSON
+  startPeriodIndex      Int
+  endPeriodIndex        Int
+  isActive              Boolean   @default(true)
+
+  @@map("forecast_assumptions")
+}
+```
+
+---
+
+### 4.15 Sammelüberweisungs-Splitting
+
+**Konzept:**
+Sammelüberweisungen (z.B. eine KV-Quartalszahlung) werden in Einzelposten aufgespalten, um korrekte Alt/Neu-Zuordnungen und Standort-Aggregationen zu ermöglichen.
+
+**Datenmodell:**
+- Ein `LedgerEntry` kann über `parentEntryId` auf einen Parent verweisen (Self-Relation).
+- Die Relation `splitChildren` zeigt alle Children eines Parents.
+- Ein Parent mit mindestens einem Child gilt als „aufgelöst" (Split-Parent).
+
+**Filter-Mechanismus:**
+```typescript
+// In lib/ledger/types.ts
+export const EXCLUDE_SPLIT_PARENTS = {
+  splitChildren: { none: {} },
+} as const;
+
+// Verwendung in allen Aggregations-Queries:
+const entries = await prisma.ledgerEntry.findMany({
+  where: { caseId, valueType: 'IST', ...EXCLUDE_SPLIT_PARENTS },
+});
+```
+
+**Integrierte Dateien (12):**
+- `lib/ledger/aggregation.ts` (7 Queries)
+- `lib/ledger-aggregation.ts`
+- `lib/credit/calculate-massekredit.ts`
+- `lib/forecast/load-and-calculate.ts`
+- API-Routes: `bank-accounts`, `ist-plan-comparison`, `liquidity-matrix`, `locations`, `kontobewegungen`, `massekredit`
+
+**Schreibschutz:**
+- PUT auf Entries mit Children verbietet Änderungen an `amountCents`, `transactionDate`, `bankAccountId`.
+- Fehlermeldung: „Erst Aufspaltung rückgängig machen."
+
+**Audit-Actions:** `SPLIT` (Aufgespalten), `UNSPLIT` (Zusammengeführt)
+
+**NICHT gefiltert:** Ledger-Ansicht (zeigt alles), Classification Engine, Audit-Trail, Hash-Berechnung.
 
 ---
 

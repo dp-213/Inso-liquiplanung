@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { getCustomerSession, checkCaseAccess } from '@/lib/customer-auth';
+import { EXCLUDE_SPLIT_PARENTS } from '@/lib/ledger/types';
 import {
   HVPLUS_MATRIX_BLOCKS,
   HVPLUS_MATRIX_ROWS,
@@ -227,6 +228,7 @@ export async function GET(
     const allEntries = await prisma.ledgerEntry.findMany({
       where: {
         caseId,
+        ...EXCLUDE_SPLIT_PARENTS,
         reviewStatus: reviewStatusFilter,
         OR: [
           { bankAccountId: { in: liquidityAccountIds } },

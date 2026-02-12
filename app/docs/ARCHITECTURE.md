@@ -449,6 +449,7 @@ LedgerEntry (UNREVIEWED)
 │   │   │   │   ├── counterparties/   # Gegenparteien
 │   │   │   │   ├── kontobewegungen/ # IST-Daten nach Kontentyp/Monat/Standort
 │   │   │   │   ├── zahlungsverifikation/ # SOLL/IST-Abgleich
+│   │   │   │   ├── forecast/         # Prognose (Szenarien + Annahmen)
 │   │   │   │   ├── freigaben/       # Kombinierte Freigaben (Links + Kundenzugänge)
 │   │   │   │   └── locations/        # Standorte
 │   │   │   └── ...
@@ -468,6 +469,7 @@ LedgerEntry (UNREVIEWED)
 │   │       └── cases/[id]/
 │   │           ├── ledger/
 │   │           ├── intake/
+│   │           ├── forecast/        # Szenarien, Annahmen, Berechnung
 │   │           ├── rules/
 │   │           └── ...
 │   ├── middleware.ts                 # Subdomain-Routing (Tenant-Erkennung)
@@ -490,6 +492,10 @@ LedgerEntry (UNREVIEWED)
 │       ├── cases/                    # Case-spezifische Konfigurationen
 │       │   └── haevg-plus/           # HAEVG PLUS eG
 │       │       └── config.ts         # Abrechnungsstellen, Banken, Split-Regeln
+│       ├── forecast/                 # Prognose-Engine
+│       │   ├── engine.ts            # Cashflow-Berechnung aus Annahmen
+│       │   ├── load-and-calculate.ts # Laden + berechnen für Dashboard
+│       │   └── types.ts             # ForecastScenario, ForecastAssumption
 │       ├── settlement/               # Settlement-Logik
 │       │   └── split-engine.ts       # Alt/Neu-Splitting
 │       ├── credit/                   # Massekredit-Logik
@@ -509,6 +515,7 @@ LedgerEntry (UNREVIEWED)
     ├── TODO.md                       # Offene Features + Bugs
     ├── TODO_REFACTORING.md           # Refactoring-Plan (zurückgestellt)
     ├── ADMIN_SYSTEM.md               # Vollständige Admin-Doku
+    ├── FORECAST-ARCHITECTURE.md       # Prognose-Modul Architektur
     ├── DASHBOARD_BEST_PRACTICES.md   # W&P-Report Analyse
     └── archiv/                       # Archivierte One-Off-Docs
         └── INDEX.md                  # Inhaltsverzeichnis

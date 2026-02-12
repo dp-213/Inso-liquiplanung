@@ -10,6 +10,7 @@
  */
 
 import { prisma } from '@/lib/db';
+import { EXCLUDE_SPLIT_PARENTS } from '@/lib/ledger/types';
 import { forecastEngine } from './engine';
 import type { ForecastAssumptionInput, IstPeriodData, ForecastCalculationResult } from './types';
 import {
@@ -205,6 +206,7 @@ export async function loadAndCalculateForecast(
   const allEntries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
+      ...EXCLUDE_SPLIT_PARENTS,
       reviewStatus: { in: ['CONFIRMED', 'ADJUSTED'] },
       OR: [
         { bankAccountId: { in: liquidityAccountIds } },

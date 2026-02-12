@@ -12,6 +12,7 @@
  */
 
 import prisma from "@/lib/db";
+import { EXCLUDE_SPLIT_PARENTS } from "@/lib/ledger/types";
 
 // =============================================================================
 // TYPES
@@ -277,10 +278,11 @@ export async function aggregateLedgerEntries(
   // Default: Nur bestätigte Einträge verwenden
   const reviewStatuses = options.reviewStatuses || ["CONFIRMED", "ADJUSTED"];
 
-  // Lade LedgerEntry für den Case
+  // Lade LedgerEntry für den Case (exclude split parents)
   const allEntries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
+      ...EXCLUDE_SPLIT_PARENTS,
       reviewStatus: { in: reviewStatuses },
       ...(options.valueTypes?.length ? { valueType: { in: options.valueTypes } } : {}),
       ...(options.excludeSteeringTags?.length

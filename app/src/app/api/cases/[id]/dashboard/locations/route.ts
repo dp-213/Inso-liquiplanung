@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { EXCLUDE_SPLIT_PARENTS } from "@/lib/ledger/types";
 
 type EstateFilter = "GESAMT" | "ALTMASSE" | "NEUMASSE" | "UNKLAR";
 
@@ -65,6 +66,7 @@ export async function GET(
           where: {
             caseId,
             locationId: location.id,
+            ...EXCLUDE_SPLIT_PARENTS,
             reviewStatus: { in: ["CONFIRMED", "ADJUSTED"] },
             ...estateWhere,
           },
@@ -93,6 +95,7 @@ export async function GET(
           where: {
             caseId,
             locationId: location.id,
+            ...EXCLUDE_SPLIT_PARENTS,
             reviewStatus: { in: ["CONFIRMED", "ADJUSTED"] },
             ...estateWhere,
           },

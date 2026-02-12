@@ -4,6 +4,46 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-041: EXCLUDE_SPLIT_PARENTS – Sammelüberweisungs-Splitting
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Sammelüberweisungen (z.B. eine KV-Zahlung über 50.000 EUR) müssen in Einzelposten aufgespalten werden (je Standort/Arzt), um korrekte Alt/Neu-Zuordnungen und Standort-Aggregationen zu ermöglichen. Dabei darf der Parent-Betrag nicht doppelt gezählt werden.
+
+### Entscheidung
+
+**A) Zentrale Prisma-WHERE-Bedingung:**
+- `EXCLUDE_SPLIT_PARENTS = { splitChildren: { none: {} } }` als wiederverwendbare Konstante in `lib/ledger/types.ts`.
+- Logik: Ein Entry ohne Children ist „aktiv" (normale Buchung oder Child). Ein Entry MIT Children ist „aufgelöst" (Split-Parent) und wird aus Aggregationen ausgeschlossen.
+
+**B) Flächendeckende Integration:**
+- Filter in allen 12 Aggregations-Dateien eingebaut: Dashboard-APIs, Massekredit, Banksalden, Forecast, Standorte, Kontobewegungen.
+- NICHT verwendet für: Ledger-Ansicht (zeigt alles), Hash-Berechnung, Classification Engine, Audit-Queries.
+
+**C) Schreibschutz für Split-Parents:**
+- PUT auf Ledger-Entries mit Children verbietet `amountCents`, `transactionDate`, `bankAccountId` Änderungen.
+- Erst Aufspaltung rückgängig machen (UNSPLIT), dann Parent bearbeiten.
+
+**D) Audit-Trail:**
+- Neue Audit-Actions SPLIT und UNSPLIT für lückenlose Nachvollziehbarkeit.
+
+### Begründung
+
+- Zentrale Konstante statt verstreuter Filter-Logik vermeidet Inkonsistenzen.
+- Parent-Entries bleiben erhalten (nicht gelöscht) → Audit-Trail bleibt vollständig.
+- Schreibschutz verhindert inkonsistente Zustände (Parent-Betrag ≠ Summe Children).
+
+### Konsequenzen
+
+- Alle Aggregations-Queries müssen `...EXCLUDE_SPLIT_PARENTS` einbinden.
+- Neue Aggregations-APIs müssen den Filter ebenfalls verwenden.
+- Ledger-Ansicht zeigt weiterhin alle Entries (auch Parents) zur manuellen Kontrolle.
+
+---
+
 ## ADR-040: Kunden-Freigabe-UX & Subdomain-Routing
 
 **Datum:** 12. Februar 2026

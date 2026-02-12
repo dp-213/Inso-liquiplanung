@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { getCustomerSession, checkCaseAccess } from "@/lib/customer-auth";
 import { calculateBankAccountBalances } from "@/lib/bank-accounts/calculate-balances";
 import { generatePeriodLabel, getPeriodDates } from "@/lib/ledger-aggregation";
+import { EXCLUDE_SPLIT_PARENTS } from "@/lib/ledger/types";
 
 /**
  * GET /api/cases/[id]/bank-accounts
@@ -84,11 +85,12 @@ export async function GET(
       orderBy: { displayOrder: "asc" },
     });
 
-    // Lade ALLE IST-Ledger-Entries (valueType=IST)
+    // Lade ALLE IST-Ledger-Entries (valueType=IST, exclude split parents)
     const ledgerEntries = await prisma.ledgerEntry.findMany({
       where: {
         caseId,
         valueType: "IST",
+        ...EXCLUDE_SPLIT_PARENTS,
       },
       select: {
         bankAccountId: true,

@@ -19,6 +19,7 @@ import {
   AGGREGATION_STATUS,
   AggregationStatus,
   AggregationStatusResponse,
+  EXCLUDE_SPLIT_PARENTS,
 } from './types';
 import { createHash } from 'crypto';
 import { calculateOpeningBalanceByScope } from '@/lib/bank-accounts/calculate-balances';
@@ -150,9 +151,9 @@ export async function aggregateLedgerEntries(
     throw new Error(`Plan ${planId} nicht gefunden`);
   }
 
-  // Fetch all LedgerEntries for the case
+  // Fetch all LedgerEntries for the case (exclude split parents)
   const entries = await prisma.ledgerEntry.findMany({
-    where: { caseId },
+    where: { caseId, ...EXCLUDE_SPLIT_PARENTS },
     orderBy: { transactionDate: 'asc' },
   });
 
@@ -317,6 +318,7 @@ export async function getLedgerEntriesForPeriod(
     where: {
       caseId,
       valueType,
+      ...EXCLUDE_SPLIT_PARENTS,
       transactionDate: {
         gte: periodStart,
         lt: periodEnd,
@@ -504,9 +506,9 @@ export async function rebuildAggregation(
       throw new Error(`Plan ${planId} nicht gefunden`);
     }
 
-    // 3. Get all LedgerEntries
+    // 3. Get all LedgerEntries (exclude split parents)
     const entries = await prisma.ledgerEntry.findMany({
-      where: { caseId },
+      where: { caseId, ...EXCLUDE_SPLIT_PARENTS },
     });
 
     // 4. Aggregate entries
@@ -592,9 +594,9 @@ export async function aggregateByAvailability(
 
   const actualPeriodCount = periodCount || plan.periodCount;
 
-  // Get all LedgerEntries for the case
+  // Get all LedgerEntries for the case (exclude split parents)
   const entries = await prisma.ledgerEntry.findMany({
-    where: { caseId },
+    where: { caseId, ...EXCLUDE_SPLIT_PARENTS },
     orderBy: { transactionDate: 'asc' },
   });
 
@@ -726,11 +728,12 @@ export async function aggregateByCounterparty(
   const locationFilter: { in?: string[] } | undefined =
     scope !== 'GLOBAL' ? { in: SCOPE_LOCATION_IDS[scope] } : undefined;
 
-  // Get entries with counterparty and location
+  // Get entries with counterparty and location (exclude split parents)
   const entries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
       valueType: 'IST', // Nur IST-Einnahmen (keine PLAN)
+      ...EXCLUDE_SPLIT_PARENTS,
       ...(Object.keys(dateFilter).length > 0 ? { transactionDate: dateFilter } : {}),
       ...(flowType === 'INFLOW' ? { amountCents: { gt: 0 } } : {}),
       ...(flowType === 'OUTFLOW' ? { amountCents: { lt: 0 } } : {}),
@@ -892,11 +895,12 @@ export async function aggregateEstateAllocation(
   const locationFilter: { in?: string[] } | undefined =
     scope !== 'GLOBAL' ? { in: SCOPE_LOCATION_IDS[scope] } : undefined;
 
-  // Get ALL IST entries
+  // Get ALL IST entries (exclude split parents)
   const entries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
       valueType: 'IST', // Nur IST-Einträge
+      ...EXCLUDE_SPLIT_PARENTS,
       ...(Object.keys(dateFilter).length > 0 ? { transactionDate: dateFilter } : {}),
       ...(locationFilter ? { locationId: locationFilter } : {}),
     },
@@ -1081,10 +1085,11 @@ export async function aggregateRollingForecast(
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // 2. Load LedgerEntries based on filter setting
+  // 2. Load LedgerEntries based on filter setting (exclude split parents)
   const allEntries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
+      ...EXCLUDE_SPLIT_PARENTS,
       ...(includeUnreviewed
         ? {} // All entries
         : { reviewStatus: { in: ['CONFIRMED', 'ADJUSTED'] } } // Only reviewed
