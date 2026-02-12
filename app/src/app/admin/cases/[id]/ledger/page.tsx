@@ -2305,7 +2305,8 @@ export default function CaseLedgerPage({
                     ? "bg-gray-100 text-gray-500"
                     : zebraClass;
 
-                  const rows: JSX.Element[] = [];
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const rows: any[] = [];
                   rows.push(
                     <tr
                       key={entry.id}
