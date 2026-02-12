@@ -10,8 +10,7 @@ interface DashboardNavProps {
 const navItems = [
   { href: "", label: "Übersicht", icon: "chart" },
   { href: "/revenue", label: "Einnahmen", icon: "money" },
-  { href: "/finanzierung", label: "Finanzierung", icon: "bank" },
-  { href: "/security", label: "Sicherungsrechte", icon: "shield" },
+  { href: "/banken-sicherungsrechte", label: "Banken & Sicherungsrechte", icon: "bank" },
   { href: "/estate", label: "Masseübersicht", icon: "folder" },
   { href: "/orders", label: "Freigaben", icon: "clipboard" },
   { href: "/compare", label: "Vergleich", icon: "compare" },
@@ -91,15 +90,15 @@ export default function DashboardNav({ caseId }: DashboardNavProps) {
   };
 
   return (
-    <nav className="flex flex-wrap gap-2 p-1 bg-gray-100 rounded-lg">
+    <nav className="flex flex-wrap gap-2 p-1 bg-[var(--accent)] rounded-lg">
       {navItems.map((item) => (
         <Link
           key={item.href}
           href={`${basePath}${item.href}`}
           className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             isActive(item.href)
-              ? "bg-white text-[var(--primary)] shadow-sm"
-              : "text-[var(--secondary)] hover:text-[var(--foreground)] hover:bg-white/50"
+              ? "bg-[var(--card-bg)] text-[var(--primary)] shadow-sm"
+              : "text-[var(--secondary)] hover:text-[var(--foreground)] hover:bg-[var(--card-bg)]/50"
           }`}
         >
           {getIcon(item.icon)}

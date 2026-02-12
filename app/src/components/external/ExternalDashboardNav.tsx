@@ -75,7 +75,7 @@ export default function ExternalDashboardNav({ activeTab, onTabChange }: Externa
             className={`flex items-center justify-center gap-1 sm:gap-2 px-3 sm:px-5 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm font-semibold transition-all min-h-[44px] flex-1 sm:flex-none ${
               activeTab === item.id
                 ? "bg-[var(--primary)] text-white shadow-md"
-                : "bg-gray-100 text-[var(--secondary)] hover:bg-gray-200 hover:text-[var(--foreground)]"
+                : "bg-[var(--accent)] text-[var(--secondary)] hover:bg-[var(--border)] hover:text-[var(--foreground)]"
             }`}
           >
             {getIcon(item.icon)}

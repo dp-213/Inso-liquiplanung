@@ -44,7 +44,7 @@ export default function DataSourceLegend({ compact = false, ledgerStats }: DataS
   }
 
   return (
-    <div className="admin-card p-4 bg-gray-50 border-gray-200">
+    <div className="admin-card p-4 bg-[var(--accent)] border-[var(--border)]">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-3">
         <h4 className="text-sm font-semibold text-[var(--foreground)]">
           Datenherkunft verstehen
@@ -117,7 +117,7 @@ export default function DataSourceLegend({ compact = false, ledgerStats }: DataS
         </div>
       </div>
       {ledgerStats && ledgerStats.dataSource === "LEDGER" && (ledgerStats.masseCount > 0 || ledgerStats.absonderungCount > 0) && (
-        <div className="mt-4 pt-3 border-t border-gray-200 flex flex-wrap gap-3 text-xs">
+        <div className="mt-4 pt-3 border-t border-[var(--border)] flex flex-wrap gap-3 text-xs">
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-blue-500"></span>
             <span className="text-[var(--secondary)]">Masse: {ledgerStats.masseCount}</span>

@@ -23,9 +23,9 @@ export default function BerechnungsgrundlagenPage({
         });
         if (response.ok) {
           const data = await response.json();
-          setCaseName(data.debtorName || data.name || "");
-          if (data.insolvencyOpeningDate) {
-            setOpeningDate(new Date(data.insolvencyOpeningDate).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }));
+          setCaseName(data.case?.debtorName || "");
+          if (data.case?.openingDate) {
+            setOpeningDate(new Date(data.case.openingDate).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }));
           }
         }
       } catch {
@@ -81,10 +81,10 @@ export default function BerechnungsgrundlagenPage({
 
       {/* Header */}
       <div className="admin-card p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-600">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <h1 className="text-2xl font-bold text-[var(--foreground)] mb-2">
           Berechnungsgrundlagen der Liquiditätsplanung
         </h1>
-        <p className="text-gray-700">
+        <p className="text-[var(--secondary)]">
           Transparente Methodik für präzise Prognosen in Ihrem Insolvenzverfahren
         </p>
       </div>
@@ -405,7 +405,7 @@ export default function BerechnungsgrundlagenPage({
       </div>
 
       {/* Traceability */}
-      <div className="admin-card p-6 bg-gray-50">
+      <div className="admin-card p-6 bg-[var(--accent)]">
         <h2 className="text-xl font-semibold text-[var(--foreground)] mb-3">
           Volle Nachvollziehbarkeit
         </h2>
@@ -414,7 +414,7 @@ export default function BerechnungsgrundlagenPage({
           zurückverfolgbar:
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-          <div className="bg-white p-4 rounded border border-[var(--border)]">
+          <div className="bg-[var(--card-bg)] p-4 rounded border border-[var(--border)]">
             <p className="font-medium text-[var(--foreground)] mb-2">
               📄 Quelldokumente
             </p>
@@ -422,7 +422,7 @@ export default function BerechnungsgrundlagenPage({
               Kontoauszüge, Abrechnungsbescheide, Verträge sind hinterlegt
             </p>
           </div>
-          <div className="bg-white p-4 rounded border border-[var(--border)]">
+          <div className="bg-[var(--card-bg)] p-4 rounded border border-[var(--border)]">
             <p className="font-medium text-[var(--foreground)] mb-2">
               🔍 Audit-Trail
             </p>
@@ -430,7 +430,7 @@ export default function BerechnungsgrundlagenPage({
               Jede Änderung wird protokolliert (Wer? Wann? Warum?)
             </p>
           </div>
-          <div className="bg-white p-4 rounded border border-[var(--border)]">
+          <div className="bg-[var(--card-bg)] p-4 rounded border border-[var(--border)]">
             <p className="font-medium text-[var(--foreground)] mb-2">
               📊 Traceability-Matrix
             </p>
@@ -458,10 +458,10 @@ export default function BerechnungsgrundlagenPage({
             />
           </svg>
           <div>
-            <h3 className="font-semibold text-gray-900 mb-2">
+            <h3 className="font-semibold text-[var(--foreground)] mb-2">
               Fragen zur Methodik?
             </h3>
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-[var(--secondary)]">
               Unser Team erläutert Ihnen gerne Details zu den
               Berechnungsgrundlagen. Alle Annahmen und Regeln können bei Bedarf
               angepasst werden.

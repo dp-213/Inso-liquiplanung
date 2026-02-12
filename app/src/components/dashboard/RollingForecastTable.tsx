@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 interface ForecastPeriod {
   periodIndex: number;
@@ -10,16 +11,25 @@ interface ForecastPeriod {
   outflowsCents: string;
   netCashflowCents: string;
   closingBalanceCents: string;
-  source: "IST" | "PLAN" | "MIXED";
+  source: "IST" | "PLAN" | "FORECAST" | "MIXED";
   istCount: number;
   planCount: number;
   isPast: boolean;
+}
+
+interface ForecastMeta {
+  scenarioName: string;
+  assumptionCount: number;
+  creditLineCents: string;
+  reservesTotalCents: string;
 }
 
 interface ForecastData {
   openingBalanceCents: string;
   todayPeriodIndex: number;
   periods: ForecastPeriod[];
+  hasForecast?: boolean;
+  forecastMeta?: ForecastMeta | null;
   // Filter info
   includeUnreviewed: boolean;
   unreviewedCount: number;
@@ -42,7 +52,7 @@ function formatEuro(cents: string | number): string {
 }
 
 // Source indicator component
-function SourceIndicator({ source }: { source: "IST" | "PLAN" | "MIXED" }) {
+function SourceIndicator({ source }: { source: "IST" | "PLAN" | "FORECAST" | "MIXED" }) {
   if (source === "IST") {
     return (
       <span
@@ -55,11 +65,23 @@ function SourceIndicator({ source }: { source: "IST" | "PLAN" | "MIXED" }) {
     );
   }
 
+  if (source === "FORECAST") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700"
+        title="Prognose aus Annahmen"
+      >
+        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+        PROGNOSE
+      </span>
+    );
+  }
+
   if (source === "PLAN") {
     return (
       <span
         className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700"
-        title="Prognose / Planwert"
+        title="Statischer Planwert"
       >
         <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
         PLAN
@@ -133,6 +155,32 @@ export default function RollingForecastTable({
 
   return (
     <div className="overflow-x-auto">
+      {/* Forecast Info Banner */}
+      {data.hasForecast && data.forecastMeta && (
+        <div className="px-4 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 text-sm text-blue-800">
+            <span className="w-2 h-2 rounded-full bg-blue-500" />
+            <span>
+              Prognose-Daten aus <strong>{data.forecastMeta.scenarioName}</strong>
+              {" "}&middot;{" "}
+              {data.forecastMeta.assumptionCount} Annahmen
+              {Number(data.forecastMeta.creditLineCents) > 0 && (
+                <>
+                  {" "}&middot;{" "}
+                  Kreditlinie: {formatEuro(data.forecastMeta.creditLineCents)}
+                </>
+              )}
+            </span>
+          </div>
+          <Link
+            href={`/admin/cases/${caseId}/forecast`}
+            className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+          >
+            Annahmen bearbeiten &rarr;
+          </Link>
+        </div>
+      )}
+
       {/* Filter Toggle */}
       <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
@@ -193,7 +241,7 @@ export default function RollingForecastTable({
         <thead>
           <tr className="border-b-2 border-gray-200">
             <th className="text-left py-3 px-4 font-semibold text-gray-700">Periode</th>
-            <th className="text-center py-3 px-2 font-semibold text-gray-700 w-20">Quelle</th>
+            <th className="text-center py-3 px-2 font-semibold text-gray-700 w-24">Quelle</th>
             <th className="text-right py-3 px-4 font-semibold text-gray-700">Anfangsbestand</th>
             <th className="text-right py-3 px-4 font-semibold text-green-700">Einzahlungen</th>
             <th className="text-right py-3 px-4 font-semibold text-red-700">Auszahlungen</th>
@@ -206,6 +254,7 @@ export default function RollingForecastTable({
             const isToday = idx === data.todayPeriodIndex;
             const netPositive = Number(period.netCashflowCents) >= 0;
             const closingNegative = Number(period.closingBalanceCents) < 0;
+            const isForecast = period.source === "FORECAST";
 
             return (
               <tr
@@ -215,7 +264,9 @@ export default function RollingForecastTable({
                     ? "bg-amber-50 border-l-4 border-l-amber-400"
                     : period.source === "IST"
                       ? "bg-green-50/30 hover:bg-green-50"
-                      : "hover:bg-gray-50"
+                      : isForecast
+                        ? "bg-blue-50/30 hover:bg-blue-50"
+                        : "hover:bg-gray-50"
                 }`}
               >
                 <td className="py-3 px-4">
@@ -254,20 +305,39 @@ export default function RollingForecastTable({
         </tbody>
       </table>
 
-      {/* Legend */}
-      <div className="mt-4 flex flex-wrap gap-4 text-xs text-gray-500 px-4">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-green-500" />
-          <span><strong>IST</strong> = Echte Bankbuchungen</span>
+      {/* Footer */}
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-4 px-4">
+        {/* Legend */}
+        <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-green-500" />
+            <span><strong>IST</strong> = Echte Bankbuchungen</span>
+          </div>
+          {data.hasForecast && (
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-blue-500" />
+              <span><strong>PROGNOSE</strong> = Annahmen-basiert</span>
+            </div>
+          )}
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-purple-500" />
+            <span><strong>PLAN</strong> = Statische Planwerte</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-amber-500" />
+            <span><strong>Mix</strong> = IST und PLAN</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-purple-500" />
-          <span><strong>PLAN</strong> = Prognose (wird bei IST-Erfassung ersetzt)</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-amber-500" />
-          <span><strong>Mix</strong> = Periode enthält IST und PLAN</span>
-        </div>
+
+        {/* Forecast link */}
+        {data.hasForecast && (
+          <Link
+            href={`/admin/cases/${caseId}/forecast`}
+            className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+          >
+            Annahmen bearbeiten &rarr;
+          </Link>
+        )}
       </div>
     </div>
   );

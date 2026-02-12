@@ -217,7 +217,7 @@ export default function RevenueAnalysisPage() {
             </thead>
             <tbody>
               {PAYMENT_SOURCES.map((source) => (
-                <tr key={source.id} className="border-b border-[var(--border)] hover:bg-gray-50">
+                <tr key={source.id} className="border-b border-[var(--border)] hover:bg-[var(--accent)]">
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       <div
@@ -246,7 +246,7 @@ export default function RevenueAnalysisPage() {
           {sourceTotals.map((source, idx) => (
             <div
               key={source.name}
-              className="p-4 rounded-lg border border-[var(--border)] bg-gray-50"
+              className="p-4 rounded-lg border border-[var(--border)] bg-[var(--accent)]"
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-[var(--secondary)]">{source.name}</span>
@@ -325,7 +325,7 @@ export default function RevenueAnalysisPage() {
                   BigInt(0)
                 );
                 return (
-                  <tr key={week.weekOffset} className="border-b border-[var(--border)] hover:bg-gray-50">
+                  <tr key={week.weekOffset} className="border-b border-[var(--border)] hover:bg-[var(--accent)]">
                     <td className="py-3 px-4 font-medium text-[var(--foreground)]">{week.weekLabel}</td>
                     {sourceTotals.map((source) => (
                       <td key={source.name} className="py-3 px-4 text-right text-[var(--secondary)]">
@@ -340,7 +340,7 @@ export default function RevenueAnalysisPage() {
               })}
             </tbody>
             <tfoot>
-              <tr className="bg-gray-50 font-medium">
+              <tr className="bg-[var(--accent)] font-medium">
                 <td className="py-3 px-4 text-[var(--foreground)]">Summe</td>
                 {sourceTotals.map((source) => (
                   <td key={source.name} className="py-3 px-4 text-right text-[var(--foreground)]">

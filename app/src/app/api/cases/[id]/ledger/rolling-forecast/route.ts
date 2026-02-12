@@ -145,7 +145,7 @@ export async function GET(
               period.planInflowsCents = BigInt(0);
               period.planOutflowsCents = BigInt(0);
               period.planCount = 0;
-              (period as Record<string, unknown>).source = 'FORECAST';
+              period.source = 'FORECAST';
 
               needsRebalance = true;
             }
@@ -174,7 +174,7 @@ export async function GET(
     let totalForecastPeriods = 0;
     for (const p of result.periods) {
       if (p.source === 'IST' || p.source === 'MIXED') totalIstPeriods++;
-      else if ((p as Record<string, unknown>).source === 'FORECAST') totalForecastPeriods++;
+      else if (p.source === 'FORECAST') totalForecastPeriods++;
       else totalPlanPeriods++;
     }
 

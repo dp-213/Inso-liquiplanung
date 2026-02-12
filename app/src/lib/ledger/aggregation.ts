@@ -979,7 +979,7 @@ export async function aggregateEstateAllocation(
 /**
  * Data source for a period in the rolling forecast
  */
-export type RollingForecastSource = 'IST' | 'PLAN' | 'MIXED';
+export type RollingForecastSource = 'IST' | 'PLAN' | 'FORECAST' | 'MIXED';
 
 /**
  * Rolling Forecast period data

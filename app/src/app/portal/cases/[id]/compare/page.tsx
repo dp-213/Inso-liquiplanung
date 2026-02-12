@@ -162,7 +162,7 @@ export default function CompareViewPage() {
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 compareMode === "ist_plan"
                   ? "bg-[var(--primary)] text-white"
-                  : "bg-gray-100 text-[var(--secondary)] hover:bg-gray-200"
+                  : "bg-[var(--accent)] text-[var(--secondary)] hover:bg-[var(--border)]"
               }`}
             >
               IST vs PLAN
@@ -172,7 +172,7 @@ export default function CompareViewPage() {
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 compareMode === "versions"
                   ? "bg-[var(--primary)] text-white"
-                  : "bg-gray-100 text-[var(--secondary)] hover:bg-gray-200"
+                  : "bg-[var(--accent)] text-[var(--secondary)] hover:bg-[var(--border)]"
               }`}
             >
               Versionen
@@ -229,7 +229,7 @@ export default function CompareViewPage() {
             </div>
 
             {/* Current Version Info */}
-            <div className="p-4 bg-gray-50 rounded-lg">
+            <div className="p-4 bg-[var(--accent)] rounded-lg">
               <h3 className="text-sm font-medium text-[var(--foreground)] mb-3">
                 Aktuelle Version: Version {data.plan.versionNumber}
               </h3>

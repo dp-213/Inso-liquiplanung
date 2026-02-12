@@ -1,17 +1,16 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import {
   ComposedChart,
   Line,
-  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
-  ReferenceArea,
   Legend,
 } from "recharts";
 
@@ -25,10 +24,17 @@ interface ForecastPeriod {
   outflowsCents: string;
   netCashflowCents: string;
   closingBalanceCents: string;
-  source: "IST" | "PLAN" | "MIXED";
+  source: "IST" | "PLAN" | "FORECAST" | "MIXED";
   istCount: number;
   planCount: number;
   isPast: boolean;
+}
+
+interface ForecastMeta {
+  scenarioName: string;
+  assumptionCount: number;
+  creditLineCents: string;
+  reservesTotalCents: string;
 }
 
 interface ForecastData {
@@ -36,7 +42,10 @@ interface ForecastData {
   todayPeriodIndex: number;
   totalIstPeriods: number;
   totalPlanPeriods: number;
+  totalForecastPeriods?: number;
   periodType: string;
+  hasForecast?: boolean;
+  forecastMeta?: ForecastMeta | null;
   periods: ForecastPeriod[];
 }
 
@@ -84,30 +93,26 @@ function CustomTooltip({
   const sourceLabel =
     data.source === "IST"
       ? "Echte Bankdaten"
-      : data.source === "PLAN"
-        ? "Prognose"
-        : "Gemischt";
+      : data.source === "FORECAST"
+        ? "Prognose (Annahmen)"
+        : data.source === "PLAN"
+          ? "Plan (Legacy)"
+          : "Gemischt";
 
-  const sourceColor =
+  const sourceBadgeClass =
     data.source === "IST"
-      ? "text-green-600"
-      : data.source === "PLAN"
-        ? "text-purple-600"
-        : "text-amber-600";
+      ? "bg-green-100 text-green-700"
+      : data.source === "FORECAST"
+        ? "bg-blue-100 text-blue-700"
+        : data.source === "PLAN"
+          ? "bg-purple-100 text-purple-700"
+          : "bg-amber-100 text-amber-700";
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 min-w-[200px]">
       <div className="flex items-center justify-between mb-2">
         <span className="font-semibold text-gray-900">{label}</span>
-        <span
-          className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-            data.source === "IST"
-              ? "bg-green-100 text-green-700"
-              : data.source === "PLAN"
-                ? "bg-purple-100 text-purple-700"
-                : "bg-amber-100 text-amber-700"
-          }`}
-        >
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${sourceBadgeClass}`}>
           {sourceLabel}
         </span>
       </div>
@@ -139,13 +144,14 @@ interface ChartDataPoint {
   balance: number;
   inflows: number;
   outflows: number;
-  source: "IST" | "PLAN" | "MIXED";
+  source: "IST" | "PLAN" | "FORECAST" | "MIXED";
   istCount: number;
   planCount: number;
   isPast: boolean;
   isToday: boolean;
   // For split lines
   istBalance: number | null;
+  forecastBalance: number | null;
   planBalance: number | null;
 }
 
@@ -185,9 +191,21 @@ export default function RollingForecastChart({
   const chartData = useMemo((): ChartDataPoint[] => {
     if (!data) return [];
 
+    // Finde den letzten IST-Punkt für den Übergang
+    const lastIstIndex = data.periods.reduce((last, p, idx) =>
+      p.source === "IST" || p.source === "MIXED" ? idx : last, -1
+    );
+
     return data.periods.map((p, idx) => {
       const balance = Number(p.closingBalanceCents) / 100;
       const isToday = idx === data.todayPeriodIndex;
+
+      // IST-Linie: IST + MIXED Perioden, plus Übergangs-Punkt
+      const isIst = p.source === "IST" || p.source === "MIXED";
+      // Forecast/Plan-Linie: FORECAST/PLAN Perioden, plus Übergangs-Punkt (letzter IST)
+      const isForecast = p.source === "FORECAST";
+      const isPlan = p.source === "PLAN";
+      const isTransitionPoint = idx === lastIstIndex && lastIstIndex >= 0;
 
       return {
         name: p.periodLabel,
@@ -199,9 +217,9 @@ export default function RollingForecastChart({
         planCount: p.planCount,
         isPast: p.isPast,
         isToday,
-        // For visual split: only show value on the relevant line
-        istBalance: p.source === "IST" || p.source === "MIXED" ? balance : null,
-        planBalance: p.source === "PLAN" ? balance : null,
+        istBalance: isIst ? balance : null,
+        forecastBalance: isForecast || (isTransitionPoint && data.hasForecast) ? balance : null,
+        planBalance: isPlan || (isTransitionPoint && !data.hasForecast && !isForecast) ? balance : null,
       };
     });
   }, [data]);
@@ -242,6 +260,9 @@ export default function RollingForecastChart({
     );
   }
 
+  const hasForecastPeriods = data.hasForecast && (data.totalForecastPeriods || 0) > 0;
+  const hasPlanPeriods = data.totalPlanPeriods > 0;
+
   return (
     <div className="space-y-4">
       {/* Summary Stats */}
@@ -249,15 +270,34 @@ export default function RollingForecastChart({
         <div className="flex items-center gap-2">
           <div className="w-4 h-1 bg-green-500 rounded" />
           <span className="text-[var(--secondary)]">
-            IST (Vergangenheit): <strong className="text-green-600">{data.totalIstPeriods} Perioden</strong>
+            IST (Bankdaten): <strong className="text-green-600">{data.totalIstPeriods} Perioden</strong>
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="w-4 h-1 bg-purple-500 rounded border-dashed" style={{ borderStyle: 'dashed', borderWidth: '2px', borderColor: '#8b5cf6', height: 0 }} />
-          <span className="text-[var(--secondary)]">
-            PLAN (Zukunft): <strong className="text-purple-600">{data.totalPlanPeriods} Perioden</strong>
-          </span>
-        </div>
+        {hasForecastPeriods && (
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-1 bg-blue-500 rounded" />
+            <span className="text-[var(--secondary)]">
+              Prognose: <strong className="text-blue-600">{data.totalForecastPeriods} Perioden</strong>
+            </span>
+          </div>
+        )}
+        {hasPlanPeriods && (
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-1 bg-purple-500 rounded" style={{ borderStyle: 'dashed', borderWidth: '2px', borderColor: '#8b5cf6', height: 0 }} />
+            <span className="text-[var(--secondary)]">
+              PLAN (Zukunft): <strong className="text-purple-600">{data.totalPlanPeriods} Perioden</strong>
+            </span>
+          </div>
+        )}
+        {hasForecastPeriods && data.forecastMeta && (
+          <Link
+            href={`/admin/cases/${caseId}/forecast`}
+            className="ml-auto text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+          >
+            <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            Prognose aktiv ({data.forecastMeta.assumptionCount} Annahmen)
+          </Link>
+        )}
       </div>
 
       {/* Chart */}
@@ -270,6 +310,10 @@ export default function RollingForecastChart({
               <linearGradient id="istGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
                 <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="forecastGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
               </linearGradient>
               <linearGradient id="planGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.2} />
@@ -327,7 +371,20 @@ export default function RollingForecastChart({
               name="IST"
             />
 
-            {/* PLAN Line - dashed purple */}
+            {/* FORECAST Line - solid blue */}
+            <Line
+              type="monotone"
+              dataKey="forecastBalance"
+              stroke="#3b82f6"
+              strokeWidth={3}
+              strokeDasharray="8 4"
+              dot={{ fill: "#3b82f6", strokeWidth: 2, stroke: "white", r: 5 }}
+              activeDot={{ r: 7, strokeWidth: 0 }}
+              connectNulls={false}
+              name="PROGNOSE"
+            />
+
+            {/* PLAN Line - dashed purple (Legacy-Fallback) */}
             <Line
               type="monotone"
               dataKey="planBalance"
@@ -347,14 +404,18 @@ export default function RollingForecastChart({
                     <div className="w-3 h-3 rounded-full bg-green-500" />
                     <span className="text-gray-600">IST (echte Bankdaten)</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-purple-500" />
-                    <span className="text-gray-600">PLAN (Prognose)</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-amber-500" />
-                    <span className="text-gray-600">Gemischt</span>
-                  </div>
+                  {hasForecastPeriods && (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-blue-500" />
+                      <span className="text-gray-600">Prognose (Annahmen-basiert)</span>
+                    </div>
+                  )}
+                  {hasPlanPeriods && (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-purple-500" />
+                      <span className="text-gray-600">PLAN (statisch)</span>
+                    </div>
+                  )}
                 </div>
               )}
             />
@@ -364,8 +425,8 @@ export default function RollingForecastChart({
       {/* Info box */}
       <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
         <strong>Rolling Forecast:</strong> Vergangenheit zeigt echte Bankbuchungen (IST),
-        Zukunft zeigt Prognosen (PLAN). Sobald neue Bankdaten erfasst werden, ersetzen
-        sie automatisch die Planwerte.
+        Zukunft zeigt {hasForecastPeriods ? "Prognosen aus Ihren Annahmen (PROGNOSE)" : "Planwerte (PLAN)"}.
+        Sobald neue Bankdaten erfasst werden, ersetzen sie automatisch die Prognosewerte.
       </div>
     </div>
   );
