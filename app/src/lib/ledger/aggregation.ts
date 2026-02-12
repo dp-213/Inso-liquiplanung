@@ -924,10 +924,17 @@ export async function aggregateEstateAllocation(
     const amountCents = BigInt(entry.amountCents);
     const isInflow = amountCents > BigInt(0);
     const estateAllocation = entry.estateAllocation || 'UNKLAR';
-    const estateRatio = entry.estateRatio !== null ? Number(entry.estateRatio) : null;
+    // estateRatio aus estateAllocation ableiten wenn null:
+    // ALTMASSE → 0.0, NEUMASSE → 1.0, MIXED ohne Ratio → UNKLAR
+    const rawRatio = entry.estateRatio !== null ? Number(entry.estateRatio) : null;
+    const estateRatio = rawRatio !== null
+      ? rawRatio
+      : estateAllocation === 'ALTMASSE' ? 0.0
+      : estateAllocation === 'NEUMASSE' ? 1.0
+      : null;
 
-    if (estateAllocation === 'UNKLAR' || estateRatio === null) {
-      // UNKLAR: Keine Zuordnung möglich
+    if (estateAllocation === 'UNKLAR' || (estateAllocation === 'MIXED' && estateRatio === null)) {
+      // UNKLAR: Keine Zuordnung möglich (oder MIXED ohne Ratio)
       if (isInflow) {
         unklarInflowCents += amountCents;
       } else {
@@ -952,7 +959,7 @@ export async function aggregateEstateAllocation(
       // MIXED: Aufteilen nach estateRatio
       // estateRatio = Neu-Anteil, (1 - estateRatio) = Alt-Anteil
       const absoluteAmount = amountCents < BigInt(0) ? -amountCents : amountCents;
-      const neuAnteilCents = BigInt(Math.round(Number(absoluteAmount) * estateRatio));
+      const neuAnteilCents = BigInt(Math.round(Number(absoluteAmount) * estateRatio!));
       const altAnteilCents = absoluteAmount - neuAnteilCents;
 
       if (isInflow) {
