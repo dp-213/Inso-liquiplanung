@@ -4,6 +4,39 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.29.0 – Portal-Konsolidierung & Einnahmen-Tab
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Einnahmen-Trend-Chart:** Stacked BarChart im Revenue-Tab zeigt Zahlungseingänge nach `categoryTag` (HZV, KV, PVS, etc.) über die letzten 6 Monate. Top-5-Kategorien als eigene Serien, Rest → „Sonstige".
+- **categoryTag-Gruppierung:** Summary-Modus in der Einnahmen-Tabelle gruppiert jetzt nach Geschäftskategorie statt nach Counterparty-Name. Gleiche Aggregationslogik wie Chart (shared `groupByCategoryTag()` Helper).
+- **Shared Revenue Helper:** `lib/revenue-helpers.ts` mit `groupByCategoryTag()` und `groupByPeriodAndTag()` als Single Source of Truth für Chart und Tabelle.
+- **Revenue-API erweitert:** `categoryTag` wird jetzt in der Detail-Response von `/api/cases/[id]/ledger/revenue` mitgeliefert.
+
+### Änderungen
+
+- **Portal-Konsolidierung:** 6 Standalone-Portal-Seiten (revenue, estate, banken-sicherungsrechte, compare, finanzierung, security) durch `redirect()` auf `/portal/cases/[id]` ersetzt. UnifiedCaseDashboard ist jetzt der einzige Einstiegspunkt.
+- **Revenue-Tab:** Chart + Tabelle kombiniert in `RevenueTabContent` (1 API-Call statt 2). Scope-Filter wirkt auf beide.
+- **Gemeinsame Farbpalette:** `REVENUE_COLORS` in `revenue-helpers.ts` wird von Chart und Tabelle identisch verwendet.
+
+### Entfernte Features
+
+- **DashboardNav.tsx** – Legacy-Navigation der Standalone-Portal-Seiten (gelöscht)
+- **ExternalDashboardNav.tsx** – Nie importiert, Dead Code (gelöscht)
+- **RevenueChart.tsx** – Alter Dummy-Chart der Legacy-Revenue-Seite (gelöscht)
+- **PAYMENT_SOURCES** – Hardcodierte Konstante in UnifiedCaseDashboard (nie referenziert, entfernt)
+
+### Bugfixes
+
+- **Perioden-Sortierung:** Chart-Balken wurden alphabetisch statt chronologisch sortiert (Apr vor Feb vor Jan). Fix: Sortierung nach `transactionDate`.
+- **Doppelte API-Calls:** Chart und Tabelle fetchten identische Daten separat. Fix: `RevenueTabContent` fetcht einmal und reicht Daten als Props durch.
+- **Farb-Inkonsistenz:** Chart (6 Farben) und Tabelle (8 Farben) hatten separate Paletten. Fix: Gemeinsame `REVENUE_COLORS`.
+- **credentials: 'include':** Im zentralen Revenue-Fetch hinzugefügt (Auth-Sicherheit für Portal-Zugriff).
+
+---
+
 ## Version 2.28.0 – Kunden-Freigabe-UX & Subdomain-Routing
 
 **Datum:** 12. Februar 2026

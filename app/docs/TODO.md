@@ -2,23 +2,21 @@
 
 ## P0 - Kritisch
 
-### Scope-Support für RevenueTable + BankAccountsTab
+### ~~Scope-Support für RevenueTable~~ + BankAccountsTab
 
-**Status:** Quick-Fix implementiert (Tabs werden ausgeblendet bei Scope != GLOBAL)
+**Status:** RevenueTable ERLEDIGT (v2.29.0), BankAccountsTab offen
 
-**Problem:**
-- RevenueTable und BankAccountsTab respektieren den Scope-Toggle nicht
-- Quick-Fix: Tabs werden ausgeblendet wenn Scope != GLOBAL
+**RevenueTable:** ✅ Scope-Filter implementiert. `RevenueTabContent` übergibt `scope` an Revenue-API, Chart und Tabelle filtern korrekt nach Standort.
 
-**Betroffene Komponenten:**
-1. **RevenueTable** (`/components/dashboard/RevenueTable.tsx`) - braucht `scope`-Parameter
-2. **BankAccountsTab** (`/components/dashboard/BankAccountsTab.tsx`) - braucht Filterung nach locationId
+**BankAccountsTab:** Noch offen – wird bei Scope != GLOBAL ausgeblendet.
 
-**Betroffene API-Routes:**
-1. `/api/cases/[id]/ledger/revenue/route.ts` - Scope-Parameter lesen + filtern
-2. `/api/cases/[id]/bank-accounts/route.ts` - Scope-Parameter lesen + filtern
+**Betroffene Komponente:**
+- **BankAccountsTab** (`/components/dashboard/BankAccountsTab.tsx`) - braucht Filterung nach locationId
 
-**Kritikalität:** Mittel (Quick-Fix verhindert falsche Darstellung)
+**Betroffene API-Route:**
+- `/api/cases/[id]/bank-accounts/route.ts` - Scope-Parameter lesen + filtern
+
+**Kritikalität:** Niedrig (Quick-Fix verhindert falsche Darstellung)
 
 ---
 
@@ -153,5 +151,5 @@ Leere Seiten (z.B. Zahlungsregister ohne Entries, Prognose ohne Annahmen) zeigen
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.28.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.29.0)
 

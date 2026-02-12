@@ -58,10 +58,6 @@ PLAN-Daten bleiben bewusst für Vergleich und Audit erhalten.
 Ein LedgerEntry kann nur einer Gegenpartei/einem Bankkonto zugeordnet werden.
 **Workaround:** Separate Entries für verschiedene Dimensionen.
 
-### ~~Forecast-Modul in Entwicklung~~ GELÖST 2026-02-12
-
-Prognose-Modul vollständig implementiert (v2.28.0): Szenarien, Annahmen-Editor, Forecast Engine, Dashboard-Integration. Admin-Links im Portal-Kontext ausgeblendet.
-
 ---
 
 ## HVPlus-Fall: Offene Punkte
@@ -80,7 +76,7 @@ Prognose-Modul vollständig implementiert (v2.28.0): Szenarien, Annahmen-Editor,
 ### Portal: Externe Komponenten noch mit hardcodierten Farben
 
 Tabellen-Komponenten (`InsolvencyEffectsTable`, `PlanningAssumptions`, `LiquidityTable`) und Chart-Tooltips verwenden noch `bg-white`/`bg-gray-50` statt CSS-Variablen.
-**Status:** Bekannt, niedrige Priorität. Portal-spezifische Seiten und Navigation sind bereits migriert.
+**Status:** Bekannt, niedrige Priorität. Portal-Standalone-Seiten (revenue, estate, etc.) wurden in v2.29.0 eliminiert – nur noch `UnifiedCaseDashboard`.
 
 ## Freigabe-Modul (Orders)
 
@@ -140,7 +136,7 @@ SOLL/IST-Abgleich zeigt nur aggregierte Netto-Werte pro Periode. Aufschlüsselun
 
 ### Eingeschränkte Standort-Ansicht
 
-Bei Scope != GLOBAL werden Revenue- und Banks-Tabs ausgeblendet (kein Scope-Support).
+Bei Scope != GLOBAL wird der Banks-Tab ausgeblendet (kein Scope-Support). Revenue-Tab unterstützt Scope-Filter seit v2.29.0.
 
 ---
 
@@ -243,6 +239,14 @@ Neue kombinierte Seite `/portal/cases/[id]/banken-sicherungsrechte` ersetzt Demo
 
 Prognose-Modul vollständig implementiert (v2.28.0): Szenarien, Annahmen-Editor, Forecast Engine mit Dashboard-Integration. Turso-Tabellen (`forecast_scenarios`, `forecast_assumptions`) erstellt.
 
+### ~~Portal: Zwei konkurrierende Navigations-Systeme~~ GELÖST 2026-02-12
+
+Standalone-Portal-Seiten (revenue, estate, banken-sicherungsrechte, compare) mit Legacy-`DashboardNav` durch Redirects auf `UnifiedCaseDashboard` ersetzt. Dead Code gelöscht (v2.29.0, ADR-043).
+
+### ~~Revenue-Tab nur nach Counterparty gruppiert~~ GELÖST 2026-02-12
+
+Einnahmen-Tabelle und neuer Trend-Chart gruppieren jetzt nach `categoryTag` (HZV, KV, PVS etc.) statt nach `counterpartyName`. Shared Helper `groupByCategoryTag()` als Single Source of Truth (v2.29.0).
+
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.28.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.29.0)

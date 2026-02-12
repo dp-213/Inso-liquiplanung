@@ -4,6 +4,41 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-043: Portal-Konsolidierung – Ein Dashboard statt Standalone-Seiten
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Das Kundenportal hatte zwei konkurrierende Navigations-Systeme:
+- **System A (Legacy):** 4 Standalone-Seiten (revenue, estate, banken-sicherungsrechte, compare) mit eigener `DashboardNav`, eigenen Typen, teils hardcodierten Daten
+- **System B (Aktuell):** `UnifiedCaseDashboard` auf `/portal/cases/[id]/` mit internen Tabs, echten API-Daten, Scope-Filter
+
+Beide Systeme waren parallel erreichbar, was zu Verwirrung führte: Standalone-Seiten zeigten teilweise veraltete/andere Daten als das Dashboard.
+
+### Entscheidung
+
+1. **Alle 6 Standalone-Routen** (revenue, estate, banken-sicherungsrechte, compare, finanzierung, security) durch `redirect()` auf `/portal/cases/${id}` ersetzen
+2. **Dead Code entfernen:** `DashboardNav`, `ExternalDashboardNav`, `RevenueChart` löschen
+3. **Einnahmen-Tab** umbauen: Gruppierung nach `categoryTag` statt `counterpartyName`, neuer Stacked BarChart
+4. **Shared Aggregation:** `groupByCategoryTag()` als Single Source of Truth für Chart und Tabelle
+5. **Kein neuer API-Endpoint:** Bestehende Revenue-API minimal um `categoryTag` erweitern
+
+### Begründung
+
+- Ein einziger Einstiegspunkt eliminiert Daten-Inkonsistenzen zwischen Legacy- und neuem System
+- `categoryTag` ist die fachlich korrekte Gruppierungsdimension (HZV, KV, PVS = Geschäftskategorien), während `counterpartyName` zu granular ist (z.B. „HAEVG Velbert" vs. „HAEVG Uckerath" sind beide HZV)
+- Shared Helper verhindert Zahlen-Abweichungen zwischen Chart und Tabelle
+
+### Konsequenzen
+
+- Alte Bookmarks auf `/portal/cases/[id]/revenue` etc. funktionieren weiterhin (Redirect)
+- `orders/page.tsx` und `berechnungsgrundlagen/page.tsx` bleiben als Standalone (Server Component bzw. statischer Content)
+- Revenue-Tab zeigt max 5+1 Serien (Top-5 nach Betrag + „Sonstige")
+
+---
+
 ## ADR-042: Pflicht-Validierung bei AI-extrahierten PDF-Daten
 
 **Datum:** 12. Februar 2026
