@@ -26,6 +26,7 @@ import PlanningAssumptions from "@/components/external/PlanningAssumptions";
 import InsolvencyEffectsTable from "@/components/external/InsolvencyEffectsTable";
 import WaterfallChart from "@/components/external/WaterfallChart";
 import RevenueTable from "@/components/dashboard/RevenueTable";
+import RevenueTrendChart from "@/components/dashboard/RevenueTrendChart";
 import SecurityRightsChart from "@/components/dashboard/SecurityRightsChart";
 import RollingForecastChart from "@/components/dashboard/RollingForecastChart";
 import RollingForecastTable from "@/components/dashboard/RollingForecastTable";
@@ -144,18 +145,6 @@ function getStatusBadge(status: string) {
       return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">{status}</span>;
   }
 }
-
-// =============================================================================
-// Payment Sources Config
-// =============================================================================
-
-const PAYMENT_SOURCES = [
-  { id: "kv_advance", name: "KV-Abschläge", description: "Monatliche Abschlagszahlungen", rhythm: "Monatlich", color: "#3b82f6" },
-  { id: "kv_final", name: "KV-Restzahlungen", description: "Quartalsweise Restzahlungen", rhythm: "Quartalsweise", color: "#10b981" },
-  { id: "hzv_advance", name: "HZV-Abschläge", description: "Monatliche Pauschalen HZV", rhythm: "Monatlich", color: "#8b5cf6" },
-  { id: "hzv_final", name: "HZV-Schlusszahlung", description: "Jährliche Abschlusszahlung", rhythm: "Jährlich", color: "#f59e0b" },
-  { id: "pvs", name: "PVS-Zahlungen", description: "Privatpatienten-Abrechnungen", rhythm: "Laufend", color: "#ec4899" },
-];
 
 // =============================================================================
 // Props Interface
@@ -461,15 +450,24 @@ export default function UnifiedCaseDashboard({
       case "revenue":
         return (
           <div className="space-y-6">
-            {/* IST-Einnahmen aus Zahlungsregister */}
             {caseId && (
-              <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Einnahmen (IST)</h2>
-                <p className="text-sm text-gray-600 mb-4">
-                  Zeigt tatsächliche Zahlungseingänge aus dem Zahlungsregister. Sortiert nach Quelle und Monat.
-                </p>
-                <RevenueTable caseId={caseId} months={6} showSummary={true} scope={scope} />
-              </div>
+              <>
+                <div className="admin-card p-6">
+                  <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">
+                    Einnahmen-Entwicklung
+                  </h2>
+                  <p className="text-sm text-[var(--secondary)] mb-4">
+                    Tatsächliche Zahlungseingänge nach Kategorie. Nur IST-Daten.
+                  </p>
+                  <RevenueTrendChart caseId={caseId} months={6} scope={scope} />
+                </div>
+                <div className="admin-card p-6">
+                  <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
+                    Einnahmen nach Kategorie
+                  </h2>
+                  <RevenueTable caseId={caseId} months={6} showSummary={true} scope={scope} />
+                </div>
+              </>
             )}
           </div>
         );

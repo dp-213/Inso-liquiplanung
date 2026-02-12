@@ -680,6 +680,7 @@ export interface RevenueBySource {
   counterpartyName: string;
   locationId: string | null;
   locationName: string;
+  categoryTag: string | null;
   periodIndex: number;
   periodLabel: string;
   amountCents: bigint; // Gesamtbetrag (wie gebucht)
@@ -774,6 +775,7 @@ export async function aggregateByCounterparty(
       counterpartyName: entry.counterparty?.name || 'Unbekannt',
       locationId: entry.locationId,
       locationName: entry.location?.name || 'Ohne Standort',
+      categoryTag: entry.categoryTag,
       periodIndex,
       periodLabel,
       amountCents: totalAmount, // Gesamtbetrag (wie gebucht)

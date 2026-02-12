@@ -17,6 +17,7 @@ import {
 } from "@/lib/ledger";
 import { formatAllocationSource, formatCategoryTagSource } from "@/lib/ledger/format-helpers";
 import { ColumnFilter, ColumnFilterValue } from "@/components/ledger/ColumnFilter";
+import BatchSplitModal from "@/components/admin/BatchSplitModal";
 
 type TabType = "all" | "review" | "rules" | "sources";
 
@@ -853,7 +854,7 @@ export default function CaseLedgerPage({
   };
 
   const toggleAllEntries = () => {
-    const visibleEntries = sortedEntries;
+    const visibleEntries = visibleTopLevelEntries;
     const allVisibleSelected = visibleEntries.length > 0 && visibleEntries.every(e => selectedEntries.has(e.id));
     if (allVisibleSelected) {
       setSelectedEntries(new Set());
@@ -942,6 +943,10 @@ export default function CaseLedgerPage({
     }
     return sortOrder === "asc" ? comparison : -comparison;
   }), [filteredEntries, sortBy, sortOrder]);
+
+  // Sichtbare Entries (ohne Children – die werden unter Parents gerendert)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const visibleTopLevelEntries = useMemo(() => sortedEntries.filter(e => !(e as any).parentEntryId), [sortedEntries]);
 
   // Calculate selection summary
   const selectedEntriesData = entries.filter(e => selectedEntries.has(e.id));
@@ -1995,7 +2000,7 @@ export default function CaseLedgerPage({
             </div>
             <span className="text-sm text-[var(--muted)]">
               {Object.keys(columnFilters).length > 0
-                ? `${sortedEntries.length} von ${entries.length} Einträgen`
+                ? `${visibleTopLevelEntries.length} von ${entries.length} Einträgen`
                 : `${entries.length} Einträge`
               }
               {Object.keys(columnFilters).length > 0 && (
@@ -2039,7 +2044,7 @@ export default function CaseLedgerPage({
                   >
                     <input
                       type="checkbox"
-                      checked={sortedEntries.length > 0 && sortedEntries.every(e => selectedEntries.has(e.id))}
+                      checked={visibleTopLevelEntries.length > 0 && visibleTopLevelEntries.every(e => selectedEntries.has(e.id))}
                       onChange={toggleAllEntries}
                       className="rounded border-gray-300"
                     />
@@ -2273,6 +2278,9 @@ export default function CaseLedgerPage({
                   const isChild = !!entryAny.parentEntryId;
                   const splitChildren: Array<{ id: string; description: string; amountCents: string; counterpartyId: string | null; locationId: string | null; categoryTag: string | null; reviewStatus: string; note: string | null }> = entryAny.splitChildren || [];
                   const isExpanded = expandedBatches.has(entry.id);
+
+                  // Children nicht als eigene Zeile rendern – sie erscheinen unter dem aufgeklappten Parent
+                  if (isChild) return [];
 
                   const entryWithExtras = entry as LedgerEntryResponse & {
                     suggestedLegalBucket?: string | null;
@@ -2671,6 +2679,36 @@ Klicken zum Filtern`}
                                   </svg>
                                   Details
                                 </button>
+                                {/* Aufspalten: Nur für normale Entries (kein Split-Parent, kein Child) */}
+                                {!isBatchParent && !isChild && (
+                                  <button
+                                    onClick={() => setSplitModalEntry({
+                                      ...entry,
+                                      isBatchParent: false,
+                                    })}
+                                    className="w-full px-3 py-2 text-left text-xs text-amber-600 hover:bg-amber-50 flex items-center gap-2"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                                    </svg>
+                                    Aufspalten
+                                  </button>
+                                )}
+                                {/* Unsplit: Nur für Split-Parents */}
+                                {isBatchParent && (
+                                  <button
+                                    onClick={() => setSplitModalEntry({
+                                      ...entry,
+                                      isBatchParent: true,
+                                    })}
+                                    className="w-full px-3 py-2 text-left text-xs text-amber-600 hover:bg-amber-50 flex items-center gap-2"
+                                  >
+                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                    </svg>
+                                    Aufspaltung verwalten
+                                  </button>
+                                )}
                                 {isTransfer && (
                                   <button
                                     onClick={() => handleUnpairTransfer(entry.id)}
@@ -3282,6 +3320,25 @@ Klicken zum Filtern`}
             </div>
           </div>
         </div>
+      )}
+
+      {/* Batch Split Modal */}
+      {splitModalEntry && !splitModalEntry.isBatchParent && (
+        <BatchSplitModal
+          caseId={id}
+          parentEntry={{
+            id: splitModalEntry.id,
+            description: splitModalEntry.description,
+            amountCents: splitModalEntry.amountCents,
+            transactionDate: splitModalEntry.transactionDate,
+            bankAccountId: (splitModalEntry as unknown as { bankAccountId: string | null }).bankAccountId || null,
+          }}
+          onClose={() => setSplitModalEntry(null)}
+          onSuccess={() => {
+            setSplitModalEntry(null);
+            fetchData();
+          }}
+        />
       )}
 
       {/* Floating Selection Summary Bar - appears when entries are selected */}

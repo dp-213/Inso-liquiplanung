@@ -125,6 +125,7 @@ export async function GET(
         counterpartyName: e.counterpartyName,
         locationId: e.locationId,
         locationName: e.locationName,
+        categoryTag: e.categoryTag,
         periodIndex: e.periodIndex,
         periodLabel: e.periodLabel,
         amountCents: e.amountCents.toString(),

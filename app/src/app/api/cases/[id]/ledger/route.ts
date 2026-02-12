@@ -17,6 +17,7 @@ import {
   markAggregationStale,
   createAuditLog,
   AUDIT_ACTIONS,
+  EXCLUDE_SPLIT_PARENTS,
 } from '@/lib/ledger';
 import { LedgerEntry } from '@prisma/client';
 
@@ -279,8 +280,8 @@ export async function GET(
       }
     }
 
-    // Stats-Where: Transfers aus Summen ausschließen
-    const statsWhere = { ...where, transferPartnerEntryId: null };
+    // Stats-Where: Transfers UND Split-Parents aus Summen ausschließen
+    const statsWhere = { ...where, transferPartnerEntryId: null, ...EXCLUDE_SPLIT_PARENTS };
 
     // Fetch entries and stats (inkl. splitChildren für Batch-Erkennung)
     const [entries, total, inflowStats, outflowStats, transferVolumeStats] = await Promise.all([

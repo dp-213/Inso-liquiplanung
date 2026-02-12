@@ -41,6 +41,7 @@ Alle Beträge in EUR. Deutsche Insolvenzverfahren sind EUR-basiert.
 ### Sammelüberweisungen ohne Einzelaufschlüsselung
 
 29 Sammelüberweisungen (179K EUR) ohne Details zu Empfängern/Zwecken.
+**Teilweise gelöst (12.02.2026):** 18 Zahlbelege der ISK-Konten (BW-Bank Uckerath+Velbert) mit 56 Einzelposten (140.150,66 EUR) vollständig verifiziert und in `Zahlbelege_Vollstaendig.json` erfasst. Verbleibende Sammelüberweisungen (Sparkasse, apoBank) noch offen.
 **Workaround:** Details von IV/Buchhalterin nachliefern.
 
 ### IST-Vorrang ist nicht umkehrbar

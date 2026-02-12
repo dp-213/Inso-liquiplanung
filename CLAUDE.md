@@ -281,6 +281,7 @@ cd app && npm run build
 | Opening Balance falsch | Opening Balance = **Eröffnungssaldo** (Monatsbeginn), NICHT Schlusssaldo! Incident 08.02: -235K EUR Fehler! |
 | Import-Script erkennt Duplikate nicht | Script prüft nur exakten String-Match bei Description. Verschiedene JSON-Quellen mit leicht anderen Texten → Duplikate. Immer `(bankAccountId + transactionDate + amountCents)` prüfen! |
 | `importRowNumber === 0` ist falsy | JavaScript: `0` ist falsy! Bei Bedingungen `!== null` oder `!== undefined` verwenden, NICHT `if (value)` |
+| AI-extrahierte IBANs/Beträge falsch | AI halluziniert regelmäßig IBANs, Kontonummern, Beträge! **JEDES** PDF einzeln lesen und Cent-genau gegen JSON prüfen. Incident 12.02: 100% der 19 IBANs waren fabriziert! (ADR-042) |
 
 ### Daten-Import Sicherheitsregeln
 
@@ -546,4 +547,5 @@ Alle Falldaten liegen unter `/Cases/<Case-Name>/`:
 - PLAN-Daten: Liquiditätsplanung vom 14.01.2026 analysiert und nachvollzogen
 - Traceability-Matrix: Jede Zahl der Planung zu Quelldatei zurückverfolgt
 - Klassifikation: IST-Entries zu ~88% klassifiziert (Counterparty, Estate Allocation)
+- Zahlbelege: 18 ISK-Zahlbelege (56 Einzelposten, 140K EUR) vollständig PDF-verifiziert (ADR-042)
 - Offene Punkte: LANR-Location-Mapping korrigieren, fehlende Dez-Kontoauszüge (3 von 5 Banken)

@@ -2,29 +2,17 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { formatCurrency } from "@/types/dashboard";
+import { groupByCategoryTag, type RevenueEntryForGrouping } from "@/lib/revenue-helpers";
 
-interface RevenueEntry {
+interface RevenueEntry extends RevenueEntryForGrouping {
   counterpartyId: string | null;
   counterpartyName: string;
   locationId: string | null;
   locationName: string;
   periodIndex: number;
-  periodLabel: string;
-  amountCents: string;
-  neumasseAmountCents: string;
-  altmasseAmountCents: string;
   estateRatio: number;
   transactionDate: string;
   description: string;
-}
-
-interface RevenueSummary {
-  counterpartyId: string | null;
-  counterpartyName: string;
-  totalCents: string;
-  neumasseTotal: string;
-  altmasseTotal: string;
-  entryCount: number;
 }
 
 interface RevenueTableProps {
@@ -53,7 +41,6 @@ export default function RevenueTable({
   scope = 'GLOBAL',
 }: RevenueTableProps) {
   const [entries, setEntries] = useState<RevenueEntry[]>([]);
-  const [summary, setSummary] = useState<RevenueSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"summary" | "details">(
@@ -66,20 +53,15 @@ export default function RevenueTable({
       setError(null);
 
       try {
-        // Fetch both summary and details with scope parameter
-        const [summaryRes, detailsRes] = await Promise.all([
-          fetch(`/api/cases/${caseId}/ledger/revenue?months=${months}&summarize=true&scope=${scope}`),
-          fetch(`/api/cases/${caseId}/ledger/revenue?months=${months}&scope=${scope}`),
-        ]);
+        const res = await fetch(
+          `/api/cases/${caseId}/ledger/revenue?months=${months}&scope=${scope}`
+        );
 
-        if (summaryRes.ok) {
-          const summaryData = await summaryRes.json();
-          setSummary(summaryData.summary || []);
-        }
-
-        if (detailsRes.ok) {
-          const detailsData = await detailsRes.json();
-          setEntries(detailsData.entries || []);
+        if (res.ok) {
+          const data = await res.json();
+          setEntries(data.entries || []);
+        } else {
+          setError("Fehler beim Laden der Einnahmen-Daten");
         }
       } catch (err) {
         setError("Fehler beim Laden der Einnahmen-Daten");
@@ -92,27 +74,30 @@ export default function RevenueTable({
     fetchData();
   }, [caseId, months, scope]);
 
+  // Summary: gruppiert nach categoryTag via shared helper
+  const grouped = useMemo(() => groupByCategoryTag(entries, 5), [entries]);
+
   // Group entries by month for details view
   const entriesByMonth = useMemo(() => {
-    const grouped = new Map<string, RevenueEntry[]>();
+    const byMonth = new Map<string, RevenueEntry[]>();
 
     for (const entry of entries) {
       const monthKey = entry.periodLabel;
-      if (!grouped.has(monthKey)) {
-        grouped.set(monthKey, []);
+      if (!byMonth.has(monthKey)) {
+        byMonth.set(monthKey, []);
       }
-      grouped.get(monthKey)!.push(entry);
+      byMonth.get(monthKey)!.push(entry);
     }
 
-    return grouped;
+    return byMonth;
   }, [entries]);
 
-  // Calculate grand totals
+  // Calculate grand totals from entries
   const { grandTotal, grandNeumasseTotal, grandAltmasseTotal } = useMemo(() => ({
-    grandTotal: summary.reduce((sum, s) => sum + BigInt(s.totalCents), BigInt(0)),
-    grandNeumasseTotal: summary.reduce((sum, s) => sum + BigInt(s.neumasseTotal), BigInt(0)),
-    grandAltmasseTotal: summary.reduce((sum, s) => sum + BigInt(s.altmasseTotal), BigInt(0)),
-  }), [summary]);
+    grandTotal: entries.reduce((sum, e) => sum + BigInt(e.amountCents), BigInt(0)),
+    grandNeumasseTotal: entries.reduce((sum, e) => sum + BigInt(e.neumasseAmountCents), BigInt(0)),
+    grandAltmasseTotal: entries.reduce((sum, e) => sum + BigInt(e.altmasseAmountCents), BigInt(0)),
+  }), [entries]);
 
   if (loading) {
     return (
@@ -131,7 +116,7 @@ export default function RevenueTable({
     );
   }
 
-  if (summary.length === 0 && entries.length === 0) {
+  if (entries.length === 0) {
     return (
       <div className="p-8 bg-gray-50 rounded-lg text-center">
         <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -157,7 +142,7 @@ export default function RevenueTable({
               : "bg-gray-100 text-[var(--secondary)] hover:bg-gray-200"
           }`}
         >
-          Nach Quelle
+          Nach Kategorie
         </button>
         <button
           onClick={() => setViewMode("details")}
@@ -172,12 +157,12 @@ export default function RevenueTable({
       </div>
 
       {viewMode === "summary" ? (
-        /* Summary View - By Counterparty */
+        /* Summary View - By categoryTag */
         <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {summary.map((source, idx) => (
+            {grouped.map((group, idx) => (
               <div
-                key={source.counterpartyId || `unknown-${idx}`}
+                key={group.tag}
                 className="p-4 rounded-lg border border-[var(--border)] bg-gray-50"
               >
                 <div className="flex items-center justify-between mb-2">
@@ -187,7 +172,7 @@ export default function RevenueTable({
                       style={{ backgroundColor: SOURCE_COLORS[idx % SOURCE_COLORS.length] }}
                     />
                     <span className="text-sm font-medium text-[var(--foreground)]">
-                      {source.counterpartyName}
+                      {group.label}
                     </span>
                   </div>
                   <span
@@ -198,25 +183,25 @@ export default function RevenueTable({
                     }}
                   >
                     {grandTotal > BigInt(0)
-                      ? `${((Number(source.totalCents) / Number(grandTotal)) * 100).toFixed(0)}%`
+                      ? `${((Number(group.totalCents) / Number(grandTotal)) * 100).toFixed(0)}%`
                       : "0%"}
                   </span>
                 </div>
                 <div className="text-2xl font-bold text-[var(--foreground)]">
-                  {formatCurrency(source.totalCents)}
+                  {formatCurrency(group.totalCents)}
                 </div>
                 <div className="text-xs text-[var(--secondary)] mt-2 space-y-0.5">
                   <div className="flex items-center justify-between">
                     <span>davon Neumasse:</span>
-                    <span className="font-medium text-green-600">{formatCurrency(source.neumasseTotal)}</span>
+                    <span className="font-medium text-green-600">{formatCurrency(group.neumasseTotal)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span>davon Altmasse:</span>
-                    <span className="font-medium text-amber-600">{formatCurrency(source.altmasseTotal)}</span>
+                    <span className="font-medium text-amber-600">{formatCurrency(group.altmasseTotal)}</span>
                   </div>
                 </div>
                 <div className="text-xs text-[var(--secondary)] mt-2 pt-2 border-t border-gray-200">
-                  {source.entryCount} Buchung{source.entryCount !== 1 ? "en" : ""}
+                  {group.entryCount} Buchung{group.entryCount !== 1 ? "en" : ""}
                 </div>
               </div>
             ))}

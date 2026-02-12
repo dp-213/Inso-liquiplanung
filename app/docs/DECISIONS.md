@@ -4,6 +4,40 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-042: Pflicht-Validierung bei AI-extrahierten PDF-Daten
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Ein vorheriger AI-Extraktionsversuch der ISK-Zahlbelege (Postenlisten SEPA CCT/CIP) erzeugte eine JSON-Datei mit **100% fabrizierten IBANs** und zahlreichen falschen Beträgen/Empfängernamen. Das Problem wurde erst bei systematischer PDF-by-PDF-Einzelprüfung entdeckt. Die AI hatte plausibel aussehende, aber komplett erfundene IBANs generiert.
+
+### Entscheidung
+
+**Jede AI-basierte Datenextraktion aus PDFs MUSS manuell validiert werden:**
+
+1. **Einzelprüfung:** Jedes Quelldokument einzeln gegen extrahierte Daten prüfen (Cent-genau, Zeichen-genau)
+2. **Summenprüfung:** Einzelposten-Summen gegen Gesamtbeträge der Zahlbelege verifizieren
+3. **IBAN-Cross-Check:** Wiederkehrende IBANs über mehrere Dokumente hinweg auf Konsistenz prüfen
+4. **Automatisierte Nachvalidierung:** Python/Script-basierte Prüfung der JSON-Integrität (Summen, IBAN-Format, Anzahl)
+5. **Validierungsmethode dokumentieren:** JSON-Metadata muss `validierungsmethode` und `letzte_validierung` enthalten
+
+### Begründung
+
+- AI-Modelle halluzinieren regelmäßig bei strukturierten Daten (IBANs, Kontonummern, Rechnungsnummern)
+- Halluzinierte Daten sind oft syntaktisch korrekt (richtige Länge, richtiges Format) aber semantisch falsch
+- Im Insolvenzkontext sind falsche Zahlungsdaten besonders kritisch (Fehlüberweisungen, falsche Massezuordnung)
+- Die 18 validierten Zahlbelege zeigten: 38 unique IBANs, alle 22 Zeichen DE-Format, aber 100% der Original-IBANs waren Halluzinationen
+
+### Konsequenzen
+
+- Höherer Zeitaufwand bei Datenextraktion (jedes PDF muss einzeln gelesen werden)
+- Dafür 100% Datenqualität bei finanziellen Quelldaten
+- Template für `Zahlbelege_Vollstaendig.json` dient als Referenzformat für künftige Extraktionen
+
+---
+
 ## ADR-041: EXCLUDE_SPLIT_PARENTS – Sammelüberweisungs-Splitting
 
 **Datum:** 12. Februar 2026

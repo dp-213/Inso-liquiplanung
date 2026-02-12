@@ -6,5 +6,5 @@ export default async function SecurityRedirect({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  redirect(`/portal/cases/${id}/banken-sicherungsrechte`);
+  redirect(`/portal/cases/${id}`);
 }
