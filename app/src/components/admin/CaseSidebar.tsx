@@ -72,10 +72,18 @@ export default function CaseSidebar({
       ],
     },
     {
+      label: "FALLDATEN",
+      items: [
+        { name: "Personal", href: `${base}/personal` },
+        { name: "Kontakte", href: `${base}/kontakte` },
+        { name: "Banken & Sicherungsrechte", href: `${base}/banken-sicherungsrechte` },
+        { name: "Finanzierung", href: `${base}/finanzierung` },
+      ],
+    },
+    {
       label: "VERFAHREN",
       items: [
         { name: "Insolvenzeffekte", href: `${base}/insolvency-effects` },
-        { name: "Banken & Sicherungsrechte", href: `${base}/banken-sicherungsrechte` },
       ],
     },
     {
@@ -91,6 +99,7 @@ export default function CaseSidebar({
       label: "ANALYSE",
       items: [
         { name: "IST-Daten", href: `${base}/kontobewegungen` },
+        { name: "Vorinsolvenz", href: `${base}/vorinsolvenz-analyse` },
         { name: "Klassifikation", href: `${base}/ist-klassifikation` },
         { name: "Verifikation", href: `${base}/zahlungsverifikation` },
         { name: "IV-Kommunikation", href: `${base}/iv-kommunikation` },

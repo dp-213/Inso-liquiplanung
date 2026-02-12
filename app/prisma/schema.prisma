@@ -59,6 +59,8 @@ model Case {
   paymentBreakdownSources PaymentBreakdownSource[] // Zahlbeleg-Aufschlüsselungen
   creditors            Creditor[]           // Kreditoren (Ausgaben-Partner)
   costCategories       CostCategory[]       // Kostenarten für Ausgaben-Planung
+  employees            Employee[]           // Mitarbeiter (Personal)
+  caseContacts         CaseContact[]        // Ansprechpartner
 
   // === FREIGABE-EINSTELLUNGEN ===
   approvalThresholdCents BigInt?            // Betrag in Cent, unter dem Auto-Approve greift (null = immer manuell)
@@ -753,6 +755,7 @@ model Location {
   case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
   bankAccounts BankAccount[]
   ledgerEntries LedgerEntry[]
+  employees Employee[]
 
   @@index([caseId])
   @@map("locations")
@@ -1263,4 +1266,83 @@ model Creditor {
 
   @@index([caseId])
   @@map("creditors")
+}
+
+// =============================================================================
+// EMPLOYEE & SALARY - Mitarbeiter und Gehaltsdaten
+// =============================================================================
+
+// Employee - Mitarbeiter eines Insolvenzfalls
+model Employee {
+  id              String    @id @default(uuid())
+  caseId          String
+  personnelNumber String?   // DATEV Personalnummer
+  lastName        String
+  firstName       String
+  role            String?   // Arzt, VW, Arzt in WB, etc.
+  lanr            String?   // Lebenslange Arztnummer
+  locationId      String?   // FK auf Location
+  svNumber        String?   // Sozialversicherungsnummer
+  taxId           String?   // Steuer-ID
+  dateOfBirth     DateTime?
+  entryDate       DateTime?
+  street          String?
+  houseNumber     String?
+  postalCode      String?
+  city            String?
+  isActive        Boolean   @default(true)
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  case            Case      @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  location        Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  salaryMonths    EmployeeSalaryMonth[]
+
+  @@unique([caseId, personnelNumber])
+  @@index([caseId])
+  @@map("employees")
+}
+
+// EmployeeSalaryMonth - Monatliche Gehaltsdaten pro Mitarbeiter
+model EmployeeSalaryMonth {
+  id                  String   @id @default(uuid())
+  employeeId          String
+  year                Int
+  month               Int      // 1-12
+  grossSalaryCents    BigInt   // Steuerbrutto
+  netSalaryCents      BigInt?  // Auszahlungsbetrag
+  employerCostsCents  BigInt?  // AG-Kosten gesamt
+  notes               String?
+  createdAt           DateTime @default(now())
+
+  employee            Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, year, month])
+  @@index([employeeId])
+  @@map("employee_salary_months")
+}
+
+// =============================================================================
+// CASE CONTACTS - Ansprechpartner pro Fall
+// =============================================================================
+
+// CaseContact - Ansprechpartner für einen Fall (IV, Berater, Buchhaltung, etc.)
+model CaseContact {
+  id           String   @id @default(uuid())
+  caseId       String
+  role         String   // IV, BERATER, BUCHHALTUNG, RECHTSANWALT, etc.
+  name         String
+  organization String?
+  email        String?
+  phone        String?
+  notes        String?
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  case         Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("case_contacts")
 }
