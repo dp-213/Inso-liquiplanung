@@ -9,6 +9,7 @@ interface CaseSidebarProps {
   caseNumber: string;
   status: string;
   pendingOrderCount: number;
+  className?: string;
 }
 
 interface NavItem {
@@ -46,6 +47,7 @@ export default function CaseSidebar({
   caseNumber,
   status,
   pendingOrderCount,
+  className,
 }: CaseSidebarProps) {
   const pathname = usePathname();
   const base = `/admin/cases/${caseId}`;
@@ -110,7 +112,7 @@ export default function CaseSidebar({
   };
 
   return (
-    <aside className="w-56 shrink-0 bg-[var(--card)] border-r border-[var(--border)] overflow-y-auto h-[calc(100vh-3.5rem)]">
+    <aside className={className ?? "w-56 shrink-0 bg-[var(--card)] border-r border-[var(--border)] overflow-y-auto h-[calc(100vh-3.5rem)]"}>
       {/* Case Header */}
       <div className="px-4 py-4 border-b border-[var(--border)]">
         <Link href={base} className="block group">
@@ -131,7 +133,7 @@ export default function CaseSidebar({
       <div className="px-3 pt-3 pb-1">
         <Link
           href={base}
-          className={`flex items-center px-3 py-2 rounded-md text-sm transition-colors ${
+          className={`flex items-center px-3 py-2.5 lg:py-2 rounded-md text-sm transition-colors ${
             pathname === base
               ? "bg-[var(--primary)]/10 text-[var(--primary)] font-medium border-l-2 border-[var(--primary)] -ml-px"
               : "text-[var(--secondary)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
@@ -155,7 +157,7 @@ export default function CaseSidebar({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-colors ${
+                  className={`flex items-center justify-between px-3 py-2.5 lg:py-1.5 rounded-md text-sm transition-colors ${
                     isActive(item.href)
                       ? "bg-[var(--primary)]/10 text-[var(--primary)] font-medium border-l-2 border-[var(--primary)] -ml-px"
                       : "text-[var(--secondary)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
@@ -178,7 +180,7 @@ export default function CaseSidebar({
       <div className="px-3 py-4 mt-2 border-t border-[var(--border)] space-y-1">
         <Link
           href={`${base}/edit`}
-          className={`flex items-center px-3 py-1.5 rounded-md text-sm transition-colors ${
+          className={`flex items-center px-3 py-2.5 lg:py-1.5 rounded-md text-sm transition-colors ${
             isActive(`${base}/edit`)
               ? "bg-[var(--primary)]/10 text-[var(--primary)] font-medium"
               : "text-[var(--secondary)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
@@ -191,7 +193,7 @@ export default function CaseSidebar({
         </Link>
         <Link
           href={`${base}/results`}
-          className="flex items-center px-3 py-1.5 rounded-md text-sm text-[var(--primary)] hover:bg-[var(--primary)]/10 transition-colors font-medium"
+          className="flex items-center px-3 py-2.5 lg:py-1.5 rounded-md text-sm text-[var(--primary)] hover:bg-[var(--primary)]/10 transition-colors font-medium"
         >
           <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -204,7 +206,7 @@ export default function CaseSidebar({
       <div className="px-3 pb-4 border-t border-[var(--border)]">
         <Link
           href={`${base}/hilfe`}
-          className={`flex items-center px-3 py-1.5 mt-3 rounded-md text-sm transition-colors ${
+          className={`flex items-center px-3 py-2.5 lg:py-1.5 mt-3 rounded-md text-sm transition-colors ${
             isActive(`${base}/hilfe`)
               ? "bg-[var(--primary)]/10 text-[var(--primary)] font-medium"
               : "text-[var(--muted)] hover:bg-[var(--accent)] hover:text-[var(--foreground)]"
