@@ -5,7 +5,7 @@ import prisma from "@/lib/db";
 /**
  * GET /api/cases/[id]/zahlungsverifikation
  *
- * SOLL/IST-Abgleich: PLAN-Werte (PeriodValues) vs. IST-Werte (LedgerEntries)
+ * SOLL/IST-Abgleich: PLAN-Werte (LedgerEntries valueType=PLAN) vs. IST-Werte (LedgerEntries valueType=IST)
  * pro Planungsperiode (Woche oder Monat).
  */
 export async function GET(
@@ -41,22 +41,9 @@ export async function GET(
       );
     }
 
-    // Aktiven LiquidityPlan laden
+    // Aktiven LiquidityPlan laden (nur Perioden-Struktur, keine PeriodValues)
     const plan = await prisma.liquidityPlan.findFirst({
       where: { caseId: id, isActive: true },
-      include: {
-        categories: {
-          include: {
-            lines: {
-              include: {
-                periodValues: {
-                  where: { valueType: "PLAN" },
-                },
-              },
-            },
-          },
-        },
-      },
     });
 
     if (!plan) {
@@ -98,64 +85,45 @@ export async function GET(
       periods.push({ index: i, label, start, end });
     }
 
-    // PLAN-Werte pro Periode aggregieren (Inflows und Outflows getrennt)
-    const planByPeriod: Record<number, { inflows: bigint; outflows: bigint }> = {};
-    for (let i = 0; i < plan.periodCount; i++) {
-      planByPeriod[i] = { inflows: BigInt(0), outflows: BigInt(0) };
-    }
-
-    for (const category of plan.categories) {
-      const isInflow = category.flowType === "INFLOW";
-      for (const line of category.lines) {
-        for (const pv of line.periodValues) {
-          if (planByPeriod[pv.periodIndex] !== undefined) {
-            if (isInflow) {
-              planByPeriod[pv.periodIndex].inflows += pv.amountCents;
-            } else {
-              // Outflows in PeriodValues sind als positive Werte gespeichert,
-              // wir speichern sie als negativ für konsistente Verrechnung
-              planByPeriod[pv.periodIndex].outflows -= pv.amountCents;
-            }
-          }
-        }
-      }
-    }
-
-    // IST-Werte: LedgerEntries für gesamten Plan-Zeitraum laden
+    // Alle LedgerEntries laden (IST + PLAN)
     // NOTE: Date filter applied in JS (Turso adapter date comparison bug)
     const planEnd = periods[periods.length - 1]?.end;
-    const allIstEntries = await prisma.ledgerEntry.findMany({
+    const allEntries = await prisma.ledgerEntry.findMany({
       where: {
         caseId: id,
-        valueType: "IST",
+        valueType: { in: ["IST", "PLAN"] },
       },
       select: {
         transactionDate: true,
         amountCents: true,
+        valueType: true,
       },
     });
 
-    const istEntries = allIstEntries.filter((e) => {
+    const filteredEntries = allEntries.filter((e) => {
       if (e.transactionDate < planStart) return false;
       if (planEnd && e.transactionDate > planEnd) return false;
       return true;
     });
 
-    // IST-Einträge den Perioden zuordnen
+    // PLAN- und IST-Werte pro Periode aggregieren
+    const planByPeriod: Record<number, { inflows: bigint; outflows: bigint }> = {};
     const istByPeriod: Record<number, { inflows: bigint; outflows: bigint }> = {};
     for (let i = 0; i < plan.periodCount; i++) {
+      planByPeriod[i] = { inflows: BigInt(0), outflows: BigInt(0) };
       istByPeriod[i] = { inflows: BigInt(0), outflows: BigInt(0) };
     }
 
-    for (const entry of istEntries) {
+    for (const entry of filteredEntries) {
       const entryDate = new Date(entry.transactionDate);
       // Finde passende Periode
       for (const period of periods) {
         if (entryDate >= period.start && entryDate <= period.end) {
+          const target = entry.valueType === "PLAN" ? planByPeriod : istByPeriod;
           if (entry.amountCents >= 0) {
-            istByPeriod[period.index].inflows += entry.amountCents;
+            target[period.index].inflows += entry.amountCents;
           } else {
-            istByPeriod[period.index].outflows += entry.amountCents;
+            target[period.index].outflows += entry.amountCents;
           }
           break;
         }
