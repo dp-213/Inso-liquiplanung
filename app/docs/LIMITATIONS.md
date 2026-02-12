@@ -207,6 +207,15 @@ Nach Prisma-Operationen kann `.next` Cache korrupt werden.
 
 Admin generiert Passwörter, User können nicht ändern.
 
+### Kein Impressum / Datenschutzerklärung
+
+Rechtlich Pflicht sobald Kunden-Portal öffentlich erreichbar. Rechtstexte müssen vom Anwalt/Generator erstellt werden.
+
+### Dark Mode: Nicht alle Komponenten pixel-perfekt
+
+Globale CSS-Overrides decken ~95% der UI ab. Einige externe Komponenten (Chart-Tooltips, InsolvencyEffectsTable, PlanningAssumptions) können noch hardcoded Light-Mode-Farben enthalten.
+**Workaround:** Betroffene Stellen bei Bedarf einzeln anpassen.
+
 ---
 
 ## Performance-Einschränkungen
@@ -273,4 +282,22 @@ Einnahmen-Tabelle und neuer Trend-Chart gruppieren jetzt nach `categoryTag` (HZV
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.37.0)
+### ~~Debug-Routes öffentlich erreichbar~~ GELÖST 2026-02-12
+
+`/api/debug/db` und `/api/debug/cases` waren ohne Auth-Check öffentlich zugänglich. Jetzt mit `getSession().isAdmin`-Prüfung abgesichert (v2.38.0).
+
+### ~~Demo-Zugangsdaten auf Login-Seite~~ GELÖST 2026-02-12
+
+Klartext-Credentials (`admin / Liqui2026`) von der Admin-Login-Seite entfernt (v2.38.0).
+
+### ~~Kein Dark Mode~~ GELÖST 2026-02-12
+
+Vollständiger Dark Mode mit System-Preference-Erkennung und manuellem Toggle implementiert (v2.38.0, ADR-050).
+
+### ~~Unprofessionelles Branding~~ GELÖST 2026-02-12
+
+Rebranding zu "Gradify Cases | Structured Case Management" mit OG-Image für Social-Previews (v2.38.0, ADR-051).
+
+---
+
+**Letzte Aktualisierung:** 2026-02-12 (v2.38.0)

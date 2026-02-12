@@ -4,6 +4,83 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-050: Dark Mode via CSS-Variablen + Globale Tailwind-Overrides
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Die App verwendet ~57 Dateien mit hardcoded `bg-white` und ~115 Stellen mit `bg-gray-*`/`bg-slate-*` Tailwind-Klassen. Ein vollständiges Refactoring aller Dateien zu CSS-Variablen wäre unverhältnismäßig aufwändig.
+
+### Entscheidung
+
+**Hybrid-Ansatz:** CSS-Variablen-System + globale Dark-Mode-Overrides.
+
+1. **Alle Design-Tokens als CSS-Variablen** in `:root` (Light) und `[data-theme="dark"]` (Dark)
+2. **globals.css Klassen** (.admin-card, .btn-*, .input-field, etc.) nutzen Variablen → schalten automatisch
+3. **Globale Overrides** fangen hardcoded Tailwind-Klassen ab:
+   ```css
+   [data-theme="dark"] .bg-white { background-color: var(--card) !important; }
+   [data-theme="dark"] .bg-gray-50 { background-color: var(--accent) !important; }
+   ```
+4. **Anti-Flash-Script** im `<head>` setzt `data-theme` vor dem ersten Render
+5. **ThemeProvider** (React Context) + localStorage für Persistenz
+
+### Begründung
+
+- **Pragmatisch:** 0 Dateien anfassen vs. 57+ Dateien refactoren
+- **Wartbar:** Neue Komponenten nutzen automatisch CSS-Variablen
+- **Kein Flash:** Inline-Script vor React-Hydration
+- **3 Modi:** Light / Dark / System (OS-Preference)
+
+### Konsequenzen
+
+- `!important` in Overrides kann Spezifitäts-Konflikte erzeugen
+- Neue Tailwind-Farben (z.B. `bg-indigo-50`) müssen ggf. manuell ergänzt werden
+- Print-Styles sind hardcoded Light (korrekt)
+
+### Relevante Dateien
+
+- `src/app/globals.css` – Design-Tokens Light + Dark + Overrides
+- `src/components/ThemeProvider.tsx` – React Context + localStorage
+- `src/components/ThemeToggle.tsx` – 3-Stufen-Toggle (Light/Dark/System)
+- `src/app/layout.tsx` – Anti-Flash-Script + ThemeProvider
+
+---
+
+## ADR-051: Plattform-Rebranding von "Inso-Liquiplanung" zu "Gradify Cases"
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+`cases.gradify.de` soll langfristig eine Vielzahl von Cases der Unternehmensberatung abdecken, nicht nur Insolvenz-Liquiditätsplanung. Der bisherige Name "Inso-Liquiplanung" war:
+1. Zu eng (nur IV)
+2. Unprofessionell für externe Präsentation (WhatsApp-Preview, LinkedIn)
+3. Nicht skalierbar auf zukünftige Case-Typen
+
+### Entscheidung
+
+- **Titel:** "Gradify Cases | Structured Case Management"
+- **Beschreibung:** "Structured Case Management Platform"
+- **Sprache:** Englisch für Branding/Meta-Tags, Deutsch für UI-Texte
+
+### Begründung
+
+- **Skalierbar:** "Cases" ist generisch genug für IV, Restrukturierung, etc.
+- **International:** Englisches Branding wirkt professioneller
+- **Konsistent:** "Gradify Cases" als Brand überall gleich (Header, Login, OG-Tags)
+
+### Konsequenzen
+
+- Alle Meta-Tags, Header, Login-Seiten, OG-Image auf "Gradify Cases" aktualisiert
+- WhatsApp/LinkedIn-Preview zeigt jetzt professionelles Branding + Bild
+- UI-Texte bleiben Deutsch (Zielgruppe: deutsche IV)
+
+---
+
 ## ADR-049: Nachhaltige Klassifikation über COUNTERPARTY_ID-Matches in Matrix-Config
 
 **Datum:** 12. Februar 2026
