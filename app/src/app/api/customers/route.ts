@@ -2,10 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { hashPassword } from "@/lib/customer-auth";
+import { validateSlug } from "@/lib/slug-utils";
 import crypto from "crypto";
 
 function generateRandomPassword(): string {
-  return crypto.randomBytes(12).toString("base64").slice(0, 12);
+  // Lesbare Zeichen ohne Verwechslungsgefahr (kein 0/O, 1/l/I, +/=/.)
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = crypto.randomBytes(14);
+  let password = "";
+  for (let i = 0; i < 14; i++) {
+    password += chars[bytes[i] % chars.length];
+  }
+  return password;
 }
 
 // GET /api/customers - List all customers
@@ -28,6 +36,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         email: true,
+        slug: true,
         name: true,
         company: true,
         phone: true,
@@ -65,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, name, company, phone } = body;
+    const { email, name, company, phone, slug } = body;
 
     if (!email || !email.trim()) {
       return NextResponse.json(
@@ -79,6 +88,29 @@ export async function POST(request: NextRequest) {
         { error: "Name erforderlich" },
         { status: 400 }
       );
+    }
+
+    // Validate slug if provided
+    let validatedSlug: string | null = null;
+    if (slug && slug.trim()) {
+      const slugCheck = validateSlug(slug.trim());
+      if (!slugCheck.valid) {
+        return NextResponse.json(
+          { error: slugCheck.error },
+          { status: 400 }
+        );
+      }
+      // Check uniqueness
+      const existingSlug = await prisma.customerUser.findUnique({
+        where: { slug: slug.trim() },
+      });
+      if (existingSlug) {
+        return NextResponse.json(
+          { error: "Dieser Slug ist bereits vergeben" },
+          { status: 400 }
+        );
+      }
+      validatedSlug = slug.trim();
     }
 
     // Check if email already exists
@@ -103,6 +135,7 @@ export async function POST(request: NextRequest) {
         name: name.trim(),
         company: company?.trim() || null,
         phone: phone?.trim() || null,
+        slug: validatedSlug,
         passwordHash,
         isActive: true,
         emailVerified: false,
@@ -112,6 +145,7 @@ export async function POST(request: NextRequest) {
       select: {
         id: true,
         email: true,
+        slug: true,
         name: true,
         company: true,
         phone: true,

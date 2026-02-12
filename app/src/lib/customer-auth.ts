@@ -128,12 +128,16 @@ export async function createCustomerSession(
   });
 
   const cookieStore = await cookies();
+  const isProduction = process.env.NODE_ENV === "production";
   cookieStore.set("customer_session", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isProduction,
     sameSite: "lax",
     expires: expiresAt,
     path: "/",
+    // Domain-Cookie für Subdomain-Sharing: .cases.gradify.de
+    // Damit ist die Session auf anchor.cases.gradify.de UND cases.gradify.de gültig
+    ...(isProduction ? { domain: ".cases.gradify.de" } : {}),
   });
 }
 
@@ -183,7 +187,7 @@ export async function validateCustomerCredentials(
   });
 
   if (!customer) {
-    return { success: false, error: "Ungueltige Anmeldedaten" };
+    return { success: false, error: "Ungültige Anmeldedaten" };
   }
 
   // Check if account is locked
@@ -247,7 +251,7 @@ export async function validateCustomerCredentials(
       };
     }
 
-    return { success: false, error: "Ungueltige Anmeldedaten" };
+    return { success: false, error: "Ungültige Anmeldedaten" };
   }
 
   return {

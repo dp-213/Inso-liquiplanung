@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { usePortalPaths } from "@/hooks/usePortalPaths";
 
 export default function CustomerLoginPage() {
   const [email, setEmail] = useState("");
@@ -9,6 +10,7 @@ export default function CustomerLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { homePath } = usePortalPaths();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,6 +21,7 @@ export default function CustomerLoginPage() {
       const response = await fetch("/api/portal/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
 
@@ -29,7 +32,7 @@ export default function CustomerLoginPage() {
         return;
       }
 
-      router.push("/portal");
+      router.push(homePath);
     } catch {
       setError("Verbindungsfehler. Bitte versuchen Sie es erneut.");
     } finally {

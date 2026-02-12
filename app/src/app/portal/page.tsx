@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { usePortalPaths } from "@/hooks/usePortalPaths";
 
 interface CaseAccess {
   id: string;
@@ -22,6 +23,7 @@ export default function PortalDashboard() {
   const [cases, setCases] = useState<CaseAccess[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { casePath } = usePortalPaths();
 
   useEffect(() => {
     async function fetchCases() {
@@ -135,7 +137,7 @@ export default function PortalDashboard() {
   const renderCaseCard = (caseItem: CaseAccess) => (
     <Link
       key={caseItem.id}
-      href={`/portal/cases/${caseItem.id}`}
+      href={casePath(caseItem.id)}
       className="admin-card p-6 hover:shadow-lg transition-shadow block"
     >
       <div className="flex items-start justify-between mb-3">

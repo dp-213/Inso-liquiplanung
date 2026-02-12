@@ -1,6 +1,6 @@
 import prisma from "@/lib/db";
 import { notFound } from "next/navigation";
-import ShareLinksManager from "@/components/admin/ShareLinksManager";
+import CombinedAccessManager from "@/components/admin/CombinedAccessManager";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -14,8 +14,24 @@ export default async function FreigabenPage({ params }: PageProps) {
     select: {
       id: true,
       debtorName: true,
+      caseNumber: true,
       shareLinks: {
         orderBy: { createdAt: "desc" },
+      },
+      customerAccess: {
+        include: {
+          customer: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              slug: true,
+              company: true,
+              isActive: true,
+            },
+          },
+        },
+        orderBy: { grantedAt: "desc" },
       },
     },
   });
@@ -28,14 +44,20 @@ export default async function FreigabenPage({ params }: PageProps) {
     <div className="space-y-6">
       <div className="admin-card p-6">
         <h1 className="text-2xl font-bold text-[var(--foreground)] mb-2">
-          Externe Freigaben
+          Freigaben
         </h1>
         <p className="text-sm text-[var(--secondary)]">
-          Externe Zugriffslinks für {caseData.debtorName} verwalten
+          Kundenzugänge und externe Links für {caseData.debtorName} verwalten
         </p>
       </div>
 
-      <ShareLinksManager caseId={id} initialLinks={caseData.shareLinks} />
+      <CombinedAccessManager
+        caseId={id}
+        caseNumber={caseData.caseNumber}
+        debtorName={caseData.debtorName}
+        initialAccess={caseData.customerAccess}
+        initialLinks={caseData.shareLinks}
+      />
     </div>
   );
 }

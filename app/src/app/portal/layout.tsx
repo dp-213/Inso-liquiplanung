@@ -1,4 +1,5 @@
 import { getCustomerSession } from "@/lib/customer-auth";
+import { isSubdomainRequest } from "@/lib/tenant";
 import CustomerHeader from "@/components/portal/CustomerHeader";
 import { redirect } from "next/navigation";
 
@@ -8,9 +9,11 @@ export default async function PortalLayout({
   children: React.ReactNode;
 }) {
   const session = await getCustomerSession();
+  const isSubdomain = await isSubdomainRequest();
 
   if (!session) {
-    redirect("/customer-login");
+    // Auf Subdomain: /login, auf Hauptdomain: /customer-login
+    redirect(isSubdomain ? "/login" : "/customer-login");
   }
 
   return (

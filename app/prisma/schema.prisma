@@ -387,6 +387,7 @@ model ShareLink {
 model CustomerUser {
   id                String    @id @default(uuid())
   email             String    @unique
+  slug              String?   @unique  // "anchor" → anchor.cases.gradify.de
   passwordHash      String
   name              String
   company           String?   // Law firm or company name

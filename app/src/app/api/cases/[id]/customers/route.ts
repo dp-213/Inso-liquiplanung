@@ -23,6 +23,7 @@ export async function GET(
             id: true,
             name: true,
             email: true,
+            slug: true,
             company: true,
             isActive: true,
           },
@@ -35,7 +36,7 @@ export async function GET(
   } catch (error) {
     console.error("Error fetching customer access:", error);
     return NextResponse.json(
-      { error: "Fehler beim Laden der Kundenzugaenge" },
+      { error: "Fehler beim Laden der Kundenzugänge" },
       { status: 500 }
     );
   }
@@ -67,7 +68,7 @@ export async function POST(
     const validAccessLevels = ["VIEW", "COMMENT", "DOWNLOAD"];
     if (accessLevel && !validAccessLevels.includes(accessLevel)) {
       return NextResponse.json(
-        { error: "Ungueltiges Zugriffslevel" },
+        { error: "Ungültiges Zugriffslevel" },
         { status: 400 }
       );
     }
@@ -158,6 +159,7 @@ export async function POST(
             id: true,
             name: true,
             email: true,
+            slug: true,
             company: true,
             isActive: true,
           },

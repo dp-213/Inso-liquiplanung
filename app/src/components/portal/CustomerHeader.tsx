@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { usePortalPaths } from "@/hooks/usePortalPaths";
 
 interface CustomerHeaderProps {
   userName: string;
@@ -15,11 +16,12 @@ export default function CustomerHeader({
   logoUrl,
 }: CustomerHeaderProps) {
   const router = useRouter();
+  const { homePath, loginPath } = usePortalPaths();
 
   const handleLogout = async () => {
     try {
-      await fetch("/api/portal/auth/logout", { method: "POST" });
-      router.push("/customer-login");
+      await fetch("/api/portal/auth/logout", { method: "POST", credentials: "include" });
+      router.push(loginPath);
     } catch {
       // Logout-Fehler werden durch den Redirect behandelt
     }
@@ -30,7 +32,7 @@ export default function CustomerHeader({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo and Title */}
-          <Link href="/portal" className="flex items-center">
+          <Link href={homePath} className="flex items-center">
             {logoUrl ? (
               <img
                 src={logoUrl}
