@@ -31,15 +31,28 @@ export async function GET(
       return NextResponse.json({ error: 'Fall nicht gefunden' }, { status: 404 });
     }
 
-    // Alle Pre-Insolvency Entries laden (exclude split parents)
+    // Geschäftskonten = alle nicht-ISK Konten (isLiquidityRelevant = false)
+    const geschaeftskontenIds = caseData.bankAccounts
+      .filter(ba => !ba.isLiquidityRelevant)
+      .map(ba => ba.id);
+
+    // Alle Entries von Geschäftskonten laden (nicht nur PRE_INSOLVENCY)
     const entries = await prisma.ledgerEntry.findMany({
       where: {
         caseId: id,
-        allocationSource: 'PRE_INSOLVENCY',
+        bankAccountId: { in: geschaeftskontenIds },
         ...EXCLUDE_SPLIT_PARENTS,
       },
       orderBy: { transactionDate: 'desc' },
     });
+
+    // Insolvenz-Monat bestimmen (für visuelle Trennlinie)
+    const cutoffDate = caseData.cutoffDate || caseData.openingDate;
+    let insolvencyMonth: string | null = null;
+    if (cutoffDate) {
+      const d = new Date(cutoffDate);
+      insolvencyMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
 
     if (entries.length === 0) {
       return NextResponse.json({
@@ -58,6 +71,7 @@ export async function GET(
         byBankAccount: [],
         unclassified: [],
         locations: [],
+        insolvencyMonth,
       });
     }
 
@@ -98,7 +112,6 @@ export async function GET(
       monthly: Map<string, bigint>;
       hasInflows: boolean;
       hasOutflows: boolean;
-      // Location breakdown: locationId → { totalCents, monthly }
       byLocation: Map<string, { totalCents: bigint; monthly: Map<string, bigint> }>;
     }>();
 
@@ -125,7 +138,6 @@ export async function GET(
       transactionDate: string;
     }> = [];
 
-    // Track locations that actually have data
     const activeLocationIds = new Set<string>();
 
     for (const entry of entries) {
@@ -138,10 +150,8 @@ export async function GET(
         totalOutflows += amount;
       }
 
-      // Effektive Counterparty: akzeptiert > vorgeschlagen
       const effectiveCpId = entry.counterpartyId || entry.suggestedCounterpartyId;
 
-      // Klassifiziert = hat Counterparty (akzeptiert oder vorgeschlagen) ODER categoryTag
       if (effectiveCpId || entry.categoryTag) {
         classifiedCount++;
       } else {
@@ -154,19 +164,16 @@ export async function GET(
         });
       }
 
-      // Monat bestimmen
       const date = new Date(entry.transactionDate);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       monthSet.add(monthKey);
 
-      // Location via bankAccountId → locationId
       const baInfo = entry.bankAccountId ? bankAccountMap.get(entry.bankAccountId) : null;
       const locationId = baInfo?.locationId || '_zentral';
       if (baInfo?.locationId) {
         activeLocationIds.add(baInfo.locationId);
       }
 
-      // Counterparty-Monthly aggregieren (akzeptiert > vorgeschlagen)
       const cpKey = effectiveCpId || '_unclassified';
       if (!cpMonthly.has(cpKey)) {
         cpMonthly.set(cpKey, {
@@ -186,7 +193,6 @@ export async function GET(
       if (isInflow) cpData.hasInflows = true;
       else cpData.hasOutflows = true;
 
-      // Location breakdown within counterparty
       if (!cpData.byLocation.has(locationId)) {
         cpData.byLocation.set(locationId, { totalCents: BigInt(0), monthly: new Map() });
       }
@@ -194,7 +200,6 @@ export async function GET(
       locData.totalCents += amount;
       locData.monthly.set(monthKey, (locData.monthly.get(monthKey) || BigInt(0)) + amount);
 
-      // Monthly aggregieren
       if (!monthlyAgg.has(monthKey)) {
         monthlyAgg.set(monthKey, { inflowsCents: BigInt(0), outflowsCents: BigInt(0), count: 0 });
       }
@@ -203,7 +208,6 @@ export async function GET(
       else mData.outflowsCents += amount;
       mData.count++;
 
-      // BankAccount aggregieren
       const baKey = entry.bankAccountId || '_none';
       if (!bankAgg.has(baKey)) {
         bankAgg.set(baKey, { inflowsCents: BigInt(0), outflowsCents: BigInt(0), count: 0 });
@@ -214,11 +218,9 @@ export async function GET(
       baData.count++;
     }
 
-    // Sortierte Monate
     const months = Array.from(monthSet).sort();
     const monthCount = months.length || 1;
 
-    // === Response aufbauen ===
     const summary = {
       totalCount: entries.length,
       classifiedCount,
@@ -230,7 +232,6 @@ export async function GET(
       months,
     };
 
-    // Counterparty-Monthly: Sortiert nach |totalCents| desc
     const counterpartyMonthly = Array.from(cpMonthly.entries())
       .sort((a, b) => {
         const absA = a[1].totalCents < BigInt(0) ? -a[1].totalCents : a[1].totalCents;
@@ -246,7 +247,6 @@ export async function GET(
           monthly[m] = v.toString();
         }
 
-        // Location breakdown
         const byLocation = Array.from(data.byLocation.entries())
           .sort((a, b) => {
             const absA = a[1].totalCents < BigInt(0) ? -a[1].totalCents : a[1].totalCents;
@@ -280,7 +280,6 @@ export async function GET(
         };
       });
 
-    // Monthly Summary
     const monthlySummary = months.map((month) => {
       const data = monthlyAgg.get(month)!;
       return {
@@ -292,7 +291,6 @@ export async function GET(
       };
     });
 
-    // By Bank Account
     const byBankAccount = Array.from(bankAgg.entries())
       .filter(([, data]) => data.count > 0)
       .sort((a, b) => b[1].count - a[1].count)
@@ -308,7 +306,6 @@ export async function GET(
         };
       });
 
-    // Locations mit Daten
     const locations = Array.from(activeLocationIds).map((locId) => ({
       id: locId,
       name: locationMap.get(locId) || locId,
@@ -321,6 +318,7 @@ export async function GET(
       byBankAccount,
       unclassified,
       locations,
+      insolvencyMonth,
     });
   } catch (error) {
     console.error('Error fetching vorinsolvenz-analyse:', error);
