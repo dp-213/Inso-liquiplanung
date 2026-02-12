@@ -77,10 +77,10 @@ Vorwärtsgerichtete Liquiditätsprognose als separates Modul (Schema + Sidebar-L
 3 von 5 Bankkonten ohne Dezember-Daten (Sparkasse, apoBank HVPlus, apoBank Uckerath). ISK-Einzahlungsliste (Nov-Dez) liegt jetzt vor und deckt ISK-Seite ab.
 **Status:** Offene Datenanforderung an IV für Geschäftskonten-Auszüge.
 
-### Portal Security-Tab zeigt Demo-Daten
+### Portal: Externe Komponenten noch mit hardcodierten Farben
 
-Die Sicherungsrechte-Seite im Kundenportal (`/portal/cases/[id]/security`) zeigt hardcodierte Demo-Daten statt reale Daten aus der API.
-**Status:** Bekannt, nicht kritisch (Admin-Dashboard zeigt korrekte Daten).
+Tabellen-Komponenten (`InsolvencyEffectsTable`, `PlanningAssumptions`, `LiquidityTable`) und Chart-Tooltips verwenden noch `bg-white`/`bg-gray-50` statt CSS-Variablen.
+**Status:** Bekannt, niedrige Priorität. Portal-spezifische Seiten und Navigation sind bereits migriert.
 
 ## Freigabe-Modul (Orders)
 
@@ -105,9 +105,9 @@ Weder der IV noch die einreichende Partei werden über Statusänderungen benachr
 Pro Anfrage kann nur ein Beleg hochgeladen werden.
 **Phase 2:** Mehrere Belege pro Anfrage.
 
-### Portal-Seite nicht verlinkt
+### Portal-Freigaben nur über Direktlink
 
-Die Freigaben-Seite existiert im Kundenportal (`/portal/cases/[id]/orders`), ist aber nicht in der Navigation verlinkt (bewusste Entscheidung für Phase 1, admin-only).
+Die Freigaben-Seite (`/portal/cases/[id]/orders`) ist in der DashboardNav verlinkt, aber als Phase-1-Feature primär für admin-gesteuerte Nutzung vorgesehen.
 
 ---
 
@@ -215,6 +215,14 @@ Redirect auf `/banken-sicherungsrechte` (v2.24.0). Bankenspiegel, Sicherungsrech
 
 SOLL/IST-Abgleich mit Ampelsystem implementiert (v2.25.0). PLAN vs. IST pro Periode mit Abweichungsanalyse.
 
+### ~~Portal Security-Tab zeigt Demo-Daten~~ GELÖST 2026-02-12
+
+Neue kombinierte Seite `/portal/cases/[id]/banken-sicherungsrechte` ersetzt Demo-Daten mit echten Bankdaten aus Customer-API (v2.27.0).
+
+### ~~Portal-Navigation inkonsistent mit Admin~~ GELÖST 2026-02-12
+
+"Finanzierung" + "Sicherungsrechte" zu "Banken & Sicherungsrechte" zusammengeführt. Alte Routen redirecten (v2.27.0).
+
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.25.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.27.0)

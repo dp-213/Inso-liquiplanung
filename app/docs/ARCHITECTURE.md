@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.26.0
+**Version:** 2.27.0
 **Stand:** 12. Februar 2026
 
 ---
@@ -452,6 +452,15 @@ LedgerEntry (UNREVIEWED)
 │   │   │   │   └── locations/        # Standorte
 │   │   │   └── ...
 │   │   ├── portal/                   # Kundenportal
+│   │   │   └── cases/[id]/
+│   │   │       ├── banken-sicherungsrechte/ # Bankenspiegel + Sicherungsrechte
+│   │   │       ├── revenue/             # Einnahmen-Übersicht
+│   │   │       ├── estate/              # Masseübersicht
+│   │   │       ├── compare/             # IST/PLAN-Vergleich
+│   │   │       ├── orders/              # Freigaben
+│   │   │       ├── berechnungsgrundlagen/ # Methodik
+│   │   │       ├── finanzierung/        # → Redirect auf banken-sicherungsrechte
+│   │   │       └── security/            # → Redirect auf banken-sicherungsrechte
 │   │   ├── view/                     # Externe Ansicht
 │   │   └── api/                      # API-Routen
 │   │       └── cases/[id]/

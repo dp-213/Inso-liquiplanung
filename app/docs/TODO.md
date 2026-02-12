@@ -85,7 +85,7 @@ Legacy-Ordner aufgelöst: 4 unique Dateien nach `01-raw/` verschoben, 2 ältere 
 **Offene Erweiterungen:**
 1. **Email-Benachrichtigungen:** Resend-Integration – IV bei neuer Anfrage, Einreicher bei Genehmigung/Ablehnung benachrichtigen
 2. **Multi-File-Upload:** Mehrere Belege pro Anfrage
-3. **Portal-Navigation aktivieren:** Freigaben-Link im Kundenportal einschalten (aktuell admin-only)
+3. ~~**Portal-Navigation aktivieren:**~~ Freigaben-Link im Kundenportal aktiv (v2.27.0 DashboardNav)
 4. **Rate-Limiting:** Submit-API gegen Missbrauch absichern
 5. **Bestellstatus-Tracking:** Nach Genehmigung: "Bestellt" → "Geliefert" → "Bezahlt"
 
@@ -121,13 +121,19 @@ SOLL/IST-Abgleich implementiert mit Ampelsystem (v2.25.0). PLAN vs. IST pro Peri
 
 ---
 
-### Portal Security-Tab: Echte Daten statt Demo-Daten
+### ~~Portal Security-Tab: Echte Daten statt Demo-Daten~~ ERLEDIGT 2026-02-12
 
-**Status:** Bekannt
-
-**Problem:** `/portal/cases/[id]/security` zeigt hardcodierte Demo-Bankkonten und Sicherungsrechte statt Daten aus der API.
+Neue kombinierte Seite `/portal/banken-sicherungsrechte` mit echten Bankdaten aus Customer-API. Alte Routen `/finanzierung` und `/security` redirecten. Navigation synchronisiert mit Admin-Dashboard (v2.27.0).
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.26.0)
+### Dark Mode: Externe Komponenten (Tabellen, Charts)
+
+**Status:** Identifiziert, niedrige Priorität
+
+**Problem:** `InsolvencyEffectsTable`, `PlanningAssumptions`, `LiquidityTable` und Chart-Tooltips verwenden noch `bg-white`/`bg-gray-50`. Portal-Seiten und Navigation sind bereits auf CSS-Variablen migriert.
+
+---
+
+**Letzte Aktualisierung:** 2026-02-12 (v2.27.0)
 

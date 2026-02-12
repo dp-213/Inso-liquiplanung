@@ -4,6 +4,51 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.27.0 – Kundenportal-Refactoring: Banken & Sicherungsrechte
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Banken & Sicherungsrechte (Portal):** Neue kombinierte Seite `/portal/cases/[id]/banken-sicherungsrechte` mit echten Bankdaten aus Customer-API. Zeigt Bankenspiegel (Bank, IBAN, Saldo, Sicherungsnehmer, Status), KPI-Kacheln (Kontoanzahl, Gesamtsaldo, verfügbar) und Sicherungsrechte-Übersicht.
+
+### Änderungen
+
+- **Portal-Navigation:** "Finanzierung" + "Sicherungsrechte" zu einem Nav-Punkt "Banken & Sicherungsrechte" zusammengeführt (analog zum Admin-Dashboard seit v2.24.0). 8 → 7 Nav-Items.
+- **Alte Routen redirecten:** `/portal/cases/[id]/finanzierung` und `/portal/cases/[id]/security` leiten automatisch auf die neue Route um.
+- **Berechnungsgrundlagen API-Fix:** Datenzugriff korrigiert: `data.debtorName` → `data.case?.debtorName`, `data.insolvencyOpeningDate` → `data.case?.openingDate`.
+
+### Styling-Vereinheitlichung (Dark-Mode-Kompatibilität)
+
+- **CustomerHeader:** `bg-white` → `bg-[var(--card-bg)]`, `hover:bg-gray-100` → `hover:bg-[var(--accent)]`
+- **DashboardNav:** `bg-gray-100` → `bg-[var(--accent)]`, `bg-white` → `bg-[var(--card-bg)]`
+- **ExternalDashboardNav:** `bg-gray-100` → `bg-[var(--accent)]`
+- **ExternalHeader:** `bg-white` → `bg-[var(--card-bg)]`
+- **DataSourceLegend:** `bg-gray-50` → `bg-[var(--accent)]`
+- **Berechnungsgrundlagen:** `text-gray-900/700` → CSS-Variablen
+- **Revenue/Compare:** `hover:bg-gray-50` → `hover:bg-[var(--accent)]`, `bg-gray-100` → `bg-[var(--accent)]`
+
+### Entfernte Features
+
+- **Demo-Daten in Security-Seite:** Hardcodierte `DEMO_BANK_ACCOUNTS` und `DEMO_SECURITY_RIGHTS` entfernt. Seite zeigt jetzt echte Daten oder redirected.
+- **Finanzierung-STUB-Aufruf:** Portal ruft nicht mehr die Admin-API `/api/cases/[id]/finanzierung` (STUB) auf.
+
+### Geänderte Dateien
+
+- `app/src/app/portal/cases/[id]/banken-sicherungsrechte/page.tsx` – **NEU**
+- `app/src/app/portal/cases/[id]/finanzierung/page.tsx` – Redirect
+- `app/src/app/portal/cases/[id]/security/page.tsx` – Redirect
+- `app/src/app/portal/cases/[id]/berechnungsgrundlagen/page.tsx` – API-Fix + Styling
+- `app/src/app/portal/cases/[id]/compare/page.tsx` – Styling
+- `app/src/app/portal/cases/[id]/revenue/page.tsx` – Styling
+- `app/src/components/external/DashboardNav.tsx` – Nav-Merge + Styling
+- `app/src/components/external/ExternalDashboardNav.tsx` – Styling
+- `app/src/components/external/ExternalHeader.tsx` – Styling
+- `app/src/components/external/DataSourceLegend.tsx` – Styling
+- `app/src/components/portal/CustomerHeader.tsx` – Styling
+
+---
+
 ## Version 2.26.0 – apoBank Massekreditvertrag, HZV-Split-Korrektur & Dashboard-Audit
 
 **Datum:** 12. Februar 2026

@@ -4,6 +4,39 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-039: Portal – Finanzierung + Sicherungsrechte zusammenführen
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Das Kundenportal hatte zwei getrennte Seiten: "Finanzierung" (rief Admin-STUB-API auf, zeigte nichts) und "Sicherungsrechte" (zeigte Platzhalter-Text). Im Admin-Dashboard wurden diese bereits in v2.24.0 zu "Banken & Sicherungsrechte" zusammengeführt.
+
+Zusätzlich verwendeten Portal-Seiten hardcodierte Tailwind-Farben (`bg-white`, `bg-gray-50`, `text-gray-900`) statt CSS-Variablen, was Dark-Mode-Inkompatibilität verursachte.
+
+### Entscheidung
+
+1. **Neue kombinierte Seite** `/portal/cases/[id]/banken-sicherungsrechte` erstellt, die echte Bankdaten aus der Customer-API (`/api/customer/cases/[id]`) nutzt.
+2. **Alte Routen** `/finanzierung` und `/security` auf neue Seite redirecten (kein 404 für Bookmarks).
+3. **DashboardNav**: Zwei Nav-Items zu einem zusammengeführt ("Banken & Sicherungsrechte").
+4. **CSS-Variablen** durchgängig in Portal-Seiten und Shared-Komponenten eingesetzt.
+
+### Begründung
+
+- Admin und Portal sollten konsistente Navigation haben.
+- Customer-API liefert bereits vollständige Bankdaten — kein separater API-Endpoint nötig.
+- STUB-API `/api/cases/[id]/finanzierung` mit Admin-Auth im Portal-Kontext war ein Fehler (falsche Session-Prüfung).
+- CSS-Variablen statt hardcodierte Farben ermöglichen zukünftigen Dark-Mode.
+
+### Konsequenzen
+
+- Alte URLs funktionieren weiterhin (Redirect).
+- Finanzierung-STUB-API bleibt bestehen (wird ggf. in Zukunft für Admin-Kreditlinien genutzt).
+- Externe Tabellen-Komponenten haben noch hardcodierte Farben (separates TODO, niedrige Priorität).
+
+---
+
 ## ADR-038: apoBank Massekreditvertrag-Update & HZV-Split-Korrektur
 
 **Datum:** 12. Februar 2026
