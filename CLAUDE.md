@@ -198,6 +198,8 @@ Alle Dokumentation liegt in `/app/docs/`:
 | `DECISIONS.md` | Architektur-Entscheidungen | Bei wichtigen Design-Entscheidungen |
 | `LIMITATIONS.md` | Bekannte Einschränkungen | Bei neuen Einschränkungen |
 | `TODO_REFACTORING.md` | 🔴 Refactoring-Plan für später | Nach inhaltlichen Änderungen |
+| `WETTBEWERBER_LIREX.md` | Lirex-Analyse (Architektur, Features, API) | Bei neuen Erkenntnissen |
+| `FEATURE_ABGLEICH_LIREX.md` | Feature-Vergleich + Roadmap | Bei Umsetzung von Features |
 
 ### Claude-spezifische Dateien
 

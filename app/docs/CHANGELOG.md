@@ -4,6 +4,75 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.32.0 – Zahlbeleg-Aufschlüsselung (wiederkehrender Workflow)
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Zahlbeleg-Upload & Match:** Persistierte Datenstruktur `PaymentBreakdownSource` + `PaymentBreakdownItem` für PDF-verifizierte Zahlbelege. Upload via JSON, automatisches Matching gegen LedgerEntries (caseId + bankAccountId + amountCents + Datum ±3 Tage + „SAMMEL" in Beschreibung).
+- **Idempotenter Split:** Zweistufiger Workflow – Upload & Match → separater Split mit Invarianten-Tests. Sammelüberweisungen werden in Einzelposten aufgeteilt mit vollständigem Audit-Trail (breakdownSourceId in fieldChanges).
+- **PaymentBreakdownPanel:** Aufklappbares Panel in der Ledger-Seite mit Status-Badges, Datei-Upload, Split-Button und aufklappbaren Einzelposten-Details.
+
+### Technische Details
+
+- Duplikat-Schutz: Gleiche `referenceNumber` wird beim Upload übersprungen
+- Summenvalidierung: Σ Items === |Parent.amountCents| (BigInt-exakt, cent-genau)
+- Absoluter Invarianten-Test: Aktive Summe === Root-Summe nach jedem Split
+- Audit-Log pro Parent mit `AUDIT_ACTIONS.SPLIT` und Breakdown-Referenz
+- Children erben: transactionDate, valueType, legalBucket, bankAccountId, estateAllocation, estateRatio
+
+### Verifiziert
+
+- 9 Sammelüberweisungen → 47 Einzelposten (100% korrekt gegen PDF-Originale)
+- Invariant: Root-Summe = Aktive Summe = 87.412.863 Cents (Differenz: 0)
+
+---
+
+## Version 2.31.0 – Forecast-Tab UX-Redesign: Excel-Feeling
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Unified Spreadsheet View:** Prognose-Tabelle und Annahmen-Editor in einer einzigen Tabelle vereint. Keine Tabs mehr – IST-Daten (grau) und PROGNOSE-Werte (blau) nebeneinander sichtbar.
+- **Inline Cell Editing:** Klick auf eine Prognose-Zelle → Input-Feld mit gelbem Rahmen. Tab navigiert zur nächsten Zelle, Enter speichert, Escape bricht ab.
+- **SpreadsheetCell mit Tab+Save:** Sequentieller Save: Tab speichert zuerst, navigiert erst bei Erfolg. Bei Fehler bleibt der Fokus in der Zelle.
+- **Ctrl+Z Undo:** Nach Inline-Edit kann der letzte gespeicherte Wert mit Ctrl/Cmd+Z wiederhergestellt werden (Einmal-Undo pro Save).
+- **Quick-Add Inline-Formular:** „+ Neue Einzahlung/Auszahlung" öffnet 4-Felder-Formular direkt in der Tabelle (Bezeichnung, Typ, Betrag, Quelle). Enter speichert und hält Formular offen (Bulk-Modus).
+- **Detail-Drawer (SlideOver):** Klick auf Zeilen-Label öffnet Drawer von rechts mit allen erweiterten Feldern (Wachstumsfaktor, Perioden-Range mit Monatsnamen, Aktiviert/Deaktiviert Toggle, Löschen). CSS-Animation mit `drawerSlideIn`.
+
+### Änderungen
+
+- **page.tsx refaktorisiert:** Von ~1.274 auf ~320 Zeilen. Reiner Orchestrator mit Data-Fetching und Event-Handlern.
+- **8 fokussierte Komponenten:** `ForecastSpreadsheet`, `ForecastScenarioBar`, `ForecastSummaryCards`, `InlineAssumptionRow`, `QuickAddRow`, `AssumptionDetailDrawer`, `SpreadsheetCell`, `types.ts` unter `components/forecast/`.
+- **Debounced Parallel Refresh:** Assumptions + Calculate werden parallel mit `Promise.all` geladen. 300ms Debounce mit Stale-Check verhindert Race Conditions bei schnellem Editieren.
+- **Derived State für Drawer:** `drawerAssumption` wird aus dem `assumptions`-Array abgeleitet statt als separater State gehalten → kein Stale-Bug nach Toggle/Refresh.
+
+### Bugfixes
+
+- **Stale Drawer State:** Drawer zeigte veraltete Daten nach Toggle/Save. Fix: Derived State Pattern.
+- **Doppelter Save bei Tab:** Tab+Blur feuerten beide einen Save. Fix: `skipBlurRef` verhindert Blur-Save wenn Tab bereits gespeichert hat.
+
+---
+
+## Version 2.30.0 – Wettbewerber-Analyse Lirex
+
+**Datum:** 12. Februar 2026
+
+### Neue Dokumentation
+
+- **`WETTBEWERBER_LIREX.md`** – Vollständige Architektur-Analyse des Lirex-Tools (Bestell-/Zahlprozess für Insolvenzverfahren). Erfasst via automatisiertem Puppeteer-Scraping: alle Routen, API-Endpunkte, Formulare, Tabellen, Rollen-System.
+- **`FEATURE_ABGLEICH_LIREX.md`** – Systematischer Feature-Vergleich mit priorisierter Roadmap: 3 Must-Haves (Freigabe-Schwellwerte, Kostenarten, Kreditoren), 4 Important (DSV, E-Mail-Benachrichtigung, Kostenlimits, Stammdaten), 7 Nice-to-Haves.
+
+### Erkenntnisse
+
+- Lirex ist im operativen Tagesgeschäft (mehrstufige Freigaben, Kostenkontrolle, Lieferanten) ausgereifter
+- Unser Tool ist in Analyse und Planung (Liquidität, Alt/Neu, Forecast, Klassifikation) Lirex deutlich überlegen
+- Hauptlücken: Konfigurierbare Freigabe-Schwellwerte, Kostenarten, Kreditoren-Stammdaten, E-Mail-Benachrichtigungen
+
+---
+
 ## Version 2.29.0 – Portal-Konsolidierung & Einnahmen-Tab
 
 **Datum:** 12. Februar 2026

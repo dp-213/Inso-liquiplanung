@@ -237,7 +237,7 @@ Neue kombinierte Seite `/portal/cases/[id]/banken-sicherungsrechte` ersetzt Demo
 
 ### ~~Forecast-Modul in Entwicklung~~ GELÖST 2026-02-12
 
-Prognose-Modul vollständig implementiert (v2.28.0): Szenarien, Annahmen-Editor, Forecast Engine mit Dashboard-Integration. Turso-Tabellen (`forecast_scenarios`, `forecast_assumptions`) erstellt.
+Prognose-Modul vollständig implementiert (v2.28.0): Szenarien, Annahmen-Editor, Forecast Engine mit Dashboard-Integration. Turso-Tabellen (`forecast_scenarios`, `forecast_assumptions`) erstellt. UX-Redesign in v2.31.0: Unified Spreadsheet mit Inline-Edit, Quick-Add und Detail-Drawer (ADR-044).
 
 ### ~~Portal: Zwei konkurrierende Navigations-Systeme~~ GELÖST 2026-02-12
 
@@ -249,4 +249,4 @@ Einnahmen-Tabelle und neuer Trend-Chart gruppieren jetzt nach `categoryTag` (HZV
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.29.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.31.0)

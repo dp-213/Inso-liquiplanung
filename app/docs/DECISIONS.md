@@ -4,6 +4,38 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-044: Forecast-Tab – Unified Spreadsheet mit Derived State
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Der Forecast-Tab hatte zwei getrennte Ansichten: eine readonly Prognose-Tabelle und einen separaten Annahmen-Editor mit 8-Felder-Modal. Für 39 Annahmen (HVPlus-Fall) bedeutete das 39× Modal öffnen → 8 Felder ausfüllen → speichern. Periodenauswahl war numerisch ("Periode 2" statt "Dez 2025"), Auswirkungen erst nach Tab-Wechsel sichtbar.
+
+### Entscheidung
+
+1. **Unified Spreadsheet:** Eine Tabelle zeigt IST-Daten und PROGNOSE-Annahmen zusammen. Annahmen sind editierbare Zeilen, Prognose-Werte sind klickbare Zellen.
+2. **Inline Quick-Add (4 Felder):** Bezeichnung, Typ, Betrag, Quelle. `flowType` ergibt sich aus dem Block (Einzahlungen/Auszahlungen), `categoryKey` wird automatisch generiert, Perioden-Range ist Default gesamte Prognose.
+3. **Detail-Drawer statt Modal:** SlideOver von rechts für erweiterte Felder (20% der Fälle: Wachstumsfaktor, Perioden-Range, Notiz).
+4. **SpreadsheetCell-Pattern:** Zentraler `doSave()` mit boolean Return. `skipBlurRef` verhindert Doppel-Save bei Tab. `previousValueRef` für Einmal-Undo.
+5. **Derived State für Drawer:** `drawerAssumptionId` als State, `drawerAssumption` abgeleitet aus `assumptions.find()`. Verhindert Stale-Bug nach Toggle/Refresh.
+6. **Debounced Parallel Refresh:** `Promise.all([fetchAssumptions(), calculate()])` mit 300ms Debounce und Stale-Counter.
+
+### Begründung
+
+- 39 Annahmen × 8-Felder-Modal = unzumutbar. Inline-Edit mit 4 Feldern + Enter-Bulk-Modus ist 10× schneller.
+- Separate State für Drawer-Objekt wird stale nach `refresh()` – Derived State löst das elegant.
+- Tab-Navigation muss sequentiell sein: erst Save, dann bei Erfolg navigieren, bei Fehler in Zelle bleiben.
+
+### Konsequenzen
+
+- 8 fokussierte Komponenten statt 1 monolithischer 1.274-Zeilen-Datei
+- API-Routes, Forecast-Engine und Prisma-Schema unverändert
+- Dashboard-Integration (RollingForecastTable) unberührt
+
+---
+
 ## ADR-043: Portal-Konsolidierung – Ein Dashboard statt Standalone-Seiten
 
 **Datum:** 12. Februar 2026

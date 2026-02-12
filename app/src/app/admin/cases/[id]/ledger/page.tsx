@@ -18,6 +18,7 @@ import {
 import { formatAllocationSource, formatCategoryTagSource } from "@/lib/ledger/format-helpers";
 import { ColumnFilter, ColumnFilterValue } from "@/components/ledger/ColumnFilter";
 import BatchSplitModal from "@/components/admin/BatchSplitModal";
+import PaymentBreakdownPanel from "@/components/admin/PaymentBreakdownPanel";
 
 type TabType = "all" | "review" | "rules" | "sources";
 
@@ -1105,6 +1106,9 @@ export default function CaseLedgerPage({
           </Link>
         </div>
       </div>
+
+      {/* Zahlbeleg-Aufschlüsselung Panel */}
+      <PaymentBreakdownPanel caseId={id} onSplitComplete={fetchData} />
 
       {/* Sticky Total Summary - always visible at top */}
       {activeTab !== "rules" && activeTab !== "sources" && stats && (

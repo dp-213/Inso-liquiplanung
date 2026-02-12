@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.29.0
+**Version:** 2.31.0
 **Stand:** 12. Februar 2026
 
 ---
@@ -479,6 +479,15 @@ LedgerEntry (UNREVIEWED)
 │   ├── hooks/
 │   │   └── usePortalPaths.ts        # Client-seitiger Subdomain-Pfad-Helper
 │   ├── components/                   # React-Komponenten
+│   │   ├── forecast/               # Prognose-Spreadsheet (v2.31.0)
+│   │   │   ├── types.ts            # Shared Types + Helpers (formatEUR, parseCentsFromEUR, cn)
+│   │   │   ├── ForecastSpreadsheet.tsx   # Unified-Tabelle (IST + Prognose)
+│   │   │   ├── ForecastScenarioBar.tsx   # Szenario-Info + Eröffnungssaldo
+│   │   │   ├── ForecastSummaryCards.tsx  # 4 KPI-Cards
+│   │   │   ├── InlineAssumptionRow.tsx   # Annahme als editierbare Tabellenzeile
+│   │   │   ├── QuickAddRow.tsx           # Inline 4-Felder-Formular
+│   │   │   ├── AssumptionDetailDrawer.tsx # SlideOver für erweiterte Felder
+│   │   │   └── SpreadsheetCell.tsx       # Editierbare Zelle (Tab+Save, Undo)
 │   └── lib/
 │       ├── db.ts                     # Prisma Client
 │       ├── auth.ts                   # Session-Handling

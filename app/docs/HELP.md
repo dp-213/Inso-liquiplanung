@@ -1,6 +1,6 @@
 # Hilfe & Anleitungen
 
-> Zuletzt aktualisiert: 2026-02-12 | Version 2.28.0
+> Zuletzt aktualisiert: 2026-02-12 | Version 2.31.0
 
 Dieses Dokument ist die **Source-of-Truth** für die Hilfe-Seite im Admin-Dashboard.
 Bei Änderungen am System wird diese Datei über `/doku` mit-aktualisiert.
@@ -99,14 +99,14 @@ Das Dashboard zeigt die Cashflow-Entwicklung ab 0 EUR. Die Prognose-Seite zeigt 
 
 **Wo:** PLANUNG → Prognose
 
-1. Eröffnungssaldo setzen (echter Kontostand)
-2. Annahmen hinzufügen (pro Cashflow-Position):
-   - Kategorie, Typ (Laufend/Fix/Einmalig), Betrag, Wachstumsrate
-   - Aktivieren/Deaktivieren per Toggle
-3. Ergebnis sofort in der Tabelle sichtbar:
-   - IST-Perioden (grau) + PROGNOSE-Perioden (blau)
-   - Headroom-Berechnung (Kontostand + Kreditlinie - Rückstellungen)
-4. **Automatische Dashboard-Integration**: Aktive Annahmen fließen sofort ins Dashboard
+Die Prognose-Seite funktioniert wie eine Excel-Tabelle:
+
+1. **Eröffnungssaldo setzen:** Klick auf den Saldo-Wert in der Szenario-Bar → Inline-Eingabe
+2. **Neue Annahme hinzufügen:** „+ Neue Einzahlung/Auszahlung" → 4-Felder-Formular direkt in der Tabelle (Bezeichnung, Typ, Betrag, Quelle). Enter speichert und hält das Formular offen für den nächsten Eintrag.
+3. **Betrag ändern:** Klick auf eine Prognose-Zelle → Eingabefeld mit gelbem Rahmen. Tab → nächste Zelle, Enter → speichern, Escape → abbrechen. Ctrl+Z → letzten Save rückgängig machen.
+4. **Erweiterte Felder:** Klick auf den Zeilen-Namen → Drawer (SlideOver) mit allen Feldern: Wachstumsfaktor, Perioden-Range (mit Monatsnamen), Notiz, Aktiviert/Deaktiviert Toggle, Löschen.
+5. **Live-Ergebnis:** IST-Perioden (grau, nicht editierbar) und PROGNOSE-Perioden (blau, editierbar) in einer Tabelle. Summen und Headroom aktualisieren sich automatisch nach jedem Save.
+6. **Automatische Dashboard-Integration:** Aktive Annahmen fließen sofort ins Dashboard.
 
 ### Schritt 5: Dashboard ablesen
 
