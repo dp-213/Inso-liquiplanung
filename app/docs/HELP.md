@@ -1,6 +1,6 @@
 # Hilfe & Anleitungen
 
-> Zuletzt aktualisiert: 2026-02-12 | Version 2.37.0
+> Zuletzt aktualisiert: 2026-02-12 | Version 2.39.0
 
 Dieses Dokument ist die **Source-of-Truth** für die Hilfe-Seite im Admin-Dashboard.
 Bei Änderungen am System wird diese Datei über `/doku` mit-aktualisiert.
@@ -140,12 +140,20 @@ Die Prognose-Seite funktioniert wie eine Excel-Tabelle:
 | **Kostenarten** | Kategorisierung von Ausgaben mit optionalem Budget. Mapping auf Liquiditätsmatrix-Tags. |
 | **Standorte** | Betriebsstätten des Unternehmens. Für standortbezogene Auswertungen. |
 
+### FALLDATEN
+
+| Seite | Zweck |
+|-------|-------|
+| **Personal** | Mitarbeiter mit Gehaltsdaten (Steuerbrutto pro Monat), Standort-Zuordnung, LANR. |
+| **Kontakte** | Ansprechpartner (IV, Berater, Buchhaltung, RA) mit E-Mail, Telefon, Notizen. |
+| **Banken & Sicherungsrechte** | Kreditlinien, Sicherungsvereinbarungen. Kreditlinie fließt in Headroom ein. |
+| **Finanzierung** | Finanzierungsstruktur und Massekredite. |
+
 ### VERFAHREN
 
 | Seite | Zweck |
 |-------|-------|
 | **Insolvenzeffekte** | Rückstellungen, Sondereffekte. Fließen in Headroom-Berechnung ein. |
-| **Banken & Sicherungsrechte** | Kreditlinien, Sicherungsvereinbarungen. Kreditlinie fließt in Headroom ein. |
 
 ### PLANUNG
 
@@ -267,11 +275,14 @@ Unter Fall bearbeiten → „Freigabe-Einstellungen" kann ein EUR-Betrag definie
 |---------|-----------|
 | **Altmasse** | Vermögenswerte und Verbindlichkeiten vor Insolvenzeröffnung |
 | **Closing Balance** | Endbestand einer Periode (Opening + Einzahlungen + Auszahlungen) |
+| **Employee** | Mitarbeiter eines Falls mit Gehaltsdaten, Standort-Zuordnung und LANR |
 | **Eröffnungssaldo** | Kontostand zu Beginn des Planungszeitraums |
+| **FALLDATEN** | Sidebar-Sektion für fallspezifische Informationen (Personal, Kontakte, Banken, Finanzierung) |
 | **Forecast Engine** | Berechnungsmodul, das aus Annahmen Cashflow-Prognosen erzeugt |
 | **Headroom** | Finanzieller Spielraum = Kontostand + Kreditlinie - Rückstellungen |
 | **IST-Daten** | Echte Bankbuchungen aus importierten Kontoauszügen |
 | **IV** | Insolvenzverwalter |
+| **LANR** | Lebenslange Arztnummer – Pflichtangabe für Ärzte in der Personalverwaltung |
 | **Kostenart** | Kategorisierung von Ausgaben (z.B. Personal, Miete) mit optionalem Budget |
 | **Kreditor** | Ausgaben-Partner (Lieferant, Dienstleister, Behörde) – getrennt von Gegenpartei |
 | **Kreditlinie** | Vereinbarter Massekredit mit der Bank |

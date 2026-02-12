@@ -30,6 +30,8 @@
    - [4.13 Freigaben – Kundenzugänge & Externe Links](#413-freigaben--kundenzugänge--externe-links-v2280)
    - [4.14 Prognose (Forecast)](#414-prognose-forecast)
    - [4.15 Sammelüberweisungs-Splitting](#415-sammelüberweisungs-splitting)
+   - [4.16 Personal (Mitarbeiter)](#416-personal-mitarbeiter-v2390)
+   - [4.17 Kontakte (Ansprechpartner)](#417-kontakte-ansprechpartner-v2390)
 5. [Datenmodell-Diagramm](#5-datenmodell-diagramm)
 6. [Datenfluss: Import bis Anzeige](#6-datenfluss-import-bis-anzeige)
 
@@ -68,7 +70,11 @@ Case (Insolvenzverfahren)
     ├── ShareLink (Externe Links)
     ├── Order (Bestell-/Zahlfreigaben)
     ├── CompanyToken (Externe Zugangs-Tokens)
-    └── CaseConfiguration (Dashboard-Konfiguration)
+    ├── CaseConfiguration (Dashboard-Konfiguration)
+    ├── Employee (Mitarbeiter) ← NEU v2.39.0
+    │       ↓ has
+    │       └── EmployeeSalaryMonth (Monatliche Gehaltsdaten)
+    └── CaseContact (Ansprechpartner) ← NEU v2.39.0
 ```
 
 ---
@@ -1389,6 +1395,70 @@ const entries = await prisma.ledgerEntry.findMany({
 - `PaymentBreakdownSource.matchedLedgerEntryId` → gematchter Parent-LedgerEntry
 - Child-Entry: `splitReason` = „Zahlbeleg PRM2VN, Posten 3/8"
 - Audit-Log: `fieldChanges.breakdownSourceId` verweist auf Source
+
+---
+
+### 4.16 Personal (Mitarbeiter) (v2.39.0)
+
+**Pfad:** `/admin/cases/[id]/personal`
+**Sidebar-Sektion:** FALLDATEN
+**API:** `/api/cases/[id]/employees` + `/api/cases/[id]/employees/[employeeId]`
+
+#### Datenmodell
+
+| Modell | Felder | Beschreibung |
+|--------|--------|--------------|
+| **Employee** | personnelNumber, lastName, firstName, role, lanr, locationId, svNumber, taxId, isActive, notes | Mitarbeiter-Stammdaten mit Standort-Zuordnung |
+| **EmployeeSalaryMonth** | employeeId, year, month, grossSalaryCents, netSalaryCents, employerCostsCents | Monatliche Gehaltsdaten (Steuerbrutto, Netto, AG-Kosten) |
+
+#### Features
+
+| Feature | Beschreibung |
+|---------|--------------|
+| **Gehaltsspalten** | Dynamische Spalten pro verfügbarem Monat (Okt 25, Nov 25, ...) |
+| **Summenzeile** | Gesamt-Steuerbrutto pro Monat über alle gefilterten Mitarbeiter |
+| **AG-Kosten-Schätzung** | Automatische Berechnung mit Pauschalwert 23% |
+| **Standort-Filter** | Dropdown zum Filtern nach Location |
+| **Aktiv-Filter** | Nur aktive / alle / nur inaktive Mitarbeiter |
+| **LANR-Warnung** | Gelbes Badge „fehlt" bei Ärzten ohne Lebenslange Arztnummer |
+| **CRUD** | Anlegen, Bearbeiten, Löschen von Mitarbeitern via Inline-Formular |
+
+#### API-Besonderheiten
+
+- **POST** unterstützt Nested Create: `salaryMonths[]` wird direkt mit angelegt
+- **PUT** unterstützt Salary-Upsert: Bestehende Monatsgehälter werden aktualisiert, neue angelegt
+- **BigInt-Serialisierung:** `grossSalaryCents` wird als String serialisiert (JSON BigInt)
+
+---
+
+### 4.17 Kontakte (Ansprechpartner) (v2.39.0)
+
+**Pfad:** `/admin/cases/[id]/kontakte`
+**Sidebar-Sektion:** FALLDATEN
+**API:** `/api/cases/[id]/contacts` + `/api/cases/[id]/contacts/[contactId]`
+
+#### Datenmodell
+
+| Feld | Pflicht | Beschreibung |
+|------|---------|--------------|
+| `role` | ✅ | IV, BERATER, BUCHHALTUNG, RECHTSANWALT, GESCHAEFTSFUEHRUNG, SONSTIGE |
+| `name` | ✅ | Name der Kontaktperson |
+| `organization` | ❌ | Kanzlei, Firma, etc. |
+| `email` | ❌ | E-Mail (klickbar als mailto-Link) |
+| `phone` | ❌ | Telefon (klickbar als tel-Link) |
+| `notes` | ❌ | Freitext-Notizen |
+| `displayOrder` | Auto | Sortierreihenfolge |
+
+#### Rollen-Badges
+
+| Rolle | Farbe |
+|-------|-------|
+| IV (Insolvenzverwalter) | Blau |
+| Berater | Grün |
+| Buchhaltung | Lila |
+| Rechtsanwalt | Amber |
+| Geschäftsführung | Indigo |
+| Sonstige | Grau |
 
 ---
 

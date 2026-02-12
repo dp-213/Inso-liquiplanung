@@ -4,6 +4,40 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-051: FALLDATEN-Sektion als Infrastruktur für fallspezifische Stammdaten
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Bei der Analyse von DATEV-Lohnjournalen (HVPlus) wurden 44 Mitarbeiter mit monatlichen Gehaltsdaten extrahiert. Diese Daten passen nicht in die bestehenden Sidebar-Sektionen (STAMMDATEN = systemweite Konfiguration, VERFAHREN = insolvenzrechtliche Aspekte). Gleichzeitig sind „Banken & Sicherungsrechte" und „Finanzierung" thematisch eher Falldaten als Verfahrensaspekte.
+
+### Entscheidung
+
+Neue Sidebar-Sektion **FALLDATEN** zwischen STAMMDATEN und VERFAHREN:
+- **Personal** (Mitarbeiter + Gehaltsdaten) — NEU
+- **Kontakte** (Ansprechpartner) — NEU
+- **Banken & Sicherungsrechte** — verschoben aus VERFAHREN
+- **Finanzierung** — in Sidebar aufgenommen (existierte als Page)
+
+Drei neue Prisma-Modelle: `Employee`, `EmployeeSalaryMonth`, `CaseContact`.
+
+### Begründung
+
+1. **Klar abgegrenzt:** STAMMDATEN = Bankkonten/Gegenparteien/Standorte (konfigurativ). FALLDATEN = fallspezifische Informationen (Personal, Kontakte, Finanzierungsstruktur). VERFAHREN = insolvenzrechtliche Aspekte (Insolvenzeffekte).
+2. **Erweiterbar:** FALLDATEN kann zukünftig um Verträge, Mietverträge, Versicherungen etc. ergänzt werden.
+3. **Employee-Modell mit SalaryMonths:** Monatsgehälter als separate Tabelle statt JSON-Blob ermöglicht Aggregation und Filterung auf DB-Ebene.
+4. **CaseContact statt allgemeinem Contact:** Case-gebunden (nicht global), da Ansprechpartner pro Verfahren variieren.
+
+### Konsequenzen
+
+- Sidebar hat jetzt 7 Sektionen (DATEN, STAMMDATEN, FALLDATEN, VERFAHREN, PLANUNG, ANALYSE, ZUGANG)
+- VERFAHREN enthält nur noch „Insolvenzeffekte" (könnte langfristig mit FALLDATEN zusammengeführt werden)
+- Turso-Migration für 3 neue Tabellen + 5 Indexes ausgeführt
+
+---
+
 ## ADR-050: Dark Mode via CSS-Variablen + Globale Tailwind-Overrides
 
 **Datum:** 12. Februar 2026

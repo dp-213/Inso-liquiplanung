@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.38.0
+**Version:** 2.39.0
 **Stand:** 12. Februar 2026
 
 ---
@@ -250,6 +250,46 @@ model Location {
   caseId  String
   name    String
   address String?
+}
+```
+
+### Falldaten (v2.39.0)
+
+```prisma
+model Employee {
+  id              String    @id @default(uuid())
+  caseId          String
+  personnelNumber String?   // DATEV Personalnummer
+  lastName        String
+  firstName       String
+  role            String?   // Arzt, VW, Arzt in WB, MFA
+  lanr            String?   // Lebenslange Arztnummer
+  locationId      String?   // FK auf Location
+  isActive        Boolean   @default(true)
+  salaryMonths    EmployeeSalaryMonth[]
+  @@unique([caseId, personnelNumber])
+}
+
+model EmployeeSalaryMonth {
+  id                  String   @id @default(uuid())
+  employeeId          String
+  year                Int
+  month               Int      // 1-12
+  grossSalaryCents    BigInt   // Steuerbrutto
+  netSalaryCents      BigInt?  // Auszahlungsbetrag
+  employerCostsCents  BigInt?  // AG-Kosten gesamt
+  @@unique([employeeId, year, month])
+}
+
+model CaseContact {
+  id           String   @id @default(uuid())
+  caseId       String
+  role         String   // IV, BERATER, BUCHHALTUNG, RECHTSANWALT, etc.
+  name         String
+  organization String?
+  email        String?
+  phone        String?
+  displayOrder Int      @default(0)
 }
 ```
 

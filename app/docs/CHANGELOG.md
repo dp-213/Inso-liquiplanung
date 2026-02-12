@@ -4,6 +4,24 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.39.0 – FALLDATEN-Sektion: Personal & Kontakte
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Sidebar-Sektion FALLDATEN:** Neue Navigations-Sektion zwischen STAMMDATEN und VERFAHREN. Enthält: Personal, Kontakte, Banken & Sicherungsrechte, Finanzierung. Infrastruktur für alle zukünftigen fallspezifischen Daten.
+- **Personal-Seite (`/admin/cases/[id]/personal`):** Mitarbeiter-Übersicht mit dynamischen Gehaltsspalten pro Monat (Steuerbrutto), Summenzeile, AG-Kosten-Schätzung (23%), Standort-Filter, Aktiv/Inaktiv-Filter, LANR-Warnung für Ärzte ohne LANR. Vollständiges CRUD.
+- **Kontakte-Seite (`/admin/cases/[id]/kontakte`):** Ansprechpartner-Verwaltung mit farbigen Rollen-Badges (IV, Berater, Buchhaltung, RA, Geschäftsführung, Sonstige). Klickbare E-Mail/Telefon-Links. Sortierung per displayOrder.
+- **3 neue Prisma-Modelle:** `Employee` (Mitarbeiter mit LANR, SV-Nummer, Standort-Zuordnung), `EmployeeSalaryMonth` (monatliche Gehaltsdaten: Steuerbrutto, Netto, AG-Kosten), `CaseContact` (Ansprechpartner mit Rolle und Kontaktdaten).
+- **4 neue API-Routes:** `employees` + `contacts` (je Collection GET/POST und Single GET/PUT/DELETE). Employees-API unterstützt Nested Salary-Create und Salary-Upsert.
+
+### Änderungen
+
+- **Sidebar-Reorganisation:** „Banken & Sicherungsrechte" von VERFAHREN nach FALLDATEN verschoben. „Finanzierung" (existierte als Seite, aber nicht in Sidebar) in FALLDATEN aufgenommen. VERFAHREN enthält nur noch „Insolvenzeffekte".
+
+---
+
 ## Version 2.38.0 – Rebranding, Dark Mode & Professionalitäts-Audit
 
 **Datum:** 12. Februar 2026
