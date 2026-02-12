@@ -1189,6 +1189,11 @@ export function getAltforderungCategoryTag(neumasseTag: string | null): string |
     'INSO_SACHAUFNAHME': 'ALTVERBINDLICHKEIT_INSO',
   };
 
+  // Wenn der Tag bereits ein ALTFORDERUNG_*/ALTVERBINDLICHKEIT_*-Tag ist, direkt zurückgeben
+  if (neumasseTag.startsWith('ALTFORDERUNG_') || neumasseTag.startsWith('ALTVERBINDLICHKEIT_')) {
+    return neumasseTag;
+  }
+
   return mapping[neumasseTag] || null;
 }
 
