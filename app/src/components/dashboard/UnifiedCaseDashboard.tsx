@@ -36,6 +36,7 @@ import IstPlanComparisonTable from "@/components/dashboard/IstPlanComparisonTabl
 import BankAccountsTab from "@/components/dashboard/BankAccountsTab";
 import BusinessLogicContent from "@/components/business-logic/BusinessLogicContent";
 import UnklarRiskBanner from "@/components/dashboard/UnklarRiskBanner";
+import DataQualityBanner from "@/components/dashboard/DataQualityBanner";
 import DataSourceLegend from "@/components/dashboard/DataSourceLegend";
 import ExecutiveSummary from "@/components/dashboard/ExecutiveSummary";
 import Link from "next/link";
@@ -728,7 +729,10 @@ export default function UnifiedCaseDashboard({
           </div>
         )}
 
-        {/* UNKLAR-Risiko Banner - prominent oberhalb der Navigation */}
+        {/* Datenqualitäts-Banner - prominent oberhalb der Navigation */}
+        {caseId && <DataQualityBanner caseId={caseId} />}
+
+        {/* UNKLAR-Risiko Banner */}
         {data.estateAllocation && caseId && (
           <UnklarRiskBanner caseId={caseId} estateAllocation={data.estateAllocation} />
         )}

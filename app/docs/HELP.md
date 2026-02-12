@@ -1,6 +1,6 @@
 # Hilfe & Anleitungen
 
-> Zuletzt aktualisiert: 2026-02-12 | Version 2.39.0
+> Zuletzt aktualisiert: 2026-02-12 | Version 2.40.0
 
 Dieses Dokument ist die **Source-of-Truth** für die Hilfe-Seite im Admin-Dashboard.
 Bei Änderungen am System wird diese Datei über `/doku` mit-aktualisiert.
@@ -132,15 +132,19 @@ Die Prognose-Seite funktioniert wie eine Excel-Tabelle:
 
 ### STAMMDATEN
 
+Alle Stammdaten-Seiten haben eine **Live-Suchleiste** und **sortierbare Spaltenheader** (Klick auf Spaltenname wechselt asc/desc).
+
 | Seite | Zweck |
 |-------|-------|
 | **Bankkonten** | Alle Bankkonten des Falls. Liquiditätsrelevanz markieren. |
-| **Gegenparteien** | Einnahmen-Partner (KV, HZV, PVS). Für Klassifikation und Reporting. |
-| **Kreditoren** | Ausgaben-Partner (Lieferanten, Dienstleister, Behörden). IBAN, USt-ID, Standard-Kostenart. |
+| **Gegenparteien** | Einnahmen-Partner (KV, HZV, PVS). Für Klassifikation und Reporting. Typ-Filter. |
+| **Kreditoren** | Ausgaben-Partner (Lieferanten, Dienstleister, Behörden). IBAN, USt-ID, Standard-Kostenart. Kategorie-Filter. |
 | **Kostenarten** | Kategorisierung von Ausgaben mit optionalem Budget. Mapping auf Liquiditätsmatrix-Tags. |
 | **Standorte** | Betriebsstätten des Unternehmens. Für standortbezogene Auswertungen. |
 
 ### FALLDATEN
+
+Auch FALLDATEN-Seiten haben Live-Suche und sortierbare Spalten.
 
 | Seite | Zweck |
 |-------|-------|

@@ -226,7 +226,7 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     matchDescription: 'Einnahmen der Kassenärztlichen Vereinigung (KVNO).',
     matches: [
       { type: 'CATEGORY_TAG', value: 'KV', description: 'Buchungen mit Kategorie-Tag „KV"' },
-      { type: 'COUNTERPARTY_PATTERN', value: '(KV|KVNO|Kassenärztliche)', description: 'Gegenpartei enthält „KV", „KVNO" oder „Kassenärztliche"' },
+      { type: 'COUNTERPARTY_PATTERN', value: '(\\bKV\\b|KVNO|Kassenärztliche)', description: 'Gegenpartei enthält „KV" (Wortgrenze), „KVNO" oder „Kassenärztliche"' },
       { type: 'COUNTERPARTY_ID', value: 'cp-kreiskasse-rhein-sieg', description: 'GKV-Zahlungen Kreiskasse Rhein-Sieg' },
     ],
   },
@@ -1214,3 +1214,60 @@ export const INSOLVENCY_ROW_IDS = [
   'cash_out_inso_darlehen',
   'cash_out_inso_verfahrenskosten',
 ];
+
+// =============================================================================
+// DATENQUALITÄTS-CHECKS – Konfiguration
+// =============================================================================
+
+/**
+ * Mapping: counterpartyId → erwarteter categoryTag
+ * Für Konsistenz-Checks: Wenn ein Entry diesen counterpartyId hat,
+ * MUSS categoryTag dem erwarteten Wert entsprechen.
+ */
+export const COUNTERPARTY_TAG_MAP: Record<string, string> = {
+  'cp-haevg-kv': 'KV',
+  'cp-kreiskasse-rhein-sieg': 'KV',
+  'cp-haevg-hzv': 'HZV',
+  'cp-haevg-pvs': 'PVS',
+};
+
+/**
+ * Tags, für die Check 3 (Quartal ↔ estateAllocation) gilt.
+ * HZV/PVS haben andere Regeln (Vormonat/Behandlungsdatum) → nicht hier.
+ */
+export const QUARTAL_CHECK_TAGS = ['KV'];
+
+/**
+ * Estate-Allocation-Erwartung basierend auf Quartal und Eröffnungsdatum.
+ */
+export interface QuartalEstateRule {
+  expectedAllocation: 'ALTMASSE' | 'NEUMASSE' | 'MIXED';
+}
+
+function getQuarterStart(date: Date): Date {
+  const month = date.getUTCMonth();
+  const quarterStartMonth = month - (month % 3);
+  return new Date(Date.UTC(date.getUTCFullYear(), quarterStartMonth, 1));
+}
+
+function getQuarterEnd(date: Date): Date {
+  const month = date.getUTCMonth();
+  const quarterEndMonth = month - (month % 3) + 3;
+  // Tag 0 = letzter Tag des Vormonats → letzter Tag des Quartals
+  return new Date(Date.UTC(date.getUTCFullYear(), quarterEndMonth, 0));
+}
+
+export function getExpectedEstateAllocation(
+  servicePeriodStart: Date,
+  openingDate: Date
+): QuartalEstateRule {
+  const qStart = getQuarterStart(servicePeriodStart);
+  const qEnd = getQuarterEnd(servicePeriodStart);
+
+  // Quartal komplett vor Eröffnung → ALTMASSE
+  if (qEnd < openingDate) return { expectedAllocation: 'ALTMASSE' };
+  // Quartal komplett nach Eröffnung → NEUMASSE
+  if (qStart > openingDate) return { expectedAllocation: 'NEUMASSE' };
+  // Eröffnung fällt in dieses Quartal → MIXED
+  return { expectedAllocation: 'MIXED' };
+}

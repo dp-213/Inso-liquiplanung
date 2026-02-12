@@ -58,7 +58,6 @@ export default function CaseSidebar({
       items: [
         { name: "Zahlungsregister", href: `${base}/ledger` },
         { name: "Import", href: `${base}/ingestion` },
-        { name: "Bestellfreigaben", href: `${base}/orders`, badge: pendingOrderCount },
       ],
     },
     {
@@ -66,7 +65,6 @@ export default function CaseSidebar({
       items: [
         { name: "Bankkonten", href: `${base}/bank-accounts` },
         { name: "Gegenparteien", href: `${base}/counterparties` },
-        { name: "Kreditoren", href: `${base}/creditors` },
         { name: "Kostenarten", href: `${base}/cost-categories` },
         { name: "Standorte", href: `${base}/locations` },
       ],
@@ -78,12 +76,8 @@ export default function CaseSidebar({
         { name: "Kontakte", href: `${base}/kontakte` },
         { name: "Banken & Sicherungsrechte", href: `${base}/banken-sicherungsrechte` },
         { name: "Finanzierung", href: `${base}/finanzierung` },
-      ],
-    },
-    {
-      label: "VERFAHREN",
-      items: [
         { name: "Insolvenzeffekte", href: `${base}/insolvency-effects` },
+        { name: "Business-Logik", href: `${base}/business-logic` },
       ],
     },
     {
@@ -91,8 +85,7 @@ export default function CaseSidebar({
       items: [
         { name: "Prämissen", href: `${base}/assumptions` },
         { name: "Prognose", href: `${base}/forecast` },
-        { name: "Liquiditätsplan", href: `${base}/results` },
-        { name: "Business-Logik", href: `${base}/business-logic` },
+        { name: "Liquiditätsplan", href: `${base}/dashboard` },
       ],
     },
     {
@@ -103,6 +96,13 @@ export default function CaseSidebar({
         { name: "Klassifikation", href: `${base}/ist-klassifikation` },
         { name: "Verifikation", href: `${base}/zahlungsverifikation` },
         { name: "IV-Kommunikation", href: `${base}/iv-kommunikation` },
+      ],
+    },
+    {
+      label: "BESCHAFFUNG",
+      items: [
+        { name: "Bestellfreigaben", href: `${base}/orders`, badge: pendingOrderCount },
+        { name: "Kreditoren", href: `${base}/creditors` },
       ],
     },
     {

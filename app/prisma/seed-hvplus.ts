@@ -74,7 +74,7 @@ const AERZTE: ArztConfig[] = [
 // =============================================================================
 
 const SETTLERS = [
-  { name: 'KV Nordrhein', shortName: 'KVNO', type: 'PAYER', matchPattern: 'KVNO|KV Nordrhein|Kassenärztliche' },
+  { name: 'KV Nordrhein', shortName: 'KVNO', type: 'PAYER', matchPattern: '(\\bKV\\b|KVNO|Kassenärztliche)' },
   { name: 'HZV-Vertrag', shortName: 'HAVG', type: 'PAYER', matchPattern: 'HAVG|HZV|Hausarzt' },
   { name: 'PVS rhein-ruhr', shortName: 'PVS', type: 'PAYER', matchPattern: 'PVS|Privatabrechnung' },
 ];
