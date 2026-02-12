@@ -6,7 +6,18 @@ export interface RevenueEntryForGrouping {
   neumasseAmountCents: string;
   altmasseAmountCents: string;
   periodLabel: string;
+  transactionDate: string;
 }
+
+// Gemeinsame Farbpalette für Chart und Tabelle
+export const REVENUE_COLORS = [
+  "#3b82f6", // Blue
+  "#10b981", // Green
+  "#8b5cf6", // Purple
+  "#f59e0b", // Amber
+  "#ec4899", // Pink
+  "#94a3b8", // Slate (für Sonstige)
+];
 
 export interface GroupedSeries {
   tag: string;
@@ -21,6 +32,7 @@ export interface PeriodSeries {
   periodLabel: string;
   series: Record<string, bigint>; // tag → totalCents
   total: bigint;
+  firstDate: string; // Frühestes transactionDate für chronologische Sortierung
 }
 
 const SONSTIGE_TAG = '__SONSTIGE__';
@@ -109,17 +121,22 @@ export function groupByPeriodAndTag(
         periodLabel: period,
         series: {},
         total: BigInt(0),
+        firstDate: entry.transactionDate,
       });
     }
 
     const p = byPeriod.get(period)!;
     p.series[tag] = (p.series[tag] || BigInt(0)) + BigInt(entry.amountCents);
     p.total += BigInt(entry.amountCents);
+    // Frühestes Datum pro Periode merken
+    if (entry.transactionDate < p.firstDate) {
+      p.firstDate = entry.transactionDate;
+    }
   }
 
-  // Sortiere Perioden chronologisch (alphabetisch funktioniert für "Mmm YYYY" Format)
+  // Sortiere Perioden chronologisch nach tatsächlichem Datum
   return Array.from(byPeriod.values()).sort((a, b) =>
-    a.periodLabel.localeCompare(b.periodLabel, 'de')
+    a.firstDate.localeCompare(b.firstDate)
   );
 }
 

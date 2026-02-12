@@ -25,8 +25,7 @@ import EstateComparisonChart from "@/components/external/EstateComparisonChart";
 import PlanningAssumptions from "@/components/external/PlanningAssumptions";
 import InsolvencyEffectsTable from "@/components/external/InsolvencyEffectsTable";
 import WaterfallChart from "@/components/external/WaterfallChart";
-import RevenueTable from "@/components/dashboard/RevenueTable";
-import RevenueTrendChart from "@/components/dashboard/RevenueTrendChart";
+import RevenueTabContent from "@/components/dashboard/RevenueTabContent";
 import SecurityRightsChart from "@/components/dashboard/SecurityRightsChart";
 import RollingForecastChart from "@/components/dashboard/RollingForecastChart";
 import RollingForecastTable from "@/components/dashboard/RollingForecastTable";
@@ -448,29 +447,9 @@ export default function UnifiedCaseDashboard({
         );
 
       case "revenue":
-        return (
-          <div className="space-y-6">
-            {caseId && (
-              <>
-                <div className="admin-card p-6">
-                  <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">
-                    Einnahmen-Entwicklung
-                  </h2>
-                  <p className="text-sm text-[var(--secondary)] mb-4">
-                    Tatsächliche Zahlungseingänge nach Kategorie. Nur IST-Daten.
-                  </p>
-                  <RevenueTrendChart caseId={caseId} months={6} scope={scope} />
-                </div>
-                <div className="admin-card p-6">
-                  <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
-                    Einnahmen nach Kategorie
-                  </h2>
-                  <RevenueTable caseId={caseId} months={6} showSummary={true} scope={scope} />
-                </div>
-              </>
-            )}
-          </div>
-        );
+        return caseId ? (
+          <RevenueTabContent caseId={caseId} months={6} scope={scope} />
+        ) : null;
 
       case "estate":
         if (!estateData) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -14,24 +14,13 @@ import {
 import {
   groupByCategoryTag,
   groupByPeriodAndTag,
+  REVENUE_COLORS,
   type RevenueEntryForGrouping,
 } from "@/lib/revenue-helpers";
 
 interface RevenueTrendChartProps {
-  caseId: string;
-  months?: number;
-  scope?: "GLOBAL" | "LOCATION_VELBERT" | "LOCATION_UCKERATH_EITORF";
+  entries: RevenueEntryForGrouping[];
 }
-
-// Gleiche Farbpalette wie RevenueTable
-const SERIES_COLORS = [
-  "#3b82f6", // Blue
-  "#10b981", // Green
-  "#8b5cf6", // Purple
-  "#f59e0b", // Amber
-  "#ec4899", // Pink
-  "#94a3b8", // Slate (für Sonstige)
-];
 
 const formatAxisCurrency = (value: number): string => {
   if (Math.abs(value) >= 1000000) {
@@ -43,49 +32,16 @@ const formatAxisCurrency = (value: number): string => {
   return value.toFixed(0);
 };
 
-const formatTooltipCurrency = (value: number): string => {
+const formatTooltipCurrency = (cents: number): string => {
   return new Intl.NumberFormat("de-DE", {
     style: "currency",
     currency: "EUR",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(value / 100);
+  }).format(cents / 100);
 };
 
-export default function RevenueTrendChart({
-  caseId,
-  months = 6,
-  scope = "GLOBAL",
-}: RevenueTrendChartProps) {
-  const [entries, setEntries] = useState<RevenueEntryForGrouping[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const res = await fetch(
-          `/api/cases/${caseId}/ledger/revenue?months=${months}&scope=${scope}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setEntries(data.entries || []);
-        } else {
-          setError("Fehler beim Laden der Einnahmen-Daten");
-        }
-      } catch {
-        setError("Fehler beim Laden der Einnahmen-Daten");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, [caseId, months, scope]);
-
+export default function RevenueTrendChart({ entries }: RevenueTrendChartProps) {
   // 1. Top-5 Serien ermitteln
   const grouped = useMemo(() => groupByCategoryTag(entries, 5), [entries]);
 
@@ -103,31 +59,12 @@ export default function RevenueTrendChart({
         periodLabel: p.periodLabel,
       };
       for (const g of grouped) {
-        // Cent → EUR für Chart
+        // Cent → EUR für Chart-Anzeige
         row[g.tag] = Number(p.series[g.tag] || BigInt(0)) / 100;
       }
       return row;
     });
   }, [entries, grouped, seriesTags]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="w-6 h-6 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
-        <span className="ml-3 text-[var(--secondary)]">
-          Lade Chart-Daten...
-        </span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-        {error}
-      </div>
-    );
-  }
 
   if (chartData.length === 0) {
     return (
@@ -153,6 +90,7 @@ export default function RevenueTrendChart({
         <Tooltip
           formatter={(value, name) => {
             const label = grouped.find((g) => g.tag === name)?.label || String(name);
+            // value ist bereits EUR (÷100 oben), zurück zu Cents für Formatierung
             return [formatTooltipCurrency(Number(value) * 100), label];
           }}
           labelStyle={{ fontWeight: 600 }}
@@ -173,7 +111,7 @@ export default function RevenueTrendChart({
             key={g.tag}
             dataKey={g.tag}
             stackId="revenue"
-            fill={SERIES_COLORS[idx % SERIES_COLORS.length]}
+            fill={REVENUE_COLORS[idx % REVENUE_COLORS.length]}
             radius={idx === grouped.length - 1 ? [2, 2, 0, 0] : [0, 0, 0, 0]}
           />
         ))}

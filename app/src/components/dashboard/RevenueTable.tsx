@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { formatCurrency } from "@/types/dashboard";
-import { groupByCategoryTag, type RevenueEntryForGrouping } from "@/lib/revenue-helpers";
+import {
+  groupByCategoryTag,
+  REVENUE_COLORS,
+  type RevenueEntryForGrouping,
+} from "@/lib/revenue-helpers";
 
 interface RevenueEntry extends RevenueEntryForGrouping {
   counterpartyId: string | null;
@@ -11,68 +15,23 @@ interface RevenueEntry extends RevenueEntryForGrouping {
   locationName: string;
   periodIndex: number;
   estateRatio: number;
-  transactionDate: string;
   description: string;
 }
 
 interface RevenueTableProps {
-  caseId: string;
-  months?: number;
+  entries: RevenueEntry[];
+  months: number;
   showSummary?: boolean;
-  scope?: 'GLOBAL' | 'LOCATION_VELBERT' | 'LOCATION_UCKERATH_EITORF';
 }
 
-// Farben für Quellen
-const SOURCE_COLORS = [
-  "#3b82f6", // Blue
-  "#10b981", // Green
-  "#8b5cf6", // Purple
-  "#f59e0b", // Amber
-  "#ec4899", // Pink
-  "#06b6d4", // Cyan
-  "#f97316", // Orange
-  "#84cc16", // Lime
-];
-
 export default function RevenueTable({
-  caseId,
-  months = 6,
+  entries,
+  months,
   showSummary = true,
-  scope = 'GLOBAL',
 }: RevenueTableProps) {
-  const [entries, setEntries] = useState<RevenueEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"summary" | "details">(
     showSummary ? "summary" : "details"
   );
-
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const res = await fetch(
-          `/api/cases/${caseId}/ledger/revenue?months=${months}&scope=${scope}`
-        );
-
-        if (res.ok) {
-          const data = await res.json();
-          setEntries(data.entries || []);
-        } else {
-          setError("Fehler beim Laden der Einnahmen-Daten");
-        }
-      } catch (err) {
-        setError("Fehler beim Laden der Einnahmen-Daten");
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, [caseId, months, scope]);
 
   // Summary: gruppiert nach categoryTag via shared helper
   const grouped = useMemo(() => groupByCategoryTag(entries, 5), [entries]);
@@ -98,23 +57,6 @@ export default function RevenueTable({
     grandNeumasseTotal: entries.reduce((sum, e) => sum + BigInt(e.neumasseAmountCents), BigInt(0)),
     grandAltmasseTotal: entries.reduce((sum, e) => sum + BigInt(e.altmasseAmountCents), BigInt(0)),
   }), [entries]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <div className="w-6 h-6 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
-        <span className="ml-3 text-[var(--secondary)]">Lade Einnahmen-Daten...</span>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-        {error}
-      </div>
-    );
-  }
 
   if (entries.length === 0) {
     return (
@@ -169,7 +111,7 @@ export default function RevenueTable({
                   <div className="flex items-center gap-2">
                     <div
                       className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: SOURCE_COLORS[idx % SOURCE_COLORS.length] }}
+                      style={{ backgroundColor: REVENUE_COLORS[idx % REVENUE_COLORS.length] }}
                     />
                     <span className="text-sm font-medium text-[var(--foreground)]">
                       {group.label}
@@ -178,8 +120,8 @@ export default function RevenueTable({
                   <span
                     className="text-xs px-2 py-0.5 rounded-full"
                     style={{
-                      backgroundColor: `${SOURCE_COLORS[idx % SOURCE_COLORS.length]}20`,
-                      color: SOURCE_COLORS[idx % SOURCE_COLORS.length],
+                      backgroundColor: `${REVENUE_COLORS[idx % REVENUE_COLORS.length]}20`,
+                      color: REVENUE_COLORS[idx % REVENUE_COLORS.length],
                     }}
                   >
                     {grandTotal > BigInt(0)
