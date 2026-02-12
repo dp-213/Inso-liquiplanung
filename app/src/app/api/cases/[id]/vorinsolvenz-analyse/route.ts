@@ -37,7 +37,7 @@ export async function GET(
       .map(ba => ba.id);
 
     // Alle Entries von Geschäftskonten laden (nicht nur PRE_INSOLVENCY)
-    const entries = await prisma.ledgerEntry.findMany({
+    const allEntries = await prisma.ledgerEntry.findMany({
       where: {
         caseId: id,
         bankAccountId: { in: geschaeftskontenIds },
@@ -45,6 +45,34 @@ export async function GET(
       },
       orderBy: { transactionDate: 'desc' },
     });
+
+    // Rand-Monate mit <5 Entries trimmen (z.B. 2 Dez-2024-Ausreißer)
+    const monthCounts = new Map<string, number>();
+    for (const e of allEntries) {
+      const d = new Date(e.transactionDate);
+      const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthCounts.set(mk, (monthCounts.get(mk) || 0) + 1);
+    }
+    const sortedMonths = Array.from(monthCounts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    const sparseMonths = new Set<string>();
+    // Vom Anfang trimmen
+    for (const [month, count] of sortedMonths) {
+      if (count < 5) sparseMonths.add(month);
+      else break;
+    }
+    // Vom Ende trimmen
+    for (let i = sortedMonths.length - 1; i >= 0; i--) {
+      if (sortedMonths[i][1] < 5) sparseMonths.add(sortedMonths[i][0]);
+      else break;
+    }
+
+    const entries = sparseMonths.size > 0
+      ? allEntries.filter(e => {
+          const d = new Date(e.transactionDate);
+          const mk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+          return !sparseMonths.has(mk);
+        })
+      : allEntries;
 
     // Insolvenz-Monat bestimmen (für visuelle Trennlinie)
     const cutoffDate = caseData.cutoffDate || caseData.openingDate;

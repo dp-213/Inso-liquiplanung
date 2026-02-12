@@ -144,13 +144,21 @@ function exportCSV(
   const header = ["Position", ...months.map(formatMonth), "Gesamt", "Ø/Mon"].join(";");
   const monthCount = months.length || 1;
 
+  function csvField(value: string): string {
+    // Quoting wenn Semikolon, Anführungszeichen oder Zeilenumbruch enthalten
+    if (value.includes(";") || value.includes('"') || value.includes("\n")) {
+      return '"' + value.replace(/"/g, '""') + '"';
+    }
+    return value;
+  }
+
   function rowToCSV(label: string, monthly: Record<string, string>, total: string): string {
     const avg = String(Math.round(parseInt(total) / monthCount));
     const cells = months.map(m => {
       const val = monthly[m];
       return val ? formatCurrencyExact(val) : "";
     });
-    return [label, ...cells, formatCurrencyExact(total), formatCurrencyExact(avg)].join(";");
+    return [csvField(label), ...cells, formatCurrencyExact(total), formatCurrencyExact(avg)].join(";");
   }
 
   const lines: string[] = [header, ""];
@@ -456,26 +464,32 @@ export default function VorinsolvenzAnalysePage({
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-20">
               {/* Insolvenz-Label-Zeile */}
-              {insolvencyMonth && months.includes(insolvencyMonth) && (
-                <tr className="bg-white border-b border-gray-100">
-                  <th className="sticky left-0 bg-white z-30"></th>
-                  {months.map((m) => (
+              {insolvencyMonth && months.includes(insolvencyMonth) && (() => {
+                const insIdx = months.indexOf(insolvencyMonth);
+                const preCount = insIdx;
+                const postCount = months.length - insIdx;
+                return (
+                  <tr className="bg-white border-b border-gray-100">
+                    <th className="sticky left-0 bg-white z-30"></th>
+                    {preCount > 0 && (
+                      <th
+                        colSpan={preCount}
+                        className="px-2 py-1 text-center text-[10px] font-medium bg-white text-gray-400"
+                      >
+                        vor Insolvenz
+                      </th>
+                    )}
                     <th
-                      key={m}
-                      className={`px-2 py-1 text-center text-[10px] font-medium min-w-[80px] bg-white ${insolvencyBorderClass(m, insolvencyMonth)}`}
+                      colSpan={postCount}
+                      className={`px-2 py-1 text-center text-[10px] font-medium bg-white text-orange-500 ${insolvencyBorderClass(insolvencyMonth, insolvencyMonth)}`}
                     >
-                      {insolvencyMonth && m < insolvencyMonth && (
-                        <span className="text-gray-400">vor Insolvenz</span>
-                      )}
-                      {insolvencyMonth && m >= insolvencyMonth && (
-                        <span className="text-orange-500">nach Eröffnung</span>
-                      )}
+                      nach Eröffnung
                     </th>
-                  ))}
-                  <th className="bg-white"></th>
-                  <th className="bg-white"></th>
-                </tr>
-              )}
+                    <th className="bg-white"></th>
+                    <th className="bg-white"></th>
+                  </tr>
+                );
+              })()}
 
               {/* Period Labels */}
               <tr className="border-b border-gray-300 bg-gray-50">
@@ -667,7 +681,7 @@ export default function VorinsolvenzAnalysePage({
       </div>
 
       {/* === Nicht zugeordnet === */}
-      {filtered.unclassified.length > 0 && (
+      {!locationFilter && filtered.unclassified.length > 0 && (
         <div className="admin-card overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 bg-amber-50">
             <h2 className="text-sm font-bold uppercase tracking-wider text-amber-800">
@@ -736,7 +750,7 @@ function SummaryRow({
   const avgColorClass = colorClass.replace("600", "500");
   return (
     <tr className={`${bgClass} font-bold ${borderClass}`}>
-      <td className={`px-4 py-2.5 sticky left-0 ${bgClass} z-10 ${colorClass.replace("text-", "text-").replace("600", "800")}`}>
+      <td className={`px-4 py-2.5 sticky left-0 ${bgClass} z-10 ${colorClass.replace("600", "800")}`}>
         {label}
       </td>
       {months.map((m) => {
