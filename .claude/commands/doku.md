@@ -57,6 +57,14 @@ Prüfe und aktualisiere JEDE dieser Dateien:
 ### `/app/docs/DASHBOARD_BEST_PRACTICES.md`
 **Wann:** Selten. Nur bei grundlegenden Änderungen am Dashboard-Reporting-Konzept.
 
+### `/app/docs/HELP.md`
+**Wann:** Bei Änderungen an Features, Workflow oder UI, die für End-User relevant sind.
+- Source-of-Truth für die Hilfe-Seite im Admin-Dashboard (`/admin/cases/[id]/hilfe`)
+- Abschnitte: Systemübersicht, Kernkonzepte, Workflow, Bereiche, FAQ, Glossar
+- Wenn neue Konzepte oder Bereiche hinzukommen: FAQ und Glossar ergänzen
+- Bei Workflow-Änderungen: Schritt-für-Schritt-Anleitung aktualisieren
+- **WICHTIG:** Nach Änderungen an HELP.md auch die React-Seite `app/src/app/admin/cases/[id]/hilfe/page.tsx` konsistent halten (Inhalte spiegeln die .md Datei wider)
+
 ## Phase 3: Cleanup
 
 **Verwaiste Dateien finden:**
@@ -67,7 +75,7 @@ Prüfe und aktualisiere JEDE dieser Dateien:
 
 **One-Off-Dokumente archivieren:**
 - Incident-Berichte, Analysedokumente, Deployment-Checklisten → `docs/archiv/`
-- Living Docs bleiben in `docs/` (CHANGELOG, ARCHITECTURE, DECISIONS, LIMITATIONS, TODO, TODO_REFACTORING, ADMIN_SYSTEM, DASHBOARD_BEST_PRACTICES)
+- Living Docs bleiben in `docs/` (CHANGELOG, ARCHITECTURE, DECISIONS, LIMITATIONS, TODO, TODO_REFACTORING, ADMIN_SYSTEM, DASHBOARD_BEST_PRACTICES, HELP)
 
 ## Phase 4: Zusammenfassung
 

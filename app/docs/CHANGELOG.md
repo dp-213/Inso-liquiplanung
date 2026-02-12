@@ -4,6 +4,71 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.28.0 – Kunden-Freigabe-UX & Subdomain-Routing
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Kombinierte Freigaben-Seite:** ShareLinks und Kundenzugänge in einer einzigen Verwaltungsseite unter `/admin/cases/[id]/freigaben`. Neuer `CombinedAccessManager` mit Tab-Ansicht (Kundenzugänge / Externe Links).
+- **Freigabe-Flow (Grant Modal):** „Fall freigeben"-Button öffnet Modal mit 2 Schritten: (1) bestehenden Kunden auswählen oder neuen anlegen, (2) kopierbarer Einladungstext mit Login-URL, E-Mail und Passwort.
+- **Kunden-Subdomains:** Slug-System für individuelle Kunden-URLs (z.B. `anchor.cases.gradify.de`). Next.js Middleware routet Subdomains automatisch auf Portal-Pfade.
+- **Slug-Validierung:** Live-Check der Slug-Verfügbarkeit über `/api/customers/check-slug`. Regeln: lowercase, alphanumerisch + Bindestriche, 3–30 Zeichen, Blacklist für reservierte Slugs.
+- **Tenant-System:** Server-seitige Tenant-Erkennung via `x-tenant-slug` Header. Helpers `getTenantSlug()` und `getTenantCustomer()` in `lib/tenant.ts`.
+- **Portal subdomain-aware:** Login, Layout und Navigation erkennen Subdomains und passen Pfade automatisch an (Hook `usePortalPaths`).
+- **Cookie-Domain-Sharing:** Customer-Session-Cookie mit `domain=".cases.gradify.de"` in Production, damit Sessions über Subdomains hinweg gültig sind.
+
+### UX-Verbesserungen
+
+- **Inline-Fehleranzeigen:** Alle `alert()`-Aufrufe durch `InlineError`-Komponente ersetzt (rotes Banner mit Dismiss-Button).
+- **Inline-Erfolgsmeldungen:** `InlineSuccess`-Komponente für Bestätigungen (grünes Banner).
+- **Custom Confirm-Dialog:** Alle `confirm()`-Aufrufe durch `ConfirmDialog`-Modal ersetzt (mit Icon, Titel, Loading-State).
+- **Bessere Passwort-Generierung:** 14 Zeichen aus lesbarem Zeichensatz ohne verwechselbare Zeichen (kein 0/O, 1/l/I, +/=).
+- **Slug-Input mit URL-Preview:** Eingabefeld visuell verbunden mit `.cases.gradify.de`-Suffix, Live-Feedback zeigt vollständige URL.
+
+### Änderungen
+
+- **Sidebar-Navigation:** „Freigaben" (Orders) umbenannt zu „Bestellfreigaben". „Externe Freigaben" + „Kundenzugänge" zusammengeführt zu „Freigaben".
+- **Alte Route `/kundenzugaenge`** redirected auf `/freigaben`.
+- **`NEXT_PUBLIC_BASE_DOMAIN`:** Neue Umgebungsvariable für Subdomain-Erkennung (Vercel + lokal).
+
+### Bugfixes
+
+- **Deutsche Umlaute:** `customer-auth.ts` („Ungültige" statt „Ungueltige"), `customers/route.ts` („Kundenzugänge" statt „Kundenzugaenge", „Ungültiges" statt „Ungueltiges").
+- **Subdomain-Erkennung:** `usePortalPaths` vergleicht jetzt gegen `NEXT_PUBLIC_BASE_DOMAIN` statt Hostname-Punkte zu zählen.
+
+### Infrastruktur
+
+- **DNS:** Wildcard CNAME `*.cases.gradify.de → cname.vercel-dns.com` bei IONOS eingerichtet.
+- **Vercel:** `anchor.cases.gradify.de` als Domain hinzugefügt, SSL automatisch.
+- **Turso-Migration:** `slug`-Spalte auf `CustomerUser` + Unique-Index.
+
+### Neue Dateien
+
+- `app/src/middleware.ts` – Subdomain-Routing
+- `app/src/lib/slug-utils.ts` – Slug-Validierung + Vorschläge
+- `app/src/lib/tenant.ts` – Tenant-Helper für Server-Components
+- `app/src/hooks/usePortalPaths.ts` – Client-seitiger Pfad-Helper
+- `app/src/components/admin/CombinedAccessManager.tsx` – Kombinierte Freigaben-Verwaltung
+- `app/src/app/api/customers/check-slug/route.ts` – Slug-Verfügbarkeits-API
+- `app/src/app/admin/cases/[id]/kundenzugaenge/page.tsx` – Redirect auf `/freigaben`
+
+### Geänderte Dateien
+
+- `app/src/components/admin/CaseSidebar.tsx` – Navigation umstrukturiert
+- `app/src/app/admin/cases/[id]/freigaben/page.tsx` – Erweitert mit CombinedAccessManager
+- `app/src/app/api/customers/route.ts` – Slug-Parameter + bessere Passwörter
+- `app/src/app/api/cases/[id]/customers/route.ts` – Umlaut-Fixes
+- `app/src/lib/customer-auth.ts` – Cookie-Domain + Umlaut-Fixes
+- `app/src/app/customer-login/page.tsx` – Subdomain-aware Redirects
+- `app/src/app/portal/layout.tsx` – Subdomain-aware Redirects
+- `app/src/app/portal/page.tsx` – Dynamische Pfade via usePortalPaths
+- `app/src/components/portal/CustomerHeader.tsx` – Subdomain-aware Links
+- `app/src/app/admin/cases/[id]/hilfe/page.tsx` – FAQ aktualisiert (Freigaben, Subdomains)
+- `app/prisma/schema.prisma` – `slug` Feld auf CustomerUser
+
+---
+
 ## Version 2.27.0 – Kundenportal-Refactoring: Banken & Sicherungsrechte
 
 **Datum:** 12. Februar 2026

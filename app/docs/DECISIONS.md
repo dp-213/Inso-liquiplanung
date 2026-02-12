@@ -4,6 +4,51 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-040: Kunden-Freigabe-UX & Subdomain-Routing
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Die Kunden-Freigabe war auf drei Seiten verteilt: Kundenverwaltung (`/customers`), Kundenzugänge (`/kundenzugaenge`) und Externe Links (`/freigaben`). Das Anlegen eines Kunden und das Vergeben von Fallzugriff waren getrennte Workflows ohne kopierbaren Einladungstext. Alle Kunden teilten sich `cases.gradify.de/portal` ohne individuelles Branding.
+
+### Entscheidung
+
+**A) Kombinierte Freigaben-Seite:**
+- ShareLinks und CustomerCaseAccess in einer Seite (`/freigaben`) mit Tab-Ansicht zusammengeführt.
+- Neuer `CombinedAccessManager` mit „Fall freigeben"-Flow: Kunde auswählen/anlegen + Zugriff vergeben + Einladungstext kopieren — alles in einem Modal.
+- Sidebar: „Freigaben" (Orders) → „Bestellfreigaben", „Externe Freigaben" + „Kundenzugänge" → „Freigaben".
+
+**B) Subdomain-System:**
+- `slug`-Feld auf `CustomerUser` (unique, nullable).
+- Next.js Middleware erkennt Subdomains (`anchor.cases.gradify.de`) und setzt `x-tenant-slug` Header.
+- URL-Rewrites: `/` → `/portal`, `/login` → `/customer-login`, `/cases/...` → `/portal/cases/...`.
+- Cookie-Domain `.cases.gradify.de` für cross-subdomain Session-Sharing.
+- Wildcard DNS CNAME bei IONOS, pro-Kunde Domain-Freischaltung in Vercel.
+
+**C) UX-Verbesserungen:**
+- Alle `alert()` → InlineError-Komponente, alle `confirm()` → ConfirmDialog-Modal.
+- Passwort-Generierung: 14 Zeichen aus lesbarem Zeichensatz (keine ambiguösen Zeichen).
+- Slug-Input mit Live-Validierung und URL-Preview.
+
+### Begründung
+
+- Ein-Seite-Workflow reduziert Klicks von ~8 auf ~3 für eine Kundenfreigabe.
+- Kopierbarer Einladungstext mit Passwort vermeidet fehleranfällige manuelle Kommunikation.
+- Subdomains ermöglichen professionelles Kunden-Branding ohne separate Deployments.
+- Middleware-Ansatz hält Portal-Code unverändert — nur Pfad-Rewrites.
+- InlineError/ConfirmDialog verbessern UX erheblich gegenüber nativen Browser-Dialogen.
+
+### Konsequenzen
+
+- Pro Kunde muss eine Domain in Vercel manuell hinzugefügt werden (`vercel domains add`).
+- Bestehende Kunden ohne Slug nutzen weiterhin `cases.gradify.de/customer-login`.
+- Alte Route `/kundenzugaenge` redirected auf `/freigaben`.
+- Wildcard DNS routet ALLE Subdomains zu Vercel — nur konfigurierte werden served.
+
+---
+
 ## ADR-039: Portal – Finanzierung + Sicherungsrechte zusammenführen
 
 **Datum:** 12. Februar 2026

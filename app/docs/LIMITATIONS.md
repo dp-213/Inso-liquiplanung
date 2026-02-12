@@ -109,6 +109,22 @@ Pro Anfrage kann nur ein Beleg hochgeladen werden.
 
 Die Freigaben-Seite (`/portal/cases/[id]/orders`) ist in der DashboardNav verlinkt, aber als Phase-1-Feature primär für admin-gesteuerte Nutzung vorgesehen.
 
+## Subdomain-Einschränkungen
+
+### Manuelle Domain-Freischaltung pro Kunde
+
+Jeder Kunden-Slug erfordert manuelle Freischaltung in Vercel (`vercel domains add slug.cases.gradify.de`). Keine automatische Provisionierung.
+**Langfristig:** Vercel API-Automatisierung bei >10 Kunden.
+
+### Slug nicht nachträglich änderbar
+
+Slug wird bei Kundenerstellung gesetzt. Änderung erfordert manuellen DB-Update + Vercel Domain-Update.
+**Workaround:** Neuen Slug anlegen, alten in Vercel entfernen.
+
+### Subdomain-Login nur mit Slug
+
+Kunden ohne Slug können nicht über eine individuelle Subdomain zugreifen. Login weiterhin über `cases.gradify.de/customer-login`.
+
 ---
 
 ## Frontend-Einschränkungen
@@ -225,4 +241,4 @@ Neue kombinierte Seite `/portal/cases/[id]/banken-sicherungsrechte` ersetzt Demo
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.27.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.28.0)

@@ -135,5 +135,23 @@ Neue kombinierte Seite `/portal/banken-sicherungsrechte` mit echten Bankdaten au
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.27.0)
+### Subdomain-Automatisierung
+
+**Status:** Manueller Workflow, funktioniert
+
+Aktuell muss pro Kunde manuell `vercel domains add slug.cases.gradify.de` ausgeführt werden. Bei >10 Kunden auf Vercel API-Automatisierung umsteigen.
+
+---
+
+## P3 - Irgendwann
+
+### Empty States mit Wegweiser
+
+**Status:** Idee, zurückgestellt bis Seiten stabil
+
+Leere Seiten (z.B. Zahlungsregister ohne Entries, Prognose ohne Annahmen) zeigen aktuell leere Tabellen. Stattdessen: Schöner Empty State mit Erklärung + Link zum nächsten Schritt. Erst umsetzen wenn die Kernseiten nicht mehr ständig umgebaut werden.
+
+---
+
+**Letzte Aktualisierung:** 2026-02-12 (v2.28.0)
 

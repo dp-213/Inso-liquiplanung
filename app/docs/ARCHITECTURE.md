@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.27.0
+**Version:** 2.28.0
 **Stand:** 12. Februar 2026
 
 ---
@@ -449,6 +449,7 @@ LedgerEntry (UNREVIEWED)
 │   │   │   │   ├── counterparties/   # Gegenparteien
 │   │   │   │   ├── kontobewegungen/ # IST-Daten nach Kontentyp/Monat/Standort
 │   │   │   │   ├── zahlungsverifikation/ # SOLL/IST-Abgleich
+│   │   │   │   ├── freigaben/       # Kombinierte Freigaben (Links + Kundenzugänge)
 │   │   │   │   └── locations/        # Standorte
 │   │   │   └── ...
 │   │   ├── portal/                   # Kundenportal
@@ -462,16 +463,23 @@ LedgerEntry (UNREVIEWED)
 │   │   │       ├── finanzierung/        # → Redirect auf banken-sicherungsrechte
 │   │   │       └── security/            # → Redirect auf banken-sicherungsrechte
 │   │   ├── view/                     # Externe Ansicht
+│   │   ├── customer-login/          # Kunden-Login (subdomain-aware)
 │   │   └── api/                      # API-Routen
 │   │       └── cases/[id]/
 │   │           ├── ledger/
 │   │           ├── intake/
 │   │           ├── rules/
 │   │           └── ...
+│   ├── middleware.ts                 # Subdomain-Routing (Tenant-Erkennung)
+│   ├── hooks/
+│   │   └── usePortalPaths.ts        # Client-seitiger Subdomain-Pfad-Helper
 │   ├── components/                   # React-Komponenten
 │   └── lib/
 │       ├── db.ts                     # Prisma Client
 │       ├── auth.ts                   # Session-Handling
+│       ├── customer-auth.ts         # Kunden-Auth (Cookie-Domain für Subdomains)
+│       ├── slug-utils.ts            # Slug-Validierung + Vorschläge
+│       ├── tenant.ts                # Tenant-Helper (getTenantSlug, getTenantCustomer)
 │       ├── ledger/                   # Ledger-Logik
 │       │   └── aggregation.ts
 │       ├── classification/           # Rule Engine

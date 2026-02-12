@@ -80,6 +80,7 @@ Case (Insolvenzverfahren)
 |------|---------|--------------|--------|
 | `name` | ✅ | Vollständiger Name | Identifikation im System |
 | `email` | ✅ | E-Mail-Adresse (unique) | Login-Kennung fürs Kundenportal |
+| `slug` | ❌ | Subdomain-Slug (unique) | Individuelle URL: `slug.cases.gradify.de` |
 | `company` | ❌ | Kanzlei/Firmenname | Branding in Berichten |
 | `phone` | ❌ | Telefonnummer | Kontaktaufnahme |
 | `passwordHash` | Auto | Verschlüsseltes Passwort | Authentifizierung |
@@ -108,6 +109,7 @@ Case (Insolvenzverfahren)
 model CustomerUser {
   id                String    @id @default(uuid())
   email             String    @unique
+  slug              String?   @unique  // "anchor" → anchor.cases.gradify.de
   passwordHash      String
   name              String
   company           String?
@@ -193,9 +195,10 @@ Das Dashboard zeigt alle Funktionen für einen Fall:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  [Bearbeiten] [Konfiguration] [Datenimport] [Dashboard]    │
-│  [Prämissen] [Insolvenzeffekte] [Bankenspiegel]            │
-│  [Zahlungsregister] [Freigaben (Badge)] [Externe Ansicht]   │
+│  DATEN: [Zahlungsregister] [Import] [Bestellfreigaben]      │
+│  STAMMDATEN: [Bankkonten] [Gegenparteien] [Standorte]      │
+│  VERFAHREN: [Insolvenzeffekte] [Banken & Sicherungsrechte] │
+│  ZUGANG: [Freigaben] [Externe Ansicht]                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -1038,6 +1041,69 @@ model CompanyToken {
   transactionDate: order.invoiceDate,
 }
 ```
+
+---
+
+### 4.13 Freigaben – Kundenzugänge & Externe Links (v2.28.0)
+
+**Pfad:** `/admin/cases/[id]/freigaben`
+
+#### Funktion
+Kombinierte Verwaltung aller Zugangsarten zu einem Fall in einer einzigen Seite. Ersetzt die getrennten Seiten „Externe Freigaben" und „Kundenzugänge" (ADR-040).
+
+#### Zwei Tabs
+
+| Tab | Inhalt | API |
+|-----|--------|-----|
+| **Kundenzugänge** | Kunden mit Portal-Zugang zu diesem Fall | `/api/cases/[id]/customers` |
+| **Externe Links** | Token-basierte Share-Links (read-only) | `/api/cases/[id]/share-links` |
+
+#### „Fall freigeben"-Flow
+
+**Schritt 1: Kunde auswählen oder anlegen**
+- Dropdown mit bestehenden Kunden (die noch keinen Zugriff haben)
+- ODER: Inline-Formular für neuen Kunden (Name, E-Mail, Unternehmen, Slug)
+- Slug-Live-Validierung mit URL-Preview (`slug.cases.gradify.de`)
+
+**Schritt 2: Einladungstext kopieren**
+Nach erfolgreicher Freigabe zeigt Modal kopierbaren Text:
+```
+Ihre Zugangsdaten für die Liquiditätsplanung:
+URL: https://anchor.cases.gradify.de
+E-Mail: rieger@anchor-rechtsanwaelte.de
+Passwort: xY3k9mP2...
+Fall: Hausärztliche Versorgung PLUS eG (70d IN 362/25)
+```
+
+- Passwort nur bei neuem Kunden sichtbar
+- URL nutzt Subdomain falls Slug vorhanden, sonst Fallback auf `cases.gradify.de/customer-login`
+
+#### Subdomain-Einrichtung pro Kunde
+
+Bei neuem Kunden mit Slug:
+1. Slug wird in DB gespeichert (unique)
+2. Domain in Vercel freischalten: `cd app && vercel domains add slug.cases.gradify.de`
+3. SSL wird automatisch provisioniert
+4. Middleware routet Subdomain auf Portal-Pfade
+
+#### Komponente
+
+**`CombinedAccessManager`** (`/components/admin/CombinedAccessManager.tsx`):
+- Tabs: Kundenzugänge / Externe Links
+- Grant-Flow-Modal mit Inline-Kundenerstellung
+- InlineError/InlineSuccess statt `alert()`
+- ConfirmDialog statt `confirm()`
+- Loading-States bei allen async-Operationen
+
+#### API-Endpunkte
+
+| Endpunkt | Methode | Zweck |
+|----------|---------|-------|
+| `/api/cases/[id]/customers` | GET | Kunden mit Zugriff auflisten |
+| `/api/cases/[id]/customers` | POST | Zugriff vergeben (inkl. Reaktivierung) |
+| `/api/cases/[id]/customers?accessId=...` | DELETE | Zugriff widerrufen |
+| `/api/customers` | POST | Neuen Kunden anlegen (mit Slug) |
+| `/api/customers/check-slug` | GET | Slug-Verfügbarkeit prüfen |
 
 ---
 
