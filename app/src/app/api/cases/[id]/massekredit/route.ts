@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { Decimal } from "@prisma/client/runtime/library";
 import { EstateAllocation } from "@/lib/types/allocation";
@@ -93,6 +94,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const session = await getSession();
+    if (!session) {
+      return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+    }
+
     const { id: caseId } = await params;
 
     // Prüfen ob Case existiert

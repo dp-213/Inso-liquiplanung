@@ -55,6 +55,7 @@ model Case {
   casePlanning         CasePlanning?        // Strukturierte Liquiditätsplanung (JSON)
   orders               Order[]              // Bestell- und Zahlfreigaben
   companyTokens        CompanyToken[]       // Token-Zugänge für externe Firmen
+  forecastScenarios    ForecastScenario[]   // Prognose-Szenarien
 
   @@index([ownerId])
   @@map("cases")
@@ -1074,4 +1075,67 @@ model CompanyToken {
 
   @@index([caseId])
   @@map("company_tokens")
+}
+
+// =============================================================================
+// FORECAST MODULE - Vorwärtsgerichtete Liquiditätsprognose
+// =============================================================================
+
+// ForecastScenario - Ein Prognose-Szenario (MVP: nur BASE)
+model ForecastScenario {
+  id                      String    @id @default(uuid())
+  caseId                  String
+  name                    String
+  description             String?
+  scenarioType            String    @default("BASE")  // BASE, DOWNSIDE, UPSIDE, CUSTOM
+  isActive                Boolean   @default(true)
+  isLocked                Boolean   @default(false)
+  lockedAt                DateTime?
+  lockedBy                String?
+  lockedReason            String?
+  periodType              String    // WEEKLY, MONTHLY
+  periodCount             Int
+  planStartDate           DateTime
+  istCutoffOverride       Int?      // Manueller Override; null = automatisch aus Matrix
+  openingBalanceCents     BigInt    // IST-Closing der letzten IST-Periode
+  openingBalanceSource    String
+  reservesTotalCents      BigInt    @default(0)
+  createdAt               DateTime  @default(now())
+  createdBy               String    @default("admin")
+  updatedAt               DateTime  @updatedAt
+
+  case        Case                  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  assumptions ForecastAssumption[]
+
+  @@index([caseId])
+  @@map("forecast_scenarios")
+}
+
+// ForecastAssumption - Einzelne Annahme innerhalb eines Szenarios
+model ForecastAssumption {
+  id                    String    @id @default(uuid())
+  scenarioId            String
+  caseId                String
+  categoryKey           String    // z.B. "HZV_UCKERATH", "PERSONAL"
+  categoryLabel         String    // z.B. "HZV Uckerath"
+  flowType              String    // INFLOW, OUTFLOW
+  assumptionType        String    // RUN_RATE, FIXED, ONE_TIME, PERCENTAGE_OF_REVENUE
+  baseAmountCents       BigInt
+  baseAmountSource      String    // Pflicht: Quellenangabe
+  baseAmountNote        String?
+  growthFactorPercent   Decimal?  // z.B. -5.0 = 5% Rückgang pro Periode
+  seasonalProfile       String?   // JSON: [1.0, 1.0, 1.3, ...] (12 Monatsfaktoren)
+  startPeriodIndex      Int
+  endPeriodIndex        Int
+  isActive              Boolean   @default(true)
+  sortOrder             Int       @default(0)
+  createdAt             DateTime  @default(now())
+  createdBy             String    @default("admin")
+  updatedAt             DateTime  @updatedAt
+
+  scenario  ForecastScenario @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@index([scenarioId])
+  @@index([caseId, categoryKey])
+  @@map("forecast_assumptions")
 }

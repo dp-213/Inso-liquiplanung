@@ -445,8 +445,8 @@ export default function BusinessLogicContent({ insolvencyDate }: BusinessLogicCo
                 <div className="font-medium">23.514,27 EUR</div>
               </div>
             </div>
-            <div className="p-3 bg-red-50 rounded text-xs border border-red-200">
-              Blockiert KV-Auszahlungen. Vereinbarung erforderlich.
+            <div className="p-3 bg-green-50 rounded text-xs border border-green-200">
+              Massekreditvertrag vereinbart (Jan 2026). 10% Fortführungsbeitrag zzgl. USt.
             </div>
           </div>
         </div>
@@ -459,10 +459,10 @@ export default function BusinessLogicContent({ insolvencyDate }: BusinessLogicCo
         </div>
         <div className="p-6">
           <div className="space-y-3">
-            <div className="flex items-start gap-3 p-3 bg-red-50 rounded border border-red-200">
-              <div className="w-6 h-6 rounded bg-red-600 text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">1</div>
+            <div className="flex items-start gap-3 p-3 bg-green-50 rounded border border-green-200">
+              <div className="w-6 h-6 rounded bg-green-600 text-white flex items-center justify-center flex-shrink-0 text-xs font-bold">&#10003;</div>
               <div className="text-sm">
-                <strong>apoBank:</strong> Keine Massekreditvereinbarung, blockiert KV-Auszahlungen
+                <strong>apoBank:</strong> Massekreditvertrag vereinbart (Jan 2026) - 10% Fortführungsbeitrag zzgl. USt, max. 100.000 EUR
               </div>
             </div>
             <div className="flex items-start gap-3 p-3 bg-amber-50 rounded border border-amber-200">

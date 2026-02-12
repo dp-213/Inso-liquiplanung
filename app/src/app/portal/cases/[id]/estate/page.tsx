@@ -386,7 +386,7 @@ export default function EstateSummaryPage() {
             </p>
             <p className="text-sm text-amber-700 mt-2">
               <strong>Neumasse:</strong> Alle Vermögenswerte, die nach Insolvenzeröffnung entstehen, z.B. aus
-              der Fortführung des Geschäftsbetriebs. Diese stehen vorrangig für Masseverbindlichkeiten zur Verfuegung.
+              der Fortführung des Geschäftsbetriebs. Diese stehen vorrangig für Masseverbindlichkeiten zur Verfügung.
             </p>
           </div>
         </div>

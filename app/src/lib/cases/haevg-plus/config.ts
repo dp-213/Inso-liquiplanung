@@ -9,8 +9,8 @@
  * - PVS rhein-ruhr: Per Behandlung, erfordert serviceDate
  *
  * Banken:
- * - Sparkasse Velbert: Vereinbarung vorhanden (10% Fortführungsbeitrag)
- * - apobank: Vereinbarung noch offen
+ * - Sparkasse Velbert: Vereinbarung vorhanden (10% Fortführungsbeitrag, Cap 137.000 EUR)
+ * - apobank: Vereinbarung vorhanden (10% Fortführungsbeitrag, Cap 100.000 EUR)
  */
 
 import {
@@ -115,15 +115,17 @@ export const KV_CONFIG: SettlerConfig = {
  * - Monatliche Abrechnung
  * - Ca. 30 Tage Verzögerung
  * - Vormonat-Logik: Zahlung im Dezember bezieht sich auf November
- * - Oktober 2025: Zeitanteilig 29/31 Alt, 2/31 Neu
+ * - Oktober 2025: 28/31 Alt, 3/31 Neu (Stichtag 29.10. = erster Tag Neumasse)
  */
 const HZV_SPLIT_RULES: Record<string, ContractSplitRule> = {
   // Oktober 2025: Zeitanteilige Aufteilung
+  // Stichtag 29.10.2025 = Insolvenzeröffnung = erster Tag Neumasse
+  // Tage 1-28 = Altmasse (28 Tage), Tage 29-31 = Neumasse (3 Tage)
   '2025-10': {
-    altRatio: 29 / 31, // 29 Tage vor Stichtag (1.-29. Oktober)
-    neuRatio: 2 / 31, // 2 Tage nach Stichtag (30.-31. Oktober)
-    source: AllocationSource.PERIOD_PRORATA,
-    note: 'Zeitanteilig: 29/31 Alt (1.-29.10.), 2/31 Neu (30.-31.10.)',
+    altRatio: 28 / 31, // 28 Tage vor Stichtag (1.-28. Oktober)
+    neuRatio: 3 / 31, // 3 Tage ab Stichtag (29.-31. Oktober)
+    source: AllocationSource.VERTRAGSREGEL,
+    note: 'Gem. Massekreditvertrag §1(2)b: 28/31 Alt (1.-28.10.), 3/31 Neu (29.-31.10.)',
   },
   // September 2025 und früher: Vollständig Altmasse
   '2025-09': {
@@ -198,9 +200,11 @@ export interface BankConfig {
  * Sparkasse Velbert
  *
  * - Globalzession vorhanden
- * - Vereinbarung vom 01.11.2025
+ * - Unechter Massekreditvertrag, unterschrieben
  * - 10% Fortführungsbeitrag zzgl. 19% USt
- * - Kein Cap vereinbart
+ * - Max. 137.000 EUR Massekredit
+ * - Laufzeit bis 31.08.2026
+ * - Sicherheit: Neuforderungen aus Velbert (Bargeschäft § 142 InsO)
  */
 export const SPARKASSE_CONFIG: BankConfig = {
   name: 'Sparkasse Velbert',
@@ -208,7 +212,7 @@ export const SPARKASSE_CONFIG: BankConfig = {
   agreementStatus: BankAgreementStatus.VEREINBART,
   contributionRate: 0.1, // 10%
   contributionVatRate: 0.19, // 19%
-  creditCapCents: null, // Kein Cap vereinbart
+  creditCapCents: BigInt(13700000), // 137.000 EUR
   isUncertain: false,
   uncertaintyNote: null,
 };
@@ -216,19 +220,22 @@ export const SPARKASSE_CONFIG: BankConfig = {
 /**
  * apobank
  *
- * - Globalzession vorhanden
- * - Vereinbarung noch OFFEN
- * - Verhandlungen laufen
+ * - Globalzession vorhanden (HZV/KV/PVS vom 08./09.07.2024)
+ * - Massekreditvertrag unterschrieben (apoBank 15.01.2026, HVPlus 20.01.2026)
+ * - 10% Fortführungsbeitrag zzgl. 19% USt
+ * - Max. 100.000 EUR Massekredit
+ * - Laufzeit bis 31.08.2026
+ * - Einzugskonto: ISK Uckerath (DE91 6005 0101 0400 0801 56)
  */
 export const APOBANK_CONFIG: BankConfig = {
   name: 'apobank',
   hasGlobalAssignment: true,
-  agreementStatus: BankAgreementStatus.OFFEN,
-  contributionRate: null, // Nicht vereinbart
-  contributionVatRate: null,
-  creditCapCents: null,
-  isUncertain: true,
-  uncertaintyNote: 'Vereinbarung noch offen - Verhandlungen laufen',
+  agreementStatus: BankAgreementStatus.VEREINBART,
+  contributionRate: 0.1, // 10%
+  contributionVatRate: 0.19, // 19%
+  creditCapCents: BigInt(10000000), // 100.000 EUR
+  isUncertain: false,
+  uncertaintyNote: null,
 };
 
 /**

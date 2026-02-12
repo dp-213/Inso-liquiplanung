@@ -68,13 +68,13 @@ const ACCOUNT_CONTEXT: Record<string, { usage: string; notes?: string }> = {
     usage: "KV, HZV, PVS (Velbert)",
     notes: "Massekreditvereinbarung aktiv",
   },
-  "MVZ Uckerath (Betriebskonto)": {
-    usage: "KV, HZV, PVS (Uckerath)",
-    notes: "Im November 2025 geschlossen",
+  "MVZ Uckerath (Konto #78818923)": {
+    usage: "KV, HZV, PVS (Uckerath + Eitorf)",
+    notes: "Massekreditvereinbarung aktiv",
   },
-  "HV PLUS eG (Zentrale)": {
+  "HV PLUS eG (Konto #28818923)": {
     usage: "Zentrale Zahlungen",
-    notes: "Gesichert durch Bank",
+    notes: "Gesichert durch apoBank",
   },
 };
 
@@ -156,20 +156,16 @@ export default function BankAccountsTab({ caseId }: { caseId: string }) {
     let locationKey: string;
     if (!acc.location) {
       locationKey = "Zentral";
-      console.log(`[BankAccounts] ${acc.accountName}: NO location → Zentral`);
     } else {
       const locName = acc.location.name.toLowerCase();
-      console.log(`[BankAccounts] ${acc.accountName}: location="${acc.location.name}" (lowercase="${locName}")`);
 
       if (locName.includes("velbert")) {
         locationKey = "Velbert";
       } else if (locName.includes("uckerath") || locName.includes("eitorf")) {
         locationKey = "Uckerath/Eitorf";
       } else {
-        // HVPlus eG oder andere zentrale Locations
         locationKey = "Zentral";
       }
-      console.log(`[BankAccounts]   → Grouped as: ${locationKey}`);
     }
 
     if (!accountsByLocation[locationKey]) {
@@ -177,8 +173,6 @@ export default function BankAccountsTab({ caseId }: { caseId: string }) {
     }
     accountsByLocation[locationKey].push(acc);
   }
-
-  console.log('[BankAccounts] Final groups:', Object.keys(accountsByLocation));
 
   // Sortiere Konten innerhalb jeder Location (ISK zuerst, dann alphabetisch)
   Object.values(accountsByLocation).forEach((accounts) => {

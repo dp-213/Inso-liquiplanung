@@ -278,7 +278,7 @@ export default function CompareViewPage() {
             <div className="flex flex-wrap gap-4 text-xs">
               <div className="flex items-center gap-2">
                 <span className="px-2 py-1 rounded bg-green-50 text-green-600">&gt; +10%</span>
-                <span className="text-[var(--secondary)]">Uebererfuellung</span>
+                <span className="text-[var(--secondary)]">Übererfüllung</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="px-2 py-1 rounded bg-gray-50 text-[var(--secondary)]">-10% bis +10%</span>
@@ -286,7 +286,7 @@ export default function CompareViewPage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="px-2 py-1 rounded bg-red-50 text-red-600">&lt; -10%</span>
-                <span className="text-[var(--secondary)]">Untererfuellung</span>
+                <span className="text-[var(--secondary)]">Untererfüllung</span>
               </div>
             </div>
           </div>
@@ -330,7 +330,7 @@ export default function CompareViewPage() {
                   Version B
                 </label>
                 <select className="w-full px-3 py-2 border border-[var(--border)] rounded-md text-sm">
-                  <option>Keine frueheren Versionen</option>
+                  <option>Keine früheren Versionen</option>
                 </select>
               </div>
             </div>
@@ -378,7 +378,7 @@ export default function CompareViewPage() {
               <div>
                 <h3 className="text-sm font-medium text-amber-800">Versionshistorie</h3>
                 <p className="text-sm text-amber-700 mt-1">
-                  Die Versionierung ermoeglicht es, aeltere Planstaende mit der aktuellen Version
+                  Die Versionierung ermöglicht es, ältere Planstände mit der aktuellen Version
                   zu vergleichen. Bei jeder wesentlichen Änderung der Planung wird automatisch
                   eine neue Version erstellt.
                 </p>

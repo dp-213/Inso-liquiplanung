@@ -513,7 +513,7 @@ Alle Falldaten liegen unter `/Cases/<Case-Name>/`:
 | **Beraterin** | Sonja Prinz (unser Team) |
 | **Buchhalterin** | Frau Dupke |
 | **Rechtsform** | eG (eingetragene Genossenschaft) |
-| **Massekredit** | Sparkasse HRV, max. 137.000 EUR |
+| **Massekredit** | Sparkasse HRV (max. 137.000 EUR) + apoBank (max. 100.000 EUR), je 10% Fortführungsbeitrag zzgl. USt |
 
 #### 3 Standorte
 
@@ -546,4 +546,4 @@ Alle Falldaten liegen unter `/Cases/<Case-Name>/`:
 - PLAN-Daten: Liquiditätsplanung vom 14.01.2026 analysiert und nachvollzogen
 - Traceability-Matrix: Jede Zahl der Planung zu Quelldatei zurückverfolgt
 - Klassifikation: IST-Entries zu ~88% klassifiziert (Counterparty, Estate Allocation)
-- Offene Punkte: apoBank-Vereinbarung klären, LANR-Location-Mapping korrigieren, fehlende Dez-Kontoauszüge (3 von 5 Banken)
+- Offene Punkte: LANR-Location-Mapping korrigieren, fehlende Dez-Kontoauszüge (3 von 5 Banken)

@@ -23,8 +23,8 @@ interface CaseData {
 const DEMO_BANK_ACCOUNTS = [
   {
     id: "1",
-    accountName: "Geschaeftskonto",
-    bankName: "Sparkasse Koeln-Bonn",
+    accountName: "Geschäftskonto",
+    bankName: "Sparkasse Köln-Bonn",
     iban: "DE89 3704 0044 0532 0130 00",
     balance: BigInt(5000000), // 50,000 EUR
     securityHolder: "Globalzession Bank XY",
@@ -44,9 +44,9 @@ const DEMO_BANK_ACCOUNTS = [
 const DEMO_SECURITY_RIGHTS = [
   {
     id: "1",
-    creditorName: "Sparkasse Koeln-Bonn",
+    creditorName: "Sparkasse Köln-Bonn",
     securityType: "Globalzession",
-    assetDescription: "Saemtliche KV-Forderungen",
+    assetDescription: "Sämtliche KV-Forderungen",
     estimatedValue: BigInt(12000000), // 120,000 EUR
     settlementStatus: "offen",
     settlementAmount: null,
@@ -55,14 +55,14 @@ const DEMO_SECURITY_RIGHTS = [
     id: "2",
     creditorName: "MedTech Leasing GmbH",
     securityType: "Eigentumsvorbehalt",
-    assetDescription: "Medizinische Geraete (Roentgen, EKG)",
+    assetDescription: "Medizinische Geräte (Röntgen, EKG)",
     estimatedValue: BigInt(3500000), // 35,000 EUR
     settlementStatus: "vereinbarung",
     settlementAmount: BigInt(2800000), // 28,000 EUR
   },
   {
     id: "3",
-    creditorName: "Vermieter Praxisraeume",
+    creditorName: "Vermieter Praxisräume",
     securityType: "Vermieterpfandrecht",
     assetDescription: "Praxiseinrichtung",
     estimatedValue: BigInt(1500000), // 15,000 EUR

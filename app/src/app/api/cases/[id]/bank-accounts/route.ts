@@ -84,12 +84,6 @@ export async function GET(
       orderBy: { displayOrder: "asc" },
     });
 
-    // DEBUG: Log was wir bekommen
-    console.log('[API /bank-accounts] Loaded accounts:');
-    accounts.forEach(acc => {
-      console.log(`  - ${acc.accountName}: locationId=${acc.locationId}, opening=${Number(acc.openingBalanceCents)/100}€`);
-    });
-
     // Lade ALLE IST-Ledger-Entries (valueType=IST)
     const ledgerEntries = await prisma.ledgerEntry.findMany({
       where: {

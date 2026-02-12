@@ -44,8 +44,8 @@ interface CaseData {
 const PAYMENT_SOURCES = [
   {
     id: "kv_advance",
-    name: "KV-Abschlaege",
-    description: "Monatliche Abschlagszahlungen der Kassenaerztlichen Vereinigung",
+    name: "KV-Abschläge",
+    description: "Monatliche Abschlagszahlungen der Kassenärztlichen Vereinigung",
     rhythm: "Monatlich",
     color: "#3b82f6",
   },
@@ -58,7 +58,7 @@ const PAYMENT_SOURCES = [
   },
   {
     id: "hzv_advance",
-    name: "HZV-Abschlaege",
+    name: "HZV-Abschläge",
     description: "Monatliche Pauschalen Hausarztzentrierte Versorgung",
     rhythm: "Monatlich",
     color: "#8b5cf6",
@@ -66,8 +66,8 @@ const PAYMENT_SOURCES = [
   {
     id: "hzv_final",
     name: "HZV-Schlusszahlung",
-    description: "Jaehrliche Abschlusszahlung HZV-Vertrag",
-    rhythm: "Jaehrlich (Dez/Jan)",
+    description: "Jährliche Abschlusszahlung HZV-Vertrag",
+    rhythm: "Jährlich (Dez/Jan)",
     color: "#f59e0b",
   },
   {

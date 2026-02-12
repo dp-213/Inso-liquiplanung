@@ -79,6 +79,7 @@ export default function CaseSidebar({
       items: [
         { name: "Prämissen", href: `${base}/assumptions` },
         { name: "Freie Planung", href: `${base}/planung` },
+        { name: "Prognose", href: `${base}/forecast` },
         { name: "Liquiditätsplan", href: `${base}/results` },
         { name: "Business-Logik", href: `${base}/business-logic` },
       ],
