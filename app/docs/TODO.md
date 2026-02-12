@@ -97,15 +97,15 @@ Legacy-Ordner aufgelöst: 4 unique Dateien nach `01-raw/` verschoben, 2 ältere 
 
 **Status:** Zeigt aktuell Placeholder. PLAN-Entries über Ledger einsehbar.
 
-### Finanzierung-Seite implementieren
+### ~~Finanzierung-Seite implementieren~~ ERLEDIGT 2026-02-10
 
-**Status:** Placeholder. Massekreditvertrag und Darlehens-Details noch nicht in DB.
+Redirect auf `/banken-sicherungsrechte` mit Bankenspiegel, Sicherungsrechte und Massekredit-Status (v2.24.0).
 
-### Zahlungsverifikation (SOLL vs. IST)
+### ~~Zahlungsverifikation (SOLL vs. IST)~~ ERLEDIGT 2026-02-12
 
-**Status:** Placeholder. SOLL-IST-Vergleich noch nicht implementiert.
+SOLL/IST-Abgleich implementiert mit Ampelsystem (v2.25.0). PLAN vs. IST pro Periode, Zusammenfassung + Perioden-Tabelle.
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-10 (v2.22.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.25.0)
 

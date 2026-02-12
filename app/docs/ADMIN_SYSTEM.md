@@ -20,6 +20,8 @@
    - [4.6 Insolvenzeffekte](#46-insolvenzeffekte)
    - [4.7 Bankenspiegel](#47-bankenspiegel)
    - [4.7b Banken & Sicherungsrechte](#47b-banken--sicherungsrechte)
+   - [4.7c IST-Kontobewegungen](#47c-ist-kontobewegungen)
+   - [4.7d Zahlungsverifikation (SOLL/IST)](#47d-zahlungsverifikation-sollist)
    - [4.8 Zahlungsregister (Ledger)](#48-zahlungsregister-ledger)
    - [4.9 Steuerungsdimensionen](#49-steuerungsdimensionen-ledgerentry)
    - [4.10 Planungsart (Horizont)](#410-planungsart-horizont)
@@ -602,6 +604,108 @@ Pro-Bank-Berechnungskarten:
 
 - Sidebar: VERFAHREN → „Banken & Sicherungsrechte"
 - Alte Routes `/security-rights` und `/finanzierung` redirecten hierher
+
+---
+
+### 4.7c IST-Kontobewegungen
+
+**Pfad:** `/admin/cases/[id]/kontobewegungen`
+
+#### Funktion
+Übersicht aller IST-Buchungen (LedgerEntries mit `valueType=IST`) mit drei Gruppierungsansichten.
+
+#### Tab-Toggle
+
+| Tab | Standard | Beschreibung |
+|-----|----------|--------------|
+| **Nach Kontentyp** | DEFAULT | ISK vs. Gläubigerkonten (via `BankAccount.isLiquidityRelevant`) |
+| **Nach Monat** | | Monatliche Aggregation |
+| **Nach Standort** | | Gruppierung nach Location |
+
+#### Tab: Nach Kontentyp
+
+Zwei Sektionen:
+- **Insolvenz-Sonderkonten (ISK):** Operative Massekonten (`isLiquidityRelevant=true`). Pro Konto: Name, Bank, IBAN, Einzahlungen/Auszahlungen/Netto, expandierbare Transaktionsliste.
+- **Gläubigerkonten:** Nicht-ISK-Konten (`isLiquidityRelevant=false`). Gleiche Darstellung.
+- **Ohne Bankkonto:** Entries ohne `bankAccountId`-Zuordnung (falls vorhanden).
+
+#### API
+
+| Endpunkt | Zweck |
+|----------|-------|
+| `GET /api/cases/[id]/kontobewegungen` | IST-Entries mit Gruppierungen (byAccountType, byLocation, byMonth) |
+
+**Response-Struktur:**
+```json
+{
+  "summary": { "totalCount", "totalInflows", "totalOutflows", "netAmount" },
+  "byAccountType": {
+    "isk": [{ "accountId", "accountName", "bankName", "iban", "inflows", "outflows", "entries" }],
+    "glaeubigerkonten": [...],
+    "ohneBankkonto": { ... } | null,
+    "iskTotal": { "inflows", "outflows", "count" },
+    "glaeubigerTotal": { "inflows", "outflows", "count" }
+  },
+  "byLocation": [...],
+  "byMonth": [...]
+}
+```
+
+---
+
+### 4.7d Zahlungsverifikation (SOLL/IST)
+
+**Pfad:** `/admin/cases/[id]/zahlungsverifikation`
+
+#### Funktion
+Vergleicht PLAN-Werte (aus PeriodValues über CashflowCategories) mit IST-Werten (aus LedgerEntries) pro Planungsperiode.
+
+#### Voraussetzung
+Aktiver LiquidityPlan muss existieren. Ohne Plan zeigt die Seite einen Hinweis.
+
+#### Zusammenfassung (3 Kacheln)
+- **PLAN gesamt:** Summe aller PLAN-Nettowerte über alle Perioden
+- **IST gesamt:** Summe aller IST-Nettowerte über alle Perioden
+- **Abweichung:** Differenz mit Ampelfarbe und Prozentangabe
+
+#### Perioden-Tabelle
+Pro Periode: PLAN-Netto, IST-Netto, Abweichung (absolut + %), Ampel-Status.
+
+#### Ampelsystem
+
+| Abweichung | Farbe | Status |
+|------------|-------|--------|
+| < 5% | Grün | Im Plan |
+| 5–15% | Gelb | Abweichung |
+| > 15% | Rot | Kritisch |
+
+Perioden ohne IST-Daten werden ausgegraut mit „Keine Daten" angezeigt.
+
+#### API
+
+| Endpunkt | Zweck |
+|----------|-------|
+| `GET /api/cases/[id]/zahlungsverifikation` | PLAN vs. IST pro Periode |
+
+**Response-Struktur:**
+```json
+{
+  "available": true,
+  "data": {
+    "plan": { "id", "name", "periodType", "periodCount", "planStartDate" },
+    "summary": { "totalPlan", "totalIst", "totalDeviation", "totalDeviationPercent", "totalStatus" },
+    "periods": [{
+      "label", "plan": { "net" }, "ist": { "net" },
+      "deviation", "deviationPercent", "status", "hasIstData"
+    }]
+  }
+}
+```
+
+**Berechnung:**
+- PLAN: PeriodValues aggregiert über CashflowCategories (Inflows positiv, Outflows negiert)
+- IST: LedgerEntries nach Periodendatumsbereichen gruppiert (signierte amountCents)
+- Perioden: Aus `LiquidityPlan.periodType` + `periodCount` + `planStartDate` berechnet
 
 ---
 

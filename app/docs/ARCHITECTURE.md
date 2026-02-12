@@ -1,7 +1,7 @@
 # System-Architektur
 
-**Version:** 2.24.0
-**Stand:** 10. Februar 2026
+**Version:** 2.25.0
+**Stand:** 12. Februar 2026
 
 ---
 
@@ -419,6 +419,13 @@ LedgerEntry (UNREVIEWED)
 | `/api/cases/[id]/counterparties` | GET/POST | Gegenparteien |
 | `/api/cases/[id]/locations` | GET/POST | Standorte |
 
+### Analyse APIs
+
+| Endpoint | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/api/cases/[id]/kontobewegungen` | GET | IST-Buchungen gruppiert nach Kontentyp/Standort/Monat |
+| `/api/cases/[id]/zahlungsverifikation` | GET | SOLL/IST-Abgleich pro Planungsperiode mit Ampel |
+
 ### Klassifikation APIs
 
 | Endpoint | Methode | Beschreibung |
@@ -440,6 +447,8 @@ LedgerEntry (UNREVIEWED)
 │   │   │   │   ├── rules/            # Klassifikationsregeln
 │   │   │   │   ├── bank-accounts/    # Bankkonten
 │   │   │   │   ├── counterparties/   # Gegenparteien
+│   │   │   │   ├── kontobewegungen/ # IST-Daten nach Kontentyp/Monat/Standort
+│   │   │   │   ├── zahlungsverifikation/ # SOLL/IST-Abgleich
 │   │   │   │   └── locations/        # Standorte
 │   │   │   └── ...
 │   │   ├── portal/                   # Kundenportal

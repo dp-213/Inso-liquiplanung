@@ -112,13 +112,10 @@ Die Freigaben-Seite existiert im Kundenportal (`/portal/cases/[id]/orders`), ist
 
 `/admin/cases/[id]/planung` zeigt Placeholder. PLAN-Entries über Ledger einsehbar.
 
-### Finanzierung-Seite nicht implementiert
+### Zahlungsverifikation: Kein Drill-Down pro Kategorie
 
-`/admin/cases/[id]/finanzierung` zeigt Placeholder.
-
-### Zahlungsverifikation nicht implementiert
-
-`/admin/cases/[id]/zahlungsverifikation` zeigt Placeholder.
+SOLL/IST-Abgleich zeigt nur aggregierte Netto-Werte pro Periode. Aufschlüsselung nach einzelnen CashflowCategories oder Einnahmen/Ausgaben getrennt ist nicht verfügbar.
+**Workaround:** Ledger-Detailansicht mit Zeitraumfilter nutzen.
 
 ### Eingeschränkte Standort-Ansicht
 
@@ -205,6 +202,14 @@ Pflicht-Regel ADR-028 eingeführt: Classification MUSS bei jedem Import erfolgen
 
 Bankkonten-Details bewusst aus Liquidity Matrix entfernt (ADR-030). Bankkonten-Tab im Dashboard zeigt diese Informationen.
 
+### ~~Finanzierung-Seite nicht implementiert~~ GELÖST 2026-02-10
+
+Redirect auf `/banken-sicherungsrechte` (v2.24.0). Bankenspiegel, Sicherungsrechte und Massekredit-Status dort zusammengefasst.
+
+### ~~Zahlungsverifikation nicht implementiert~~ GELÖST 2026-02-12
+
+SOLL/IST-Abgleich mit Ampelsystem implementiert (v2.25.0). PLAN vs. IST pro Periode mit Abweichungsanalyse.
+
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.24.1)
+**Letzte Aktualisierung:** 2026-02-12 (v2.25.0)

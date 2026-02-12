@@ -4,6 +4,29 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.25.0 – Kontobewegungen ISK/Gläubiger-Trennung + Zahlungsverifikation SOLL/IST
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Kontobewegungen: Tab-Toggle mit Kontentyp-Ansicht:** Neue Standard-Ansicht „Nach Kontentyp" trennt ISK (operative Massekonten, `isLiquidityRelevant=true`) von Gläubigerkonten. Jedes Konto als Accordion mit Bankname, IBAN, Saldo und expandierbarer Transaktionsliste. Zusätzlich Sektion „Ohne Bankkonto" für nicht zugeordnete Entries. Tab-Toggle: Nach Kontentyp (Default) | Nach Monat | Nach Standort.
+- **Zahlungsverifikation: SOLL/IST-Abgleich mit Ampelsystem:** Vergleicht PLAN-Werte (aus PeriodValues über CashflowCategories) mit IST-Werten (aus LedgerEntries) pro Planungsperiode. Zusammenfassung als 3 Kacheln (PLAN gesamt, IST gesamt, Abweichung). Perioden-Tabelle mit Ampelfarben: <5% grün, 5–15% gelb, >15% rot. Unterstützt WEEKLY und MONTHLY Perioden. Fallback-Ansicht bei fehlendem Plan.
+
+### Änderungen
+
+- **Kontobewegungen-API erweitert:** Neue `byAccountType`-Gruppierung in Response (ISK, Gläubigerkonten, Ohne Bankkonto mit jeweiligen Totals). BankAccount-Daten (Name, Bank, IBAN) pro Konto mitgeliefert. Bestehende `byLocation` und `byMonth` unverändert.
+- **Zahlungsverifikation-API implementiert:** Stub durch vollständige Implementierung ersetzt. Lädt aktiven LiquidityPlan, berechnet Periodengrenzen, aggregiert PLAN- und IST-Werte, berechnet Abweichungen (absolut + prozentual).
+
+### Geänderte Dateien
+
+- `app/src/app/api/cases/[id]/kontobewegungen/route.ts` – byAccountType-Gruppierung
+- `app/src/app/admin/cases/[id]/kontobewegungen/page.tsx` – Tab-Toggle UI
+- `app/src/app/api/cases/[id]/zahlungsverifikation/route.ts` – SOLL/IST-Vergleich
+- `app/src/app/admin/cases/[id]/zahlungsverifikation/page.tsx` – Ampel-UI
+
+---
+
 ## Version 2.24.1 – Matrix-Audit: Defensives Alt-Tag-Mapping & ABSONDERUNG-Fix
 
 **Datum:** 12. Februar 2026
