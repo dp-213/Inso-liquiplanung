@@ -449,16 +449,17 @@ export default function CaseEditPage({
                 placeholder="z.B. 500.00"
               />
               <p className="text-xs text-[var(--muted)] mt-1">
-                Anfragen unter diesem Betrag werden automatisch freigegeben. Leer = immer manuell.
+                Anfragen bis einschließlich diesem Betrag werden automatisch freigegeben. Leer = immer manuell.
               </p>
             </div>
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
               <h4 className="text-sm font-medium text-amber-800 mb-2">Wie funktioniert Auto-Freigabe?</h4>
               <ul className="text-xs text-amber-700 space-y-1">
-                <li>• Anfragen <strong>unter</strong> dem Schwellwert werden sofort freigegeben</li>
+                <li>• Anfragen <strong>bis einschließlich</strong> dem Schwellwert werden sofort freigegeben</li>
                 <li>• Ein LedgerEntry wird automatisch erstellt (PLAN, Neumasse)</li>
                 <li>• Der Status wird auf <strong>AUTO_APPROVED</strong> gesetzt</li>
                 <li>• Anfragen <strong>über</strong> dem Schwellwert bleiben zur manuellen Prüfung</li>
+                <li>• Beispiel: Schwellwert 500 € → Anfrage über 500 € = manuell</li>
               </ul>
             </div>
           </div>

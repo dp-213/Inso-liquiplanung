@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
 import prisma from "@/lib/db";
 
-// DEBUG Route - NO AUTH CHECK
 export async function GET() {
-  try {
-    console.log("=== DEBUG: Fetching cases ===");
+  const session = await getSession();
+  if (!session?.isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
+  try {
     const cases = await prisma.case.findMany({
       include: {
         owner: {
@@ -24,22 +27,15 @@ export async function GET() {
       orderBy: { createdAt: "desc" },
     });
 
-    console.log(`=== DEBUG: Found ${cases.length} cases ===`);
-    console.log(JSON.stringify(cases, null, 2));
-
     return NextResponse.json({
       success: true,
       count: cases.length,
       cases,
     });
-  } catch (error: any) {
-    console.error("=== DEBUG ERROR ===", error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      {
-        success: false,
-        error: error.message,
-        stack: error.stack,
-      },
+      { success: false, error: message },
       { status: 500 }
     );
   }

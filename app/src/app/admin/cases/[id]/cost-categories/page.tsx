@@ -57,7 +57,7 @@ export default function CostCategoriesPage() {
 
   async function fetchData() {
     try {
-      const res = await fetch(`/api/cases/${caseId}/cost-categories`);
+      const res = await fetch(`/api/cases/${caseId}/cost-categories`, { credentials: "include" });
       if (res.ok) {
         const data = await res.json();
         setCategories(data.costCategories || []);
@@ -87,6 +87,7 @@ export default function CostCategoriesPage() {
 
       const res = await fetch(url, {
         method,
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name,
@@ -119,6 +120,7 @@ export default function CostCategoriesPage() {
     try {
       const res = await fetch(`/api/cases/${caseId}/cost-categories/${categoryId}`, {
         method: "DELETE",
+        credentials: "include",
       });
 
       if (!res.ok) {

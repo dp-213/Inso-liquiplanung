@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /admin
+Disallow: /api
+Disallow: /portal
+Disallow: /customer-login
+Allow: /view/
+
+Sitemap: https://cases.gradify.de/sitemap.xml

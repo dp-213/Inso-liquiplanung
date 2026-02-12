@@ -136,9 +136,144 @@ export async function GET(
       }
     }
 
+    // === Split-Kontext laden ===
+    const isChild = !!entry.parentEntryId;
+    let splitChildren: Array<{
+      id: string;
+      description: string;
+      amountCents: string;
+      counterpartyId: string | null;
+      locationId: string | null;
+      categoryTag: string | null;
+      reviewStatus: string;
+      note: string | null;
+      bookingReference: string | null;
+    }> = [];
+    let parentEntry: {
+      id: string;
+      description: string;
+      amountCents: string;
+      transactionDate: string;
+      splitReason: string | null;
+    } | null = null;
+    let siblings: Array<{
+      id: string;
+      description: string;
+      amountCents: string;
+      counterpartyId: string | null;
+      locationId: string | null;
+    }> = [];
+    let breakdownInfo: {
+      recipientName: string;
+      recipientIban: string;
+      purpose: string | null;
+      itemIndex: number;
+      sourceReference: string;
+      sourceDate: string;
+      sourceFile: string | null;
+    } | null = null;
+
+    // Split-Queries parallel ausführen
+    const [children, parentResult, siblingsResult, breakdownItem] = await Promise.all([
+      // Children laden (prüft ob Entry ein Parent ist)
+      prisma.ledgerEntry.findMany({
+        where: { parentEntryId: entry.id },
+        select: {
+          id: true,
+          description: true,
+          amountCents: true,
+          counterpartyId: true,
+          locationId: true,
+          categoryTag: true,
+          reviewStatus: true,
+          note: true,
+          bookingReference: true,
+        },
+      }),
+      // Parent laden (nur wenn Child)
+      isChild && entry.parentEntryId
+        ? prisma.ledgerEntry.findFirst({
+            where: { id: entry.parentEntryId },
+            select: { id: true, description: true, amountCents: true, transactionDate: true, splitReason: true },
+          })
+        : Promise.resolve(null),
+      // Geschwister laden (nur wenn Child)
+      isChild && entry.parentEntryId
+        ? prisma.ledgerEntry.findMany({
+            where: { parentEntryId: entry.parentEntryId, id: { not: entry.id } },
+            select: { id: true, description: true, amountCents: true, counterpartyId: true, locationId: true },
+          })
+        : Promise.resolve([]),
+      // Zahlbeleg-Herkunft laden (nur wenn Child)
+      isChild
+        ? prisma.paymentBreakdownItem.findFirst({
+            where: { createdLedgerEntryId: entry.id },
+            include: { source: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    const isParent = children.length > 0;
+
+    if (isParent) {
+      splitChildren = children.map(c => ({
+        id: c.id,
+        description: c.description,
+        amountCents: c.amountCents.toString(),
+        counterpartyId: c.counterpartyId,
+        locationId: c.locationId,
+        categoryTag: c.categoryTag,
+        reviewStatus: c.reviewStatus,
+        note: c.note,
+        bookingReference: c.bookingReference,
+      }));
+    }
+
+    if (parentResult) {
+      parentEntry = {
+        id: parentResult.id,
+        description: parentResult.description,
+        amountCents: parentResult.amountCents.toString(),
+        transactionDate: parentResult.transactionDate.toISOString(),
+        splitReason: parentResult.splitReason,
+      };
+    }
+
+    if (siblingsResult.length > 0) {
+      siblings = siblingsResult.map(s => ({
+        id: s.id,
+        description: s.description,
+        amountCents: s.amountCents.toString(),
+        counterpartyId: s.counterpartyId,
+        locationId: s.locationId,
+      }));
+    }
+
+    if (breakdownItem) {
+      breakdownInfo = {
+        recipientName: breakdownItem.recipientName,
+        recipientIban: breakdownItem.recipientIban,
+        purpose: breakdownItem.purpose,
+        itemIndex: breakdownItem.itemIndex,
+        sourceReference: breakdownItem.source.referenceNumber,
+        sourceDate: breakdownItem.source.executionDate.toISOString(),
+        sourceFile: breakdownItem.source.sourceFileName,
+      };
+    }
+
+    const splitContext = (isParent || isChild) ? {
+      isParent,
+      isChild,
+      splitChildren,
+      parentEntry,
+      siblings,
+      breakdownInfo,
+    } : null;
+
     return NextResponse.json({
       ...serializeLedgerEntry(entry),
       importData,
+      splitContext,
     });
   } catch (error) {
     console.error('Error fetching ledger entry:', error);

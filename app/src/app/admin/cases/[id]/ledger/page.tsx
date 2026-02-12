@@ -31,6 +31,50 @@ interface ColumnConfig {
   minWidth: number;
 }
 
+// Column Preset configuration
+interface ColumnPreset {
+  id: string;
+  label: string;
+  columns: string[];
+}
+
+const COLUMN_PRESETS: ColumnPreset[] = [
+  {
+    id: "standard",
+    label: "Standard",
+    columns: ["checkbox", "transactionDate", "categoryTag", "description", "amountCents", "bankAccount", "counterparty", "valueType", "reviewStatus", "actions"],
+  },
+  {
+    id: "review",
+    label: "Review",
+    columns: ["checkbox", "transactionDate", "description", "amountCents", "legalBucket", "estateAllocation", "reviewStatus", "suggestion", "dimSuggestion", "actions"],
+  },
+  {
+    id: "klassifikation",
+    label: "Klassifikation",
+    columns: ["checkbox", "transactionDate", "categoryTag", "description", "amountCents", "counterparty", "location", "estateAllocation", "legalBucket", "actions"],
+  },
+  {
+    id: "kompakt",
+    label: "Kompakt",
+    columns: ["checkbox", "transactionDate", "categoryTag", "description", "amountCents", "reviewStatus", "actions"],
+  },
+  {
+    id: "quellen",
+    label: "Quellen",
+    columns: ["checkbox", "transactionDate", "description", "amountCents", "import", "bankAccount", "actions"],
+  },
+];
+
+// Column group configuration for improved column menu
+const COLUMN_GROUPS: { label: string; columns: string[] }[] = [
+  { label: "Kernfelder", columns: ["transactionDate", "categoryTag", "description", "amountCents"] },
+  { label: "Dimensionen", columns: ["location", "bankAccount", "counterparty"] },
+  { label: "Klassifikation", columns: ["valueType", "estateAllocation", "legalBucket"] },
+  { label: "Governance", columns: ["reviewStatus", "suggestion", "dimSuggestion"] },
+  { label: "Quelle", columns: ["import"] },
+];
+
 const COLUMN_DEFINITIONS: ColumnConfig[] = [
   { id: "checkbox", label: "Auswahl", defaultVisible: true, defaultWidth: 40, minWidth: 40 },
   { id: "transactionDate", label: "Datum", defaultVisible: true, defaultWidth: 100, minWidth: 80 },
@@ -205,10 +249,19 @@ export default function CaseLedgerPage({
     });
   }, []);
 
+  // Global search
+  const [globalSearch, setGlobalSearch] = useState("");
+  // Advanced filters toggle
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  // Active column preset
+  const [activePreset, setActivePreset] = useState<string>("standard");
+
   // Column visibility and widths
   const [columnVisibility, setColumnVisibility] = useState<Record<string, boolean>>(() => {
+    // Initialize with "standard" preset
+    const preset = COLUMN_PRESETS.find(p => p.id === "standard")!;
     const initial: Record<string, boolean> = {};
-    COLUMN_DEFINITIONS.forEach(col => { initial[col.id] = col.defaultVisible; });
+    COLUMN_DEFINITIONS.forEach(col => { initial[col.id] = preset.columns.includes(col.id); });
     return initial;
   });
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => {
@@ -420,6 +473,16 @@ export default function CaseLedgerPage({
 
   const toggleColumnVisibility = (columnId: string) => {
     setColumnVisibility(prev => ({ ...prev, [columnId]: !prev[columnId] }));
+    setActivePreset(""); // Manuelles Umschalten → kein Preset aktiv
+  };
+
+  const applyPreset = (presetId: string) => {
+    const preset = COLUMN_PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+    const newVis: Record<string, boolean> = {};
+    COLUMN_DEFINITIONS.forEach(col => { newVis[col.id] = preset.columns.includes(col.id); });
+    setColumnVisibility(newVis);
+    setActivePreset(presetId);
   };
 
   const resetColumnWidths = () => {
@@ -463,6 +526,7 @@ export default function CaseLedgerPage({
   };
 
   const clearFilters = () => {
+    setGlobalSearch("");
     setFilterValueType("");
     setFilterLegalBucket("");
     setFilterReviewStatus("");
@@ -478,7 +542,33 @@ export default function CaseLedgerPage({
     setFilterIsTransfer("");
   };
 
-  const hasActiveFilters = filterValueType || filterLegalBucket || filterReviewStatus || filterSuggestedBucket || filterFrom || filterTo || filterBankAccountId || filterCounterpartyId || filterLocationId || filterImportJobId || filterEstateAllocation || filterCategoryTag || filterIsTransfer;
+  const hasActiveFilters = globalSearch || filterValueType || filterLegalBucket || filterReviewStatus || filterSuggestedBucket || filterFrom || filterTo || filterBankAccountId || filterCounterpartyId || filterLocationId || filterImportJobId || filterEstateAllocation || filterCategoryTag || filterIsTransfer;
+
+  // Aktive Filter als Chips für die Anzeige
+  const activeFilterChips = useMemo(() => {
+    const chips: { label: string; onRemove: () => void }[] = [];
+    if (globalSearch) chips.push({ label: `"${globalSearch}"`, onRemove: () => setGlobalSearch("") });
+    if (filterValueType) chips.push({ label: VALUE_TYPE_LABELS[filterValueType], onRemove: () => setFilterValueType("") });
+    if (filterLegalBucket) chips.push({ label: LEGAL_BUCKET_LABELS[filterLegalBucket], onRemove: () => setFilterLegalBucket("" as LegalBucket | "") });
+    if (filterReviewStatus) chips.push({ label: REVIEW_STATUS_LABELS[filterReviewStatus], onRemove: () => setFilterReviewStatus("" as ReviewStatus | "") });
+    if (filterSuggestedBucket) chips.push({ label: `Vorschlag: ${filterSuggestedBucket}`, onRemove: () => setFilterSuggestedBucket("") });
+    if (filterBankAccountId) chips.push({ label: filterBankAccountId === "null" ? "Ohne Bankkonto" : (bankAccountsMap.get(filterBankAccountId) || filterBankAccountId), onRemove: () => setFilterBankAccountId("") });
+    if (filterCounterpartyId) chips.push({ label: filterCounterpartyId === "null" ? "Ohne Gegenpartei" : (counterpartiesMap.get(filterCounterpartyId) || filterCounterpartyId), onRemove: () => setFilterCounterpartyId("") });
+    if (filterLocationId) chips.push({ label: filterLocationId === "null" ? "Ohne Standort" : (locationsMap.get(filterLocationId) || filterLocationId), onRemove: () => setFilterLocationId("") });
+    if (filterImportJobId) {
+      const job = importJobs.find(j => j.importJobId === filterImportJobId);
+      chips.push({ label: `Import: ${job?.importSource || filterImportJobId.slice(0, 8)}`, onRemove: () => setFilterImportJobId("") });
+    }
+    if (filterEstateAllocation) chips.push({ label: ESTATE_ALLOCATION_LABELS[filterEstateAllocation] || filterEstateAllocation, onRemove: () => setFilterEstateAllocation("" as EstateAllocation) });
+    if (filterCategoryTag) chips.push({ label: filterCategoryTag === "null" ? "Nicht zugeordnet" : (CATEGORY_TAG_LABELS[filterCategoryTag] || filterCategoryTag), onRemove: () => setFilterCategoryTag("") });
+    if (filterIsTransfer) chips.push({ label: filterIsTransfer === "true" ? "Nur Umbuchungen" : "Ohne Umbuchungen", onRemove: () => setFilterIsTransfer("") });
+    if (filterFrom) chips.push({ label: `ab ${filterFrom}`, onRemove: () => setFilterFrom("") });
+    if (filterTo) chips.push({ label: `bis ${filterTo}`, onRemove: () => setFilterTo("") });
+    return chips;
+  }, [globalSearch, filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterBankAccountId, filterCounterpartyId, filterLocationId, filterImportJobId, filterEstateAllocation, filterCategoryTag, filterIsTransfer, filterFrom, filterTo, bankAccountsMap, counterpartiesMap, locationsMap, importJobs]);
+
+  // Anzahl der aktiven erweiterten Filter (ohne globale Suche)
+  const activeAdvancedFilterCount = [filterValueType, filterLegalBucket, filterReviewStatus, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountId, filterCounterpartyId, filterLocationId, filterImportJobId, filterEstateAllocation, filterCategoryTag, filterIsTransfer].filter(Boolean).length;
 
   // Bulk Actions
   const handleBulkConfirm = async (filter?: { suggestedLegalBucket?: string; minConfidence?: number }) => {
@@ -874,9 +964,24 @@ export default function CaseLedgerPage({
     }
   };
 
-  // Apply column filters (memoized)
+  // Apply global search + column filters (memoized)
   const filteredEntries = useMemo(() => entries.filter(entry => {
     const entryAny = entry as any;
+
+    // Globale Suche: VOR den Spalten-Filtern prüfen
+    if (globalSearch.trim()) {
+      const q = globalSearch.toLowerCase().trim();
+      const categoryLabel = entryAny.categoryTag ? (CATEGORY_TAG_LABELS[entryAny.categoryTag] || '').toLowerCase() : '';
+      const matchesSearch =
+        entry.description.toLowerCase().includes(q) ||
+        (counterpartiesMap.get(entryAny.counterpartyId)?.toLowerCase().includes(q)) ||
+        (entryAny.note?.toLowerCase().includes(q)) ||
+        (entryAny.bookingReference?.toLowerCase().includes(q)) ||
+        (entryAny.importSource?.toLowerCase().includes(q)) ||
+        (entryAny.splitReason?.toLowerCase().includes(q)) ||
+        categoryLabel.includes(q);
+      if (!matchesSearch) return false;
+    }
 
     for (const [columnId, filter] of Object.entries(columnFilters)) {
       if (filter.type === 'multiselect' && filter.values && filter.values.length > 0) {
@@ -917,7 +1022,7 @@ export default function CaseLedgerPage({
     }
 
     return true;
-  }), [entries, columnFilters, locationsMap, bankAccountsMap, counterpartiesMap]);
+  }), [entries, columnFilters, locationsMap, bankAccountsMap, counterpartiesMap, globalSearch]);
 
   // Sort entries (memoized)
   const sortedEntries = useMemo(() => [...filteredEntries].sort((a, b) => {
@@ -1697,244 +1802,315 @@ export default function CaseLedgerPage({
 
       {/* Filters - only show for non-rules/sources tabs */}
       {activeTab !== "rules" && activeTab !== "sources" && (
-      <div className="admin-card p-4">
-        <div className="flex flex-wrap items-end gap-4">
-          <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-              Werttyp
-            </label>
-            <select
-              value={filterValueType}
-              onChange={(e) => setFilterValueType(e.target.value as ValueType | "")}
-              className="input-field min-w-[120px]"
-            >
-              <option value="">Alle</option>
-              {Object.entries(VALUE_TYPE_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-              Rechtsstatus
-            </label>
-            <select
-              value={filterLegalBucket}
-              onChange={(e) => setFilterLegalBucket(e.target.value as LegalBucket | "")}
-              className="input-field min-w-[150px]"
-            >
-              <option value="">Alle</option>
-              {Object.entries(LEGAL_BUCKET_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-              Review-Status
-            </label>
-            <select
-              value={filterReviewStatus}
-              onChange={(e) => setFilterReviewStatus(e.target.value as ReviewStatus | "")}
-              className="input-field min-w-[150px]"
-            >
-              <option value="">Alle</option>
-              {Object.entries(REVIEW_STATUS_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-              Vorschlag
-            </label>
-            <select
-              value={filterSuggestedBucket}
-              onChange={(e) => setFilterSuggestedBucket(e.target.value)}
-              className="input-field min-w-[150px]"
-            >
-              <option value="">Alle</option>
-              <option value="MASSE">MASSE</option>
-              <option value="ABSONDERUNG">ABSONDERUNG</option>
-              <option value="NEUTRAL">NEUTRAL</option>
-              <option value="null">Ohne Vorschlag</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-              Von
-            </label>
-            <input
-              type="date"
-              value={filterFrom}
-              onChange={(e) => setFilterFrom(e.target.value)}
-              className="input-field"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-              Bis
-            </label>
-            <input
-              type="date"
-              value={filterTo}
-              onChange={(e) => setFilterTo(e.target.value)}
-              className="input-field"
-            />
-          </div>
-
-          {/* Dimensions-Filter */}
-          {bankAccountsList.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Bankkonto
-              </label>
-              <select
-                value={filterBankAccountId}
-                onChange={(e) => setFilterBankAccountId(e.target.value)}
-                className="input-field min-w-[150px]"
-              >
-                <option value="">Alle</option>
-                <option value="null">Ohne Bankkonto</option>
-                {bankAccountsList.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.bankName}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {counterpartiesList.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Gegenpartei
-              </label>
-              <select
-                value={filterCounterpartyId}
-                onChange={(e) => setFilterCounterpartyId(e.target.value)}
-                className="input-field min-w-[150px]"
-              >
-                <option value="">Alle</option>
-                <option value="null">Ohne Gegenpartei</option>
-                {counterpartiesList.map((cp) => (
-                  <option key={cp.id} value={cp.id}>
-                    {cp.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {locationsList.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Standort
-              </label>
-              <select
-                value={filterLocationId}
-                onChange={(e) => setFilterLocationId(e.target.value)}
-                className="input-field min-w-[150px]"
-              >
-                <option value="">Alle</option>
-                <option value="null">Ohne Standort</option>
-                {locationsList.map((loc) => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {importJobs.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Import
-              </label>
-              <select
-                value={filterImportJobId}
-                onChange={(e) => setFilterImportJobId(e.target.value)}
-                className="input-field min-w-[200px]"
-              >
-                <option value="">Alle Importe</option>
-                {importJobs.map((job) => (
-                  <option key={job.importJobId} value={job.importJobId}>
-                    {job.importSource || job.importJobId.slice(0, 8)} ({job.entryCount} Einträge)
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Alt-/Neumasse Filter */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-              Alt-/Neumasse
-            </label>
-            <select
-              value={filterEstateAllocation}
-              onChange={(e) => setFilterEstateAllocation(e.target.value as EstateAllocation)}
-              className="input-field min-w-[130px]"
-            >
-              <option value="">Alle</option>
-              <option value="ALTMASSE">Altmasse</option>
-              <option value="NEUMASSE">Neumasse</option>
-              <option value="MIXED">Gemischt</option>
-              <option value="UNKLAR">Unklar</option>
-            </select>
-          </div>
-
-          {/* Matrix-Kategorie Filter */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-              Matrix-Kat.
-            </label>
-            <select
-              value={filterCategoryTag}
-              onChange={(e) => setFilterCategoryTag(e.target.value)}
-              className="input-field min-w-[150px]"
-            >
-              <option value="">Alle</option>
-              <option value="null">Nicht zugeordnet</option>
-              {CATEGORY_TAG_OPTIONS.map(group => (
-                <optgroup key={group.group} label={group.group}>
-                  {group.tags.map(tag => (
-                    <option key={tag} value={tag}>{CATEGORY_TAG_LABELS[tag]}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-          </div>
-
-          {/* Umbuchungs-Filter */}
-          <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-              Umbuchungen
-            </label>
-            <select
-              value={filterIsTransfer}
-              onChange={(e) => setFilterIsTransfer(e.target.value)}
-              className="input-field min-w-[150px]"
-            >
-              <option value="">Alle Einträge</option>
-              <option value="false">Ohne Umbuchungen</option>
-              <option value="true">Nur Umbuchungen</option>
-            </select>
-          </div>
-
-          {hasActiveFilters && (
+      <div className="space-y-3">
+        {/* Preset-Leiste */}
+        <div className="flex items-center gap-2 px-1">
+          <span className="text-sm text-[var(--muted)] mr-1">Ansicht:</span>
+          {COLUMN_PRESETS.map(preset => (
             <button
-              onClick={clearFilters}
-              className="btn-secondary text-sm"
+              key={preset.id}
+              onClick={() => applyPreset(preset.id)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activePreset === preset.id
+                  ? "bg-white shadow-sm border border-gray-200 text-[var(--foreground)]"
+                  : "text-[var(--secondary)] hover:bg-gray-100"
+              }`}
             >
-              Filter zurücksetzen
+              {preset.label}
             </button>
+          ))}
+        </div>
+
+        {/* Globale Suchleiste */}
+        <div className="admin-card p-4 space-y-3">
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              placeholder="Suche in Beschreibung, Gegenpartei, Notiz, IBAN..."
+              className="input-field w-full pl-10 pr-8"
+            />
+            {globalSearch && (
+              <button
+                onClick={() => setGlobalSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Filter-Chips */}
+          {activeFilterChips.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {activeFilterChips.map((chip, i) => (
+                <span key={i} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-sm bg-blue-100 text-blue-800 border border-blue-200">
+                  {chip.label}
+                  <button onClick={chip.onRemove} className="ml-0.5 hover:text-blue-600 text-blue-400">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </span>
+              ))}
+              <button onClick={clearFilters} className="text-sm text-red-500 hover:text-red-700 ml-2">
+                Alle entfernen
+              </button>
+            </div>
+          )}
+
+          {/* Erweiterte Filter Toggle */}
+          <button
+            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+            className="flex items-center gap-1.5 text-sm text-[var(--secondary)] hover:text-[var(--foreground)] transition-colors"
+          >
+            <span>{showAdvancedFilters ? "▼" : "▶"}</span>
+            Erweiterte Filter
+            {activeAdvancedFilterCount > 0 && (
+              <span className="ml-1 text-blue-600 font-medium">({activeAdvancedFilterCount})</span>
+            )}
+          </button>
+
+          {/* Erweiterte Filter (collapsible) */}
+          {showAdvancedFilters && (
+            <div className="pt-2 border-t border-[var(--border)]">
+              <div className="flex flex-wrap items-end gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                    Werttyp
+                  </label>
+                  <select
+                    value={filterValueType}
+                    onChange={(e) => setFilterValueType(e.target.value as ValueType | "")}
+                    className="input-field min-w-[120px]"
+                  >
+                    <option value="">Alle</option>
+                    {Object.entries(VALUE_TYPE_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                    Rechtsstatus
+                  </label>
+                  <select
+                    value={filterLegalBucket}
+                    onChange={(e) => setFilterLegalBucket(e.target.value as LegalBucket | "")}
+                    className="input-field min-w-[150px]"
+                  >
+                    <option value="">Alle</option>
+                    {Object.entries(LEGAL_BUCKET_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                    Review-Status
+                  </label>
+                  <select
+                    value={filterReviewStatus}
+                    onChange={(e) => setFilterReviewStatus(e.target.value as ReviewStatus | "")}
+                    className="input-field min-w-[150px]"
+                  >
+                    <option value="">Alle</option>
+                    {Object.entries(REVIEW_STATUS_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                    Vorschlag
+                  </label>
+                  <select
+                    value={filterSuggestedBucket}
+                    onChange={(e) => setFilterSuggestedBucket(e.target.value)}
+                    className="input-field min-w-[150px]"
+                  >
+                    <option value="">Alle</option>
+                    <option value="MASSE">MASSE</option>
+                    <option value="ABSONDERUNG">ABSONDERUNG</option>
+                    <option value="NEUTRAL">NEUTRAL</option>
+                    <option value="null">Ohne Vorschlag</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                    Von
+                  </label>
+                  <input
+                    type="date"
+                    value={filterFrom}
+                    onChange={(e) => setFilterFrom(e.target.value)}
+                    className="input-field"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                    Bis
+                  </label>
+                  <input
+                    type="date"
+                    value={filterTo}
+                    onChange={(e) => setFilterTo(e.target.value)}
+                    className="input-field"
+                  />
+                </div>
+
+                {/* Dimensions-Filter */}
+                {bankAccountsList.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                      Bankkonto
+                    </label>
+                    <select
+                      value={filterBankAccountId}
+                      onChange={(e) => setFilterBankAccountId(e.target.value)}
+                      className="input-field min-w-[150px]"
+                    >
+                      <option value="">Alle</option>
+                      <option value="null">Ohne Bankkonto</option>
+                      {bankAccountsList.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.bankName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {counterpartiesList.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                      Gegenpartei
+                    </label>
+                    <select
+                      value={filterCounterpartyId}
+                      onChange={(e) => setFilterCounterpartyId(e.target.value)}
+                      className="input-field min-w-[150px]"
+                    >
+                      <option value="">Alle</option>
+                      <option value="null">Ohne Gegenpartei</option>
+                      {counterpartiesList.map((cp) => (
+                        <option key={cp.id} value={cp.id}>
+                          {cp.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {locationsList.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                      Standort
+                    </label>
+                    <select
+                      value={filterLocationId}
+                      onChange={(e) => setFilterLocationId(e.target.value)}
+                      className="input-field min-w-[150px]"
+                    >
+                      <option value="">Alle</option>
+                      <option value="null">Ohne Standort</option>
+                      {locationsList.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {importJobs.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                      Import
+                    </label>
+                    <select
+                      value={filterImportJobId}
+                      onChange={(e) => setFilterImportJobId(e.target.value)}
+                      className="input-field min-w-[200px]"
+                    >
+                      <option value="">Alle Importe</option>
+                      {importJobs.map((job) => (
+                        <option key={job.importJobId} value={job.importJobId}>
+                          {job.importSource || job.importJobId.slice(0, 8)} ({job.entryCount} Einträge)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Alt-/Neumasse Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                    Alt-/Neumasse
+                  </label>
+                  <select
+                    value={filterEstateAllocation}
+                    onChange={(e) => setFilterEstateAllocation(e.target.value as EstateAllocation)}
+                    className="input-field min-w-[130px]"
+                  >
+                    <option value="">Alle</option>
+                    <option value="ALTMASSE">Altmasse</option>
+                    <option value="NEUMASSE">Neumasse</option>
+                    <option value="MIXED">Gemischt</option>
+                    <option value="UNKLAR">Unklar</option>
+                  </select>
+                </div>
+
+                {/* Matrix-Kategorie Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                    Matrix-Kat.
+                  </label>
+                  <select
+                    value={filterCategoryTag}
+                    onChange={(e) => setFilterCategoryTag(e.target.value)}
+                    className="input-field min-w-[150px]"
+                  >
+                    <option value="">Alle</option>
+                    <option value="null">Nicht zugeordnet</option>
+                    {CATEGORY_TAG_OPTIONS.map(group => (
+                      <optgroup key={group.group} label={group.group}>
+                        {group.tags.map(tag => (
+                          <option key={tag} value={tag}>{CATEGORY_TAG_LABELS[tag]}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Umbuchungs-Filter */}
+                <div>
+                  <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                    Umbuchungen
+                  </label>
+                  <select
+                    value={filterIsTransfer}
+                    onChange={(e) => setFilterIsTransfer(e.target.value)}
+                    className="input-field min-w-[150px]"
+                  >
+                    <option value="">Alle Einträge</option>
+                    <option value="false">Ohne Umbuchungen</option>
+                    <option value="true">Nur Umbuchungen</option>
+                  </select>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -1973,9 +2149,49 @@ export default function CaseLedgerPage({
                 Spalten
               </button>
               {showColumnMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-56 py-2">
-                  <div className="px-3 py-1.5 border-b border-gray-100 flex items-center justify-between">
+                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 w-64 py-2">
+                  <div className="px-3 py-1.5 border-b border-gray-100">
                     <span className="text-xs font-semibold text-gray-500 uppercase">Spalten anzeigen</span>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {COLUMN_GROUPS.map(group => (
+                      <div key={group.label}>
+                        <div className="px-3 pt-2.5 pb-1">
+                          <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">{group.label}</span>
+                        </div>
+                        {group.columns.map(colId => {
+                          const col = COLUMN_DEFINITIONS.find(c => c.id === colId);
+                          if (!col) return null;
+                          return (
+                            <label
+                              key={col.id}
+                              className="flex items-center gap-2 px-3 py-1 hover:bg-gray-50 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={columnVisibility[col.id]}
+                                onChange={() => toggleColumnVisibility(col.id)}
+                                className="rounded border-gray-300"
+                              />
+                              <span className="text-sm">{col.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="px-3 py-2 border-t border-gray-100 flex items-center justify-between">
+                    <button
+                      onClick={() => {
+                        const newVis: Record<string, boolean> = {};
+                        COLUMN_DEFINITIONS.forEach(col => { newVis[col.id] = true; });
+                        setColumnVisibility(newVis);
+                        setActivePreset("");
+                      }}
+                      className="text-xs text-[var(--primary)] hover:underline"
+                    >
+                      Alle anzeigen
+                    </button>
                     <button
                       onClick={resetColumnWidths}
                       className="text-xs text-[var(--primary)] hover:underline"
@@ -1983,27 +2199,11 @@ export default function CaseLedgerPage({
                       Breiten zurücksetzen
                     </button>
                   </div>
-                  <div className="max-h-64 overflow-y-auto">
-                    {COLUMN_DEFINITIONS.filter(col => col.id !== "checkbox" && col.id !== "actions").map(col => (
-                      <label
-                        key={col.id}
-                        className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={columnVisibility[col.id]}
-                          onChange={() => toggleColumnVisibility(col.id)}
-                          className="rounded border-gray-300"
-                        />
-                        <span className="text-sm">{col.label}</span>
-                      </label>
-                    ))}
-                  </div>
                 </div>
               )}
             </div>
             <span className="text-sm text-[var(--muted)]">
-              {Object.keys(columnFilters).length > 0
+              {(Object.keys(columnFilters).length > 0 || globalSearch)
                 ? `${visibleTopLevelEntries.length} von ${entries.length} Einträgen`
                 : `${entries.length} Einträge`
               }
@@ -2012,7 +2212,7 @@ export default function CaseLedgerPage({
                   onClick={() => setColumnFilters({})}
                   className="ml-2 text-xs text-red-500 hover:text-red-700"
                 >
-                  Alle Filter zurücksetzen
+                  Spaltenfilter zurücksetzen
                 </button>
               )}
             </span>
@@ -2789,9 +2989,9 @@ Klicken zum Filtern`}
                           )}
                           {/* Restliche Spalten: kompakte Darstellung */}
                           {columnVisibility.import && <td className="text-gray-400">-</td>}
-                          {columnVisibility.location && <td className="text-gray-500 text-[10px]">{child.locationId || '-'}</td>}
+                          {columnVisibility.location && <td className="text-gray-500 text-[10px]">{child.locationId ? (locationsMap.get(child.locationId) || child.locationId) : '-'}</td>}
                           {columnVisibility.bankAccount && <td className="text-gray-400">↑</td>}
-                          {columnVisibility.counterparty && <td className="text-gray-500 text-[10px] truncate">{child.counterpartyId || '-'}</td>}
+                          {columnVisibility.counterparty && <td className="text-gray-500 text-[10px] truncate">{child.counterpartyId ? (counterpartiesMap.get(child.counterpartyId) || child.counterpartyId) : '-'}</td>}
                           {columnVisibility.valueType && <td className="text-gray-400">↑</td>}
                           {columnVisibility.estateAllocation && <td className="text-gray-400">↑</td>}
                           {columnVisibility.legalBucket && <td className="text-gray-400">↑</td>}

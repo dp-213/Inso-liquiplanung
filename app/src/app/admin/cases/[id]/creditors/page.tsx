@@ -58,8 +58,8 @@ export default function CreditorsPage() {
   async function fetchData() {
     try {
       const [credRes, catRes] = await Promise.all([
-        fetch(`/api/cases/${caseId}/creditors`),
-        fetch(`/api/cases/${caseId}/cost-categories`),
+        fetch(`/api/cases/${caseId}/creditors`, { credentials: "include" }),
+        fetch(`/api/cases/${caseId}/cost-categories`, { credentials: "include" }),
       ]);
 
       if (credRes.ok) {
@@ -93,6 +93,7 @@ export default function CreditorsPage() {
 
       const res = await fetch(url, {
         method,
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name,
@@ -126,6 +127,7 @@ export default function CreditorsPage() {
     try {
       const res = await fetch(`/api/cases/${caseId}/creditors/${creditorId}`, {
         method: "DELETE",
+        credentials: "include",
       });
 
       if (!res.ok) {

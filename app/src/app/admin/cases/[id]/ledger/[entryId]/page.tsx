@@ -167,6 +167,46 @@ export default function LedgerEntryEditPage({
     sheetName: string | null;
   } | null>(null);
 
+  // Split-Kontext
+  const [splitContext, setSplitContext] = useState<{
+    isParent: boolean;
+    isChild: boolean;
+    splitChildren: Array<{
+      id: string;
+      description: string;
+      amountCents: string;
+      counterpartyId: string | null;
+      locationId: string | null;
+      categoryTag: string | null;
+      reviewStatus: string;
+      note: string | null;
+      bookingReference: string | null;
+    }>;
+    parentEntry: {
+      id: string;
+      description: string;
+      amountCents: string;
+      transactionDate: string;
+      splitReason: string | null;
+    } | null;
+    siblings: Array<{
+      id: string;
+      description: string;
+      amountCents: string;
+      counterpartyId: string | null;
+      locationId: string | null;
+    }>;
+    breakdownInfo: {
+      recipientName: string;
+      recipientIban: string;
+      purpose: string | null;
+      itemIndex: number;
+      sourceReference: string;
+      sourceDate: string;
+      sourceFile: string | null;
+    } | null;
+  } | null>(null);
+
   // Transfer Partner
   const [transferPartner, setTransferPartner] = useState<LedgerEntryResponse | null>(null);
   const [unpairingTransfer, setUnpairingTransfer] = useState(false);
@@ -239,6 +279,10 @@ export default function LedgerEntryEditPage({
           // Import-Rohdaten speichern
           if (data.importData) {
             setImportData(data.importData);
+          }
+          // Split-Kontext speichern
+          if (data.splitContext) {
+            setSplitContext(data.splitContext);
           }
           // Transfer-Partner laden
           if (data.transferPartnerEntryId) {
@@ -1246,6 +1290,151 @@ export default function LedgerEntryEditPage({
               )}
             </div>
           </div>
+
+          {/* Split-Kontext Section */}
+          {splitContext && (splitContext.isParent || splitContext.isChild) && (
+            <div className="admin-card p-6">
+              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Split-Kontext</h2>
+
+              {/* Entry ist Parent (Sammelüberweisung) */}
+              {splitContext.isParent && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
+                      Sammelüberweisung
+                    </span>
+                    <span className="text-sm text-[var(--muted)]">
+                      {splitContext.splitChildren.length} Einzelposten
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {splitContext.splitChildren.map(child => {
+                      const childAmount = parseInt(child.amountCents);
+                      return (
+                        <Link
+                          key={child.id}
+                          href={`/admin/cases/${id}/ledger/${child.id}`}
+                          className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-gray-50 transition-colors group text-sm"
+                        >
+                          <span className="truncate flex-1 mr-2 text-[var(--foreground)] group-hover:text-blue-600">
+                            {child.description}
+                          </span>
+                          <span className={`font-mono text-xs whitespace-nowrap ${childAmount >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
+                            {formatCurrency(child.amountCents)}
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+
+                  {/* Summenprüfung */}
+                  {(() => {
+                    const childrenSum = splitContext.splitChildren.reduce((sum, c) => sum + parseInt(c.amountCents), 0);
+                    const parentAmount = parseInt(entry.amountCents);
+                    const matches = childrenSum === parentAmount;
+                    return (
+                      <div className={`flex items-center justify-between pt-2 border-t border-[var(--border)] text-sm ${matches ? 'text-green-700' : 'text-red-600'}`}>
+                        <span>Summe {matches ? 'stimmt' : 'weicht ab'}: {formatCurrency(childrenSum.toString())}</span>
+                        <span>{matches ? '✓' : '✗'}</span>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              {/* Entry ist Child (Einzelposten) */}
+              {splitContext.isChild && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                      Einzelposten
+                    </span>
+                  </div>
+
+                  {/* Parent-Link */}
+                  {splitContext.parentEntry && (
+                    <div className="space-y-1">
+                      <p className="text-xs text-[var(--muted)]">Aus Sammelüberweisung:</p>
+                      <Link
+                        href={`/admin/cases/${id}/ledger/${splitContext.parentEntry.id}`}
+                        className="flex items-center justify-between py-2 px-3 rounded bg-gray-50 hover:bg-gray-100 transition-colors text-sm"
+                      >
+                        <div className="truncate mr-2">
+                          <span className="font-medium text-[var(--foreground)]">{splitContext.parentEntry.description}</span>
+                          <span className="text-xs text-[var(--muted)] ml-2">
+                            (Posten {splitContext.breakdownInfo ? splitContext.breakdownInfo.itemIndex + 1 : '?'}/{splitContext.siblings.length + 1})
+                          </span>
+                        </div>
+                        <span className={`font-mono text-xs whitespace-nowrap ${parseInt(splitContext.parentEntry.amountCents) >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
+                          {formatCurrency(splitContext.parentEntry.amountCents)}
+                        </span>
+                      </Link>
+                    </div>
+                  )}
+
+                  {/* Zahlbeleg-Herkunft */}
+                  {splitContext.breakdownInfo && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-[var(--foreground)]">Zahlbeleg-Herkunft</p>
+                      <div className="bg-gray-50 rounded-lg p-3 space-y-1.5 text-sm">
+                        <div className="flex gap-2">
+                          <span className="text-[var(--muted)] min-w-[60px]">Referenz:</span>
+                          <span className="font-mono text-[var(--foreground)]">{splitContext.breakdownInfo.sourceReference}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-[var(--muted)] min-w-[60px]">Datum:</span>
+                          <span className="text-[var(--foreground)]">{formatDate(splitContext.breakdownInfo.sourceDate)}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <span className="text-[var(--muted)] min-w-[60px]">IBAN:</span>
+                          <span className="font-mono text-xs text-[var(--foreground)]">{splitContext.breakdownInfo.recipientIban}</span>
+                        </div>
+                        {splitContext.breakdownInfo.purpose && (
+                          <div className="flex gap-2">
+                            <span className="text-[var(--muted)] min-w-[60px]">Zweck:</span>
+                            <span className="text-[var(--foreground)]">{splitContext.breakdownInfo.purpose}</span>
+                          </div>
+                        )}
+                        {splitContext.breakdownInfo.sourceFile && (
+                          <div className="flex gap-2">
+                            <span className="text-[var(--muted)] min-w-[60px]">Datei:</span>
+                            <span className="text-xs text-[var(--secondary)]">{splitContext.breakdownInfo.sourceFile}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Geschwister-Liste */}
+                  {splitContext.siblings.length > 0 && (
+                    <div className="space-y-1.5">
+                      <p className="text-xs font-medium text-[var(--foreground)]">Geschwister ({splitContext.siblings.length})</p>
+                      <div className="space-y-1">
+                        {splitContext.siblings.map(sib => {
+                          const sibAmount = parseInt(sib.amountCents);
+                          return (
+                            <Link
+                              key={sib.id}
+                              href={`/admin/cases/${id}/ledger/${sib.id}`}
+                              className="flex items-center justify-between py-1 px-2 rounded hover:bg-gray-50 transition-colors group text-sm"
+                            >
+                              <span className="truncate flex-1 mr-2 text-[var(--secondary)] group-hover:text-blue-600">
+                                {sib.description}
+                              </span>
+                              <span className={`font-mono text-xs whitespace-nowrap ${sibAmount >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}>
+                                {formatCurrency(sib.amountCents)}
+                              </span>
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Classification Suggestion (if available) */}
           {(entry as LedgerEntryResponse & { suggestedLegalBucket?: string; suggestedConfidence?: number; suggestedReason?: string }).suggestedLegalBucket && (

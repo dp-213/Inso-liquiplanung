@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
+import { getSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  const session = await getSession();
+  if (!session?.isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const diagnostics: Record<string, unknown> = {
     timestamp: new Date().toISOString(),
     nodeVersion: process.version,
@@ -56,7 +62,6 @@ export async function GET() {
       ownerType: typeof cases[0].owner,
     } : null;
 
-    // Test date rendering
     if (cases[0]?.updatedAt) {
       try {
         const dateStr = new Date(cases[0].updatedAt).toLocaleDateString("de-DE");
@@ -72,7 +77,6 @@ export async function GET() {
     diagnostics.error = {
       message: error instanceof Error ? error.message : String(error),
       name: error instanceof Error ? error.name : "Unknown",
-      stack: error instanceof Error ? error.stack?.split("\n").slice(0, 5) : undefined,
     };
     diagnostics.success = false;
 

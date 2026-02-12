@@ -34,7 +34,7 @@ export default function GlobalError({ error, reset }: ErrorProps) {
           Anwendungsfehler
         </h1>
         <p className="text-[var(--secondary)] mb-6">
-          Ein unerwarteter Fehler ist aufgetreten. Bitte laden Sie die Seite neu oder versuchen Sie es spater erneut.
+          Ein unerwarteter Fehler ist aufgetreten. Bitte laden Sie die Seite neu oder versuchen Sie es später erneut.
         </p>
         {error.message && (
           <p className="text-xs text-red-600 mb-2 font-mono bg-red-50 p-2 rounded">
