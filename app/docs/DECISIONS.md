@@ -4,6 +4,38 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-048: Mobile Case-Navigation – Server/Client Split + Drawer
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Das Admin-Dashboard war auf Mobile/Tablet (< 1024px) unbenutzbar: Die Case-Sidebar mit 25+ Navigationslinks war `hidden lg:block` und es gab keinen alternativen Zugang. Insolvenzverwalter und Berater müssen auch unterwegs auf Fall-Daten zugreifen können.
+
+### Entscheidung
+
+1. **Server/Client Split im CaseLayout.** `layout.tsx` bleibt Server Component (Prisma-Fetch), neuer `CaseLayoutClient.tsx` als Client Component für Drawer-State. Vermeidet „use client" auf der Server-Layout-Ebene.
+2. **Drawer statt Bottom-Tab-Bar.** Slide-in-Drawer von links mit bestehender `CaseSidebar` (via `className` Prop). Kein Redesign der Navigation nötig, identische Struktur auf Desktop und Mobile.
+3. **useMobileSidebar als zentraler Hook.** State-Management, ESC-Key, Route-Change-Close und iOS-Safari-Scroll-Lock (`position: fixed` + `scrollY` Restore) in einem Hook.
+4. **CSS-Transitions statt Animation-Library.** `transition-transform` + `transition-opacity` für Drawer und Backdrop. Kein Framer Motion oder ähnliches nötig.
+5. **Z-Index als CSS Custom Properties.** Konsistentes Layering-System (`--z-sidebar`, `--z-drawer`, `--z-modal`) statt Magic Numbers.
+
+### Begründung
+
+- Server/Client Split ist Next.js Best Practice – Server Components für Data-Fetching, Client Components für Interaktivität
+- Drawer wiederverwendet die bestehende Sidebar → kein doppeltes Navigation-Maintenance
+- CSS-only Animationen sind performanter und brauchen keine zusätzliche Dependency
+- Z-Index-System verhindert zukünftige Layer-Konflikte
+
+### Konsequenzen
+
+- CaseLayout hat jetzt 2 Dateien statt 1 (`layout.tsx` + `CaseLayoutClient.tsx`)
+- `CaseSidebar` akzeptiert optionales `className` Prop (Breaking Change bei externer Nutzung – gibt es nicht)
+- Alle neuen Mobile-Elemente sind `lg:hidden`, Desktop-Verhalten bleibt identisch
+
+---
+
 ## ADR-047: Creditor und CostCategory als separate Entities
 
 **Datum:** 12. Februar 2026

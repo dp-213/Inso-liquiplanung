@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.34.0
+**Version:** 2.35.0
 **Stand:** 12. Februar 2026
 
 ---
@@ -477,6 +477,7 @@ LedgerEntry (UNREVIEWED)
 │   ├── app/
 │   │   ├── admin/                    # Admin-Dashboard
 │   │   │   ├── cases/[id]/
+│   │   │   │   ├── CaseLayoutClient.tsx # Client Component (Mobile-State)
 │   │   │   │   ├── ledger/           # Zahlungsregister
 │   │   │   │   ├── rules/            # Klassifikationsregeln
 │   │   │   │   ├── bank-accounts/    # Bankkonten
@@ -508,8 +509,14 @@ LedgerEntry (UNREVIEWED)
 │   │           └── ...
 │   ├── middleware.ts                 # Subdomain-Routing (Tenant-Erkennung)
 │   ├── hooks/
-│   │   └── usePortalPaths.ts        # Client-seitiger Subdomain-Pfad-Helper
+│   │   ├── usePortalPaths.ts        # Client-seitiger Subdomain-Pfad-Helper
+│   │   └── useMobileSidebar.ts      # Drawer-State, ESC, Scroll-Lock (v2.35.0)
 │   ├── components/                   # React-Komponenten
+│   │   ├── admin/
+│   │   │   ├── AdminShell.tsx        # Top-Level Admin Layout
+│   │   │   ├── CaseSidebar.tsx       # Case-Navigation (Desktop + Drawer)
+│   │   │   ├── CaseSidebarDrawer.tsx # Mobile Drawer-Wrapper (v2.35.0)
+│   │   │   └── MobileCaseHeader.tsx  # Sticky Mobile Case-Header (v2.35.0)
 │   │   ├── forecast/               # Prognose-Spreadsheet (v2.31.0)
 │   │   │   ├── types.ts            # Shared Types + Helpers (formatEUR, parseCentsFromEUR, cn)
 │   │   │   ├── ForecastSpreadsheet.tsx   # Unified-Tabelle (IST + Prognose)

@@ -4,6 +4,41 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.35.0 – Mobile-Ready Case-Navigation
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Mobile Drawer-Navigation:** Case-Sidebar ist auf Mobile/Tablet (< 1024px) als Slide-in-Drawer von links erreichbar. Backdrop mit Blur, CSS-Transition für open/close, schließt bei Backdrop-Click, ESC-Key und Route-Wechsel.
+- **Mobile Case-Header:** Sticky Header unter Admin-Header mit Hamburger-Button, Case-Name und aktuelle Sektion (aus URL-Segment abgeleitet, z.B. „Zahlungsregister", „Import").
+- **Touch-Targets:** Alle Sidebar-Links und Hamburger-Buttons haben mindestens 44px Touch-Target auf Mobile, kompakt auf Desktop (`py-2.5 lg:py-1.5`).
+- **Z-Index-System:** CSS Custom Properties für konsistentes Layering (`--z-sidebar: 45`, `--z-drawer: 55`, `--z-modal: 60` etc.).
+- **AdminShell animiertes Dropdown:** Mobile-Menü öffnet/schließt mit `max-height` + `opacity` Transition statt abruptem Mount/Unmount.
+
+### Architektur
+
+- **Server/Client Split in CaseLayout:** `layout.tsx` bleibt Server Component (Prisma-Fetch), neuer `CaseLayoutClient.tsx` als Client Component für Drawer-State.
+- **useMobileSidebar Hook:** Zentraler Hook für Drawer-State mit iOS-Safari-kompatiblem Body-Scroll-Lock (`position: fixed` + `scrollY` Restore).
+- **CaseSidebar: className Prop:** Erlaubt Drawer, eigene Styles zu übergeben (Desktop behält Standard-Klassen).
+
+### Bugfixes (Self-Review)
+
+- **Scroll-to-Top-Bug:** `useMobileSidebar` hätte beim Initial Mount nach oben gescrollt. Fix: `wasOpenRef` Guard.
+- **Dark Mode:** `MobileCaseHeader` nutzt jetzt `bg-[var(--card)]` statt hardcodiertem `bg-white`.
+- **Fehlende Segment-Labels:** `dashboard`, `config`, `rules`, `planung` im URL→Label-Mapping ergänzt.
+
+### Neue Dateien
+
+| Datei | Zweck |
+|-------|-------|
+| `hooks/useMobileSidebar.ts` | Drawer-State, ESC, Scroll-Lock, Route-Close |
+| `components/admin/MobileCaseHeader.tsx` | Sticky Mobile-Header |
+| `components/admin/CaseSidebarDrawer.tsx` | Drawer-Wrapper mit Backdrop |
+| `admin/cases/[id]/CaseLayoutClient.tsx` | Client Component für Layout |
+
+---
+
 ## Version 2.34.0 – Kreditoren, Kostenarten & Auto-Freigabe (Lirex Must-Haves)
 
 **Datum:** 12. Februar 2026

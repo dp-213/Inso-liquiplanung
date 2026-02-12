@@ -263,4 +263,4 @@ Einnahmen-Tabelle und neuer Trend-Chart gruppieren jetzt nach `categoryTag` (HZV
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.32.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.35.0)
