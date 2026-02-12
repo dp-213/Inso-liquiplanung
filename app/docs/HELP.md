@@ -1,6 +1,6 @@
 # Hilfe & Anleitungen
 
-> Zuletzt aktualisiert: 2026-02-12 | Version 2.31.0
+> Zuletzt aktualisiert: 2026-02-12 | Version 2.34.0
 
 Dieses Dokument ist die **Source-of-Truth** für die Hilfe-Seite im Admin-Dashboard.
 Bei Änderungen am System wird diese Datei über `/doku` mit-aktualisiert.
@@ -134,7 +134,9 @@ Die Prognose-Seite funktioniert wie eine Excel-Tabelle:
 | Seite | Zweck |
 |-------|-------|
 | **Bankkonten** | Alle Bankkonten des Falls. Liquiditätsrelevanz markieren. |
-| **Gegenparteien** | Gläubiger, Lieferanten, Abrechnungsstellen. Für Klassifikation und Reporting. |
+| **Gegenparteien** | Einnahmen-Partner (KV, HZV, PVS). Für Klassifikation und Reporting. |
+| **Kreditoren** | Ausgaben-Partner (Lieferanten, Dienstleister, Behörden). IBAN, USt-ID, Standard-Kostenart. |
+| **Kostenarten** | Kategorisierung von Ausgaben mit optionalem Budget. Mapping auf Liquiditätsmatrix-Tags. |
 | **Standorte** | Betriebsstätten des Unternehmens. Für standortbezogene Auswertungen. |
 
 ### VERFAHREN
@@ -246,6 +248,16 @@ Ein Slug wie `anchor` erzeugt eine individuelle URL: `anchor.cases.gradify.de`. 
 **Was sehen externe Empfänger eines Share-Links?**
 Eine Nur-Lese-Ansicht des Dashboards ohne Rolling Forecast (Chart und Tabelle). Nur die Grunddaten und Zusammenfassungen.
 
+### Bestellfreigaben & Auto-Freigabe
+
+**Was ist der Auto-Freigabe-Schwellwert?**
+Unter Fall bearbeiten → „Freigabe-Einstellungen" kann ein EUR-Betrag definiert werden. Anfragen bis einschließlich diesem Betrag werden automatisch freigegeben (Status: AUTO_APPROVED) und sofort als PLAN-LedgerEntry verbucht. Anfragen über dem Schwellwert bleiben zur manuellen Prüfung.
+
+**Was sind Kreditoren und Kostenarten?**
+- **Kreditoren:** Ausgaben-Partner (Lieferanten, Dienstleister, Behörden) unter STAMMDATEN. Mit IBAN, USt-ID, Kategorie und Standard-Kostenart.
+- **Kostenarten:** Kategorisierung von Ausgaben (z.B. Personal, Miete, Material) mit optionalem Budget und Mapping auf die Liquiditätsmatrix-Tags.
+- Beide sind optional: Orders können auch ohne Kreditor/Kostenart-Zuordnung eingereicht werden.
+
 ---
 
 ## 6. Glossar
@@ -259,6 +271,8 @@ Eine Nur-Lese-Ansicht des Dashboards ohne Rolling Forecast (Chart und Tabelle). 
 | **Headroom** | Finanzieller Spielraum = Kontostand + Kreditlinie - Rückstellungen |
 | **IST-Daten** | Echte Bankbuchungen aus importierten Kontoauszügen |
 | **IV** | Insolvenzverwalter |
+| **Kostenart** | Kategorisierung von Ausgaben (z.B. Personal, Miete) mit optionalem Budget |
+| **Kreditor** | Ausgaben-Partner (Lieferant, Dienstleister, Behörde) – getrennt von Gegenpartei |
 | **Kreditlinie** | Vereinbarter Massekredit mit der Bank |
 | **LedgerEntry** | Einzelne Buchung im Zahlungsregister (zentrale Dateneinheit) |
 | **Neumasse** | Vermögenswerte und Verbindlichkeiten nach Insolvenzeröffnung |

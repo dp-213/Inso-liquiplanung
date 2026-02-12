@@ -4,6 +4,37 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-047: Creditor und CostCategory als separate Entities
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Aus dem Lirex-Feature-Abgleich ergaben sich drei Must-Haves: Kreditoren als Entity, Kostenarten pro Fall, Freigabe-Schwellwerte. Die zentrale Design-Frage war: Sollen Kreditoren (Ausgaben-Partner) und Counterparties (Einnahmen-Partner) zusammengelegt werden?
+
+### Entscheidung
+
+1. **Creditor ist eine SEPARATE Entity** von Counterparty. Counterparty = Einnahmen-Partner (KV, HZV, PVS) mit `matchPattern` für Auto-Klassifikation. Creditor = Ausgaben-Partner (Lieferanten, Behörden) mit IBAN, USt-ID, Kategorie.
+2. **CostCategory existiert PARALLEL zu categoryTag.** categoryTag ist tief in die Liquiditätsmatrix integriert (12 feste Werte). CostCategory ist für Ausgaben-Planung/Freigaben, optional mit categoryTag-Mapping.
+3. **Order.creditor (String) BLEIBT erhalten** als Freitext-Fallback für Token-basierte externe Submissions. Neues `creditorId` FK ist optional.
+4. **Auto-Approve erstellt LedgerEntry atomar** – auch kleine Beträge tauchen in der Liquiditätsplanung auf. Schwellwert `<=` (bis einschließlich).
+
+### Begründung
+
+- Counterparty und Creditor haben unterschiedliche Felder, Workflows und Semantik
+- Zusammenlegen würde beide Konzepte verwässern und die bestehende Klassifikations-Engine verkomplizieren
+- CostCategory als paralleles System vermeidet Breaking Changes an der Liquiditätsmatrix
+- Freitext-Fallback für Creditor erlaubt einfache externe Submissions ohne Stammdaten-Pflicht
+
+### Konsequenzen
+
+- Zwei Entity-Typen für „Geschäftspartner" (kann verwirrend sein)
+- CostCategory-Budget ist informativ, nicht enforced (keine Warnungen bei Überschreitung)
+- Auto-Approve-LedgerEntry hat feste Werte: PLAN, MASSE, NEUMASSE (nicht konfigurierbar)
+
+---
+
 ## ADR-046: Turso Date-Filter-Workaround (JS statt Prisma WHERE)
 
 **Datum:** 12. Februar 2026

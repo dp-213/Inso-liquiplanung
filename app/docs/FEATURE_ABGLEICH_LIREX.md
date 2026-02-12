@@ -138,25 +138,20 @@
 
 ## 3. Handlungsempfehlungen
 
-### 3.1 MUST-HAVE (Hoher Mehrwert, geringer Aufwand)
+### 3.1 MUST-HAVE (Hoher Mehrwert, geringer Aufwand) – ✅ UMGESETZT (v2.34.0)
 
-#### A. Mehrstufige Freigabe-Schwellwerte
-**Was:** Konfigurierbare Betrags-Schwellwerte, ab denen eine Freigabe erforderlich ist.
-**Warum:** Reduziert Micro-Management. Kleine Beträge (< X EUR) werden auto-freigegeben.
-**Aufwand:** Gering (Case-Config erweitern, Order-Logic anpassen)
-**Lirex-Vorbild:** Betrag-Schwellwert pro Stufe, separate Checkboxen für Bestellungstypen
+#### A. Mehrstufige Freigabe-Schwellwerte ✅
+**Status:** Umgesetzt (v2.34.0, ADR-047)
+**Implementierung:** `Case.approvalThresholdCents` – Anfragen ≤ Schwellwert werden automatisch freigegeben (AUTO_APPROVED). Atomare Transaktion mit LedgerEntry. Konfiguration unter Fall bearbeiten → Freigabe-Einstellungen.
+**Nicht umgesetzt:** Mehrstufig (mehrere Schwellwerte, verschiedene Genehmiger). Aktuell: ein Schwellwert pro Fall.
 
-#### B. Kostenarten pro Verfahren
-**Was:** Konfigurierbare Kostenarten (z.B. "Fremdleistungen", "InsO-Kosten", "Personal") pro Case.
-**Warum:** Strukturiert die Ausgaben, ermöglicht Budget-Tracking und bessere Kategorisierung.
-**Aufwand:** Mittel (neue Entity `CostCategory`, Zuordnung bei Orders und LedgerEntries)
-**Lirex-Vorbild:** `BuZLKostenarten` mit freier Konfiguration pro Verfahren
+#### B. Kostenarten pro Verfahren ✅
+**Status:** Umgesetzt (v2.34.0, ADR-047)
+**Implementierung:** Entity `CostCategory` mit Name, Kurzname, Budget (informativ), categoryTag-Mapping, Aktiv-Flag. CRUD unter `/admin/cases/[id]/cost-categories`. Unique-Constraint auf (caseId, name). Optional bei Orders zuordenbar.
 
-#### C. Kreditoren-Stammdaten
-**Was:** Kreditoren als eigene Entity statt Freitext in Orders.
-**Warum:** Vermeidet Tippfehler, ermöglicht Auswertungen pro Kreditor, Wiederverwendung.
-**Aufwand:** Mittel (neue Entity, Dropdown in Order-Formular, Migration bestehender Freitext-Daten)
-**Lirex-Vorbild:** `BuZLKreditor` mit Kreditornummer, Kostenart-Zuordnung, Kostenlimit
+#### C. Kreditoren-Stammdaten ✅
+**Status:** Umgesetzt (v2.34.0, ADR-047)
+**Implementierung:** Entity `Creditor` mit Name, IBAN, USt-ID, Kategorie, Standard-Kostenart. CRUD unter `/admin/cases/[id]/creditors`. Separat von Counterparty (Einnahmen-Partner). `Order.creditor` (Freitext) bleibt als Fallback, `Order.creditorId` (FK) ist optional.
 
 ### 3.2 IMPORTANT (Hoher Mehrwert, mittlerer Aufwand)
 

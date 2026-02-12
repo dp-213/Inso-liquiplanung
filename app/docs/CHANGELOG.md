@@ -4,6 +4,45 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.34.0 – Kreditoren, Kostenarten & Auto-Freigabe (Lirex Must-Haves)
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Kreditoren-Stammdaten:** Neue Entity `Creditor` (Lieferanten, Dienstleister, Behörden). CRUD-Seite unter `/admin/cases/[id]/creditors` mit Feldern: Name, Kurzname, IBAN, USt-ID, Kategorie, Standard-Kostenart, Anmerkungen. Separat von Counterparty (Einnahmen-Partner).
+- **Kostenarten pro Fall:** Neue Entity `CostCategory` mit optionalem Budget (EUR), categoryTag-Mapping, Aktiv/Inaktiv-Status. CRUD-Seite unter `/admin/cases/[id]/cost-categories`. Unique-Constraint auf `(caseId, name)`.
+- **Auto-Freigabe-Schwellwert:** Neues Feld `Case.approvalThresholdCents`. Bestell-/Zahlungsanfragen bis einschließlich Schwellwert werden automatisch freigegeben (Status: `AUTO_APPROVED`). Atomare Transaktion: Order + PLAN-LedgerEntry (Neumasse) + bookingReference in einem Schritt.
+- **Order-Integration:** Orders können optional `creditorId` und `costCategoryId` referenzieren. Kostenart-Badge in OrderList. AUTO_APPROVED-Status-Badge (blau).
+- **Ledger-Detail-Seite:** Einzelansicht für LedgerEntries mit Edit-Formular unter `/admin/cases/[id]/ledger/[entryId]`.
+- **Lirex-Wettbewerber-Analyse:** Dokumentation `WETTBEWERBER_LIREX.md` und `FEATURE_ABGLEICH_LIREX.md` mit Feature-Vergleich und Roadmap.
+
+### Bugfixes
+
+- **credentials: "include" in 6 fetch-Calls** der Kreditoren- und Kostenarten-Seiten ergänzt (hätte 401 in Production verursacht).
+- **BigInt-Serialisierung in Case PUT Response** – `approvalThresholdCents` hätte JSON.stringify zum Absturz gebracht.
+- **Auto-Approve LedgerEntry** fehlte `bookingReference` und `note` (Konsistenz mit manueller Freigabe).
+- **UI-Text Schwellwert:** "unter" → "bis einschließlich" (konsistent mit `<=` Logik im Code).
+
+### Sicherheit & Branding
+
+- Debug-Routes (`/api/debug/*`) mit Auth-Check abgesichert (waren öffentlich)
+- robots.txt: Admin/API/Portal für Crawler gesperrt
+- Custom 404-Seite mit Gradify-Branding
+- Next.js Placeholder-SVGs entfernt
+
+### Schema-Änderungen (Turso-Migration)
+
+```sql
+CREATE TABLE cost_categories (...);
+CREATE TABLE creditors (...);
+ALTER TABLE orders ADD COLUMN creditorId TEXT;
+ALTER TABLE orders ADD COLUMN costCategoryId TEXT;
+ALTER TABLE cases ADD COLUMN approvalThresholdCents INTEGER;
+```
+
+---
+
 ## Version 2.33.0 – Turso Date-Filter-Bugfix (Production-Fix)
 
 **Datum:** 12. Februar 2026

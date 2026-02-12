@@ -78,14 +78,21 @@ Legacy-Ordner aufgelöst: 4 unique Dateien nach `01-raw/` verschoben, 2 ältere 
 
 ### Freigabe-Modul: Phase 2
 
-**Status:** Phase 1 implementiert (v2.21.0), Phase 2 geplant
+**Status:** Phase 1 implementiert (v2.21.0), Lirex Must-Haves umgesetzt (v2.34.0), Phase 2 teilweise offen
+
+**Erledigt (v2.34.0):**
+- ~~**Kreditoren-Stammdaten:**~~ Entity `Creditor` mit CRUD-Seite, optional bei Orders
+- ~~**Kostenarten pro Fall:**~~ Entity `CostCategory` mit Budget + categoryTag-Mapping
+- ~~**Auto-Freigabe-Schwellwert:**~~ `Case.approvalThresholdCents`, atomare LedgerEntry-Erstellung
+- ~~**Portal-Navigation aktivieren:**~~ Freigaben-Link im Kundenportal aktiv (v2.27.0 DashboardNav)
 
 **Offene Erweiterungen:**
 1. **Email-Benachrichtigungen:** Resend-Integration – IV bei neuer Anfrage, Einreicher bei Genehmigung/Ablehnung benachrichtigen
 2. **Multi-File-Upload:** Mehrere Belege pro Anfrage
-3. ~~**Portal-Navigation aktivieren:**~~ Freigaben-Link im Kundenportal aktiv (v2.27.0 DashboardNav)
-4. **Rate-Limiting:** Submit-API gegen Missbrauch absichern
-5. **Bestellstatus-Tracking:** Nach Genehmigung: "Bestellt" → "Geliefert" → "Bezahlt"
+3. **Rate-Limiting:** Submit-API gegen Missbrauch absichern
+4. **Bestellstatus-Tracking:** Nach Genehmigung: "Bestellt" → "Geliefert" → "Bezahlt"
+5. **Mehrstufige Schwellwerte:** Verschiedene Genehmiger pro Betragsstufe (Lirex-Vorbild)
+6. **Budget-Warnungen:** CostCategory.budgetCents als Warnung bei Überschreitung nutzen
 
 ---
 

@@ -854,7 +854,9 @@ Andere              |  45.000 EUR        | 15%
 #### Stammdatenpflege
 
 - **Bankkonten:** `/admin/cases/[id]/bank-accounts`
-- **Gegenparteien:** `/admin/cases/[id]/counterparties`
+- **Gegenparteien:** `/admin/cases/[id]/counterparties` (Einnahmen-Partner: KV, HZV, PVS)
+- **Kreditoren:** `/admin/cases/[id]/creditors` (Ausgaben-Partner: Lieferanten, Dienstleister, Behörden)
+- **Kostenarten:** `/admin/cases/[id]/cost-categories` (Budget, categoryTag-Mapping)
 - **Standorte:** `/admin/cases/[id]/locations`
 
 ---
@@ -986,14 +988,16 @@ model Order {
   requestDate         DateTime  @default(now())
   invoiceDate         DateTime
   amountCents         BigInt
-  creditor            String
+  creditor            String    // Freitext-Fallback (immer gesetzt)
+  creditorId          String?   // FK auf Creditor-Stammdaten (optional)
+  costCategoryId      String?   // FK auf Kostenart (optional)
   description         String
   notes               String?
   documentName        String?
   documentMimeType    String?
   documentSizeBytes   BigInt?
   documentContent     String?   // Base64-encoded
-  status              String    @default("PENDING")  // PENDING | APPROVED | REJECTED
+  status              String    @default("PENDING")  // PENDING | APPROVED | REJECTED | AUTO_APPROVED
   approvedAmountCents BigInt?   // Wenn IV anderen Betrag genehmigt
   approvedAt          DateTime?
   approvedBy          String?
@@ -1002,8 +1006,10 @@ model Order {
   ledgerEntryId       String?   @unique
   createdAt           DateTime  @default(now())
 
-  case        Case         @relation(...)
-  ledgerEntry LedgerEntry? @relation(...)
+  case         Case          @relation(...)
+  ledgerEntry  LedgerEntry?  @relation(...)
+  creditorRef  Creditor?     @relation(..., onDelete: SetNull)
+  costCategory CostCategory? @relation(..., onDelete: SetNull)
   @@index([caseId])
   @@index([caseId, status])
 }
@@ -1042,8 +1048,55 @@ model CompanyToken {
   amountCents: -absAmount,  // Immer negativ (Auszahlung)
   description: `Freigabe: ${order.creditor} – ${order.description}`,
   transactionDate: order.invoiceDate,
+  bookingReference: `ORDER-${order.id.slice(0, 8)}`,
+  note: `Freigegebene ${typeLabel} ...`,
 }
 ```
+
+#### Auto-Freigabe (v2.34.0)
+
+Wenn `Case.approvalThresholdCents` gesetzt ist, werden Orders **bis einschließlich** dem Schwellwert automatisch freigegeben:
+
+| Bedingung | Ergebnis |
+|-----------|----------|
+| `amountCents <= approvalThresholdCents` | Status: `AUTO_APPROVED`, LedgerEntry sofort erstellt |
+| `amountCents > approvalThresholdCents` | Status: `PENDING`, manuelle Prüfung erforderlich |
+| `approvalThresholdCents = null` | Immer manuell |
+
+**Konfiguration:** `/admin/cases/[id]/edit` → Abschnitt "Freigabe-Einstellungen"
+
+**Technisch:** Atomare `$transaction` erstellt Order + LedgerEntry + bookingReference in einem Schritt. LedgerEntry-Werte: `PLAN, MASSE, NEUMASSE, bookingSource: MANUAL`.
+
+#### Kreditoren & Kostenarten (v2.34.0)
+
+```prisma
+model Creditor {
+  id                    String @id
+  caseId                String
+  name                  String
+  shortName             String?
+  iban                  String?
+  taxId                 String?
+  category              String?  // LIEFERANT | DIENSTLEISTER | BEHOERDE | SONSTIGE
+  defaultCostCategoryId String?  // FK auf CostCategory
+  notes                 String?
+  case                  Case @relation(onDelete: Cascade)
+}
+
+model CostCategory {
+  id           String  @id
+  caseId       String
+  name         String
+  shortName    String?
+  budgetCents  BigInt?   // Informatives Monatsbudget
+  categoryTag  String?   // Mapping auf Liquiditätsmatrix-Tags
+  isActive     Boolean @default(true)
+  case         Case @relation(onDelete: Cascade)
+  @@unique([caseId, name])
+}
+```
+
+**Design-Entscheidung:** Creditor ≠ Counterparty (ADR-047). Counterparty = Einnahmen-Partner, Creditor = Ausgaben-Partner.
 
 ---
 
