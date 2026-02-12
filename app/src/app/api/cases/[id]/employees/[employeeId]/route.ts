@@ -32,7 +32,18 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(employee);
+    // BigInt → string für JSON-Serialisierung
+    const serialized = {
+      ...employee,
+      salaryMonths: employee.salaryMonths.map((sm) => ({
+        ...sm,
+        grossSalaryCents: sm.grossSalaryCents.toString(),
+        netSalaryCents: sm.netSalaryCents?.toString() ?? null,
+        employerCostsCents: sm.employerCostsCents?.toString() ?? null,
+      })),
+    };
+
+    return NextResponse.json(serialized);
   } catch (error) {
     console.error("Error fetching employee:", error);
     return NextResponse.json(
@@ -143,7 +154,18 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(result);
+    // BigInt → string für JSON-Serialisierung
+    const serialized = result ? {
+      ...result,
+      salaryMonths: result.salaryMonths.map((sm) => ({
+        ...sm,
+        grossSalaryCents: sm.grossSalaryCents.toString(),
+        netSalaryCents: sm.netSalaryCents?.toString() ?? null,
+        employerCostsCents: sm.employerCostsCents?.toString() ?? null,
+      })),
+    } : null;
+
+    return NextResponse.json(serialized);
   } catch (error) {
     console.error("Error updating employee:", error);
     return NextResponse.json(

@@ -26,9 +26,20 @@ export async function GET(
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     });
 
+    // BigInt → string für JSON-Serialisierung
+    const serialized = employees.map((emp) => ({
+      ...emp,
+      salaryMonths: emp.salaryMonths.map((sm) => ({
+        ...sm,
+        grossSalaryCents: sm.grossSalaryCents.toString(),
+        netSalaryCents: sm.netSalaryCents?.toString() ?? null,
+        employerCostsCents: sm.employerCostsCents?.toString() ?? null,
+      })),
+    }));
+
     return NextResponse.json({
       caseId,
-      employees,
+      employees: serialized,
     });
   } catch (error) {
     console.error("Error fetching employees:", error);
@@ -117,7 +128,18 @@ export async function POST(
       },
     });
 
-    return NextResponse.json(employee, { status: 201 });
+    // BigInt → string für JSON-Serialisierung
+    const serialized = {
+      ...employee,
+      salaryMonths: employee.salaryMonths.map((sm) => ({
+        ...sm,
+        grossSalaryCents: sm.grossSalaryCents.toString(),
+        netSalaryCents: sm.netSalaryCents?.toString() ?? null,
+        employerCostsCents: sm.employerCostsCents?.toString() ?? null,
+      })),
+    };
+
+    return NextResponse.json(serialized, { status: 201 });
   } catch (error) {
     console.error("Error creating employee:", error);
     return NextResponse.json(
