@@ -117,8 +117,11 @@ export async function GET(
         totalOutflows += amount;
       }
 
-      // Klassifiziert = hat counterpartyId ODER categoryTag
-      if (entry.counterpartyId || entry.categoryTag) {
+      // Effektive Counterparty: akzeptiert > vorgeschlagen
+      const effectiveCpId = entry.counterpartyId || entry.suggestedCounterpartyId;
+
+      // Klassifiziert = hat Counterparty (akzeptiert oder vorgeschlagen) ODER categoryTag
+      if (effectiveCpId || entry.categoryTag) {
         classifiedCount++;
       } else {
         unclassified.push({
@@ -135,11 +138,11 @@ export async function GET(
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       monthSet.add(monthKey);
 
-      // Counterparty-Monthly aggregieren
-      const cpKey = entry.counterpartyId || '_unclassified';
+      // Counterparty-Monthly aggregieren (akzeptiert > vorgeschlagen)
+      const cpKey = effectiveCpId || '_unclassified';
       if (!cpMonthly.has(cpKey)) {
         cpMonthly.set(cpKey, {
-          counterpartyId: entry.counterpartyId,
+          counterpartyId: effectiveCpId,
           totalCents: BigInt(0),
           matchCount: 0,
           monthly: new Map(),
