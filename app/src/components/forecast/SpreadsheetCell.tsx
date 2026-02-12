@@ -6,25 +6,15 @@ import { cn } from "./types";
 type CellStatus = "idle" | "editing" | "saving" | "saved" | "error";
 
 interface SpreadsheetCellProps {
-  /** Anzeige-Wert im Idle-Zustand (formatiert, z.B. "28.600") */
   displayValue: string;
-  /** Edit-Wert beim Fokus (z.B. "28600,00") */
   editValue: string;
-  /** Readonly – kein Editing erlaubt (z.B. IST-Zellen) */
   readonly?: boolean;
-  /** Callback wenn Wert gespeichert wird. Gibt den neuen String zurück. */
   onSave?: (newValue: string) => Promise<void>;
-  /** Keyboard-Navigation: Tab → nächste Zelle */
   onTabNext?: () => void;
-  /** Keyboard-Navigation: Shift+Tab → vorherige Zelle */
   onTabPrev?: () => void;
-  /** Extra CSS-Klassen */
   className?: string;
-  /** Tooltip */
   title?: string;
-  /** Ref-Callback für externe Fokus-Steuerung */
   inputRef?: (el: HTMLInputElement | null) => void;
-  /** Placeholder im IST-Bereich */
   placeholder?: string;
 }
 
@@ -44,6 +34,12 @@ export default function SpreadsheetCell({
   const [currentValue, setCurrentValue] = useState(editValue);
   const localRef = useRef<HTMLInputElement | null>(null);
 
+  // Undo: vorherigen Wert merken nach erfolgreichem Save
+  const previousValueRef = useRef<string | null>(null);
+
+  // Tab-Navigation: blur überspringen wenn Tab den Save schon erledigt hat
+  const skipBlurRef = useRef(false);
+
   // Sync edit value wenn sich Props ändern (z.B. nach Neuberechnung)
   useEffect(() => {
     if (status === "idle") {
@@ -51,77 +47,126 @@ export default function SpreadsheetCell({
     }
   }, [editValue, status]);
 
-  const handleFocus = useCallback(() => {
-    if (readonly) return;
-    setStatus("editing");
-    setCurrentValue(editValue);
-    // Text selektieren beim Fokus
-    setTimeout(() => localRef.current?.select(), 0);
-  }, [readonly, editValue]);
-
-  const handleBlur = useCallback(async () => {
-    if (status !== "editing") return;
-
-    // Keine Änderung?
-    if (currentValue === editValue) {
+  // ── Zentraler Save ──────────────────────────────────────────────
+  // Gibt true zurück wenn Save erfolgreich (oder nicht nötig)
+  const doSave = useCallback(async (valueToSave: string): Promise<boolean> => {
+    if (valueToSave === editValue) {
       setStatus("idle");
-      return;
+      return true;
     }
-
     if (!onSave) {
       setStatus("idle");
-      return;
+      return true;
     }
 
     setStatus("saving");
     try {
-      await onSave(currentValue);
+      previousValueRef.current = editValue; // Für Undo merken
+      await onSave(valueToSave);
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 1200);
+      return true;
     } catch {
+      previousValueRef.current = null; // Undo zurücksetzen bei Fehler
       setStatus("error");
       setCurrentValue(editValue);
       setTimeout(() => setStatus("idle"), 2000);
+      return false;
     }
-  }, [status, currentValue, editValue, onSave]);
+  }, [editValue, onSave]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+  // ── Focus ───────────────────────────────────────────────────────
+  const handleFocus = useCallback(() => {
+    if (readonly) return;
+    setStatus("editing");
+    setCurrentValue(editValue);
+    setTimeout(() => localRef.current?.select(), 0);
+  }, [readonly, editValue]);
+
+  // ── Blur ────────────────────────────────────────────────────────
+  const handleBlur = useCallback(async () => {
+    // Tab hat den Save schon erledigt → blur ignorieren
+    if (skipBlurRef.current) {
+      skipBlurRef.current = false;
+      return;
+    }
+    if (status !== "editing") return;
+    await doSave(currentValue);
+  }, [status, currentValue, doSave]);
+
+  // ── Keyboard ────────────────────────────────────────────────────
+  const handleKeyDown = useCallback(async (e: React.KeyboardEvent) => {
+    // ── Enter: Save & blur ──
     if (e.key === "Enter") {
       e.preventDefault();
       (e.target as HTMLInputElement).blur();
-    } else if (e.key === "Escape") {
+      return;
+    }
+
+    // ── Escape: Abbrechen (oder Undo wenn gerade erst fokussiert) ──
+    if (e.key === "Escape") {
       e.preventDefault();
       setCurrentValue(editValue);
       setStatus("idle");
       (e.target as HTMLInputElement).blur();
-    } else if (e.key === "Tab") {
-      e.preventDefault();
-      // Erst blur (speichern), dann navigieren
-      (e.target as HTMLInputElement).blur();
-      if (e.shiftKey) {
-        onTabPrev?.();
-      } else {
-        onTabNext?.();
-      }
+      return;
     }
-  }, [editValue, onTabNext, onTabPrev]);
 
+    // ── Tab: Save → erst bei Erfolg navigieren ──
+    if (e.key === "Tab") {
+      e.preventDefault();
+
+      // Blur überspringen – Tab handelt den Save selbst
+      skipBlurRef.current = true;
+
+      const success = await doSave(currentValue);
+      if (success) {
+        // Navigieren
+        if (e.shiftKey) {
+          onTabPrev?.();
+        } else {
+          onTabNext?.();
+        }
+      } else {
+        // Fehlgeschlagen → in Zelle bleiben
+        skipBlurRef.current = false;
+        setStatus("editing");
+        localRef.current?.focus();
+      }
+      return;
+    }
+
+    // ── Ctrl/Cmd+Z: Undo letzten Save ──
+    if (e.key === "z" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      if (previousValueRef.current !== null) {
+        e.preventDefault();
+        const prevVal = previousValueRef.current;
+        previousValueRef.current = null; // Einmal-Undo
+        setCurrentValue(prevVal);
+
+        // Direkt rückspeichern (doSave handelt saved→idle Transition)
+        if (status === "editing") {
+          await doSave(prevVal);
+        }
+      }
+      return;
+    }
+  }, [editValue, currentValue, status, doSave, onTabNext, onTabPrev]);
+
+  // ── Status-Styling ──────────────────────────────────────────────
   const statusClasses: Record<CellStatus, string> = {
     idle: "",
     editing: "ring-2 ring-yellow-400 bg-yellow-50",
     saving: "bg-blue-50",
     saved: "bg-green-50",
-    error: "bg-red-50",
+    error: "bg-red-50 ring-2 ring-red-300",
   };
 
-  // Readonly: einfaches td
+  // ── Readonly: einfaches td ──────────────────────────────────────
   if (readonly) {
     return (
       <td
-        className={cn(
-          "text-right p-2 px-3 tabular-nums",
-          className
-        )}
+        className={cn("text-right p-2 px-3 tabular-nums", className)}
         title={title}
       >
         {placeholder ?? displayValue}
@@ -129,17 +174,11 @@ export default function SpreadsheetCell({
     );
   }
 
-  // Editable: Input-Zelle
+  // ── Editable: Input-Zelle ───────────────────────────────────────
   const isEditing = status === "editing" || status === "saving";
 
   return (
-    <td
-      className={cn(
-        "p-1 px-1",
-        className
-      )}
-      title={title}
-    >
+    <td className={cn("p-1 px-1", className)} title={title}>
       <input
         ref={(el) => {
           localRef.current = el;

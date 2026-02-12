@@ -228,6 +228,17 @@ body {
   background: #94a3b8;
 }
 
+/* Drawer slide-in animation */
+@keyframes drawerSlideIn {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes backdropFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* Loading states */
 @keyframes shimmer {
   0% { background-position: -200% 0; }

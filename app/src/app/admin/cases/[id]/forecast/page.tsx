@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -25,8 +25,11 @@ export default function ForecastPage() {
   const [calculating, setCalculating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Drawer-State
-  const [drawerAssumption, setDrawerAssumption] = useState<AssumptionJSON | null>(null);
+  // Drawer-State: ID tracken, Objekt aus aktuellem assumptions-Array ableiten
+  const [drawerAssumptionId, setDrawerAssumptionId] = useState<string | null>(null);
+  const drawerAssumption = drawerAssumptionId
+    ? assumptions.find(a => a.id === drawerAssumptionId) || null
+    : null;
 
   // ============================================================================
   // DATA FETCHING
@@ -71,17 +74,26 @@ export default function ForecastPage() {
     }
   }, [caseId]);
 
-  const refresh = useCallback(async () => {
-    await fetchAssumptions();
-    await calculate();
+  // Debounced refresh: verhindert parallele Calls bei schnellem Editieren
+  // Assumptions + Calculate parallel statt sequentiell (halbe Wartezeit)
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshCountRef = useRef(0);
+  const refresh = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(async () => {
+      const thisRefresh = ++refreshCountRef.current;
+      await Promise.all([fetchAssumptions(), calculate()]);
+      // Stale-Check: wenn inzwischen ein neuerer refresh kam, ignorieren
+      if (refreshCountRef.current !== thisRefresh) return;
+    }, 300);
   }, [fetchAssumptions, calculate]);
 
   useEffect(() => {
     async function init() {
       setLoading(true);
       await fetchScenario();
-      await fetchAssumptions();
-      await calculate();
+      // Assumptions + Calculate parallel laden
+      await Promise.all([fetchAssumptions(), calculate()]);
       setLoading(false);
     }
     if (caseId) init();
@@ -130,7 +142,7 @@ export default function ForecastPage() {
       credentials: "include",
     });
     if (res.ok) {
-      setDrawerAssumption(null);
+      setDrawerAssumptionId(null);
       await refresh();
     }
   };
@@ -143,6 +155,7 @@ export default function ForecastPage() {
       body: JSON.stringify({ id: a.id, isActive: !a.isActive }),
     });
     await refresh();
+    // drawerAssumption wird automatisch aktualisiert (abgeleitet aus assumptions-Array)
   };
 
   // ============================================================================
@@ -286,7 +299,7 @@ export default function ForecastPage() {
           caseId={caseId}
           onAssumptionSaved={refresh}
           onAssumptionCreated={refresh}
-          onOpenDrawer={(a) => setDrawerAssumption(a)}
+          onOpenDrawer={(a) => setDrawerAssumptionId(a.id)}
         />
       )}
 
@@ -299,7 +312,7 @@ export default function ForecastPage() {
           onSave={saveAssumption}
           onDelete={deleteAssumption}
           onToggle={toggleAssumption}
-          onClose={() => setDrawerAssumption(null)}
+          onClose={() => setDrawerAssumptionId(null)}
         />
       )}
     </div>

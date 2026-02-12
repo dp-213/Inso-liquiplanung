@@ -20,6 +20,7 @@ export default function QuickAddRow({
 }: QuickAddRowProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Formular-State
   const [label, setLabel] = useState("");
@@ -43,6 +44,7 @@ export default function QuickAddRow({
     if (!label.trim() || !amount.trim() || !source.trim()) return;
 
     setSaving(true);
+    setError(null);
     try {
       const categoryKey = label.trim().toUpperCase().replace(/[^A-ZÄÖÜ0-9]/gi, "_");
       const res = await fetch(`/api/cases/${caseId}/forecast/assumptions`, {
@@ -61,14 +63,17 @@ export default function QuickAddRow({
         }),
       });
 
-      if (!res.ok) throw new Error("Erstellen fehlgeschlagen");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Erstellen fehlgeschlagen");
+      }
 
       resetForm();
       onCreated();
       // Formular bleibt offen für nächsten Eintrag (Bulk-Modus)
       setTimeout(() => labelRef.current?.focus(), 100);
     } catch (err) {
-      console.error("QuickAdd Fehler:", err);
+      setError(err instanceof Error ? err.message : "Fehler beim Erstellen");
     } finally {
       setSaving(false);
     }
@@ -187,6 +192,9 @@ export default function QuickAddRow({
             </svg>
           </button>
         </div>
+        {error && (
+          <p className="text-xs text-red-600 mt-1 ml-0.5">{error}</p>
+        )}
         <p className="text-[10px] text-[var(--muted)] mt-1 ml-0.5">
           Enter = Speichern & nächste Zeile &middot; Escape = Schließen
         </p>

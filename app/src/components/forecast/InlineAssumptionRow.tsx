@@ -116,13 +116,18 @@ export default function InlineAssumptionRow({
           ? "–"
           : formatEUR(isInflow ? amountCents : `-${amountCents}`);
 
+        const hasGrowth = assumption.growthFactorPercent !== null && assumption.growthFactorPercent !== 0;
+        const tooltip = hasGrowth
+          ? `${lineItem?.formula || ""} (Basisbetrag: ${formatEUR(assumption.baseAmountCents)})`
+          : lineItem?.formula;
+
         return (
           <SpreadsheetCell
             key={period.periodIndex}
             displayValue={displayAmount}
             editValue={formatEURInput(assumption.baseAmountCents)}
             className="bg-blue-50/20"
-            title={lineItem?.formula}
+            title={tooltip}
             onSave={handleSaveAmount}
             inputRef={(el) => { cellRefs.current[idx] = el; }}
             onTabNext={() => {
