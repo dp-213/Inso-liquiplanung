@@ -1269,7 +1269,7 @@ const entries = await prisma.ledgerEntry.findMany({
 
 **NICHT gefiltert:** Ledger-Ansicht (zeigt alles), Classification Engine, Audit-Trail, Hash-Berechnung.
 
-**API-Endpunkte:**
+**API-Endpunkte (Manuelles Splitting):**
 
 | Endpunkt | Methode | Beschreibung |
 |----------|---------|--------------|
@@ -1281,6 +1281,60 @@ const entries = await prisma.ledgerEntry.findMany({
 - `isBatchParent: boolean` – Hat der Entry Children?
 - `splitChildren: Array` – Zusammenfassung der Children (id, Beschreibung, Betrag, Counterparty, Location)
 - `parentEntryId: string | null` – Verweis auf Parent (bei Children)
+
+#### Zahlbeleg-Aufschlüsselung (v2.32.0)
+
+**Wiederkehrender Workflow** für das Splitting von Sammelüberweisungen anhand von PDF-verifizierten Zahlbelegen.
+
+**Datenmodell:**
+- `PaymentBreakdownSource` – Ein Zahlbeleg mit Matching-Status auf LedgerEntry
+- `PaymentBreakdownItem` – Einzelposten innerhalb eines Zahlbelegs (Empfänger, IBAN, Betrag, Verwendungszweck)
+
+**Workflow:**
+```
+1. JSON hochladen (PaymentBreakdownPanel)
+   → POST /api/cases/[id]/ledger/breakdown
+   → Sources + Items persistiert, automatisch gematcht
+
+2. Matching prüfen (in der UI aufklappbar)
+   → Status-Badges: UPLOADED (kein Match), MATCHED (bereit), SPLIT (erledigt), ERROR
+
+3. Split ausführen (Button "Splits ausführen")
+   → POST /api/cases/[id]/ledger/breakdown/split
+   → Children im Ledger erstellt, Invarianten-Test, Audit-Log
+```
+
+**Matching-Kriterien:** caseId + bankAccountId + amountCents (negiert) + transactionDate ±3 Tage + description enthält „SAMMEL"
+
+**Bank-Account-Mapping** (hardcodiert in `breakdown/route.ts`):
+- `BW-Bank #400080156 (ISK) Uckerath` → `ba-isk-uckerath`
+- `BW-Bank #400080228 (ISK) Velbert` → `ba-isk-velbert`
+
+**Idempotenz:**
+- Upload: Gleiche `referenceNumber` wird übersprungen (Duplikat-Check)
+- Split: Sources mit Status `SPLIT` werden übersprungen
+
+**Sicherheitschecks pro Split:**
+- Σ Items === |Parent.amountCents| (BigInt-exakt, cent-genau)
+- Parent hat keine existierenden Children
+- Parent ist selbst kein Child (keine rekursiven Splits)
+- Absoluter Invarianten-Test: Aktive Summe === Root-Summe
+
+**API-Endpunkte (Zahlbeleg-Workflow):**
+
+| Endpunkt | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/ledger/breakdown` | GET | Status aller PaymentBreakdownSources mit Items |
+| `/ledger/breakdown` | POST | Upload & Match (Body: `{ zahlbelege: [...], sourceFileName? }`) |
+| `/ledger/breakdown/split` | POST | Idempotenter Split (Body: `{ sourceIds?, dryRun? }`) |
+
+**UI-Komponente:** `PaymentBreakdownPanel` – Aufklappbares Panel in der Ledger-Seite (über der Entry-Liste), mit Datei-Upload, Status-Badges und aufklappbaren Einzelposten-Details.
+
+**Traceability:**
+- `PaymentBreakdownItem.createdLedgerEntryId` → erzeugter Child-LedgerEntry
+- `PaymentBreakdownSource.matchedLedgerEntryId` → gematchter Parent-LedgerEntry
+- Child-Entry: `splitReason` = „Zahlbeleg PRM2VN, Posten 3/8"
+- Audit-Log: `fieldChanges.breakdownSourceId` verweist auf Source
 
 ---
 

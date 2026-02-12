@@ -38,11 +38,15 @@ Alle Beträge in EUR. Deutsche Insolvenzverfahren sind EUR-basiert.
 ~60 Privatpatienten-Rechnungen mit sehr unterschiedlichen Formaten. Ein einzelnes Pattern würde False Positives erzeugen.
 **Workaround:** Sammel-Counterparty "Privatpatient*innen" + manuelle Klassifikation.
 
-### Sammelüberweisungen ohne Einzelaufschlüsselung
+### Zahlbeleg-Aufschlüsselung: Bank-Mapping hardcodiert
 
-29 Sammelüberweisungen (179K EUR) ohne Details zu Empfängern/Zwecken.
-**Teilweise gelöst (12.02.2026):** 18 Zahlbelege der ISK-Konten (BW-Bank Uckerath+Velbert) mit 56 Einzelposten (140.150,66 EUR) vollständig verifiziert und in `Zahlbelege_Vollstaendig.json` erfasst. Verbleibende Sammelüberweisungen (Sparkasse, apoBank) noch offen.
-**Workaround:** Details von IV/Buchhalterin nachliefern.
+`BANK_ACCOUNT_MAPPING` in `breakdown/route.ts` kennt nur BW-Bank ISK-Konten (Uckerath + Velbert). Neue Bankkonten müssen manuell ergänzt werden.
+**Betrifft:** Nur den Zahlbeleg-Upload; Splitting selbst ist bank-agnostisch.
+
+### Sammelüberweisungen: Verbleibende ohne Zahlbelege
+
+Von 29 Sammelüberweisungen im Ledger sind 9 gesplittet (47 Einzelposten, ISK BW-Bank). 9 weitere sind Einzelzahlungen (von BW-Bank als „SAMMELÜBERWEISUNG" gelabelt, brauchen keinen Split). 1 apoBank-Sammelüberweisung und ~10 Januar-Sammelüberweisungen (15.–29.01.) haben noch keine Zahlbelege.
+**Workaround:** Zahlbelege vom IV nachliefern, über PaymentBreakdownPanel hochladen und splitten.
 
 ### IST-Vorrang ist nicht umkehrbar
 
@@ -249,4 +253,4 @@ Einnahmen-Tabelle und neuer Trend-Chart gruppieren jetzt nach `categoryTag` (HZV
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.31.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.32.0)

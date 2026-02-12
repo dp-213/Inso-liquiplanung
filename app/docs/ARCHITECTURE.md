@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.31.0
+**Version:** 2.32.0
 **Stand:** 12. Februar 2026
 
 ---
@@ -252,6 +252,37 @@ model Location {
   address String?
 }
 ```
+
+### PaymentBreakdown (Zahlbeleg-Aufschlüsselung)
+
+```prisma
+model PaymentBreakdownSource {
+  id                    String    @id @default(uuid())
+  caseId                String
+  referenceNumber       String    // Auftragsnummer (z.B. "PRM2VN")
+  executionDate         DateTime
+  totalAmountCents      BigInt    // Gesamtbetrag positiv
+  bankAccountId         String    // Aufgelöst aus Zahlbeleg-Bankkonto
+  paymentType           String    // CCT (Sammelüberweisung) oder CIP
+  status                String    @default("UPLOADED") // UPLOADED → MATCHED → SPLIT | ERROR
+  matchedLedgerEntryId  String?   // Gematchter Parent-LedgerEntry
+  items                 PaymentBreakdownItem[]
+  @@unique([caseId, referenceNumber])
+}
+
+model PaymentBreakdownItem {
+  id                    String    @id @default(uuid())
+  sourceId              String
+  recipientName         String    // Empfänger
+  recipientIban         String
+  amountCents           BigInt    // Betrag positiv (wie im Zahlbeleg)
+  purpose               String?   // Verwendungszweck
+  itemIndex             Int       // Position (0-basiert)
+  createdLedgerEntryId  String?   // Erzeugter Child-LedgerEntry nach Split
+}
+```
+
+**Workflow:** Upload (JSON) → Matching → Review → Split → Children im Ledger. Siehe ADR-045.
 
 ---
 

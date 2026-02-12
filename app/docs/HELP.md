@@ -125,7 +125,7 @@ Die Prognose-Seite funktioniert wie eine Excel-Tabelle:
 
 | Seite | Zweck |
 |-------|-------|
-| **Zahlungsregister** | Alle Buchungen (IST + PLAN) in einer Übersicht. Filtern, Suchen, Bearbeiten. |
+| **Zahlungsregister** | Alle Buchungen (IST + PLAN) in einer Übersicht. Filtern, Suchen, Bearbeiten. Zahlbeleg-Upload für Sammelüberweisungen. |
 | **Import** | Neue Kontoauszüge als CSV importieren. Spalten-Mapping, Duplikat-Erkennung. |
 | **Bestellfreigaben** | Auszahlungsanweisungen zur Freigabe durch den IV. (ehem. „Freigaben") |
 
@@ -183,6 +183,9 @@ Das System prüft auf Duplikate anhand von Bankkonto, Datum und Betrag. Erkannte
 
 **Warum sehe ich "Ungeprüfte Buchungen"?**
 Neu importierte Buchungen haben den Status `UNREVIEWED`. Sie müssen erst über die Klassifikation geprüft und bestätigt werden, bevor sie in die Planung einfließen.
+
+**Wie funktioniert die Zahlbeleg-Aufschlüsselung?**
+Sammelüberweisungen fassen mehrere Zahlungen zusammen. Um die Einzelposten (Empfänger, Betrag, IBAN) sichtbar zu machen, laden Sie die Zahlbelege als JSON im Zahlungsregister hoch. Das System matcht automatisch gegen bestehende Buchungen. Nach Prüfung des Matchings klicken Sie auf „Splits ausführen" – die Sammelüberweisung wird in aufklappbare Einzelposten aufgeteilt.
 
 ### Prognose & Dashboard
 
@@ -261,6 +264,7 @@ Eine Nur-Lese-Ansicht des Dashboards ohne Rolling Forecast (Chart und Tabelle). 
 | **Neumasse** | Vermögenswerte und Verbindlichkeiten nach Insolvenzeröffnung |
 | **Opening Balance** | Anfangsbestand einer Periode |
 | **Periode** | Zeitabschnitt (Woche oder Monat) in der Liquiditätsplanung |
+| **PaymentBreakdown** | Zahlbeleg-Aufschlüsselung – splittet Sammelüberweisungen in Einzelposten |
 | **PLAN** | Statische Planwerte (Legacy, wird durch PROGNOSE ersetzt) |
 | **Prämisse** | Textuelle Planungsannahme für Dokumentation |
 | **PROGNOSE/FORECAST** | Berechnete Zukunftswerte aus aktiven Annahmen |

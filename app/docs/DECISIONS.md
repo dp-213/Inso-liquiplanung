@@ -4,6 +4,42 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-045: Zahlbeleg-Aufschlüsselung als persistierter, wiederkehrender Workflow
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Sammelüberweisungen (BW-Bank ISK) fassen mehrere Einzelzahlungen zusammen. Im Ledger erscheinen sie als ein Betrag (z.B. -4.993,48 EUR) ohne Empfänger-Details. Für gerichtsfeste Alt/Neu-Zuordnung und Standort-Aggregation müssen die Einzelposten sichtbar sein. Die ISK-Zahlbelege (PDFs) liefern diese Details: Empfänger, IBAN, Betrag, Verwendungszweck.
+
+**Bisheriger Ansatz (verworfen):** Textarea-JSON-Processing im Ledger – einmaliger Hack ohne Persistenz, nicht wiederholbar.
+
+### Entscheidung
+
+1. **Persistierte Datenstruktur:** `PaymentBreakdownSource` (= 1 Zahlbeleg) + `PaymentBreakdownItem` (= 1 Einzelposten). Eigenständige Tabellen, kein neues Feld auf LedgerEntry.
+2. **Zwei-Stufen-Workflow:** Upload & Persistierung → Separater, idempotenter Split. Kein Auto-Split bei Upload.
+3. **Matching-Kriterien:** caseId + bankAccountId + amountCents (negiert) + transactionDate ±3 Tage + description enthält „SAMMEL". Fallback: Ohne SAMMEL-Keyword wenn Betrag+Datum passen.
+4. **Bank-Account-Mapping:** Hardcodiert in `BANK_ACCOUNT_MAPPING` (BW-Bank #400080156 → `ba-isk-uckerath`, #400080228 → `ba-isk-velbert`).
+5. **Traceability:** `PaymentBreakdownItem.createdLedgerEntryId` → Child, `PaymentBreakdownSource.matchedLedgerEntryId` → Parent, `splitReason` = „Zahlbeleg PRM2VN, Posten 3/8", Audit-Log mit `breakdownSourceId`.
+6. **Summenvalidierung:** Σ Items === |Parent.amountCents| (BigInt-exakt). Invarianten-Test: Aktive Summe === Root-Summe.
+
+### Begründung
+
+- Textarea-JSON ist nicht auditierbar und nicht wiederholbar. Persistierte Sources ermöglichen Nachvollziehbarkeit.
+- Zwei Stufen ermöglichen Review zwischen Upload (Matching prüfen) und Split (irreversible Aktion).
+- ±3 Tage Toleranz nötig, weil Ausführungsdatum (Zahlbeleg) und Buchungsdatum (Kontoauszug) abweichen können.
+- Hardcodiertes Bank-Mapping reicht für den aktuellen Fall; bei neuen Fällen erweiterbar.
+
+### Konsequenzen
+
+- 2 neue Prisma-Modelle, 2 neue API-Routen, 1 neue UI-Komponente
+- Zahlbelege müssen als JSON vorliegen (manuell aus PDFs extrahiert und verifiziert, ADR-042)
+- Bank-Mapping muss bei neuen Banken manuell erweitert werden
+- Workflow ist monatlich wiederholbar: Neue Zahlbelege hochladen → Match prüfen → Split ausführen
+
+---
+
 ## ADR-044: Forecast-Tab – Unified Spreadsheet mit Derived State
 
 **Datum:** 12. Februar 2026
