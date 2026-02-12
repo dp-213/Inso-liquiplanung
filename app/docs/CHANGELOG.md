@@ -4,6 +4,28 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.24.1 – Matrix-Audit: Defensives Alt-Tag-Mapping & ABSONDERUNG-Fix
+
+**Datum:** 12. Februar 2026
+
+### Bugfixes
+
+- **ABSONDERUNG-Match bei Verfahrenskosten entfernt:** `cash_out_inso_verfahrenskosten` fing pauschal alle `LEGAL_BUCKET=ABSONDERUNG`-Buchungen. Absonderungszahlungen an Banken (z.B. Sparkasse-Tilgung) sind keine Verfahrenskosten — der LEGAL_BUCKET-Match wurde entfernt. CATEGORY_TAG + DESCRIPTION_PATTERN reichen für korrektes Matching.
+
+### Änderungen
+
+- **6 neue Alt-Tag-Mappings in `getAltforderungCategoryTag()`:** Defensives Mapping für `STEUERN`, `VERFAHRENSKOSTEN`, `DARLEHEN_TILGUNG`, `INSO_RUECKZAHLUNG`, `INSO_VORFINANZIERUNG`, `INSO_SACHAUFNAHME`. Verhindert Datenverlust bei MIXED-Buchungen mit diesen Tags (Alt-Anteil wurde bisher stillschweigend ignoriert → `null`).
+
+### Geänderte Dateien
+
+- `app/src/lib/cases/haevg-plus/matrix-config.ts` – Alt-Tag-Mappings + LEGAL_BUCKET Match entfernt
+
+### Hinweis
+
+Beide Änderungen sind rein defensiv. Aktuell existieren keine MIXED-Entries mit den betroffenen Tags, daher ändern sich keine Matrix-Werte. Die Änderungen verhindern zukünftigen Datenverlust.
+
+---
+
 ## Version 2.24.0 – Banken & Sicherungsrechte (Drei-Ebenen-Trennung)
 
 **Datum:** 10. Februar 2026

@@ -72,11 +72,6 @@ Keine automatische Extrapolation oder Trendberechnung. Determinismus-Prinzip: Pr
 **Status:** Verifikation mit IV ausstehend.
 **Dokumentiert in:** ADR-027
 
-### LANR-Location-Mapping fehlerhaft
-
-4 von 8 Ärzten werden falschem Standort zugeordnet (~50% der HZV-Einnahmen betroffen).
-**Status:** KRITISCH - muss vor Turso-Sync korrigiert werden.
-
 ### Fehlende Dezember-Kontoauszüge
 
 3 von 5 Bankkonten ohne Dezember-Daten (Sparkasse, apoBank HVPlus, apoBank Uckerath). ISK-Einzahlungsliste (Nov-Dez) liegt jetzt vor und deckt ISK-Seite ab.
@@ -212,4 +207,4 @@ Bankkonten-Details bewusst aus Liquidity Matrix entfernt (ADR-030). Bankkonten-T
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-10 (v2.22.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.24.1)

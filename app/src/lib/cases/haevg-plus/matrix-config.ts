@@ -725,7 +725,6 @@ export const HVPLUS_MATRIX_ROWS: MatrixRowConfig[] = [
     matchDescription: 'Verfahrenskosten, Gerichtskosten und Beratungskosten.',
     matches: [
       { type: 'CATEGORY_TAG', value: 'VERFAHRENSKOSTEN', description: 'Buchungen mit Kategorie-Tag „VERFAHRENSKOSTEN"' },
-      { type: 'LEGAL_BUCKET', value: 'ABSONDERUNG', description: 'Buchungen mit Rechtsstatus „ABSONDERUNG"' },
       { type: 'DESCRIPTION_PATTERN', value: '(Verfahren|Gericht|Insolvenz|Verwalter|Berater|Rechtsanwalt|Steuerberater|Gutachter|Unternehmensberater)', description: 'Buchungstext enthält Verfahrens-/Beratungsbegriffe' },
     ],
   },
@@ -1088,6 +1087,14 @@ export function getAltforderungCategoryTag(neumasseTag: string | null): string |
     'RUNDFUNK': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
     'BANKGEBUEHREN': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
     'BUERO_IT': 'ALTVERBINDLICHKEIT_BETRIEBSKOSTEN',
+
+    // ─── Insolvenzspezifische Tags (defensiv) ───
+    'STEUERN': 'ALTVERBINDLICHKEIT_STEUERN',
+    'VERFAHRENSKOSTEN': 'ALTVERBINDLICHKEIT_VERFAHRENSKOSTEN',
+    'DARLEHEN_TILGUNG': 'ALTVERBINDLICHKEIT_DARLEHEN',
+    'INSO_RUECKZAHLUNG': 'ALTVERBINDLICHKEIT_INSO',
+    'INSO_VORFINANZIERUNG': 'ALTVERBINDLICHKEIT_INSO',
+    'INSO_SACHAUFNAHME': 'ALTVERBINDLICHKEIT_INSO',
   };
 
   return mapping[neumasseTag] || null;

@@ -4,6 +4,43 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-037: Defensives Alt-Tag-Mapping & ABSONDERUNG-Match-Bereinigung
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Code-Audit der Matrix-Pipeline ergab zwei defensiv relevante Befunde:
+
+1. **Fehlende Alt-Mappings:** `getAltforderungCategoryTag()` hatte keine Mappings für insolvenzspezifische Tags (`STEUERN`, `VERFAHRENSKOSTEN`, `DARLEHEN_TILGUNG`, `INSO_RUECKZAHLUNG`, `INSO_VORFINANZIERUNG`, `INSO_SACHAUFNAHME`). Bei MIXED-Buchungen mit diesen Tags ging der Alt-Anteil stillschweigend verloren (Mapping → `null` → voller Betrag in Neumasse).
+
+2. **Zu breiter ABSONDERUNG-Match:** `cash_out_inso_verfahrenskosten` enthielt `{ type: 'LEGAL_BUCKET', value: 'ABSONDERUNG' }`, was ALLE Absonderungsbuchungen in "Verfahrenskosten" routete — auch Bankentilgungen, die dort nicht hingehören.
+
+### Entscheidung
+
+**A)** 6 neue Mappings in `getAltforderungCategoryTag()`:
+- `STEUERN` → `ALTVERBINDLICHKEIT_STEUERN`
+- `VERFAHRENSKOSTEN` → `ALTVERBINDLICHKEIT_VERFAHRENSKOSTEN`
+- `DARLEHEN_TILGUNG` → `ALTVERBINDLICHKEIT_DARLEHEN`
+- `INSO_RUECKZAHLUNG` / `INSO_VORFINANZIERUNG` / `INSO_SACHAUFNAHME` → `ALTVERBINDLICHKEIT_INSO`
+
+**B)** LEGAL_BUCKET-Match aus `cash_out_inso_verfahrenskosten` entfernt. CATEGORY_TAG + DESCRIPTION_PATTERN genügen.
+
+### Begründung
+
+- Beide Änderungen sind defensiv: Aktuell existieren keine MIXED-Entries mit diesen Tags, daher ändern sich keine Matrix-Werte
+- Die Alt-Tags haben noch keine eigenen Matrix-Zeilen → Fallback `cash_out_operative_sonstige` greift, was besser ist als Datenverlust
+- ABSONDERUNG sollte nicht pauschal in Verfahrenskosten landen (z.B. Sparkasse-Absonderungstilgung ≠ Verfahrenskosten)
+
+### Konsequenzen
+
+- Keine Verhaltensänderung bei aktuellen Daten
+- Zukünftige MIXED-Buchungen mit insolvenzspezifischen Tags verlieren keinen Alt-Anteil mehr
+- Absonderungsbuchungen ohne passenden CATEGORY_TAG oder DESCRIPTION_PATTERN landen korrekt im Fallback
+
+---
+
 ## ADR-036: Drei-Ebenen-Trennung – Banken & Sicherungsrechte als eigener Tab
 
 **Datum:** 10. Februar 2026
