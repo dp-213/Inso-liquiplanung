@@ -42,6 +42,11 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="admin-card p-8">
           <div className="text-center mb-8">
+            <img
+              src="/favicon.png"
+              alt="Gradify"
+              className="h-12 w-auto mx-auto mb-4"
+            />
             <h1 className="text-2xl font-bold text-[var(--foreground)]">
               Gradify Cases
             </h1>

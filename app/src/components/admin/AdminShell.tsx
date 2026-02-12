@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import ThemeToggle from "@/components/ThemeToggle";
 
 interface AdminShellProps {
   username: string;
@@ -52,7 +53,7 @@ export default function AdminShell({ username, children }: AdminShellProps) {
   return (
     <div className="min-h-screen bg-[var(--background)]">
       {/* Top Bar */}
-      <header className="h-14 bg-white border-b border-[var(--border)] sticky top-0 z-40">
+      <header className="h-14 bg-[var(--card)] border-b border-[var(--border)] sticky top-0 z-40">
         <div className="h-full flex items-center justify-between px-4 sm:px-6">
           {/* Left: Logo + Nav */}
           <div className="flex items-center gap-6">
@@ -70,7 +71,7 @@ export default function AdminShell({ username, children }: AdminShellProps) {
                   className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                     isActive(item.href)
                       ? "bg-[var(--primary)]/10 text-[var(--primary)]"
-                      : "text-[var(--secondary)] hover:text-[var(--foreground)] hover:bg-gray-100"
+                      : "text-[var(--secondary)] hover:text-[var(--foreground)] hover:bg-[var(--accent)]"
                   }`}
                 >
                   {item.name}
@@ -79,8 +80,9 @@ export default function AdminShell({ username, children }: AdminShellProps) {
             </nav>
           </div>
 
-          {/* Right: User + Logout */}
-          <div className="flex items-center gap-3">
+          {/* Right: Theme + User + Logout */}
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
             <span className="hidden sm:inline text-sm text-[var(--secondary)]">
               Angemeldet als{" "}
               <span className="font-medium text-[var(--foreground)]">{username}</span>
@@ -95,7 +97,9 @@ export default function AdminShell({ username, children }: AdminShellProps) {
             {/* Mobile hamburger */}
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="md:hidden p-2 -mr-2 text-[var(--secondary)] hover:text-[var(--foreground)]"
+              className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2 text-[var(--secondary)] hover:text-[var(--foreground)]"
+              aria-label={menuOpen ? "Menü schließen" : "Menü öffnen"}
+              aria-expanded={menuOpen}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {menuOpen ? (
@@ -108,24 +112,30 @@ export default function AdminShell({ username, children }: AdminShellProps) {
           </div>
         </div>
 
-        {/* Mobile dropdown */}
-        {menuOpen && (
-          <nav className="md:hidden bg-white border-b border-[var(--border)] px-4 py-2 space-y-1 shadow-lg">
+        {/* Mobile dropdown – animiert mit max-height + opacity */}
+        <nav
+          className={`md:hidden bg-[var(--card)] border-b border-[var(--border)] shadow-lg overflow-hidden transition-all duration-200 ease-out ${
+            menuOpen
+              ? "max-h-60 opacity-100"
+              : "max-h-0 opacity-0 border-b-0"
+          }`}
+        >
+          <div className="px-4 py-2 space-y-1">
             {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`block px-3 py-2 rounded-md text-sm font-medium ${
+                className={`block px-3 py-3 rounded-md text-sm font-medium ${
                   isActive(item.href)
                     ? "bg-[var(--primary)]/10 text-[var(--primary)]"
-                    : "text-[var(--secondary)] hover:bg-gray-100"
+                    : "text-[var(--secondary)] hover:bg-[var(--accent)]"
                 }`}
               >
                 {item.name}
               </Link>
             ))}
-          </nav>
-        )}
+          </div>
+        </nav>
       </header>
 
       {/* Main content - full width */}
