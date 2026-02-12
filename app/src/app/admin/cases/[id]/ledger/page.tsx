@@ -150,6 +150,22 @@ export default function CaseLedgerPage({
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [viewMode, setViewMode] = useState<"table" | "grouped">("table");
 
+  // Split/Batch State
+  const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set());
+  const [splitModalEntry, setSplitModalEntry] = useState<(LedgerEntryResponse & { isBatchParent?: boolean }) | null>(null);
+
+  const toggleBatchExpand = useCallback((entryId: string) => {
+    setExpandedBatches(prev => {
+      const next = new Set(prev);
+      if (next.has(entryId)) {
+        next.delete(entryId);
+      } else {
+        next.add(entryId);
+      }
+      return next;
+    });
+  }, []);
+
   // Column Filters State
   const [columnFilters, setColumnFilters] = useState<Record<string, ColumnFilterValue>>({});
 
@@ -2248,9 +2264,16 @@ export default function CaseLedgerPage({
                 </tr>
               </thead>
                             <tbody>
-                {sortedEntries.map((entry, index) => {
+                {sortedEntries.flatMap((entry, index) => {
                   const amount = parseInt(entry.amountCents);
                   const isInflow = amount >= 0;
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const entryAny = entry as any;
+                  const isBatchParent = entryAny.isBatchParent === true;
+                  const isChild = !!entryAny.parentEntryId;
+                  const splitChildren: Array<{ id: string; description: string; amountCents: string; counterpartyId: string | null; locationId: string | null; categoryTag: string | null; reviewStatus: string; note: string | null }> = entryAny.splitChildren || [];
+                  const isExpanded = expandedBatches.has(entry.id);
+
                   const entryWithExtras = entry as LedgerEntryResponse & {
                     suggestedLegalBucket?: string | null;
                     suggestedConfidence?: number | null;
@@ -2274,11 +2297,16 @@ export default function CaseLedgerPage({
                   const zebraClass = index % 2 === 0 ? '' : 'bg-gray-50/30';
                   const rowBgClass = selectedEntries.has(entry.id)
                     ? "bg-blue-50"
+                    : isBatchParent
+                    ? "bg-amber-50/70"
+                    : isChild
+                    ? "bg-gray-50/50"
                     : isTransfer
                     ? "bg-gray-100 text-gray-500"
                     : zebraClass;
 
-                  return (
+                  const rows: JSX.Element[] = [];
+                  rows.push(
                     <tr
                       key={entry.id}
                       className={`${rowBgClass} hover:bg-gray-100/50 transition-colors cursor-pointer`}
@@ -2403,12 +2431,27 @@ export default function CaseLedgerPage({
                         >
                           <div className="truncate" style={{ maxWidth: columnWidths.description - 16 }}>
                             <div className="font-medium text-[var(--foreground)] truncate">
+                              {isBatchParent && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); toggleBatchExpand(entry.id); }}
+                                  className="inline-flex items-center mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-200 transition-colors"
+                                >
+                                  {isExpanded ? '▼' : '▶'} Sammelüberweisung ({splitChildren.length})
+                                </button>
+                              )}
+                              {isChild && (
+                                <span className="inline-flex items-center mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                                  ↳ Einzelposten
+                                </span>
+                              )}
                               {isTransfer && (
                                 <span className="inline-flex items-center mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-100 text-indigo-700 border border-indigo-200">
                                   &#8644; Umbuchung
                                 </span>
                               )}
-                              {entry.description}
+                              <span className={isBatchParent ? 'line-through text-gray-400' : ''}>
+                                {entry.description}
+                              </span>
                             </div>
                             {entry.note && (
                               <div className="text-xs text-[var(--muted)] truncate">
@@ -2423,7 +2466,7 @@ export default function CaseLedgerPage({
                       {columnVisibility.amountCents && (
                         <td
                           className={`text-right font-mono whitespace-nowrap ${
-                            isInflow ? "text-[var(--success)]" : "text-[var(--danger)]"
+                            isBatchParent ? "text-gray-400 line-through" : isInflow ? "text-[var(--success)]" : "text-[var(--danger)]"
                           }`}
                         >
                           {formatCurrency(entry.amountCents)}
@@ -2654,6 +2697,88 @@ Klicken zum Filtern`}
                       </td>
                     </tr>
                   );
+
+                  // Children-Zeilen nach dem Parent rendern (wenn aufgeklappt)
+                  if (isBatchParent && isExpanded && splitChildren.length > 0) {
+                    for (const child of splitChildren) {
+                      const childAmount = parseInt(child.amountCents);
+                      const childIsInflow = childAmount >= 0;
+                      rows.push(
+                        <tr
+                          key={`child-${child.id}`}
+                          className="bg-amber-50/30 hover:bg-amber-100/30 transition-colors text-xs border-l-4 border-amber-300"
+                        >
+                          {/* Checkbox */}
+                          <td style={{ position: 'sticky', left: 0, zIndex: 9, backgroundColor: 'rgba(254, 252, 232, 0.3)', boxShadow: '2px 0 4px rgba(0,0,0,0.05)' }}>
+                            <span className="text-gray-300 pl-1">↳</span>
+                          </td>
+                          {/* Datum */}
+                          {columnVisibility.transactionDate && (
+                            <td style={{ position: 'sticky', left: columnWidths.checkbox, zIndex: 9, backgroundColor: 'rgba(254, 252, 232, 0.3)', boxShadow: '2px 0 4px rgba(0,0,0,0.05)' }} className="whitespace-nowrap text-gray-400">
+                              {formatDate(entry.transactionDate)}
+                            </td>
+                          )}
+                          {/* Matrix-Kat */}
+                          {columnVisibility.categoryTag && (
+                            <td style={{ position: 'sticky', left: columnWidths.checkbox + columnWidths.transactionDate, zIndex: 9, backgroundColor: 'rgba(254, 252, 232, 0.3)', boxShadow: '2px 0 4px rgba(0,0,0,0.05)' }}>
+                              {child.categoryTag && (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700">
+                                  {CATEGORY_TAG_LABELS[child.categoryTag] || child.categoryTag}
+                                </span>
+                              )}
+                            </td>
+                          )}
+                          {/* Beschreibung */}
+                          {columnVisibility.description && (
+                            <td>
+                              <div className="truncate pl-4" style={{ maxWidth: columnWidths.description - 32 }}>
+                                <span className="inline-flex items-center mr-1 px-1 py-0.5 rounded text-[9px] font-medium bg-gray-100 text-gray-500 border border-gray-200">↳</span>
+                                {child.description}
+                              </div>
+                              {child.note && <div className="text-[10px] text-gray-400 pl-4 truncate">{child.note}</div>}
+                            </td>
+                          )}
+                          {/* Betrag */}
+                          {columnVisibility.amountCents && (
+                            <td className={`text-right font-mono whitespace-nowrap ${childIsInflow ? "text-[var(--success)]" : "text-[var(--danger)]"}`}>
+                              {formatCurrency(child.amountCents)}
+                            </td>
+                          )}
+                          {/* Restliche Spalten: kompakte Darstellung */}
+                          {columnVisibility.import && <td className="text-gray-400">-</td>}
+                          {columnVisibility.location && <td className="text-gray-500 text-[10px]">{child.locationId || '-'}</td>}
+                          {columnVisibility.bankAccount && <td className="text-gray-400">↑</td>}
+                          {columnVisibility.counterparty && <td className="text-gray-500 text-[10px] truncate">{child.counterpartyId || '-'}</td>}
+                          {columnVisibility.valueType && <td className="text-gray-400">↑</td>}
+                          {columnVisibility.estateAllocation && <td className="text-gray-400">↑</td>}
+                          {columnVisibility.legalBucket && <td className="text-gray-400">↑</td>}
+                          {columnVisibility.reviewStatus && (
+                            <td>
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                child.reviewStatus === 'CONFIRMED' ? 'bg-green-100 text-green-700' :
+                                child.reviewStatus === 'ADJUSTED' ? 'bg-amber-100 text-amber-700' :
+                                'bg-gray-100 text-gray-600'
+                              }`}>
+                                {REVIEW_STATUS_LABELS[child.reviewStatus as ReviewStatus] || child.reviewStatus}
+                              </span>
+                            </td>
+                          )}
+                          {columnVisibility.suggestion && <td></td>}
+                          {columnVisibility.dimSuggestion && <td></td>}
+                          <td>
+                            <Link
+                              href={`/admin/cases/${id}/ledger/${child.id}`}
+                              className="text-xs text-blue-600 hover:text-blue-800"
+                            >
+                              Bearbeiten
+                            </Link>
+                          </td>
+                        </tr>
+                      );
+                    }
+                  }
+
+                  return rows;
                 })}
               </tbody>
             </table>
