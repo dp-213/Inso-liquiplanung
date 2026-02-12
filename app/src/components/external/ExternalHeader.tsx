@@ -13,8 +13,7 @@ export default function ExternalHeader() {
               </svg>
             </div>
             <div>
-              <span className="font-semibold text-[var(--foreground)]">Liquiditätsplanung</span>
-              <span className="hidden sm:inline text-sm text-[var(--muted)] ml-2">Insolvenzverfahren</span>
+              <span className="font-semibold text-[var(--foreground)]">Gradify Cases</span>
             </div>
           </div>
 

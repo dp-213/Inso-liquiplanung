@@ -122,20 +122,23 @@ export async function GET(
     }
 
     // IST-Werte: LedgerEntries für gesamten Plan-Zeitraum laden
+    // NOTE: Date filter applied in JS (Turso adapter date comparison bug)
     const planEnd = periods[periods.length - 1]?.end;
-    const istEntries = await prisma.ledgerEntry.findMany({
+    const allIstEntries = await prisma.ledgerEntry.findMany({
       where: {
         caseId: id,
         valueType: "IST",
-        transactionDate: {
-          gte: planStart,
-          ...(planEnd ? { lte: planEnd } : {}),
-        },
       },
       select: {
         transactionDate: true,
         amountCents: true,
       },
+    });
+
+    const istEntries = allIstEntries.filter((e) => {
+      if (e.transactionDate < planStart) return false;
+      if (planEnd && e.transactionDate > planEnd) return false;
+      return true;
     });
 
     // IST-Einträge den Perioden zuordnen

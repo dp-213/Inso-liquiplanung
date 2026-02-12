@@ -61,10 +61,10 @@ export default function CustomerLoginPage() {
               </svg>
             </div>
             <h1 className="text-2xl font-bold text-[var(--foreground)]">
-              Kundenportal
+              Gradify Cases
             </h1>
             <p className="text-[var(--muted)] mt-2">
-              Liquiditätsplanung für Insolvenzverwalter
+              Mandantenportal
             </p>
           </div>
 

@@ -43,10 +43,10 @@ export default function LoginPage() {
         <div className="admin-card p-8">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-[var(--foreground)]">
-              Liquiditätsplanung
+              Gradify Cases
             </h1>
             <p className="text-[var(--muted)] mt-2">
-              Internes Kontrollcockpit
+              Administration
             </p>
           </div>
 

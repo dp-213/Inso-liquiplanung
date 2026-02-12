@@ -57,6 +57,11 @@ model Case {
   companyTokens        CompanyToken[]       // Token-Zugänge für externe Firmen
   forecastScenarios    ForecastScenario[]   // Prognose-Szenarien
   paymentBreakdownSources PaymentBreakdownSource[] // Zahlbeleg-Aufschlüsselungen
+  creditors            Creditor[]           // Kreditoren (Ausgaben-Partner)
+  costCategories       CostCategory[]       // Kostenarten für Ausgaben-Planung
+
+  // === FREIGABE-EINSTELLUNGEN ===
+  approvalThresholdCents BigInt?            // Betrag in Cent, unter dem Auto-Approve greift (null = immer manuell)
 
   @@index([ownerId])
   @@map("cases")
@@ -1029,7 +1034,9 @@ model Order {
   requestDate     DateTime @default(now())
   invoiceDate     DateTime // Bei ZAHLUNG: Rechnungsdatum, bei BESTELLUNG: erwartetes Zahlungsdatum
   amountCents     BigInt
-  creditor        String   // Name des Gläubigers/Lieferanten
+  creditor        String   // Name des Gläubigers/Lieferanten (Freitext-Fallback)
+  creditorId      String?  // FK auf Creditor-Stammdaten (optional)
+  costCategoryId  String?  // FK auf Kostenart (optional)
   description     String
   notes           String?  // Ergänzende Informationen (z.B. Kontext, Dringlichkeit)
 
@@ -1040,7 +1047,7 @@ model Order {
   documentContent   String?  // Base64-encoded Dateiinhalt
 
   // Status
-  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED, AUTO_APPROVED
 
   // IV kann abweichenden Betrag genehmigen
   approvedAmountCents BigInt?
@@ -1055,7 +1062,9 @@ model Order {
   ledgerEntryId   String?  @unique
   ledgerEntry     LedgerEntry? @relation(fields: [ledgerEntryId], references: [id], onDelete: SetNull)
 
-  case            Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  case            Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  creditorRef     Creditor?     @relation(fields: [creditorId], references: [id], onDelete: SetNull)
+  costCategory    CostCategory? @relation(fields: [costCategoryId], references: [id], onDelete: SetNull)
 
   createdAt       DateTime @default(now())
 
@@ -1202,4 +1211,56 @@ model PaymentBreakdownItem {
 
   @@index([sourceId])
   @@map("payment_breakdown_items")
+}
+
+// =============================================================================
+// CREDITOR & COST CATEGORY - Kreditoren und Kostenarten für Freigabe-Workflow
+// =============================================================================
+
+// CostCategory - Kostenarten für Ausgaben-Planung und Freigaben
+// Case-spezifisch, parallel zu categoryTag (kein Ersatz!)
+model CostCategory {
+  id           String   @id @default(uuid())
+  caseId       String
+  name         String
+  shortName    String?
+  description  String?
+  budgetCents  BigInt?   // Optionales Monatsbudget in Cent
+  categoryTag  String?   // Mapping auf LedgerEntry.categoryTag (z.B. PERSONAL, MIETE)
+  displayOrder Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  case             Case       @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  orders           Order[]
+  creditorDefaults Creditor[]
+
+  @@unique([caseId, name])
+  @@index([caseId])
+  @@map("cost_categories")
+}
+
+// Creditor - Kreditoren (Lieferanten, Dienstleister, Behörden)
+// Separate Entity von Counterparty (Einnahmen-Partner)
+model Creditor {
+  id                    String   @id @default(uuid())
+  caseId                String
+  name                  String
+  shortName             String?
+  iban                  String?
+  taxId                 String?    // USt-ID
+  category              String?    // LIEFERANT, DIENSTLEISTER, BEHOERDE, SONSTIGE
+  defaultCostCategoryId String?
+  notes                 String?
+  displayOrder          Int      @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  case                Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  defaultCostCategory CostCategory? @relation(fields: [defaultCostCategoryId], references: [id], onDelete: SetNull)
+  orders              Order[]
+
+  @@index([caseId])
+  @@map("creditors")
 }

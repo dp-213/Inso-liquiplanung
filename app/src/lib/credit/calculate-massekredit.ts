@@ -246,14 +246,14 @@ async function sumAltforderungen(
   asOfDate?: Date
 ): Promise<bigint> {
   // Alle positiven Einträge (Einnahmen) für diese Bank mit Altmasse-Zuordnung (exclude split parents)
-  const entries = await prisma.ledgerEntry.findMany({
+  // NOTE: Date filter applied in JS (Turso adapter date comparison bug)
+  const allEntries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
       bankAccountId,
       valueType: 'IST',
       ...EXCLUDE_SPLIT_PARENTS,
       amountCents: { gt: 0 }, // Nur Einnahmen
-      ...(asOfDate && { transactionDate: { lte: asOfDate } }),
       OR: [
         { estateAllocation: EstateAllocation.ALTMASSE },
         { estateAllocation: EstateAllocation.MIXED },
@@ -263,8 +263,13 @@ async function sumAltforderungen(
       amountCents: true,
       estateAllocation: true,
       estateRatio: true,
+      transactionDate: true,
     },
   });
+
+  const entries = asOfDate
+    ? allEntries.filter((e) => e.transactionDate <= asOfDate)
+    : allEntries;
 
   let total = BigInt(0);
 

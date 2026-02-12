@@ -143,23 +143,23 @@ export async function GET(
       plan.periodType as 'WEEKLY' | 'MONTHLY'
     );
 
-    // Build query
+    // Build query (NOTE: Date filter applied in JS - Turso adapter date comparison bug)
     const where: Record<string, unknown> = {
       caseId,
-      transactionDate: {
-        gte: periodStart,
-        lt: periodEnd,
-      },
     };
 
     if (valueType && Object.values(VALUE_TYPES).includes(valueType)) {
       where.valueType = valueType;
     }
 
-    // Fetch entries
-    const entries = await prisma.ledgerEntry.findMany({
+    // Fetch entries, filter dates in JS
+    const allEntries = await prisma.ledgerEntry.findMany({
       where,
       orderBy: { transactionDate: 'asc' },
+    });
+
+    const entries = allEntries.filter((e) => {
+      return e.transactionDate >= periodStart && e.transactionDate < periodEnd;
     });
 
     // Calculate totals

@@ -58,7 +58,7 @@ export default function AdminShell({ username, children }: AdminShellProps) {
           <div className="flex items-center gap-6">
             <Link href="/admin" className="flex items-center shrink-0">
               <img src="/favicon.png" alt="Gradify" className="h-7 w-auto mr-2" />
-              <span className="font-bold text-[var(--foreground)] hidden sm:inline">Gradify</span>
+              <span className="font-bold text-[var(--foreground)] hidden sm:inline">Gradify Cases</span>
             </Link>
 
             {/* Desktop Nav */}

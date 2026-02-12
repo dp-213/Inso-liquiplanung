@@ -58,10 +58,7 @@ export default function CustomerHeader({
             )}
             <div>
               <span className="font-semibold text-[var(--foreground)]">
-                Liquiditätsplanung
-              </span>
-              <span className="hidden sm:inline text-sm text-[var(--muted)] ml-2">
-                Kundenportal
+                Gradify Cases
               </span>
             </div>
           </Link>

@@ -4,6 +4,32 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.33.0 – Turso Date-Filter-Bugfix (Production-Fix)
+
+**Datum:** 12. Februar 2026
+
+### Bugfixes
+
+- **Kritisch: Prisma/Turso Date-Vergleiche repariert.** `@prisma/adapter-libsql` v6.19.2 generiert fehlerhafte SQL-Vergleiche für Date-Objekte auf Turso (Dates als INT ms gespeichert, Adapter vergleicht als Strings). Fix: Date-Filter aus Prisma WHERE entfernt, stattdessen JS-Post-Filter. Betrifft 7 Stellen:
+  - `aggregateByCounterparty()` in `lib/ledger/aggregation.ts`
+  - `aggregateEstateAllocation()` in `lib/ledger/aggregation.ts`
+  - `getLedgerEntriesForPeriod()` in `lib/ledger/aggregation.ts`
+  - `sumAltforderungen()` in `lib/credit/calculate-massekredit.ts`
+  - Zahlungsverifikation-Route (`api/cases/[id]/zahlungsverifikation`)
+  - Ledger-Route (`api/cases/[id]/ledger`) – inkl. Pagination-Refactor auf JS
+  - Period-Route (`api/cases/[id]/ledger/period/[periodIndex]`)
+  - Breakdown-Route (`api/cases/[id]/ledger/breakdown`) – Zahlbeleg-Matching
+- **Turso-Schema synchronisiert.** Fehlende Spalten/Tabellen auf Production nachgezogen: `cases.approvalThresholdCents`, `cost_categories`-Tabelle, `creditors`-Tabelle, `orders.creditorId`/`costCategoryId`.
+- **Debug-Code entfernt.** Temporäre Debug-Queries und `_debug`-Response-Feld aus Revenue-API bereinigt.
+
+### Technische Details
+
+- Workaround-Pattern: Prisma-Query ohne Date-Filter → JS `.filter()` mit Date-Vergleich
+- Haupt-Ledger-Route: Pagination und Aggregation komplett in JS statt via Prisma `take`/`skip`/`aggregate`
+- Root Cause: `@prisma/adapter-libsql` Bug bei DateTime-Spalten auf Turso/libSQL
+
+---
+
 ## Version 2.32.0 – Zahlbeleg-Aufschlüsselung (wiederkehrender Workflow)
 
 **Datum:** 12. Februar 2026

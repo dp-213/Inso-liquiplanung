@@ -64,6 +64,8 @@ export default function CaseSidebar({
       items: [
         { name: "Bankkonten", href: `${base}/bank-accounts` },
         { name: "Gegenparteien", href: `${base}/counterparties` },
+        { name: "Kreditoren", href: `${base}/creditors` },
+        { name: "Kostenarten", href: `${base}/cost-categories` },
         { name: "Standorte", href: `${base}/locations` },
       ],
     },

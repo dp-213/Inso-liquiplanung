@@ -284,6 +284,7 @@ cd app && npm run build
 | Import-Script erkennt Duplikate nicht | Script prüft nur exakten String-Match bei Description. Verschiedene JSON-Quellen mit leicht anderen Texten → Duplikate. Immer `(bankAccountId + transactionDate + amountCents)` prüfen! |
 | `importRowNumber === 0` ist falsy | JavaScript: `0` ist falsy! Bei Bedingungen `!== null` oder `!== undefined` verwenden, NICHT `if (value)` |
 | AI-extrahierte IBANs/Beträge falsch | AI halluziniert regelmäßig IBANs, Kontonummern, Beträge! **JEDES** PDF einzeln lesen und Cent-genau gegen JSON prüfen. Incident 12.02: 100% der 19 IBANs waren fabriziert! (ADR-042) |
+| Prisma Date-Filter auf Turso liefert 0 Ergebnisse | `@prisma/adapter-libsql` v6.19.2 Bug: `transactionDate: { gte, lte }` in Prisma WHERE funktioniert NICHT auf Turso! Date-Filter IMMER in JS statt Prisma. Siehe ADR-046. `grep -r "Turso adapter date comparison bug"` |
 
 ### Daten-Import Sicherheitsregeln
 

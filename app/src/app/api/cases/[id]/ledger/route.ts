@@ -270,61 +270,68 @@ export async function GET(
       where.transferPartnerEntryId = null;
     }
 
-    if (from || to) {
-      where.transactionDate = {};
-      if (from) {
-        (where.transactionDate as Record<string, Date>).gte = new Date(from);
-      }
-      if (to) {
-        (where.transactionDate as Record<string, Date>).lte = new Date(to);
+    // NOTE: Date filter is applied in JS, NOT in Prisma query.
+    // Prisma's @prisma/adapter-libsql has a bug where Date comparisons
+    // fail on Turso (dates stored as INT ms, adapter compares as strings).
+    const dateFrom = from ? new Date(from) : undefined;
+    const dateTo = to ? new Date(to) : undefined;
+
+    // Fetch all matching entries (without date filter), then filter + paginate in JS
+    const allEntries = await prisma.ledgerEntry.findMany({
+      where,
+      include: {
+        splitChildren: {
+          select: {
+            id: true,
+            description: true,
+            amountCents: true,
+            counterpartyId: true,
+            locationId: true,
+            categoryTag: true,
+            reviewStatus: true,
+            note: true,
+          },
+        },
+      },
+      orderBy: { transactionDate: 'asc' },
+    });
+
+    // Apply date filter in JS
+    const dateFiltered = (dateFrom || dateTo)
+      ? allEntries.filter((e) => {
+          if (dateFrom && e.transactionDate < dateFrom) return false;
+          if (dateTo && e.transactionDate > dateTo) return false;
+          return true;
+        })
+      : allEntries;
+
+    // Paginate in JS
+    const total = dateFiltered.length;
+    const entries = dateFiltered.slice(offset, offset + limit);
+
+    // Calculate stats from date-filtered entries (excl. transfers + split parents)
+    let totalInflows = BigInt(0);
+    let totalOutflows = BigInt(0);
+    let transferVolume = BigInt(0);
+
+    for (const e of dateFiltered) {
+      const isTransferEntry = e.transferPartnerEntryId !== null;
+      const isSplitParent = e.splitChildren && e.splitChildren.length > 0;
+
+      if (isTransferEntry) {
+        if (e.amountCents >= BigInt(0)) {
+          transferVolume += e.amountCents;
+        }
+      } else if (!isSplitParent) {
+        if (e.amountCents >= BigInt(0)) {
+          totalInflows += e.amountCents;
+        } else {
+          totalOutflows += e.amountCents;
+        }
       }
     }
 
-    // Stats-Where: Transfers UND Split-Parents aus Summen ausschließen
-    const statsWhere = { ...where, transferPartnerEntryId: null, ...EXCLUDE_SPLIT_PARENTS };
-
-    // Fetch entries and stats (inkl. splitChildren für Batch-Erkennung)
-    const [entries, total, inflowStats, outflowStats, transferVolumeStats] = await Promise.all([
-      prisma.ledgerEntry.findMany({
-        where,
-        include: {
-          splitChildren: {
-            select: {
-              id: true,
-              description: true,
-              amountCents: true,
-              counterpartyId: true,
-              locationId: true,
-              categoryTag: true,
-              reviewStatus: true,
-              note: true,
-            },
-          },
-        },
-        orderBy: { transactionDate: 'asc' },
-        take: limit,
-        skip: offset,
-      }),
-      prisma.ledgerEntry.count({ where }),
-      prisma.ledgerEntry.aggregate({
-        where: { ...statsWhere, amountCents: { gte: 0 } },
-        _sum: { amountCents: true },
-      }),
-      prisma.ledgerEntry.aggregate({
-        where: { ...statsWhere, amountCents: { lt: 0 } },
-        _sum: { amountCents: true },
-      }),
-      // Transfer-Volumen: Nur positive Seite (um Doppelzählung zu vermeiden)
-      prisma.ledgerEntry.aggregate({
-        where: { ...where, transferPartnerEntryId: { not: null }, amountCents: { gte: 0 } },
-        _sum: { amountCents: true },
-      }),
-    ]);
-
-    const totalInflows = inflowStats._sum.amountCents || BigInt(0);
-    const totalOutflows = outflowStats._sum.amountCents || BigInt(0);
     const netAmount = totalInflows + totalOutflows;
-    const transferVolume = transferVolumeStats._sum.amountCents || BigInt(0);
 
     // Transform to response format (inkl. splitChildren + isBatchParent)
     const response = entries.map((entry) => ({

@@ -13,8 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Gradify | Inso-Liquiplanung",
-  description: "Liquiditätsplanung für Insolvenzverfahren",
+  title: "Gradify Cases | Structured Case Management",
+  description: "Structured Case Management Platform",
+  openGraph: {
+    title: "Gradify Cases | Structured Case Management",
+    description: "Structured Case Management Platform",
+    siteName: "Gradify Cases",
+  },
 };
 
 export default function RootLayout({

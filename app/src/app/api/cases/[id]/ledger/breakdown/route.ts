@@ -207,17 +207,21 @@ export async function POST(
         const dateTo = new Date(executionDate);
         dateTo.setDate(dateTo.getDate() + 3);
 
-        const candidates = await prisma.ledgerEntry.findMany({
+        // NOTE: Date filter applied in JS (Turso adapter date comparison bug)
+        const allCandidates = await prisma.ledgerEntry.findMany({
           where: {
             caseId,
             bankAccountId,
             amountCents: ledgerAmountCents,
-            transactionDate: { gte: dateFrom, lte: dateTo },
             parentEntryId: null, // Kein Child
             splitChildren: { none: {} }, // Hat keine Children
           },
           select: { id: true, description: true, transactionDate: true },
         });
+
+        const candidates = allCandidates.filter((c) =>
+          c.transactionDate >= dateFrom && c.transactionDate <= dateTo
+        );
 
         // Bevorzuge Einträge mit "SAMMEL" in Beschreibung
         const sammelCandidates = candidates.filter(c =>

@@ -21,6 +21,7 @@ interface CaseData {
   filingDate: string;
   openingDate: string | null;
   cutoffDate: string | null;  // Stichtag für Alt/Neu-Masse
+  approvalThresholdCents: string | null; // BigInt als String
   status: string;
   owner: { id: string; name: string; email: string };
   plans: Array<{
@@ -55,6 +56,7 @@ export default function CaseEditPage({
     openingDate: "",
     cutoffDate: "",  // Stichtag für Alt/Neu-Masse
     status: "",
+    approvalThresholdEur: "",  // Freigabe-Schwellwert in EUR
   });
   const [planFormData, setPlanFormData] = useState({
     name: "",
@@ -91,6 +93,9 @@ export default function CaseEditPage({
             ? new Date(data.cutoffDate).toISOString().split("T")[0]
             : "",
           status: data.status,
+          approvalThresholdEur: data.approvalThresholdCents
+            ? (Number(data.approvalThresholdCents) / 100).toFixed(2)
+            : "",
         });
         // Set plan data if active plan exists
         const activePlan = data.plans?.find((p: { isActive: boolean }) => p.isActive);
@@ -123,6 +128,10 @@ export default function CaseEditPage({
 
     try {
       // Save case data
+      const approvalThresholdCents = formData.approvalThresholdEur
+        ? Math.round(parseFloat(formData.approvalThresholdEur) * 100)
+        : null;
+
       const caseRes = await fetch(`/api/cases/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -134,6 +143,7 @@ export default function CaseEditPage({
           openingDate: formData.openingDate || null,
           cutoffDate: formData.cutoffDate || null,
           status: formData.status,
+          approvalThresholdCents,
         }),
       });
 
@@ -409,6 +419,46 @@ export default function CaseEditPage({
                 <li>• <strong>Neumasse:</strong> Leistungen NACH dem Stichtag</li>
                 <li>• <strong>Mixed:</strong> Leistungszeitraum überlappt Stichtag</li>
                 <li>• <strong>Unklar:</strong> Kein Leistungsdatum vorhanden</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        {/* Freigabe-Einstellungen */}
+        <div className="pt-6 border-t border-[var(--border)]">
+          <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">Freigabe-Einstellungen</h3>
+          <p className="text-sm text-[var(--muted)] mb-4">
+            Konfiguriert die automatische Freigabe von Bestell- und Zahlungsanfragen.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label
+                htmlFor="approvalThresholdEur"
+                className="block text-sm font-medium text-[var(--foreground)] mb-2"
+              >
+                Auto-Freigabe-Schwellwert (EUR)
+              </label>
+              <input
+                type="number"
+                id="approvalThresholdEur"
+                step="0.01"
+                min="0"
+                value={formData.approvalThresholdEur}
+                onChange={(e) => setFormData({ ...formData, approvalThresholdEur: e.target.value })}
+                className="input-field"
+                placeholder="z.B. 500.00"
+              />
+              <p className="text-xs text-[var(--muted)] mt-1">
+                Anfragen unter diesem Betrag werden automatisch freigegeben. Leer = immer manuell.
+              </p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <h4 className="text-sm font-medium text-amber-800 mb-2">Wie funktioniert Auto-Freigabe?</h4>
+              <ul className="text-xs text-amber-700 space-y-1">
+                <li>• Anfragen <strong>unter</strong> dem Schwellwert werden sofort freigegeben</li>
+                <li>• Ein LedgerEntry wird automatisch erstellt (PLAN, Neumasse)</li>
+                <li>• Der Status wird auf <strong>AUTO_APPROVED</strong> gesetzt</li>
+                <li>• Anfragen <strong>über</strong> dem Schwellwert bleiben zur manuellen Prüfung</li>
               </ul>
             </div>
           </div>

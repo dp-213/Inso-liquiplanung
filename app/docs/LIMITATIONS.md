@@ -22,6 +22,16 @@ Alle Kunden teilen eine Datenbank. Trennung erfolgt per `caseId`/`customerId`.
 
 ---
 
+## Datenbank-Einschränkungen
+
+### Prisma/Turso: Keine Date-Vergleiche in WHERE-Klauseln
+
+`@prisma/adapter-libsql` v6.19.2 generiert fehlerhafte SQL für Date-Vergleiche auf Turso. `transactionDate: { gte: new Date(), lte: new Date() }` gibt immer 0 Ergebnisse zurück.
+**Workaround:** Date-Filter in JavaScript statt in Prisma WHERE (ADR-046). Betrifft 7+ Stellen, markiert mit `// NOTE: Date filter applied in JS (Turso adapter date comparison bug)`.
+**Rückbau:** Bei Prisma v7.x oder Adapter-Fix prüfen. `grep -r "Turso adapter date comparison bug"` findet alle Stellen.
+
+---
+
 ## Funktionale Einschränkungen
 
 ### Keine Währungsumrechnung

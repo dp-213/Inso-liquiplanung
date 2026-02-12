@@ -314,17 +314,18 @@ export async function getLedgerEntriesForPeriod(
     plan.periodType as 'WEEKLY' | 'MONTHLY'
   );
 
-  return prisma.ledgerEntry.findMany({
+  // NOTE: Date filter applied in JS (Turso adapter date comparison bug)
+  const allEntries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
       valueType,
       ...EXCLUDE_SPLIT_PARENTS,
-      transactionDate: {
-        gte: periodStart,
-        lt: periodEnd,
-      },
     },
     orderBy: { transactionDate: 'asc' },
+  });
+
+  return allEntries.filter((entry) => {
+    return entry.transactionDate >= periodStart && entry.transactionDate < periodEnd;
   });
 }
 
@@ -716,26 +717,18 @@ export async function aggregateByCounterparty(
   const flowType = options?.flowType || 'INFLOW';
   const scope = options?.scope || 'GLOBAL';
 
-  // Build date filter
-  const dateFilter: { gte?: Date; lte?: Date } = {};
-  if (options?.startDate) {
-    dateFilter.gte = options.startDate;
-  }
-  if (options?.endDate) {
-    dateFilter.lte = options.endDate;
-  }
-
   // Build location filter based on scope
   const locationFilter: { in?: string[] } | undefined =
     scope !== 'GLOBAL' ? { in: SCOPE_LOCATION_IDS[scope] } : undefined;
 
-  // Get entries with counterparty and location (exclude split parents)
+  // NOTE: Date filter is applied in JS, NOT in Prisma query.
+  // Prisma's @prisma/adapter-libsql has a bug where Date comparisons
+  // fail on Turso (dates stored as INT ms, adapter compares as strings).
   const entries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
-      valueType: 'IST', // Nur IST-Einnahmen (keine PLAN)
+      valueType: 'IST',
       ...EXCLUDE_SPLIT_PARENTS,
-      ...(Object.keys(dateFilter).length > 0 ? { transactionDate: dateFilter } : {}),
       ...(flowType === 'INFLOW' ? { amountCents: { gt: 0 } } : {}),
       ...(flowType === 'OUTFLOW' ? { amountCents: { lt: 0 } } : {}),
       ...(locationFilter ? { locationId: locationFilter } : {}),
@@ -747,7 +740,14 @@ export async function aggregateByCounterparty(
     orderBy: { transactionDate: 'asc' },
   });
 
-  return entries.map((entry) => {
+  // Apply date filter in JS (workaround for Turso adapter date comparison bug)
+  const filteredEntries = entries.filter((entry) => {
+    if (options?.startDate && entry.transactionDate < options.startDate) return false;
+    if (options?.endDate && entry.transactionDate > options.endDate) return false;
+    return true;
+  });
+
+  return filteredEntries.map((entry) => {
     const periodIndex = calculatePeriodIndex({
       transactionDate: entry.transactionDate,
       planStartDate: plan.planStartDate,
@@ -884,26 +884,16 @@ export async function aggregateEstateAllocation(
 ): Promise<EstateAllocationSummary> {
   const scope = options?.scope || 'GLOBAL';
 
-  // Build date filter
-  const dateFilter: { gte?: Date; lte?: Date } = {};
-  if (options?.startDate) {
-    dateFilter.gte = options.startDate;
-  }
-  if (options?.endDate) {
-    dateFilter.lte = options.endDate;
-  }
-
   // Build location filter based on scope
   const locationFilter: { in?: string[] } | undefined =
     scope !== 'GLOBAL' ? { in: SCOPE_LOCATION_IDS[scope] } : undefined;
 
-  // Get ALL IST entries (exclude split parents)
-  const entries = await prisma.ledgerEntry.findMany({
+  // NOTE: Date filter applied in JS (Turso adapter date comparison bug)
+  const allEntries = await prisma.ledgerEntry.findMany({
     where: {
       caseId,
-      valueType: 'IST', // Nur IST-Einträge
+      valueType: 'IST',
       ...EXCLUDE_SPLIT_PARENTS,
-      ...(Object.keys(dateFilter).length > 0 ? { transactionDate: dateFilter } : {}),
       ...(locationFilter ? { locationId: locationFilter } : {}),
     },
     select: {
@@ -911,7 +901,15 @@ export async function aggregateEstateAllocation(
       amountCents: true,
       estateAllocation: true,
       estateRatio: true,
+      transactionDate: true,
     },
+  });
+
+  // Apply date filter in JS (workaround for Turso adapter date comparison bug)
+  const entries = allEntries.filter((entry) => {
+    if (options?.startDate && entry.transactionDate < options.startDate) return false;
+    if (options?.endDate && entry.transactionDate > options.endDate) return false;
+    return true;
   });
 
   let altmasseInflowCents = BigInt(0);

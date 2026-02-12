@@ -85,7 +85,7 @@ export async function PUT(
 
     const { id } = await params;
     const body = await request.json();
-    const { caseNumber, debtorName, courtName, filingDate, openingDate, cutoffDate, status } = body;
+    const { caseNumber, debtorName, courtName, filingDate, openingDate, cutoffDate, status, approvalThresholdCents } = body;
 
     // Check if case number is being changed and already exists
     if (caseNumber) {
@@ -118,11 +118,22 @@ export async function PUT(
           cutoffDate: cutoffDate ? new Date(cutoffDate) : null,
         }),
         ...(status && { status }),
+        ...(approvalThresholdCents !== undefined && {
+          approvalThresholdCents: approvalThresholdCents !== null
+            ? BigInt(approvalThresholdCents)
+            : null,
+        }),
         updatedBy: session.username,
       },
     });
 
-    return NextResponse.json(updatedCase);
+    const serialized = JSON.parse(
+      JSON.stringify(updatedCase, (_, value) =>
+        typeof value === "bigint" ? value.toString() : value
+      )
+    );
+
+    return NextResponse.json(serialized);
   } catch (error) {
     console.error("Error updating case:", error);
     return NextResponse.json(

@@ -20,34 +20,48 @@ export default async function AdminOrdersPage({ params }: PageProps) {
 
     if (!caseData) notFound();
 
-    // Orders laden (OHNE documentContent – wird nur via Download-API geladen)
-    const orders = await prisma.order.findMany({
-        where: { caseId },
-        orderBy: { createdAt: "desc" },
-        select: {
-            id: true,
-            type: true,
-            caseId: true,
-            requestDate: true,
-            invoiceDate: true,
-            amountCents: true,
-            approvedAmountCents: true,
-            creditor: true,
-            description: true,
-            notes: true,
-            documentName: true,
-            documentMimeType: true,
-            documentSizeBytes: true,
-            // documentContent: BEWUSST AUSGELASSEN (bis 10MB pro Beleg!)
-            status: true,
-            approvedAt: true,
-            approvedBy: true,
-            rejectedAt: true,
-            rejectionReason: true,
-            ledgerEntryId: true,
-            createdAt: true,
-        },
-    });
+    // Orders, Creditors und CostCategories parallel laden
+    const [orders, creditors, costCategories] = await Promise.all([
+        prisma.order.findMany({
+            where: { caseId },
+            orderBy: { createdAt: "desc" },
+            select: {
+                id: true,
+                type: true,
+                caseId: true,
+                requestDate: true,
+                invoiceDate: true,
+                amountCents: true,
+                approvedAmountCents: true,
+                creditor: true,
+                creditorId: true,
+                costCategoryId: true,
+                description: true,
+                notes: true,
+                documentName: true,
+                documentMimeType: true,
+                documentSizeBytes: true,
+                // documentContent: BEWUSST AUSGELASSEN (bis 10MB pro Beleg!)
+                status: true,
+                approvedAt: true,
+                approvedBy: true,
+                rejectedAt: true,
+                rejectionReason: true,
+                ledgerEntryId: true,
+                createdAt: true,
+            },
+        }),
+        prisma.creditor.findMany({
+            where: { caseId },
+            select: { id: true, name: true, shortName: true },
+            orderBy: { name: "asc" },
+        }),
+        prisma.costCategory.findMany({
+            where: { caseId, isActive: true },
+            select: { id: true, name: true, shortName: true },
+            orderBy: { name: "asc" },
+        }),
+    ]);
 
     // BigInt-Serialisierung für Client Components
     const serializedOrders = JSON.parse(JSON.stringify(orders, (_key, value) =>
@@ -56,6 +70,9 @@ export default async function AdminOrdersPage({ params }: PageProps) {
 
     const pendingOrders = serializedOrders.filter((o: { status: string }) => o.status === "PENDING");
     const historyOrders = serializedOrders.filter((o: { status: string }) => o.status !== "PENDING");
+
+    const serializedCreditors = creditors.map(c => ({ id: c.id, name: c.name, shortName: c.shortName }));
+    const serializedCostCategories = costCategories.map(c => ({ id: c.id, name: c.name, shortName: c.shortName }));
 
     return (
         <div className="space-y-6">
@@ -73,7 +90,7 @@ export default async function AdminOrdersPage({ params }: PageProps) {
                     </h3>
                 </div>
                 <div className="p-0">
-                    <OrderList orders={pendingOrders} caseId={caseId} isPending={true} />
+                    <OrderList orders={pendingOrders} caseId={caseId} isPending={true} creditors={serializedCreditors} costCategories={serializedCostCategories} />
                 </div>
             </div>
 
@@ -85,7 +102,7 @@ export default async function AdminOrdersPage({ params }: PageProps) {
                         </h3>
                     </div>
                     <div className="p-0">
-                        <OrderList orders={historyOrders} caseId={caseId} isPending={false} />
+                        <OrderList orders={historyOrders} caseId={caseId} isPending={false} creditors={serializedCreditors} costCategories={serializedCostCategories} />
                     </div>
                 </div>
             )}

@@ -4,6 +4,40 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-046: Turso Date-Filter-Workaround (JS statt Prisma WHERE)
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert (temporärer Workaround)
+
+### Kontext
+
+Revenue-Tab auf Production zeigte „Keine Einnahmen" trotz 535 Entries in Turso. Diagnose ergab: `@prisma/adapter-libsql` v6.19.2 generiert fehlerhafte SQL-Vergleiche für Date-Objekte. Turso speichert DateTime als INTEGER (Millisekunden seit Epoch), der Adapter vergleicht jedoch als Strings. Ergebnis: `transactionDate >= '2025-08-12T...'` matcht nie gegen INT-Werte.
+
+**Beweis:** `count({ where: { transactionDate: { gte, lte } } })` → 0, aber `count({})` auf gleichen Daten → 535.
+
+### Entscheidung
+
+1. **Date-Filter aus allen Prisma WHERE-Klauseln entfernen** wo DateTime-Vergleiche auf Turso fehlschlagen
+2. **JS-Post-Filter statt DB-Filter:** Alle Entries ohne Date-Filter fetchen, dann in JavaScript filtern
+3. **Pagination in JS** für die Haupt-Ledger-Route (vorher Prisma `take`/`skip`, jetzt `Array.slice()`)
+4. **Kommentar-Convention:** Jede betroffene Stelle bekommt den Kommentar `// NOTE: Date filter applied in JS (Turso adapter date comparison bug)`
+
+### Begründung
+
+- Adapter-Bug liegt außerhalb unserer Kontrolle (Prisma-seitiges Problem)
+- Die Datenmenge ist klein genug (~700 Entries pro Case) für JS-Filterung
+- Korrektheit hat Vorrang vor Performance
+- Der Workaround ist lokalisiert und leicht rückgängig zu machen
+
+### Konsequenzen
+
+- **Performance:** Alle Entries werden geladen statt nur gefilterte → bei aktueller Datenmenge (<1000 Entries) irrelevant
+- **Wartung:** Bei Prisma/Adapter-Update (v7.x) prüfen ob Bug gefixt, dann Workaround rückbauen
+- **Konsistenz:** Alle 7+ Stellen mit Date-Filtern müssen den Workaround nutzen – neue Date-Filter in Prisma-Queries sind auf Turso verboten
+- **Suchbar:** `grep -r "Turso adapter date comparison bug"` findet alle betroffenen Stellen
+
+---
+
 ## ADR-045: Zahlbeleg-Aufschlüsselung als persistierter, wiederkehrender Workflow
 
 **Datum:** 12. Februar 2026

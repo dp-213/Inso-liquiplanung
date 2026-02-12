@@ -18,6 +18,8 @@ export async function POST(req: NextRequest) {
     const token = formData.get("token") as string;
     const type = (formData.get("type") as string) || "ZAHLUNG";
     const creditor = formData.get("creditor") as string;
+    const creditorId = formData.get("creditorId") as string | null;
+    const costCategoryId = formData.get("costCategoryId") as string | null;
     const description = formData.get("description") as string;
     const amountCents = formData.get("amountCents") as string;
     const invoiceDate = formData.get("invoiceDate") as string;
@@ -98,14 +100,85 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 5. Order erstellen
+    // 5. Auto-Approve prüfen
+    const caseData = companyToken.case;
+    const amountBigInt = BigInt(parsedAmount);
+    const shouldAutoApprove =
+      caseData.approvalThresholdCents !== null &&
+      amountBigInt <= caseData.approvalThresholdCents;
+
+    // 6. Order erstellen (ggf. mit Auto-Approve + LedgerEntry in einer Transaktion)
+    if (shouldAutoApprove) {
+      const result = await prisma.$transaction(async (tx) => {
+        const typeLabel = type === "BESTELLUNG" ? "Bestellfreigabe" : "Zahlungsfreigabe";
+
+        const ledgerEntry = await tx.ledgerEntry.create({
+          data: {
+            caseId: companyToken.caseId,
+            transactionDate: parsedDate,
+            amountCents: -amountBigInt,
+            description: `${creditor}: ${description}`,
+            valueType: "PLAN",
+            legalBucket: "MASSE",
+            estateAllocation: "NEUMASSE",
+            allocationSource: "MANUELL",
+            allocationNote: `Auto-${typeLabel} (unter Schwellwert)`,
+            bookingSource: "MANUAL",
+            note: `Automatisch freigegebene ${typeLabel}`,
+            createdBy: "system",
+          },
+        });
+
+        const order = await tx.order.create({
+          data: {
+            caseId: companyToken.caseId,
+            type,
+            creditor,
+            creditorId: creditorId || null,
+            costCategoryId: costCategoryId || null,
+            description,
+            amountCents: amountBigInt,
+            invoiceDate: parsedDate,
+            notes: notes || null,
+            documentName,
+            documentMimeType,
+            documentSizeBytes,
+            documentContent,
+            status: "AUTO_APPROVED",
+            approvedAt: new Date(),
+            approvedBy: "system",
+            ledgerEntryId: ledgerEntry.id,
+          },
+        });
+
+        // bookingReference nachträglich setzen (braucht Order-ID)
+        await tx.ledgerEntry.update({
+          where: { id: ledgerEntry.id },
+          data: { bookingReference: `ORDER-${order.id.slice(0, 8)}` },
+        });
+
+        return order;
+      });
+
+      const typeLabel = type === "BESTELLUNG" ? "Bestellanfrage" : "Zahlungsanfrage";
+      return NextResponse.json({
+        success: true,
+        orderId: result.id,
+        autoApproved: true,
+        message: `${typeLabel} automatisch freigegeben (unter Schwellwert)`,
+      });
+    }
+
+    // Kein Auto-Approve: Normal als PENDING erstellen
     const order = await prisma.order.create({
       data: {
         caseId: companyToken.caseId,
         type,
         creditor,
+        creditorId: creditorId || null,
+        costCategoryId: costCategoryId || null,
         description,
-        amountCents: BigInt(parsedAmount),
+        amountCents: amountBigInt,
         invoiceDate: parsedDate,
         notes: notes || null,
         documentName,

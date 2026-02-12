@@ -10,6 +10,8 @@ interface SerializedOrder {
     id: string;
     type: string;
     creditor: string;
+    creditorId?: string | null;
+    costCategoryId?: string | null;
     description: string;
     notes?: string | null;
     amountCents: string | number;
@@ -22,17 +24,31 @@ interface SerializedOrder {
     rejectionReason?: string | null;
 }
 
+interface CreditorRef {
+    id: string;
+    name: string;
+    shortName: string | null;
+}
+
+interface CostCategoryRef {
+    id: string;
+    name: string;
+    shortName: string | null;
+}
+
 interface OrderListProps {
     orders: SerializedOrder[];
     caseId: string;
     isPending: boolean;
+    creditors?: CreditorRef[];
+    costCategories?: CostCategoryRef[];
 }
 
 type SortField = "date" | "amount" | "creditor";
 type SortDir = "asc" | "desc";
 type TypeFilter = "ALL" | "BESTELLUNG" | "ZAHLUNG";
 
-export function OrderList({ orders, caseId, isPending }: OrderListProps) {
+export function OrderList({ orders, caseId, isPending, creditors = [], costCategories = [] }: OrderListProps) {
     const router = useRouter();
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [rejectingOrder, setRejectingOrder] = useState<SerializedOrder | null>(null);
@@ -307,6 +323,14 @@ export function OrderList({ orders, caseId, isPending }: OrderListProps) {
                                     </td>
                                     <td className="px-6 py-4 text-sm font-medium text-gray-900">
                                         <div className="whitespace-nowrap">{order.creditor}</div>
+                                        {order.costCategoryId && (() => {
+                                            const cat = costCategories.find(c => c.id === order.costCategoryId);
+                                            return cat ? (
+                                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700 mt-0.5">
+                                                    {cat.shortName || cat.name}
+                                                </span>
+                                            ) : null;
+                                        })()}
                                         <div className="sm:hidden text-xs text-gray-500 font-normal mt-0.5 truncate max-w-[200px]" title={order.description}>
                                             {order.description}
                                         </div>
@@ -381,14 +405,22 @@ export function OrderList({ orders, caseId, isPending }: OrderListProps) {
                                                 </button>
                                             </div>
                                         ) : (
-                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${order.status === "APPROVED"
+                                            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
+                                                order.status === "APPROVED"
                                                     ? "bg-green-100 text-green-800"
+                                                    : order.status === "AUTO_APPROVED"
+                                                    ? "bg-blue-100 text-blue-800"
                                                     : "bg-red-100 text-red-800"
                                                 }`}>
                                                 {order.status === "APPROVED" ? (
                                                     <>
                                                         <Check className="h-3 w-3 mr-1" />
                                                         Freigegeben
+                                                    </>
+                                                ) : order.status === "AUTO_APPROVED" ? (
+                                                    <>
+                                                        <Check className="h-3 w-3 mr-1" />
+                                                        Auto-Freigabe
                                                     </>
                                                 ) : (
                                                     <>
