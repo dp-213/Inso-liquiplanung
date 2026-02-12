@@ -14,11 +14,14 @@ export async function GET(
   const { id } = await params;
 
   try {
-    // Hole Case mit Locations
+    // Hole Case mit Locations und BankAccounts
     const caseData = await prisma.case.findUnique({
       where: { id },
       include: {
         locations: true,
+        bankAccounts: {
+          orderBy: { displayOrder: 'asc' },
+        },
       },
     });
 
@@ -38,6 +41,90 @@ export async function GET(
     // Berechne Gesamtstatistiken
     let totalInflows = BigInt(0);
     let totalOutflows = BigInt(0);
+
+    for (const entry of entries) {
+      if (entry.amountCents >= 0) {
+        totalInflows += entry.amountCents;
+      } else {
+        totalOutflows += entry.amountCents;
+      }
+    }
+
+    // === Gruppierung nach Kontentyp (ISK vs. Gläubigerkonten) ===
+    const iskAccounts: Record<string, {
+      accountId: string;
+      accountName: string;
+      bankName: string;
+      iban: string | null;
+      inflows: bigint;
+      outflows: bigint;
+      count: number;
+      entries: typeof entries;
+    }> = {};
+
+    const glaeubigerAccounts: Record<string, {
+      accountId: string;
+      accountName: string;
+      bankName: string;
+      iban: string | null;
+      inflows: bigint;
+      outflows: bigint;
+      count: number;
+      entries: typeof entries;
+    }> = {};
+
+    // Initialisiere BankAccounts
+    for (const account of caseData.bankAccounts) {
+      const target = account.isLiquidityRelevant ? iskAccounts : glaeubigerAccounts;
+      target[account.id] = {
+        accountId: account.id,
+        accountName: account.accountName,
+        bankName: account.bankName,
+        iban: account.iban,
+        inflows: BigInt(0),
+        outflows: BigInt(0),
+        count: 0,
+        entries: [],
+      };
+    }
+
+    // Bucket für Einträge ohne Bankkonto
+    const noBankAccount = {
+      accountId: '_none',
+      accountName: 'Ohne Bankkonto',
+      bankName: '',
+      iban: null as string | null,
+      inflows: BigInt(0),
+      outflows: BigInt(0),
+      count: 0,
+      entries: [] as typeof entries,
+    };
+
+    // Aggregiere Daten nach Kontentyp
+    for (const entry of entries) {
+      const accountId = entry.bankAccountId;
+
+      let bucket: typeof noBankAccount;
+      if (!accountId) {
+        bucket = noBankAccount;
+      } else if (iskAccounts[accountId]) {
+        bucket = iskAccounts[accountId];
+      } else if (glaeubigerAccounts[accountId]) {
+        bucket = glaeubigerAccounts[accountId];
+      } else {
+        bucket = noBankAccount;
+      }
+
+      if (entry.amountCents >= 0) {
+        bucket.inflows += entry.amountCents;
+      } else {
+        bucket.outflows += entry.amountCents;
+      }
+      bucket.count++;
+      bucket.entries.push(entry);
+    }
+
+    // === Gruppierung nach Standort ===
     const byLocation: Record<string, {
       name: string;
       inflows: bigint;
@@ -46,7 +133,6 @@ export async function GET(
       entries: typeof entries;
     }> = {};
 
-    // Initialisiere Locations
     for (const loc of caseData.locations) {
       byLocation[loc.id] = {
         name: loc.name,
@@ -56,7 +142,6 @@ export async function GET(
         entries: [],
       };
     }
-    // Für Einträge ohne Location
     byLocation['_none'] = {
       name: 'Ohne Standort',
       inflows: BigInt(0),
@@ -65,30 +150,20 @@ export async function GET(
       entries: [],
     };
 
-    // Aggregiere Daten
     for (const entry of entries) {
-      const amount = entry.amountCents;
       const locId = entry.locationId || '_none';
-
-      if (amount >= 0) {
-        totalInflows += amount;
-        if (byLocation[locId]) {
-          byLocation[locId].inflows += amount;
-        }
-      } else {
-        totalOutflows += amount;
-        if (byLocation[locId]) {
-          byLocation[locId].outflows += amount;
-        }
-      }
-
       if (byLocation[locId]) {
+        if (entry.amountCents >= 0) {
+          byLocation[locId].inflows += entry.amountCents;
+        } else {
+          byLocation[locId].outflows += entry.amountCents;
+        }
         byLocation[locId].count++;
         byLocation[locId].entries.push(entry);
       }
     }
 
-    // Gruppiere nach Monat
+    // === Gruppierung nach Monat ===
     const byMonth: Record<string, {
       month: string;
       inflows: bigint;
@@ -117,6 +192,32 @@ export async function GET(
       byMonth[monthKey].count++;
     }
 
+    // Hilfsfunktion: Entry für JSON serialisieren
+    const serializeEntry = (e: typeof entries[number]) => ({
+      id: e.id,
+      date: e.transactionDate.toISOString(),
+      description: e.description,
+      amount: e.amountCents.toString(),
+      estateAllocation: e.estateAllocation,
+      allocationNote: e.allocationNote,
+      importSource: e.importSource,
+      counterpartyId: e.counterpartyId,
+      categoryTag: e.categoryTag,
+    });
+
+    // Hilfsfunktion: Account-Bucket für JSON serialisieren
+    const serializeAccountBucket = (b: typeof noBankAccount) => ({
+      accountId: b.accountId,
+      accountName: b.accountName,
+      bankName: b.bankName,
+      iban: b.iban,
+      inflows: b.inflows.toString(),
+      outflows: b.outflows.toString(),
+      netAmount: (b.inflows + b.outflows).toString(),
+      count: b.count,
+      entries: b.entries.map(serializeEntry),
+    });
+
     // Konvertiere BigInt zu String für JSON
     const result = {
       case: {
@@ -130,6 +231,25 @@ export async function GET(
         totalOutflows: totalOutflows.toString(),
         netAmount: (totalInflows + totalOutflows).toString(),
       },
+      byAccountType: {
+        isk: Object.values(iskAccounts)
+          .filter(a => a.count > 0)
+          .map(serializeAccountBucket),
+        glaeubigerkonten: Object.values(glaeubigerAccounts)
+          .filter(a => a.count > 0)
+          .map(serializeAccountBucket),
+        ohneBankkonto: noBankAccount.count > 0 ? serializeAccountBucket(noBankAccount) : null,
+        iskTotal: {
+          inflows: Object.values(iskAccounts).reduce((s, a) => s + a.inflows, BigInt(0)).toString(),
+          outflows: Object.values(iskAccounts).reduce((s, a) => s + a.outflows, BigInt(0)).toString(),
+          count: Object.values(iskAccounts).reduce((s, a) => s + a.count, 0),
+        },
+        glaeubigerTotal: {
+          inflows: Object.values(glaeubigerAccounts).reduce((s, a) => s + a.inflows, BigInt(0)).toString(),
+          outflows: Object.values(glaeubigerAccounts).reduce((s, a) => s + a.outflows, BigInt(0)).toString(),
+          count: Object.values(glaeubigerAccounts).reduce((s, a) => s + a.count, 0),
+        },
+      },
       byLocation: Object.entries(byLocation)
         .filter(([, data]) => data.count > 0)
         .map(([locId, data]) => ({
@@ -139,15 +259,7 @@ export async function GET(
           outflows: data.outflows.toString(),
           netAmount: (data.inflows + data.outflows).toString(),
           count: data.count,
-          entries: data.entries.map(e => ({
-            id: e.id,
-            date: e.transactionDate.toISOString(),
-            description: e.description,
-            amount: e.amountCents.toString(),
-            estateAllocation: e.estateAllocation,
-            allocationNote: e.allocationNote,
-            importSource: e.importSource,
-          })),
+          entries: data.entries.map(serializeEntry),
         })),
       byMonth: Object.values(byMonth)
         .sort((a, b) => a.month.localeCompare(b.month))
