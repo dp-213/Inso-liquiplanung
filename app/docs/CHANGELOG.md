@@ -4,6 +4,44 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.56.0 – Performance-Engine (GuV-light) + Ergebnisrechnung-UI
+
+**Datum:** 13. Februar 2026
+
+### Neue Funktionen
+
+- **Performance-Engine (GuV-light):** Periodisierte Ergebnisrechnung pro Standort und Monat. Beantwortet die Kernfrage der IV: „Trägt sich Velbert alleine? Was kostet der Weiterbetrieb?"
+  - Erlöse nach Leistungsmonat (SERVICE_PERIOD/SERVICE_DATE), Personal aus EmployeeSalaryMonth
+  - P&L-Gruppen: Erlöse, Personal, Fixkosten, Sonstige Kosten
+  - Zentraler Kostenblock (Kosten ohne Standort-Zuordnung) + optionale Umlage (Erlösanteil oder Kopfzahl)
+  - IST/PLAN-Vorrang pro Zeile und Monat (nicht binär pro Periode)
+  - Datenqualitäts-Report mit Warnungen
+- **Performance-UI-Seite** (`/admin/cases/[id]/performance`):
+  - 4 KPI-Karten (Gesamterlöse, Gesamtkosten, Deckungsbeitrag, Ø Marge), farbcodiert
+  - DB-Trend-Chart (Recharts ComposedChart) mit gruppiertem Bar pro Standort + Marge-Linie + Null-Referenzlinie
+  - Standort-Tabs mit Status-Dots (grün = profitabel, rot = Verlust, grau = Zentral)
+  - P&L-Tabelle (liquidity-table CSS) mit aufklappbaren Gruppen, IST/PLAN/MIX Badges pro Monat, Gesamt-Spalte
+  - Datenqualitäts-Sektion (aufklappbar) mit 8 Statistik-Boxes + Warnungen
+  - Umlagen-Toggle (Segmented Control: Ohne/Erlösanteil/Kopfzahl) mit Re-Fetch
+  - Ungeprüfte-Entries-Filter (Checkbox)
+- **API-Route** `GET /api/cases/{id}/performance?allocationMethod=NONE|REVENUE_SHARE|HEADCOUNT_SHARE&includeUnreviewed=false`
+
+### Änderungen
+
+- **Dashboard-Übersicht vereinfacht:** `ExecutiveSummary` (6 KPI-Karten) ersetzt durch kompakte `OverviewMetricsBar` (Einzeilen-Leiste)
+- **Dashboard-API:** ISK-Konten-Aggregation hinzugefügt (`iskBalanceCents`, `iskAccountCount`), `accountType` in BankAccountInfo
+- **Sidebar:** „Performance (GuV)"-Link in ANALYSE-Sektion (zwischen Geschäftskonten und Klassifikation)
+- **Mobile-Header:** `performance: "Performance (GuV)"` in segmentLabels
+
+### Technisch
+
+- **Neues Modul:** `lib/performance-engine/` (types.ts, config.ts, periodize.ts, aggregate.ts, index.ts)
+- **Neue UI-Seite:** `admin/cases/[id]/performance/page.tsx` (~900 Zeilen, Client-Component mit Recharts)
+- **Gelöschte Komponente:** `ExecutiveSummary.tsx` → ersetzt durch `OverviewMetricsBar.tsx`
+- **Keine Schema-Änderungen** — nutzt bestehende LedgerEntries + EmployeeSalaryMonth
+
+---
+
 ## Version 2.55.0 – Dashboard-Übersicht-Redesign & Bereinigte Liquidität
 
 **Datum:** 13. Februar 2026

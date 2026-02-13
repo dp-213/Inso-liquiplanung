@@ -4,6 +4,43 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-066: Performance-Engine — Ergebnisrechnung (GuV-light) als eigenes Modul
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Problem
+
+1. **Keine Standort-Profitabilität sichtbar:** Die bestehende Liquiditätsplanung zeigt Cashflows, aber nicht ob ein Standort sich selbst trägt. Die IV-Kernfrage „Trägt sich Velbert alleine?" war nicht beantwortbar.
+2. **Erlöse nach Zahlungsdatum verzerren:** HZV-Zahlungen kommen mit 1 Monat Verzögerung. Ein Monat ohne Zahlungseingang ist nicht gleich ein Monat ohne Leistung. Periodisierung nach Leistungsmonat (SERVICE_PERIOD) ist nötig.
+3. **Personal nicht aus Bankbuchungen ableitbar:** Sammelüberweisungen an ISK-Konten enthalten Gehälter, aber ohne Aufschlüsselung pro Standort. EmployeeSalaryMonth hat diese Daten bereits strukturiert.
+4. **Zentralkosten verfälschen Standort-Vergleich:** Verwaltungskosten (Steuerberater, Software, IV-Gebühren) haben keine Standort-Zuordnung und müssen separat oder umgelegt gezeigt werden.
+
+### Entscheidung
+
+Eigenständiges Modul `lib/performance-engine/` mit:
+- **Erlöse nach Leistungsmonat** (nicht Zahlungsdatum): Fallback-Kette SERVICE_PERIOD → SERVICE_DATE → TRANSACTION_DATE
+- **Personal aus EmployeeSalaryMonth** (nicht aus LedgerEntries): Direkter Zugriff auf Brutto + AG-Kosten pro Standort und Monat
+- **P&L-Gruppen** (REVENUE, PERSONNEL_COST, FIXED_COST, OTHER_COST) über konfigurierbare `PnLRowConfig[]` pro Fall
+- **Zentrale Kosten** als eigener Block, optionale Umlage auf Standorte (Erlösanteil oder Kopfzahl)
+- **IST/PLAN-Vorrang pro Zeile und Monat**: Feinere Granularität als binär pro Periode
+- **BigInt-Konsistenz**: Alle Cent-Werte als BigInt intern, String-Serialisierung an API-Grenze
+
+### Begründung
+
+- **Eigenes Modul statt Dashboard-Erweiterung:** Die Ergebnisrechnung ist konzeptionell anders als die Liquiditätsplanung (Cashflow ≠ P&L). Eigene Engine vermeidet Vermischung der Berechnungslogik.
+- **Config-basierte P&L-Zeilen:** Jeder Fall hat andere Erlösquellen und Kostenarten. `config.ts` pro Fall statt Hardcodes.
+- **Umlage optional:** Nicht jeder IV will Zentralkosten auf Standorte umlegen. Toggle in der UI.
+
+### Konsequenzen
+
+- Performance-Engine liest aus denselben Tabellen (LedgerEntry, EmployeeSalaryMonth) wie die bestehende Calculation Engine
+- Kein neues Schema nötig — keine Turso-Migration
+- Config muss pro Fall gepflegt werden (`lib/performance-engine/config.ts`)
+- API-Response enthält BigInts als Strings (Client muss `Number()` verwenden)
+
+---
+
 ## ADR-065: Dashboard-Übersicht von 6 auf 3 Sektionen + Bereinigte Liquidität als Hero
 
 **Datum:** 13. Februar 2026

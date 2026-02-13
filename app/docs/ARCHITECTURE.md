@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.55.0
+**Version:** 2.56.0
 **Stand:** 13. Februar 2026
 
 ---
@@ -53,6 +53,21 @@
 │   - Baut 4-Ebenen-Erklärung aus Trace-Daten                       │
 │   - Liest Beschreibungen aus matrix-config.ts (ADR-031)            │
 │   - Deterministisch, auditierbar, unveränderlich                   │
+└─────────────────────────────────────────────────────────────────────┘
+           │
+           v
+┌─────────────────────────────────────────────────────────────────────┐
+│                    PERFORMANCE ENGINE (GuV-light)                    │
+│                    lib/performance-engine/                           │
+│                                                                      │
+│   types.ts      – PerformanceResult, LocationMonthResult, PnL*      │
+│   config.ts     – PnLRowConfig[] pro Fall (Erlös-/Kostenzeilen)     │
+│   periodize.ts  – Zuordnung LedgerEntries → Leistungsmonat          │
+│   aggregate.ts  – Standort×Monat-Aggregation + Umlage               │
+│   index.ts      – Haupteinsprung calculatePerformance()             │
+│                                                                      │
+│   API: GET /api/cases/{id}/performance                              │
+│   UI:  /admin/cases/[id]/performance (Recharts + liquidity-table)   │
 └─────────────────────────────────────────────────────────────────────┘
            │
            v

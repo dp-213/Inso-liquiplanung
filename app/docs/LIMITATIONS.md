@@ -243,7 +243,26 @@ Globale CSS-Overrides decken ~95% der UI ab. Einige externe Komponenten (Chart-T
 
 ---
 
-## Performance-Einschränkungen
+## Performance-Engine (GuV-light) Einschränkungen
+
+### P&L-Konfiguration muss pro Fall gepflegt werden
+
+`lib/performance-engine/config.ts` enthält `PnLRowConfig[]` mit categoryTags pro Fall. Neue Fälle müssen ihre eigenen Erlös- und Kostenzeilen definieren. Ohne Config liefert die Engine leere P&L-Gruppen.
+**Workaround:** Config beim Fall-Onboarding anlegen.
+
+### Nur MONTHLY-Pläne unterstützt
+
+Performance-Engine unterstützt nur `periodType=MONTHLY`. Fälle mit `WEEKLY`-Plänen erhalten HTTP 400.
+**Status:** Bewusste Einschränkung. WEEKLY-Support bei Bedarf ergänzen.
+
+### Keine Alt/Neu-Masse-Separation in P&L-Tabelle
+
+Die Engine berechnet `altmasseAnteilCents` und `neumasseAnteilCents` pro Zeile, die UI zeigt diese aber noch nicht. P&L-Tabelle zeigt nur den Gesamtbetrag.
+**Status:** Daten vorhanden, UI-Erweiterung bei Bedarf.
+
+---
+
+## Laufzeit-Einschränkungen
 
 ### Große Ledger-Ansichten
 
@@ -325,4 +344,4 @@ Rebranding zu "Gradify Cases | Structured Case Management" mit OG-Image für Soc
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-13 (v2.50.0)
+**Letzte Aktualisierung:** 2026-02-13 (v2.56.0)

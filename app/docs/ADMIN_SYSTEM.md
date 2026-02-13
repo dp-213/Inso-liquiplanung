@@ -33,8 +33,9 @@
    - [4.16 Personal (Mitarbeiter)](#416-personal-mitarbeiter-v2390)
    - [4.17 Kontakte (Ansprechpartner)](#417-kontakte-ansprechpartner-v2390)
    - [4.18 Geschäftskonten-Analyse](#418-geschäftskonten-analyse-v2410)
-   - [4.19 Datenqualitäts-Checks](#419-datenqualitäts-checks-v2420)
-   - [4.20 System Health Panel](#420-system-health-panel-v2460)
+   - [4.19 Performance / Ergebnisrechnung](#419-performance--ergebnisrechnung-v2560)
+   - [4.20 Datenqualitäts-Checks](#420-datenqualitäts-checks-v2420)
+   - [4.21 System Health Panel](#421-system-health-panel-v2460)
 5. [Datenmodell-Diagramm](#5-datenmodell-diagramm)
 6. [Datenfluss: Import bis Anzeige](#6-datenfluss-import-bis-anzeige)
 
@@ -1485,7 +1486,47 @@ Alle LedgerEntries von Bankkonten mit `isLiquidityRelevant=false` (Geschäftskon
 
 ---
 
-### 4.19 Datenqualitäts-Checks (v2.42.0, aktualisiert v2.46.0)
+### 4.19 Performance / Ergebnisrechnung (v2.56.0)
+
+**Pfad:** `/admin/cases/[id]/performance`
+**Sidebar-Sektion:** ANALYSE → „Performance (GuV)"
+**API:** `GET /api/cases/[id]/performance?allocationMethod=NONE|REVENUE_SHARE|HEADCOUNT_SHARE&includeUnreviewed=false`
+
+#### Funktion
+
+Periodisierte Ergebnisrechnung (GuV-light) pro Standort und Monat. Beantwortet die IV-Kernfrage: „Trägt sich ein Standort wirtschaftlich?"
+
+#### Architektur
+
+Eigenes Modul `lib/performance-engine/` mit:
+- **Erlöse nach Leistungsmonat** (nicht Zahlungsdatum): SERVICE_PERIOD → SERVICE_DATE → TRANSACTION_DATE
+- **Personal aus EmployeeSalaryMonth** (nicht Bankbuchungen)
+- **P&L-Gruppen:** REVENUE, PERSONNEL_COST, FIXED_COST, OTHER_COST
+- **Zentraler Kostenblock** (ohne locationId) + optionale Umlage
+
+#### UI-Struktur
+
+| Sektion | Inhalt |
+|---------|--------|
+| **Header** | Titel, IST-Abdeckung Progress-Bar, Umlagen-Toggle (Segmented Control), Ungeprüfte-Checkbox |
+| **KPI-Karten** | 4 Cards: Gesamterlöse, Gesamtkosten, Deckungsbeitrag, Ø Marge (responsive grid) |
+| **DB-Trend-Chart** | Recharts ComposedChart: Gruppierte Bars pro Standort + Marge-Linie + Null-Referenzlinie |
+| **Standort-Tabs** | Pill-Buttons mit Status-Dots (grün/rot/grau). Wechselt KPIs + Tabelle |
+| **P&L-Tabelle** | `.liquidity-table` mit aufklappbaren Gruppen, IST/PLAN/MIX Badges, Gesamt-Spalte |
+| **Datenqualität** | Aufklappbar: 8 Statistik-Boxes + Warnungen |
+
+#### Controls
+
+| Control | Auswirkung |
+|---------|------------|
+| **Umlagen-Toggle** | NONE / REVENUE_SHARE / HEADCOUNT_SHARE — Re-Fetch bei Wechsel |
+| **Ungeprüfte** | Checkbox — bezieht unreviewed Entries ein, Re-Fetch |
+| **Standort-Tabs** | Client-seitig — KPIs und Tabelle wechseln ohne Re-Fetch |
+| **Gruppen-Toggle** | Aufklappen/Zuklappen der P&L-Gruppen in der Tabelle |
+
+---
+
+### 4.20 Datenqualitäts-Checks (v2.42.0, aktualisiert v2.46.0)
 
 **API:** `GET /api/cases/[id]/validate-consistency`
 **Anzeige:** Ausschließlich im **System Health Panel** (`/admin/cases/[id]/system`, Sektion B)
@@ -1558,7 +1599,7 @@ Max. 20 Items pro Check in der Response (`totalItems` zeigt Gesamtzahl).
 
 ---
 
-### 4.20 System Health Panel (v2.46.0)
+### 4.21 System Health Panel (v2.46.0)
 
 **Pfad:** `/admin/cases/[id]/system`
 **Komponente:** `app/src/app/admin/cases/[id]/system/page.tsx`
