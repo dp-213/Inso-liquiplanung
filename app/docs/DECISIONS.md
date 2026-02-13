@@ -4,6 +4,42 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-063: DELTA-Perspektive immer NEUMASSE + NEUTRAL-Filter
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Drei fachliche Fehler im Standort-Vergleich (v2.52.0):
+1. NEUTRAL-Entries (Auskehrungen, interne Kontoüberträge, 126K EUR) wurden bei positiven Beträgen als Revenue gezählt.
+2. DELTA nutzte das POST-Ergebnis mit dem aktuellen Estate-Filter. Bei „GESAMT" enthielt DELTA Altforderungen – unfairer Vergleich.
+3. Info-Banner waren ungenau: DELTA zeigte nicht, dass nur NEUMASSE verglichen wird; PRE zeigte nicht die Datenlage.
+
+### Entscheidung
+
+1. **NEUTRAL-Filter global:** `legalBucket: { not: "NEUTRAL" }` in der Location Compare API WHERE-Clause. Gilt für BEIDE Perspektiven. MASSE, ABSONDERUNG, UNKNOWN bleiben drin.
+
+2. **DELTA immer NEUMASSE via Konstante:** `const DELTA_ESTATE_FILTER = "NEUMASSE" as const` – nie aus dem UI-State abgeleitet. Eigener `deltaPostRawData` State mit separatem useEffect. Optimierung: Wenn POST bereits mit NEUMASSE geladen ist, wird kein Extra-Fetch gemacht.
+
+3. **Präzise Banner:** DELTA zeigt „ISK-Neumasse – laufender Betrieb (Y Mon.)", PRE zeigt „Geschäftskonten-Daten (X Mon.)".
+
+### Begründung
+
+- **Neumasse ist leistungszeitbezogen, nicht kontobezogen.** DELTA misst operative Tragfähigkeit → nur NEUMASSE ist sinnvoll.
+- **NEUTRAL-Entries sind kein Ertrag.** Auskehrungen zwischen eigenen Konten sind Geldverschiebungen, keine wirtschaftliche Leistung.
+- **Defensive Konstante statt State-Ableitung:** Verhindert, dass spätere UI-Refactors versehentlich den DELTA-Filter korrumpieren.
+- **ABSONDERUNG existiert aktuell nicht in den Daten.** Wird bei Bedarf später ergänzt.
+
+### Konsequenzen
+
+- Standort-Revenue-Zahlen sinken (NEUTRAL rausgefiltert) – fachlich korrekt
+- DELTA zeigt immer NEUMASSE, auch wenn POST auf GESAMT steht – gewünscht
+- 1 zusätzlicher API-Call wenn POST nicht auf NEUMASSE steht (Optimierung greift im Default-Case)
+- ADR-062 (Perspektiven-Modell) bleibt gültig, wird um diesen ADR ergänzt
+
+---
+
 ## ADR-062: Standort-Vergleich Perspektiven-Modell (accountType + perspective)
 
 **Datum:** 13. Februar 2026

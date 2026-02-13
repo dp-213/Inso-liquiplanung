@@ -4,6 +4,28 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.53.0 – Standort-Vergleich: Fachliche Korrekturen
+
+**Datum:** 13. Februar 2026
+
+### Bugfixes
+
+- **NEUTRAL-Entries aus Standort-Vergleich gefiltert:** Auskehrungsbatzen und interne Kontoüberträge (`legalBucket=NEUTRAL`, u.a. 126K EUR) wurden bei positiven Beträgen als Revenue gezählt. Jetzt per `legalBucket: { not: "NEUTRAL" }` in der API-Query ausgeschlossen – gilt für beide Perspektiven (POST und PRE).
+- **DELTA-Perspektive nutzt immer NEUMASSE:** Bisher verwendete DELTA die POST-Daten mit dem aktuellen Estate-Filter. Bei „GESAMT" enthielt DELTA also auch Altforderungen → unfairer Vergleich. Jetzt lädt DELTA eigene Daten mit einer defensiven Konstante (`DELTA_ESTATE_FILTER = "NEUMASSE"`), unabhängig vom UI-Filter.
+
+### Verbesserungen
+
+- **DELTA-Banner präzisiert:** „Geschäftskonten (X Mon.) vs. ISK-Neumasse – laufender Betrieb (Y Mon.)" statt nur „ISK".
+- **PRE-Banner mit Monatsanzahl:** „Geschäftskonten-Daten (X Mon.)" mit dynamischer Monatsanzahl und kürzerem Text.
+
+### Technisch
+
+- API: 1 Zeile Filter-Änderung (`legalBucket: { not: "NEUTRAL" }`)
+- Client: Neuer `deltaPostRawData` State mit eigenem useEffect. Optimierung: Wenn POST bereits mit NEUMASSE geladen ist, wird kein Extra-Fetch gemacht.
+- 3 Dateien geändert (API-Route, LocationView, LocationDeltaView), kein Schema-Change
+
+---
+
 ## Version 2.52.0 – Standort-Vergleich: Perspektiven-Modell
 
 **Datum:** 13. Februar 2026
