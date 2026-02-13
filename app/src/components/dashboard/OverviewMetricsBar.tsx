@@ -94,10 +94,11 @@ export default function OverviewMetricsBar({ data }: OverviewMetricsBarProps) {
           <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400 mb-1">
             Datenstand
           </div>
-          <div className="text-sm font-medium text-[var(--foreground)] leading-tight">
-            <span className="text-blue-600">{istCount} IST</span>
-            {" / "}
-            <span className="text-purple-600">{planCount} PLAN</span>
+          <div className="text-lg font-bold text-[var(--foreground)] leading-tight">
+            <span className="text-blue-600">{istCount}</span>
+            <span className="text-gray-400 text-sm font-normal"> IST </span>
+            <span className="text-purple-600">{planCount}</span>
+            <span className="text-gray-400 text-sm font-normal"> PLAN</span>
           </div>
           {unreviewedCount > 0 && (
             <div className="text-[11px] text-amber-600 font-medium mt-0.5">

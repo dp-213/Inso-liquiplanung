@@ -32,7 +32,6 @@ import BankAccountsTab from "@/components/dashboard/BankAccountsTab";
 import BusinessLogicContent from "@/components/business-logic/BusinessLogicContent";
 import UnklarRiskBanner from "@/components/dashboard/UnklarRiskBanner";
 import OverviewMetricsBar from "@/components/dashboard/OverviewMetricsBar";
-import Link from "next/link";
 
 // =============================================================================
 // Tab Navigation Icons

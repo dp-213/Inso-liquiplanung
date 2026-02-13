@@ -336,7 +336,7 @@ export default function CaseLedgerPage({
   }, [activeTab]);
 
   // Sort state
-  type SortField = "transactionDate" | "description" | "amountCents" | "valueType" | "legalBucket" | "reviewStatus";
+  type SortField = "transactionDate" | "description" | "amountCents" | "valueType" | "legalBucket" | "reviewStatus" | "categoryTag" | "import" | "location" | "bankAccount" | "counterparty" | "estateAllocation";
   const [sortBy, setSortBy] = useState<SortField>("transactionDate");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
@@ -1138,6 +1138,10 @@ export default function CaseLedgerPage({
 
   // Sort entries (memoized)
   const sortedEntries = useMemo(() => [...filteredEntries].sort((a, b) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const aAny = a as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const bAny = b as any;
     let comparison = 0;
     switch (sortBy) {
       case "transactionDate":
@@ -1158,9 +1162,27 @@ export default function CaseLedgerPage({
       case "reviewStatus":
         comparison = a.reviewStatus.localeCompare(b.reviewStatus);
         break;
+      case "categoryTag":
+        comparison = (aAny.categoryTag || '').localeCompare(bAny.categoryTag || '', "de");
+        break;
+      case "import":
+        comparison = (aAny.importSource || 'Manuell').localeCompare(bAny.importSource || 'Manuell', "de");
+        break;
+      case "location":
+        comparison = (locationsMap.get(aAny.locationId) || '').localeCompare(locationsMap.get(bAny.locationId) || '', "de");
+        break;
+      case "bankAccount":
+        comparison = (bankAccountsMap.get(aAny.bankAccountId) || '').localeCompare(bankAccountsMap.get(bAny.bankAccountId) || '', "de");
+        break;
+      case "counterparty":
+        comparison = (counterpartiesMap.get(aAny.counterpartyId) || '').localeCompare(counterpartiesMap.get(bAny.counterpartyId) || '', "de");
+        break;
+      case "estateAllocation":
+        comparison = (aAny.estateAllocation || '').localeCompare(bAny.estateAllocation || '', "de");
+        break;
     }
     return sortOrder === "asc" ? comparison : -comparison;
-  }), [filteredEntries, sortBy, sortOrder]);
+  }), [filteredEntries, sortBy, sortOrder, locationsMap, bankAccountsMap, counterpartiesMap]);
 
   // Sichtbare Entries (ohne Children – die werden unter Parents gerendert)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -2230,14 +2252,7 @@ export default function CaseLedgerPage({
           </div>
         </div>
 
-        {entries.length === 0 ? (
-          <div className="p-8 text-center text-[var(--secondary)]">
-            {hasActiveFilters
-              ? "Keine Einträge mit diesen Filterkriterien gefunden"
-              : "Keine Ledger-Einträge für diesen Fall vorhanden"}
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
+        <div className="overflow-x-auto">
             <table
               ref={tableRef}
               className="admin-table"
@@ -2299,10 +2314,10 @@ export default function CaseLedgerPage({
                         boxShadow: '2px 0 4px rgba(0,0,0,0.05)',
                         overflow: 'hidden',
                       }}
-                      className="relative group"
+                      className="relative group cursor-pointer"
                     >
                       <div className="flex items-center">
-                        Matrix-Kat.
+                        <SortHeader field="categoryTag" label="Matrix-Kat." />
                         <ColumnFilter columnId="categoryTag" filterType="multiselect" options={categoryTagOptions} currentFilter={columnFilters["categoryTag"]} onFilterChange={handleColumnFilterChange} />
                       </div>
                       <div
@@ -2347,9 +2362,9 @@ export default function CaseLedgerPage({
 
                   {/* 6. Quelle */}
                   {columnVisibility.import && (
-                    <th style={{ width: columnWidths.import }} className="relative group">
+                    <th style={{ width: columnWidths.import }} className="relative group cursor-pointer">
                       <div className="flex items-center">
-                        Quelle
+                        <SortHeader field="import" label="Quelle" />
                         <ColumnFilter columnId="import" filterType="multiselect" options={importSourceOptions} currentFilter={columnFilters["import"]} onFilterChange={handleColumnFilterChange} />
                       </div>
                       <div
@@ -2361,9 +2376,9 @@ export default function CaseLedgerPage({
 
                   {/* 7. Standort */}
                   {columnVisibility.location && (
-                    <th style={{ width: columnWidths.location }} className="relative group">
+                    <th style={{ width: columnWidths.location }} className="relative group cursor-pointer">
                       <div className="flex items-center">
-                        Standort
+                        <SortHeader field="location" label="Standort" />
                         <ColumnFilter columnId="location" filterType="multiselect" options={locationOptions} currentFilter={columnFilters["location"]} onFilterChange={handleColumnFilterChange} />
                       </div>
                       <div
@@ -2375,9 +2390,9 @@ export default function CaseLedgerPage({
 
                   {/* 8. Bankkonto */}
                   {columnVisibility.bankAccount && (
-                    <th style={{ width: columnWidths.bankAccount }} className="relative group">
+                    <th style={{ width: columnWidths.bankAccount }} className="relative group cursor-pointer">
                       <div className="flex items-center">
-                        Bankkonto
+                        <SortHeader field="bankAccount" label="Bankkonto" />
                         <ColumnFilter columnId="bankAccount" filterType="multiselect" options={bankAccountOptions} currentFilter={columnFilters["bankAccount"]} onFilterChange={handleColumnFilterChange} />
                       </div>
                       <div
@@ -2389,9 +2404,9 @@ export default function CaseLedgerPage({
 
                   {/* 9. Gegenpartei */}
                   {columnVisibility.counterparty && (
-                    <th style={{ width: columnWidths.counterparty }} className="relative group">
+                    <th style={{ width: columnWidths.counterparty }} className="relative group cursor-pointer">
                       <div className="flex items-center">
-                        Gegenpartei
+                        <SortHeader field="counterparty" label="Gegenpartei" />
                         <ColumnFilter columnId="counterparty" filterType="multiselect" options={counterpartyOptions} currentFilter={columnFilters["counterparty"]} onFilterChange={handleColumnFilterChange} />
                       </div>
                       <div
@@ -2417,9 +2432,9 @@ export default function CaseLedgerPage({
 
                   {/* 11. Alt/Neu */}
                   {columnVisibility.estateAllocation && (
-                    <th style={{ width: columnWidths.estateAllocation }} className="relative group">
+                    <th style={{ width: columnWidths.estateAllocation }} className="relative group cursor-pointer">
                       <div className="flex items-center">
-                        Alt/Neu
+                        <SortHeader field="estateAllocation" label="Alt/Neu" />
                         <ColumnFilter columnId="estateAllocation" filterType="multiselect" options={estateAllocationOptions} currentFilter={columnFilters["estateAllocation"]} onFilterChange={handleColumnFilterChange} />
                       </div>
                       <div
@@ -2484,7 +2499,28 @@ export default function CaseLedgerPage({
                 </tr>
               </thead>
                             <tbody>
-                {sortedEntries.flatMap((entry, index) => {
+                {sortedEntries.length === 0 ? (
+                  <tr>
+                    <td colSpan={20} className="p-8 text-center text-[var(--secondary)]">
+                      {entries.length === 0
+                        ? (hasActiveFilters
+                          ? "Keine Einträge mit diesen Filterkriterien gefunden"
+                          : "Keine Ledger-Einträge für diesen Fall vorhanden")
+                        : (
+                          <div>
+                            <p>Keine Einträge entsprechen den aktiven Spaltenfiltern.</p>
+                            <button
+                              onClick={() => setColumnFilters({})}
+                              className="mt-2 text-sm text-[var(--primary)] hover:underline"
+                            >
+                              Spaltenfilter zurücksetzen
+                            </button>
+                          </div>
+                        )
+                      }
+                    </td>
+                  </tr>
+                ) : sortedEntries.flatMap((entry, index) => {
                   const amount = parseInt(entry.amountCents);
                   const isInflow = amount >= 0;
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -3057,7 +3093,6 @@ export default function CaseLedgerPage({
               </tbody>
             </table>
           </div>
-        )}
       </div>
       )}
 
