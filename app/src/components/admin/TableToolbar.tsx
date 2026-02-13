@@ -58,6 +58,7 @@ interface SortableHeaderProps {
   currentSortDir: "asc" | "desc";
   onToggle: (key: string) => void;
   className?: string;
+  align?: "left" | "right";
 }
 
 export function SortableHeader({
@@ -66,15 +67,18 @@ export function SortableHeader({
   currentSortKey,
   currentSortDir,
   onToggle,
-  className = "px-4 py-3 text-left text-xs font-semibold text-[var(--secondary)] uppercase",
+  className = "px-4 py-3 text-xs font-semibold text-[var(--secondary)] uppercase",
+  align = "left",
 }: SortableHeaderProps) {
   const isActive = currentSortKey === sortKey;
+  const alignClass = align === "right" ? "text-right" : "text-left";
+  const flexJustify = align === "right" ? "justify-end" : "";
   return (
     <th
-      className={`${className} cursor-pointer select-none hover:text-[var(--foreground)] transition-colors`}
+      className={`${className} ${alignClass} cursor-pointer select-none hover:text-[var(--foreground)] transition-colors`}
       onClick={() => onToggle(sortKey)}
     >
-      <span className="inline-flex items-center gap-1">
+      <span className={`inline-flex items-center gap-1 ${flexJustify}`}>
         {label}
         <span className={`text-[10px] ${isActive ? "text-[var(--primary)]" : "text-[var(--muted)] opacity-40"}`}>
           {isActive ? (currentSortDir === "asc" ? "\u25B2" : "\u25BC") : "\u25B2"}

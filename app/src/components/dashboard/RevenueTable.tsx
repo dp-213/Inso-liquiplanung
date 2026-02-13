@@ -9,6 +9,8 @@ import {
   SONSTIGE_TAG,
   type RevenueEntryForGrouping,
 } from "@/lib/revenue-helpers";
+import { useTableControls } from "@/hooks/useTableControls";
+import { SortableHeader } from "@/components/admin/TableToolbar";
 import RevenueCategoryDrawer from "./RevenueCategoryDrawer";
 
 interface RevenueEntry extends RevenueEntryForGrouping {
@@ -48,9 +50,7 @@ export default function RevenueTable({
   const drawerEntries = useMemo(() => {
     if (!selectedCategory) return [];
     const tag = selectedCategory.tag;
-    // Die Tags aus groupByCategoryTag: __OHNE_TAG__ für null, __SONSTIGE__ für Rest
     if (tag === SONSTIGE_TAG) {
-      // Alle Tags, die NICHT in den Top-Gruppen sind (außer Sonstige selbst)
       const topTags = new Set(grouped.filter((g) => g.tag !== SONSTIGE_TAG).map((g) => g.tag));
       return entries.filter((e) => {
         const entryTag = e.categoryTag || OHNE_TAG;
@@ -63,29 +63,27 @@ export default function RevenueTable({
     return entries.filter((e) => e.categoryTag === tag);
   }, [selectedCategory, entries, grouped]);
 
-  // Group entries by month for details view
-  const entriesByMonth = useMemo(() => {
-    const byMonth = new Map<string, RevenueEntry[]>();
+  // Detail-Ansicht: useTableControls für flache sortierbare Tabelle
+  const { search, setSearch, sortKey, sortDir, toggleSort, result: filtered } =
+    useTableControls(entries, {
+      searchFields: ["counterpartyName", "locationName", "description", "periodLabel"],
+      defaultSort: { key: "transactionDate", dir: "desc" },
+    });
 
-    for (const entry of entries) {
-      const monthKey = entry.periodLabel;
-      if (!byMonth.has(monthKey)) {
-        byMonth.set(monthKey, []);
-      }
-      byMonth.get(monthKey)!.push(entry);
-    }
-
-    return byMonth;
-  }, [entries]);
-
-  // Calculate grand totals from entries
+  // Grand Totals (immer auf Basis aller Entries für Summary)
   const { grandTotal, grandNeumasseTotal, grandAltmasseTotal } = useMemo(() => ({
     grandTotal: entries.reduce((sum, e) => sum + BigInt(e.amountCents), BigInt(0)),
     grandNeumasseTotal: entries.reduce((sum, e) => sum + BigInt(e.neumasseAmountCents), BigInt(0)),
     grandAltmasseTotal: entries.reduce((sum, e) => sum + BigInt(e.altmasseAmountCents), BigInt(0)),
   }), [entries]);
 
-  // Dynamischer Grand-Total Text
+  // Footer-Summen für Detail-Ansicht: basierend auf gefilterten Ergebnissen
+  const filteredTotals = useMemo(() => ({
+    total: filtered.reduce((sum, e) => sum + BigInt(e.amountCents), BigInt(0)),
+    neumasse: filtered.reduce((sum, e) => sum + BigInt(e.neumasseAmountCents), BigInt(0)),
+    altmasse: filtered.reduce((sum, e) => sum + BigInt(e.altmasseAmountCents), BigInt(0)),
+  }), [filtered]);
+
   const totalLabel = months === 0 ? "Gesamteinnahmen (gesamt)" : `Gesamteinnahmen (${months} Monate)`;
 
   if (entries.length === 0) {
@@ -101,6 +99,10 @@ export default function RevenueTable({
       </div>
     );
   }
+
+  const footerLabel = filtered.length === entries.length
+    ? "Gesamt"
+    : `Gesamt (${filtered.length} von ${entries.length})`;
 
   return (
     <div className="space-y-4">
@@ -203,35 +205,126 @@ export default function RevenueTable({
           </div>
         </div>
       ) : (
-        /* Details View - Monthly Breakdown */
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border)]">
-                <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Datum</th>
-                <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Quelle</th>
-                <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Standort</th>
-                <th className="text-left py-3 px-4 font-medium text-[var(--secondary)]">Beschreibung</th>
-                <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">Betrag</th>
-                <th className="text-right py-3 px-4 font-medium text-[var(--secondary)]">Alt/Neu</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from(entriesByMonth.entries()).map(([month, monthEntries]) => (
-                <>
-                  {/* Month Header */}
-                  <tr key={`header-${month}`} className="bg-gray-50">
-                    <td colSpan={6} className="py-2 px-4 font-semibold text-[var(--foreground)]">
-                      {month}
-                    </td>
+        /* Details View - Flat sortable table */
+        <div className="space-y-0">
+          {/* Kompakte Suchleiste */}
+          <div className="py-2 flex items-center gap-2">
+            <div className="relative flex-1 max-w-sm">
+              <svg
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--muted)]"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buchungen durchsuchen..."
+                className="input w-full pl-8 py-1.5 text-sm"
+              />
+            </div>
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="text-xs text-[var(--primary)] hover:underline whitespace-nowrap"
+              >
+                Zurücksetzen
+              </button>
+            )}
+            <span className="text-xs text-[var(--muted)] ml-auto whitespace-nowrap">
+              {filtered.length === entries.length
+                ? `${entries.length} Buchungen`
+                : `${filtered.length} von ${entries.length} Buchungen`}
+            </span>
+          </div>
+
+          {filtered.length === 0 && search ? (
+            <div className="p-8 text-center bg-gray-50 rounded-lg">
+              <p className="text-[var(--muted)]">
+                Keine Treffer für &bdquo;{search}&ldquo;
+              </p>
+              <button
+                onClick={() => setSearch("")}
+                className="mt-2 text-sm text-[var(--primary)] hover:underline"
+              >
+                Suche zurücksetzen
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <SortableHeader
+                      label="Monat"
+                      sortKey="periodLabel"
+                      currentSortKey={sortKey as string}
+                      currentSortDir={sortDir}
+                      onToggle={(k) => toggleSort(k as keyof RevenueEntry)}
+                      className="py-3 px-4 text-xs font-medium text-[var(--secondary)]"
+                    />
+                    <SortableHeader
+                      label="Datum"
+                      sortKey="transactionDate"
+                      currentSortKey={sortKey as string}
+                      currentSortDir={sortDir}
+                      onToggle={(k) => toggleSort(k as keyof RevenueEntry)}
+                      className="py-3 px-4 text-xs font-medium text-[var(--secondary)]"
+                    />
+                    <SortableHeader
+                      label="Quelle"
+                      sortKey="counterpartyName"
+                      currentSortKey={sortKey as string}
+                      currentSortDir={sortDir}
+                      onToggle={(k) => toggleSort(k as keyof RevenueEntry)}
+                      className="py-3 px-4 text-xs font-medium text-[var(--secondary)]"
+                    />
+                    <SortableHeader
+                      label="Standort"
+                      sortKey="locationName"
+                      currentSortKey={sortKey as string}
+                      currentSortDir={sortDir}
+                      onToggle={(k) => toggleSort(k as keyof RevenueEntry)}
+                      className="py-3 px-4 text-xs font-medium text-[var(--secondary)]"
+                    />
+                    <SortableHeader
+                      label="Beschreibung"
+                      sortKey="description"
+                      currentSortKey={sortKey as string}
+                      currentSortDir={sortDir}
+                      onToggle={(k) => toggleSort(k as keyof RevenueEntry)}
+                      className="py-3 px-4 text-xs font-medium text-[var(--secondary)]"
+                    />
+                    <SortableHeader
+                      label="Betrag"
+                      sortKey="amountCents"
+                      currentSortKey={sortKey as string}
+                      currentSortDir={sortDir}
+                      onToggle={(k) => toggleSort(k as keyof RevenueEntry)}
+                      className="py-3 px-4 text-xs font-medium text-[var(--secondary)]"
+                      align="right"
+                    />
+                    <th className="text-right py-3 px-4 font-medium text-[var(--secondary)] text-xs">Alt/Neu</th>
                   </tr>
-                  {/* Entries */}
-                  {monthEntries.map((entry, idx) => (
+                </thead>
+                <tbody>
+                  {filtered.map((entry, idx) => (
                     <tr
-                      key={`${month}-${idx}`}
-                      className="border-b border-[var(--border)] hover:bg-gray-50"
+                      key={idx}
+                      className={`border-b border-[var(--border)] hover:bg-blue-50/50 ${idx % 2 === 1 ? "bg-gray-50/50" : ""}`}
                     >
-                      <td className="py-3 px-4 text-[var(--secondary)]">
+                      <td className="py-3 px-4 text-[var(--secondary)] whitespace-nowrap">
+                        {entry.periodLabel}
+                      </td>
+                      <td className="py-3 px-4 text-[var(--secondary)] whitespace-nowrap">
                         {new Date(entry.transactionDate).toLocaleDateString("de-DE")}
                       </td>
                       <td className="py-3 px-4">
@@ -243,10 +336,10 @@ export default function RevenueTable({
                       <td className="py-3 px-4 text-[var(--secondary)] max-w-xs truncate">
                         {entry.description}
                       </td>
-                      <td className="py-3 px-4 text-right font-medium text-green-600">
+                      <td className="py-3 px-4 text-right font-medium text-green-600 whitespace-nowrap">
                         {formatCurrency(entry.amountCents)}
                       </td>
-                      <td className="py-3 px-4 text-right text-xs">
+                      <td className="py-3 px-4 text-right text-xs whitespace-nowrap">
                         <div className="space-y-0.5">
                           {BigInt(entry.altmasseAmountCents) > BigInt(0) && (
                             <div className="text-amber-600">
@@ -265,22 +358,22 @@ export default function RevenueTable({
                       </td>
                     </tr>
                   ))}
-                </>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr className="bg-[var(--primary)] text-white">
-                <td colSpan={4} className="py-3 px-4 font-medium">Gesamt</td>
-                <td className="py-3 px-4 text-right font-bold">
-                  {formatCurrency(grandTotal)}
-                </td>
-                <td className="py-3 px-4 text-right text-xs space-y-0.5">
-                  <div>Alt: {formatCurrency(grandAltmasseTotal)}</div>
-                  <div>Neu: {formatCurrency(grandNeumasseTotal)}</div>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
+                </tbody>
+                <tfoot>
+                  <tr className="bg-[var(--primary)] text-white">
+                    <td colSpan={5} className="py-3 px-4 font-medium">{footerLabel}</td>
+                    <td className="py-3 px-4 text-right font-bold whitespace-nowrap">
+                      {formatCurrency(filteredTotals.total)}
+                    </td>
+                    <td className="py-3 px-4 text-right text-xs whitespace-nowrap space-y-0.5">
+                      <div>Alt: {formatCurrency(filteredTotals.altmasse)}</div>
+                      <div>Neu: {formatCurrency(filteredTotals.neumasse)}</div>
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
