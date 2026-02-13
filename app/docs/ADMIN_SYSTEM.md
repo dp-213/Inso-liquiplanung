@@ -16,7 +16,7 @@
    - [4.2 Konfiguration](#42-konfiguration)
    - [4.3 Datenimport](#43-datenimport)
    - [4.4 Dashboard](#44-dashboard)
-   - [4.5 Prämissen](#45-prämissen)
+   - [4.5 Berechnungsannahmen](#45-berechnungsannahmen)
    - [4.6 Insolvenzeffekte](#46-insolvenzeffekte)
    - [4.7 Bankenspiegel](#47-bankenspiegel)
    - [4.7b Banken & Sicherungsrechte](#47b-banken--sicherungsrechte)
@@ -34,6 +34,7 @@
    - [4.17 Kontakte (Ansprechpartner)](#417-kontakte-ansprechpartner-v2390)
    - [4.18 Geschäftskonten-Analyse](#418-geschäftskonten-analyse-v2410)
    - [4.19 Datenqualitäts-Checks](#419-datenqualitäts-checks-v2420)
+   - [4.20 System Health Panel](#420-system-health-panel-v2460)
 5. [Datenmodell-Diagramm](#5-datenmodell-diagramm)
 6. [Datenfluss: Import bis Anzeige](#6-datenfluss-import-bis-anzeige)
 
@@ -63,7 +64,7 @@ Case (Insolvenzverfahren)
     │       │       └── CashflowLine (Position)
     │       │               ↓ contains
     │       │               └── PeriodValue (Wochenwerte) ← DERIVED CACHE
-    │       ├── PlanningAssumption (Planungsprämissen)
+    │       ├── PlanningAssumption (Berechnungsannahmen, Case-Level)
     │       └── InsolvencyEffect (Insolvenzeffekte)
     │
     ├── LedgerEntry (Zahlungsregister) ← SINGLE SOURCE OF TRUTH
@@ -447,43 +448,73 @@ Endbestand = Anfangsbestand + Cashflow
 
 ---
 
-### 4.5 Prämissen
+### 4.5 Berechnungsannahmen
 
 **Pfad:** `/admin/cases/[id]/assumptions`
+**Version:** v2.45.0 (vorher: "Prämissen")
 
 #### Funktion
-Dokumentation der Planungsannahmen nach W&P-Standard.
+3-Block-Architektur für Berechnungsgrundlagen (ADR-058):
 
-#### Erfasste Daten
+**Block 1 – Datenqualität (auto, read-only)**
+Live-Kennzahlen direkt aus der DB. Nie manuell editierbar.
+
+| Kennzahl | Beschreibung |
+|----------|--------------|
+| IST-Entries | Anzahl + Confirmed-Prozent |
+| PLAN-Entries | Anzahl + abgedeckte Monate |
+| Estate-Breakdown | ALTMASSE / NEUMASSE / MIXED / UNKLAR |
+| Bankkonten | Anzahl aktiver Konten |
+| Gegenpartei-Abdeckung | Prozent mit zugeordneter Counterparty |
+
+**Block 2 – Planungsannahmen (Case-Level Dokumentation)**
 
 | Feld | Beschreibung | Beispiel |
 |------|--------------|----------|
-| `categoryName` | Zugeordnete Kategorie | "Forderungseinzug" |
-| `source` | Datenquelle | "OP-Debitorenliste zum 05.01.2026" |
-| `description` | Ausführliche Beschreibung | "Einzugsquote 60% auf Basis historischer Daten" |
-| `riskLevel` | Risikobewertung | conservative, low, medium, high, aggressive |
+| `title` | Freier Titel der Annahme | "Fortführung aller Praxen bis Q1/2026" |
+| `source` | Datenquelle/Beleg | "IV-Gespräch 09.02.2026" |
+| `description` | Ausführliche Beschreibung | "Massekredit Sparkasse sichert Liquidität" |
+| `status` | Belastbarkeit | ANNAHME, VERIFIZIERT, WIDERLEGT |
+| `linkedModule` | Link zu Stammdaten-Modul | "banken", "personal", "business-logic" |
 
-#### Warum?
-- **Nachvollziehbarkeit:** Wie kam die Prognose zustande?
-- **Audit-Sicherheit:** Welche Daten wurden verwendet?
-- **Risikobewertung:** Wie belastbar ist die Annahme?
-- **W&P-Standard:** Branchenübliche Dokumentation
+**Block 3 – Prognose-Annahmen (read-only, aus Forecast)**
+ForecastAssumptions gruppiert nach INFLOW/OUTFLOW mit Methodik und Risiko.
+
+| Feld | Beschreibung |
+|------|--------------|
+| `method` | Herleitung des Betrags |
+| `baseReferencePeriod` | Referenzzeitraum (z.B. "IST Dez 2025 – Jan 2026") |
+| `riskProbability` | Abweichungswahrscheinlichkeit (0.0–1.0) |
+| `riskImpactCents` | EUR-Auswirkung bei Eintritt |
+| `riskComment` | Qualitative Risikobegründung |
 
 #### Datenmodell
 
 ```prisma
 model PlanningAssumption {
-  id            String   @id @default(uuid())
-  planId        String
-  categoryName  String
-  source        String
-  description   String
-  riskLevel     String   // conservative, low, medium, high, aggressive
+  id             String    @id @default(uuid())
+  caseId         String    // Case-Level (nicht Plan-Level!)
+  planId         String?   // Legacy, optional
+  title          String    // Freier Titel
+  source         String
+  description    String
+  status         String    @default("ANNAHME") // ANNAHME | VERIFIZIERT | WIDERLEGT
+  linkedModule   String?   // "banken", "personal", "business-logic"
+  linkedEntityId String?
+  lastReviewedAt DateTime?
 
-  plan LiquidityPlan @relation(...)
-  @@unique([planId, categoryName])
+  case Case @relation(...)
+  @@index([caseId])
 }
 ```
+
+#### API-Endpoints
+
+| Endpoint | Methode | Beschreibung |
+|----------|---------|--------------|
+| `/api/cases/[id]/data-quality` | GET | Block 1: Live-Metriken |
+| `/api/cases/[id]/plan/assumptions` | GET/POST/DELETE | Block 2: CRUD |
+| `/api/cases/[id]/forecast/assumptions` | GET | Block 3: Read-only |
 
 ---
 
@@ -1547,15 +1578,16 @@ Alle LedgerEntries von Bankkonten mit `isLiquidityRelevant=false` (Geschäftskon
 
 Automatische Konsistenzprüfung aller IST-LedgerEntries eines Falls. Erkennt Inkonsistenzen zwischen Dimensionen (Counterparty ↔ Tag, Estate ↔ Quartal, Pattern ↔ Beschreibung) und verwaiste Referenzen.
 
-#### 5 Checks
+#### 6 Checks
 
-| # | Check | Severity | Beschreibung |
-|---|-------|----------|--------------|
-| 1 | Gegenpartei ↔ Kategorie-Tag | Fehler | Entries mit bekannter CP müssen erwarteten categoryTag haben (`COUNTERPARTY_TAG_MAP`) |
-| 2 | Tag ohne Gegenpartei | Warnung | Entries mit categoryTag (KV/HZV/PVS) sollten passende CP zugewiesen haben |
-| 3 | estateAllocation ↔ Quartal | Fehler | Alt/Neu-Zuordnung muss zum Leistungszeitraum passen (nur KV). Priorität: servicePeriodStart > serviceDate > Beschreibung-Regex |
-| 4 | Pattern-Match | Warnung | Buchungstext sollte zum matchPattern der zugewiesenen CP passen (manuelle Zuordnung = legitim) |
-| 5 | Verwaiste Dimensionen | Fehler | Alle referenzierten Location/BankAccount/Counterparty-IDs müssen in Stammdaten existieren |
+| # | Check | Severity | Anzeige | Beschreibung |
+|---|-------|----------|---------|--------------|
+| 1 | Gegenpartei ↔ Kategorie-Tag | Fehler | Dashboard + System | Entries mit bekannter CP müssen erwarteten categoryTag haben (`COUNTERPARTY_TAG_MAP`) |
+| 2 | Tag ohne Gegenpartei | Warnung | Dashboard + System | Entries mit categoryTag (KV/HZV/PVS) sollten passende CP zugewiesen haben |
+| 3 | estateAllocation ↔ Quartal | Fehler | Dashboard + System | Alt/Neu-Zuordnung muss zum Leistungszeitraum passen (nur KV). Priorität: servicePeriodStart > serviceDate > Beschreibung-Regex |
+| 4 | Pattern-Match | Warnung | Dashboard + System | Buchungstext sollte zum matchPattern der zugewiesenen CP passen (manuelle Zuordnung = legitim) |
+| 5 | Verwaiste Dimensionen | Fehler | Dashboard + System | Alle referenzierten Location/BankAccount/Counterparty-IDs müssen in Stammdaten existieren |
+| 6 | Gegenparteien ohne Pattern | Warnung | **Nur System** | CPs mit 5+ Buchungen ohne matchPattern (v2.44.0, seit v2.46.0 nur im System Health Panel) |
 
 #### Konfiguration (case-spezifisch)
 
@@ -1606,6 +1638,58 @@ export function getExpectedEstateAllocation(
 ```
 
 Max. 20 Items pro Check in der Response (`totalItems` zeigt Gesamtzahl).
+
+---
+
+### 4.20 System Health Panel (v2.46.0)
+
+**Pfad:** `/admin/cases/[id]/system`
+**Komponente:** `app/src/app/admin/cases/[id]/system/page.tsx`
+
+#### Funktion
+
+Zentrales Diagnose-Dashboard für Admins. Konsolidiert Informationen aus 5 bestehenden APIs auf einer Seite mit Auto-Refresh (30s).
+
+#### 3 Sektionen
+
+**A) Daten-Übersicht**
+4 Metriken-Karten in einer Reihe:
+
+| Karte | Quelle | Farblogik |
+|-------|--------|-----------|
+| IST-Buchungen | `data-quality` → totalIST, dateRange | – |
+| Review-Status | `data-quality` → confirmedPct | ≥80% grün, ≥50% amber, sonst rot |
+| Gegenpartei-Zuordnung | `data-quality` → counterpartyPct | ≥80% grün, sonst amber |
+| Alt/Neu-Verteilung | `data-quality` → estateBreakdown | UNKLAR > 0 → rot |
+
+**B) Konfigurationsprüfung**
+Alle 6 Konsistenz-Checks aus `validate-consistency`. Unterschied zum Dashboard-Banner:
+- Zeigt **alle 6 Checks** (Dashboard zeigt nur 1–5)
+- Aufklappbare Details pro Check mit Items und Deep-Links
+- Bestandene Checks kompakt als grüne Tags zusammengefasst
+
+**C) System-Status**
+3 Unterblöcke:
+
+| Block | Quelle | Features |
+|-------|--------|----------|
+| Aggregation | `aggregation?stats=true` | Status-Badge (CURRENT/STALE/REBUILDING), "Jetzt aktualisieren"-Button |
+| Importe | `import-jobs` | Letzter Import (Quelle, Datum, Entries, Summe), Link zu Import-Seite |
+| Freigaben | `share` | Aktive/Inaktive/Abgelaufene Links, letzter Zugriff |
+
+#### Verwendete APIs (kein neuer Endpoint)
+
+| API | Felder |
+|-----|--------|
+| `GET /api/cases/[id]/data-quality` | totalIST, confirmedPct, counterpartyPct, estateBreakdown, dateRange |
+| `GET /api/cases/[id]/validate-consistency` | Alle 6 Checks inkl. Check 6 |
+| `GET /api/cases/[id]/aggregation?stats=true` | status, pendingChanges, lastAggregatedAt, activePlanName |
+| `GET /api/cases/[id]/import-jobs` | importJobs Array mit Quelle/Counts/Summen |
+| `GET /api/cases/[id]/share` | ShareLink Array mit isActive, expiresAt, accessCount |
+
+#### Sidebar-Integration
+
+"System"-Link im Bottom-Bereich der CaseSidebar, zwischen "Fall bearbeiten" und "Hilfe". Schild-Icon.
 
 ---
 
@@ -1789,7 +1873,9 @@ Zusätzlich am Plan hängend:
 ### Dashboard-Daten
 - `GET /api/cases/[id]/dashboard` - Berechnete Daten
 - `GET /api/cases/[id]/plan/categories` - Kategorien + Lines
-- `GET /api/cases/[id]/assumptions` - Prämissen
+- `GET /api/cases/[id]/data-quality` - Datenqualitäts-Metriken (Block 1)
+- `GET/POST/DELETE /api/cases/[id]/plan/assumptions` - Berechnungsannahmen (Block 2)
+- `GET /api/cases/[id]/forecast/assumptions` - Prognose-Annahmen (Block 3)
 - `GET /api/cases/[id]/insolvency-effects` - Insolvenzeffekte
 - `GET /api/cases/[id]/bank-accounts` - Bankenspiegel
 

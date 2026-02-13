@@ -59,6 +59,18 @@ Bankkonten-Details (Opening/Closing Balance pro Bank) bewusst aus Liquidity Matr
 
 ## P1 - Wichtig
 
+### Automatischer Turso-Sync-Check im Dashboard
+
+**Status:** Offen (ADR-056)
+
+**Problem:** Lokale Imports/Scripts schreiben nur in SQLite. Turso-Sync muss manuell erfolgen. Stiller Drift wird erst bei manuellem Count-Vergleich entdeckt.
+
+**Ziel:** Dashboard-Widget oder API-Check der automatisch Entry-Counts zwischen letztem bekannten Turso-Stand und aktuellem Stand vergleicht. Bei Drift: Warnung im Admin-Dashboard.
+
+**Priorität:** Mittel – manuelle Regel (CLAUDE.md) reicht kurzfristig, automatisch wäre langfristig sicherer.
+
+---
+
 ### Refactoring: Service Layer für API-Routen
 
 **Status:** ZURÜCKGESTELLT
@@ -164,5 +176,5 @@ Leere Seiten (z.B. Zahlungsregister ohne Entries, Prognose ohne Annahmen) zeigen
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.42.0)
+**Letzte Aktualisierung:** 2026-02-13 (v2.46.0)
 

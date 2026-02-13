@@ -1,6 +1,6 @@
 # Hilfe & Anleitungen
 
-> Zuletzt aktualisiert: 2026-02-12 | Version 2.42.0
+> Zuletzt aktualisiert: 2026-02-13 | Version 2.46.0
 
 Dieses Dokument ist die **Source-of-Truth** für die Hilfe-Seite im Admin-Dashboard.
 Bei Änderungen am System wird diese Datei über `/doku` mit-aktualisiert.
@@ -87,14 +87,16 @@ Das Dashboard zeigt die Cashflow-Entwicklung ab 0 EUR. Die Prognose-Seite zeigt 
 3. Vorschläge akzeptieren oder manuell anpassen
 4. Buchungen bestätigen (`CONFIRMED`)
 
-### Schritt 3: Prämissen dokumentieren
+### Schritt 3: Berechnungsannahmen dokumentieren
 
-**Wo:** PLANUNG → Prämissen
+**Wo:** PLANUNG → Berechnungsannahmen
 
-- Textuelle Beschreibung der Planungsgrundlagen
-- Risikolevel pro Prämisse (niedrig/mittel/hoch)
-- Dient als Audit-Trail für Gericht und Gläubigerausschuss
-- Keine Berechnung — rein dokumentarisch
+3 Blöcke auf einer Seite:
+1. **Datenqualität (auto):** IST/PLAN-Counts, Confirmed%, Estate-Breakdown — wird automatisch berechnet
+2. **Planungsannahmen:** Textuelle Beschreibung der Planungsgrundlagen mit Status (ANNAHME/VERIFIZIERT/WIDERLEGT) und Links zu Stammdaten-Modulen
+3. **Prognose-Annahmen (read-only):** Zeigt die Forecast-Annahmen mit Methodik und Risiko-Bewertung
+
+Dient als Audit-Trail für Gericht und Gläubigerausschuss.
 
 ### Schritt 4: Prognose-Annahmen pflegen
 
@@ -163,7 +165,7 @@ Auch FALLDATEN-Seiten haben Live-Suche und sortierbare Spalten.
 
 | Seite | Zweck |
 |-------|-------|
-| **Prämissen** | Dokumentation der Planungsgrundlagen (Text + Risiko). Für Gericht/Gläubiger. |
+| **Berechnungsannahmen** | 3-Block-Ansicht: Datenqualität (auto), Planungsannahmen (Dokumentation), Prognose-Annahmen (read-only). |
 | **Prognose** | Annahmen-Editor für Zukunftswerte. Berechnet Cashflows + Headroom. |
 | **Liquiditätsplan** | Dashboard mit Rolling Forecast (IST + PROGNOSE kombiniert). |
 | **Business-Logik** | Regelwerk für Klassifikation und Masse-Zuordnung. |
@@ -183,6 +185,13 @@ Auch FALLDATEN-Seiten haben Live-Suche und sortierbare Spalten.
 |-------|-------|
 | **Freigaben** | Kundenzugänge + externe Share-Links verwalten. Neuen Kunden anlegen und Fall freigeben in einem Schritt. |
 | **Externe Ansicht** | Link-basierter Nur-Lese-Zugriff für Gläubigerausschuss, Gericht, etc. |
+
+### VERWALTUNG
+
+| Seite | Zweck |
+|-------|-------|
+| **System** | Zentrales Diagnose-Dashboard: Daten-Übersicht (IST-Buchungen, Review-Status, Gegenpartei-Zuordnung, Alt/Neu-Verteilung), alle 6 Konfigurationsprüfungen, Aggregations-Status mit Rebuild-Button, Import-Historie, Freigabe-Links. Auto-Refresh alle 30s. |
+| **Fall bearbeiten** | Name, Aktenzeichen, Status und Datumsfelder des Falls anpassen. |
 
 ---
 
@@ -210,9 +219,9 @@ Aus Ihren Annahmen auf der Prognose-Seite (PLANUNG → Prognose). Jede aktive An
 **Warum startet das Dashboard bei 0 EUR?**
 Das Dashboard zeigt die Cashflow-Entwicklung, nicht den absoluten Kontostand. So sehen Sie auf einen Blick, ob das Unternehmen positiven oder negativen Cashflow generiert. Den echten Kontostand mit Headroom finden Sie auf der Prognose-Seite.
 
-**Was ist der Unterschied zwischen Prämissen und Prognose-Annahmen?**
-- **Prämissen** sind textuelle Beschreibungen für die Dokumentation (Gericht, Gläubiger). Keine Berechnung.
-- **Prognose-Annahmen** sind Zahlenwerte (EUR pro Periode), die in die Berechnung einfließen.
+**Was ist der Unterschied zwischen Planungsannahmen und Prognose-Annahmen?**
+- **Planungsannahmen** (Block 2) sind textuelle Beschreibungen mit Status (ANNAHME/VERIFIZIERT/WIDERLEGT) für die Dokumentation gegenüber Gericht und Gläubigern. Keine Berechnung.
+- **Prognose-Annahmen** (Block 3) sind Zahlenwerte (EUR pro Periode) mit Methodik und Risiko-Bewertung, die in die Berechnung einfließen.
 
 **Was bedeutet "Headroom"?**
 Headroom = Kontostand + verfügbare Kreditlinie - Rückstellungen. Es ist der finanzielle Spielraum. Wird der Headroom negativ, droht Zahlungsunfähigkeit.

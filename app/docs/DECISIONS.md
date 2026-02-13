@@ -4,6 +4,150 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-059: System Health Panel als eigene Route
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Diagnose- und Konfigurationsinformationen waren über 5+ Seiten verstreut: DataQualityBanner auf dem Dashboard, AggregationStatusBanner, Import-Historie auf der Ingestion-Seite, Share-Link-Status auf der Freigaben-Seite. Ein Admin musste mehrere Seiten besuchen um den Gesamtzustand eines Falls zu verstehen.
+
+Check 6 (Gegenparteien ohne Match-Pattern) war im DataQualityBanner platziert, ist aber ein Konfigurations-Thema, kein Datenqualitäts-Problem.
+
+### Alternativen betrachtet
+
+1. **Hilfe-Seite erweitern:** Verworfen – Hilfe ist für End-User (IV), nicht für System-Diagnose. Keine Tab-Struktur, keine API-Calls.
+2. **Dashboard-Tab hinzufügen:** Verworfen – Dashboard ist bereits komplex. System-Status ist orthogonal zum Inhalt.
+3. **Eigene Route `/system`:** Gewählt – ermöglicht Auto-Refresh, Action-Buttons, klare Trennung.
+
+### Entscheidung
+
+- Eigene Route `/admin/cases/[id]/system` als Client Component
+- Kein neuer API-Endpoint – nutzt 5 bestehende APIs parallel (`data-quality`, `validate-consistency`, `aggregation?stats=true`, `import-jobs`, `share`)
+- Check 6 aus DataQualityBanner entfernt, Summen im Banner nur für Checks 1–5
+- Auto-Refresh alle 30 Sekunden
+- Sidebar-Link im Bottom-Bereich (neben "Fall bearbeiten")
+
+### Konsequenzen
+
+- **Positiv:** Zentraler Überblick über Fall-Gesundheit, Check 6 an semantisch korrekter Stelle
+- **Positiv:** Kein neuer API-Endpoint, minimale Backend-Änderungen
+- **Negativ:** 5 parallele API-Calls beim Laden (akzeptabel, da APIs leichtgewichtig)
+- **Offen:** Bei Bedarf weitere Checks/Sektionen ergänzbar (z.B. Classification Rules, Turso-Sync-Status)
+
+---
+
+## ADR-058: Berechnungsannahmen-Tab – 3-Block-Architektur
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Der ehemalige "Prämissen"-Tab mischte drei verschiedene Dinge:
+1. **Systemstatus** (Datenbasis, Entry-Counts) – ändert sich automatisch, sollte nie manuell gepflegt werden
+2. **Falldokumentation** (Sparkasse-Vertrag, apoBank-Risiko) – gehört zum Case, nicht zum Plan
+3. **Berechnungsannahmen** (Forecast-Parameter) – gehört zur Prognose-Engine
+
+Das Modell `PlanningAssumption` war Plan-gebunden (`planId` + `categoryName` Unique-Constraint), obwohl Annahmen fallweit gelten. `riskLevel` (low/medium/high) war ein generisches Risikolevel ohne fachliche Aussagekraft.
+
+### Entscheidung
+
+Redesign in 3 klar getrennte Blöcke auf einem Tab "Berechnungsannahmen":
+
+**Block 1 – Datenqualität (auto):** Live-Metriken aus DB (IST/PLAN-Count, Confirmed%, Estate-Breakdown). Neuer API-Endpoint `/api/cases/[id]/data-quality`. Nie manuell editierbar.
+
+**Block 2 – Planungsannahmen (Dokumentation):** `PlanningAssumption` refactored auf Case-Level (`caseId` statt `planId`). Neue Felder: `title` (statt `categoryName`), `status` (ANNAHME/VERIFIZIERT/WIDERLEGT statt riskLevel), `linkedModule` (dynamischer Link zu Stammdaten-Modul).
+
+**Block 3 – Prognose-Annahmen (Berechnung):** `ForecastAssumption` erweitert um Methodik (method, baseReferencePeriod) und quantitatives Risiko (riskProbability 0.0–1.0, riskImpactCents, riskComment). Read-only im Tab, editierbar im Prognose-Editor.
+
+### Begründung
+
+1. **Systemstatus ≠ Annahme:** Entry-Counts und Confirmed% ändern sich ständig – sie als Prämisse zu speichern ist per Definition veraltet.
+2. **Case-Level statt Plan-Level:** Annahmen wie "apoBank verweigert Vereinbarung" gelten für den ganzen Fall, nicht für einen spezifischen Plan.
+3. **Dynamische Links statt Duplikation:** `linkedModule: "banken"` verweist auf `/banken-sicherungsrechte`, wo die Daten gepflegt werden. Keine Kopie.
+4. **Quantitatives Risiko:** `riskProbability` + `riskImpactCents` ermöglicht echte Sensitivitätsanalyse statt vager "medium"-Labels.
+
+### Konsequenzen
+
+- **Migration:** 11 bestehende PlanningAssumptions auf neue Felder migriert (Turso + lokal)
+- **Alte Spalten:** `categoryName` und `riskLevel` bleiben in Turso-Schema (SQLite kann keine Spalten droppen), werden aber nicht mehr gelesen
+- **Breaking Change:** Alle APIs liefern jetzt `title`/`status` statt `categoryName`/`riskLevel`
+- **Portal:** Zeigt Block 2 + Block 3 (mit `visibilityScope: "EXTERN"` Filter)
+
+---
+
+## ADR-057: Check 6 – Gegenparteien ohne Match-Pattern
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Check 4 (Pattern-Match-Validierung) war fast nutzlos: 555 von 580 Entries wurden übersprungen, weil nur 3 von ~30 Counterparties ein `matchPattern` hatten. 7 Entries waren falsch `cp-privatpatienten` zugewiesen (D.O.C., mediDOK, united-domains), ohne dass ein Check das erkennen konnte.
+
+### Entscheidung
+
+Neuer Check 6 „Gegenparteien ohne Match-Pattern" mit Entry-Count-Schwelle ≥ 5:
+- Nur CPs mit 5+ IST-Entries (ohne interne Transfers) werden gewarnt
+- One-off-CPs (< 5 Entries) werden bewusst ignoriert
+- Deep-Link auf Counterparties-Seite mit `?filter=NO_PATTERN`
+- `entryId`-Feld nutzt `cp:`-Prefix (ist kein LedgerEntry, sondern Counterparty)
+
+### Begründung
+
+1. **Schwellwert vermeidet Rauschen:** ~55 CPs haben 1-4 Entries – Patternisierung für diese wäre Overengineering.
+2. **Sichtbarkeit statt Zwang:** Check macht Pattern-Lücken sichtbar, erzwingt aber keine automatische Patternisierung.
+3. **Kreislauf:** Check 6 senkt Pattern-Lücken → Check 4 wird effektiver → Fehlzuordnungen werden erkannt.
+
+### Konsequenzen
+
+- CPs mit 5+ Entries ohne Pattern erscheinen als Warnung im Dashboard
+- Nach Pattern-Ergänzung: Check 4 Skipped sinkt, Check 6 Warnings sinken
+- Bei neuen Fällen: CPs die über UI/Scripts erstellt werden, starten ohne Pattern – Check 6 warnt automatisch ab 5 Entries
+
+---
+
+## ADR-056: Lokale ↔ Turso Synchronisations-Pflicht
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Über mehrere Wochen entstand eine stille Datendrift zwischen lokaler SQLite-Entwicklungsdatenbank und Turso-Production:
+- 47 ISK-Zahlbeleg-Entries (Frau Dupke, 12.02.2026) nur lokal importiert, nie synchronisiert
+- 56 PaymentBreakdownItems + 18 Sources nur lokal
+- 91 Vor-Insolvenz-Counterparties (von Scripts erzeugt) nur lokal, mit 200 Entry-Referenzen via `suggestedCounterpartyId`
+- 2 IV-Notizen, 1 Share-Link nur lokal
+
+Der Drift wurde erst entdeckt, als ein Entry-Count-Abgleich (3425 lokal vs. 3378 Turso) auffiel. Ohne diesen manuellen Check wäre der Drift unbemerkt geblieben.
+
+### Entscheidung
+
+**Neue Pflicht-Regel:** Nach jedem Daten-Import oder Script-Ausführung, die Daten in die lokale DB schreibt, MUSS ein Abgleich mit Turso erfolgen. Checkliste:
+
+1. **Sofort nach Import/Script:** `SELECT COUNT(*) FROM ledger_entries WHERE valueType='IST'` auf beiden DBs vergleichen
+2. **Vor jedem Deploy:** Kurzer Tabellen-Count-Abgleich (ledger_entries, counterparties, payment_breakdown_items)
+3. **Sync-Richtung:** Lokal → Turso (lokale DB ist Entwicklungs-Wahrheit für Imports)
+4. **Werkzeug:** `sqlite3 dev.db ".mode insert" "SELECT * FROM table WHERE ..."` → `turso db shell` pipen
+
+### Begründung
+
+1. **Daten sind die heilige Kuh:** Cent-genaue Korrektheit ist Kernversprechen der Anwendung.
+2. **Stiller Drift ist gefährlicher als lauter Fehler:** Die App funktioniert mit veralteten Turso-Daten scheinbar normal.
+3. **Kein automatischer Sync gewünscht:** Bidirektionaler Sync ist komplex und fehleranfällig. Expliziter, manueller Sync mit Verifikation ist sicherer.
+
+### Konsequenzen
+
+- Jeder Import hat jetzt einen expliziten „Turso-Sync"-Schritt
+- CLAUDE.md „Häufige Fehler" enthält Warnung
+- Bei Diskrepanz: Sofort klären, nie ignorieren
+- Langfristig: Automatischen Count-Check in CI/CD oder Dashboard einbauen
+
+---
+
 ## ADR-055: Ledger Fast-Path (DB-Pagination + Aggregate-Stats)
 
 **Datum:** 13. Februar 2026

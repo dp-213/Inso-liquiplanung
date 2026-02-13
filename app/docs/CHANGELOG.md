@@ -4,6 +4,100 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.46.0 – System Health Panel
+
+**Datum:** 13. Februar 2026
+
+### Neue Funktionen
+
+- **System Health Panel:** Neue Admin-Seite `/admin/cases/[id]/system` mit zentraler Diagnose-Übersicht für jeden Fall. Konsolidiert Informationen die vorher über 5+ Seiten verstreut waren:
+  - **Sektion A – Daten-Übersicht:** 4 Metriken-Karten (IST-Buchungen mit Datumsbereich, Review-Status als %-Balken, Gegenpartei-Zuordnung, Alt/Neu-Verteilung mit UNKLAR-Warnung)
+  - **Sektion B – Konfigurationsprüfung:** Alle 6 Konsistenz-Checks mit aufklappbaren Details, Deep-Links und Sortierung (Fehler → Warnungen → OK)
+  - **Sektion C – System-Status:** Aggregation (mit "Jetzt aktualisieren"-Button), letzte Importe, Freigabe-Links
+- **Auto-Refresh:** System-Seite aktualisiert alle 30 Sekunden automatisch
+- **Sidebar-Link:** Neuer "System"-Eintrag mit Schild-Icon im Bottom-Bereich der Fall-Sidebar
+
+### Änderungen
+
+- **DataQualityBanner:** Check 6 (Gegenparteien ohne Match-Pattern) aus dem Dashboard-Banner entfernt – ist jetzt ausschließlich im System Health Panel zu finden. Fehler/Warnungs-Summen werden nur noch für Datenqualitäts-Checks (1–5) berechnet.
+- **Keine neuen API-Endpoints:** System-Seite nutzt 5 bestehende APIs parallel (`data-quality`, `validate-consistency`, `aggregation`, `import-jobs`, `share`)
+
+---
+
+## Version 2.45.0 – Berechnungsannahmen-Tab Redesign (3-Block-Architektur)
+
+**Datum:** 13. Februar 2026
+
+### Neue Funktionen
+
+- **Berechnungsannahmen-Tab (3 Blöcke):** Komplettes Redesign des ehemaligen "Prämissen"-Tabs in 3 klar getrennte Bereiche:
+  - **Block 1 – Datenqualität:** Auto-berechnete Kennzahlen (IST/PLAN-Count, Confirmed%, Estate-Breakdown, Bankkonten, Gegenpartei-Abdeckung, Datumsbereiche). Live aus DB, nie manuell gepflegt.
+  - **Block 2 – Planungsannahmen:** Case-Level Dokumentation mit Status (ANNAHME/VERIFIZIERT/WIDERLEGT) und dynamischen Links zu Stammdaten-Modulen (Banken, Personal, Business-Logik).
+  - **Block 3 – Prognose-Annahmen:** ForecastAssumptions read-only mit Methodik-Feldern (method, baseReferencePeriod) und quantitativem Risiko (riskProbability, riskImpactCents, riskComment).
+- **DataQuality-API:** Neuer Endpoint `GET /api/cases/[id]/data-quality` liefert aggregierte Datenqualitäts-Metriken.
+- **DataQualityPanel:** Neue Komponente `components/dashboard/DataQualityPanel.tsx` für Block 1.
+- **ForecastAssumption Methodik & Risiko:** AssumptionDetailDrawer um Sektion "Methodik & Risiko" erweitert (method, baseReferencePeriod, riskProbability, riskImpactCents, riskComment, visibilityScope).
+
+### Schema-Änderungen
+
+- **PlanningAssumption refactored:**
+  - `categoryName` → `title` (freier Titel statt feste Kategorie)
+  - `riskLevel` → `status` (ANNAHME/VERIFIZIERT/WIDERLEGT statt low/medium/high)
+  - `planId` → optional (war NOT NULL), neu: `caseId` als Primary-Dimension
+  - Neue Felder: `linkedModule`, `linkedEntityId`, `lastReviewedAt`
+  - Unique-Constraint `[planId, categoryName]` entfernt, Index auf `caseId` hinzugefügt
+- **ForecastAssumption erweitert:** 8 neue Felder für Methodik (method, baseReferencePeriod, scenarioSensitivity), Risiko (riskProbability, riskImpactCents, riskComment) und Review (lastReviewedAt, visibilityScope). Index auf `[caseId, categoryKey]`.
+
+### Änderungen
+
+- **Sidebar:** "Prämissen" → "Berechnungsannahmen" umbenannt
+- **Dashboard-Tab:** "Planungsprämissen" → "Berechnungsannahmen" umbenannt
+- **Portal/PDF:** Nutzen neue Feldnamen (title/status statt categoryName/riskLevel)
+- **Legacy-Bereinigung:** Optionale categoryName/riskLevel-Felder aus AssumptionInfo-Interface entfernt, PDF-Export-Fallbacks bereinigt
+
+### Migration (Turso)
+
+- 11 bestehende PlanningAssumptions migriert: caseId aus Plan abgeleitet, title=categoryName, status aus riskLevel gemappt (LOW→VERIFIZIERT, MEDIUM/HIGH→ANNAHME)
+- Alte Spalten (categoryName, riskLevel) bleiben in DB erhalten (SQLite DROP COLUMN vermieden), werden aber nicht mehr gelesen
+
+---
+
+## Version 2.44.0 – Datenqualitäts-Check 6 & Turso-Synchronisation
+
+**Datum:** 13. Februar 2026
+
+### Neue Funktionen
+
+- **Check 6: Gegenparteien ohne Match-Pattern:** Neuer Datenqualitäts-Check warnt bei Counterparties mit 5+ IST-Buchungen ohne `matchPattern`. Sortiert nach Buchungsanzahl (wichtigste zuerst). Interne Transfers (`transferPartnerEntryId`) werden ausgeschlossen. Severity: Warning.
+- **Deep-Link zu Gegenparteien:** Check-6-Warnungen verlinken direkt auf `/counterparties?filter=NO_PATTERN` statt auf Ledger.
+- **Counterparties-Seite erweitert:**
+  - 5. Summary-Card „Ohne Pattern" (Amber) im Überblick
+  - Neuer Filter „Ohne Pattern" im Typ-Dropdown
+  - URL-Parameter `?filter=NO_PATTERN` wird automatisch vorbelegt (Deep-Link vom Dashboard)
+  - Amber-Indikator „Kein Pattern" statt „-" in Tabelle
+
+### Daten-Fixes (Turso + Lokal)
+
+- **7 falsch zugeordnete Entries korrigiert:** 5× `counterpartyId` auf NULL gesetzt (D.O.C., united-domains, etc.), 2× korrekte CP zugewiesen (mediDOK, Landesoberkasse).
+- **12 Counterparties mit Match-Pattern nachgerüstet:** Konservative Regex-Patterns für CPs mit 5+ Entries (Privatpatienten, Pega, mediDOK, u.a.).
+
+### Datenbank-Synchronisation (Lokal ↔ Turso)
+
+- **47 fehlende ISK-Zahlbeleg-Entries nachsynchronisiert:** Frau Dupke Dez-2025 + Jan-2026, lokal importiert am 12.02. aber nie zu Turso übertragen.
+- **56 PaymentBreakdownItems + 18 PaymentBreakdownSources synchronisiert:** Existierten nur lokal.
+- **91 Vor-Insolvenz-Counterparties synchronisiert:** Von `classify-pre-insolvency` Scripts erzeugt, 200 Entries referenzierten sie über `suggestedCounterpartyId`.
+- **2 IV-Notizen + 1 Share-Link synchronisiert.**
+- **5 Duplikat-Counterparties in Turso bereinigt:** `cp-drv-bund` (Duplikat von `cp-hvplus-drv-bund`) etc., alle mit 0 Referenzen.
+- **dev.db Konsolidierung:** `app/prisma/dev.db` → `app/dev.db` verschoben, Duplikat-Verwirrung dauerhaft beseitigt.
+
+### Endstand
+
+- Lokal + Turso: 3.425 IST-Entries, 792.716,09 EUR Gesamtsumme – identisch.
+- 275 Counterparties in beiden DBs.
+- Alle 7 Tabellen synchron (außer erwartete Differenzen: `customer_users`, `customer_case_access` nur in Production).
+
+---
+
 ## Version 2.43.0 – Performance-Optimierung (Ledger & Vercel)
 
 **Datum:** 13. Februar 2026

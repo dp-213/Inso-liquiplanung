@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.43.0
+**Version:** 2.46.0
 **Stand:** 13. Februar 2026
 
 ---
@@ -627,8 +627,10 @@ Workflow:
 │   │   │   ├── ForecastSummaryCards.tsx  # 4 KPI-Cards
 │   │   │   ├── InlineAssumptionRow.tsx   # Annahme als editierbare Tabellenzeile
 │   │   │   ├── QuickAddRow.tsx           # Inline 4-Felder-Formular
-│   │   │   ├── AssumptionDetailDrawer.tsx # SlideOver für erweiterte Felder
+│   │   │   ├── AssumptionDetailDrawer.tsx # SlideOver für Methodik & Risiko
 │   │   │   └── SpreadsheetCell.tsx       # Editierbare Zelle (Tab+Save, Undo)
+│   │   └── dashboard/
+│   │       └── DataQualityPanel.tsx      # Block 1: Auto-berechnete Datenqualität
 │   └── lib/
 │       ├── db.ts                     # Prisma Client
 │       ├── auth.ts                   # Session-Handling
