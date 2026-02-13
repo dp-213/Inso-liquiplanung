@@ -16,7 +16,7 @@ interface FaqItem {
 const GLOSSARY = [
   { term: "Altmasse", definition: "Vermögenswerte und Verbindlichkeiten, die vor der Insolvenzeröffnung entstanden sind" },
   { term: "Closing Balance", definition: "Endbestand einer Periode = Opening + Einzahlungen + Auszahlungen" },
-  { term: "Datenqualitäts-Check", definition: "Automatische Konsistenzprüfung auf dem Dashboard (6 Regeln, rot/gelb)" },
+  { term: "Datenqualitäts-Check", definition: "Automatische Konsistenzprüfung im System Health Panel (6 Regeln, aufklappbar mit Deep-Links)" },
   { term: "Eröffnungssaldo", definition: "Kontostand zu Beginn des Planungszeitraums" },
   { term: "Geschäftskonten", definition: "Vorinsolvenz-Analyse: Kontobewegungen nach Kategorie mit Standort-Aufschlüsselung" },
   { term: "Headroom", definition: "Finanzieller Spielraum = Kontostand + Kreditlinie \u2013 Rückstellungen" },
@@ -359,14 +359,14 @@ export default function HilfePage() {
       ],
     },
     {
-      title: "Datenqualität",
+      title: "Datenqualität & System-Diagnose",
       items: [
         {
-          question: "Was ist das rote/gelbe Banner auf dem Dashboard?",
+          question: "Wo finde ich die Datenqualitäts-Checks?",
           answer: (
             <div className="space-y-2">
               <p>
-                Der automatische Datenqualitäts-Check prüft bei jedem Seitenaufruf <strong>6 Konsistenzregeln</strong>:
+                Unter <strong>VERWALTUNG → System</strong>. Das System Health Panel prüft automatisch <strong>6 Konsistenzregeln</strong> (Auto-Refresh alle 30s):
               </p>
               <ol className="list-decimal list-inside space-y-1 ml-2 text-sm">
                 <li>Gegenpartei ↔ Kategorie-Tag stimmen überein</li>
@@ -377,7 +377,7 @@ export default function HilfePage() {
                 <li>Gegenparteien mit 5+ Buchungen haben ein Match-Pattern</li>
               </ol>
               <p className="text-xs text-[var(--muted)]">
-                Rot = Fehler (korrigieren), Gelb = Warnungen (Hinweise). Details und Deep-Links über das Banner abrufbar.
+                Fehlgeschlagene Checks sind aufklappbar mit Detail-Items und Deep-Links zum Zahlungsregister.
               </p>
             </div>
           ),

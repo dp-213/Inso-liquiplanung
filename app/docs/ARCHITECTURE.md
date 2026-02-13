@@ -617,20 +617,17 @@ Workflow:
 │   │   │   ├── MobileCaseHeader.tsx  # Sticky Mobile Case-Header (v2.35.0)
 │   │   │   └── TableToolbar.tsx      # Such-Toolbar + SortableHeader für CRUD-Listen (v2.40.0)
 │   │   ├── dashboard/
-│   │   │   ├── DataQualityBanner.tsx  # Datenqualitäts-Prüfung (rot/amber/hidden) (v2.42.0)
 │   │   │   ├── UnifiedCaseDashboard.tsx # Haupt-Dashboard
 │   │   │   └── UnklarRiskBanner.tsx    # UNKLAR-Risiko-Banner
-│   │   ├── forecast/               # Prognose-Spreadsheet (v2.31.0)
-│   │   │   ├── types.ts            # Shared Types + Helpers (formatEUR, parseCentsFromEUR, cn)
-│   │   │   ├── ForecastSpreadsheet.tsx   # Unified-Tabelle (IST + Prognose)
-│   │   │   ├── ForecastScenarioBar.tsx   # Szenario-Info + Eröffnungssaldo
-│   │   │   ├── ForecastSummaryCards.tsx  # 4 KPI-Cards
-│   │   │   ├── InlineAssumptionRow.tsx   # Annahme als editierbare Tabellenzeile
-│   │   │   ├── QuickAddRow.tsx           # Inline 4-Felder-Formular
-│   │   │   ├── AssumptionDetailDrawer.tsx # SlideOver für Methodik & Risiko
-│   │   │   └── SpreadsheetCell.tsx       # Editierbare Zelle (Tab+Save, Undo)
-│   │   └── dashboard/
-│   │       └── DataQualityPanel.tsx      # Block 1: Auto-berechnete Datenqualität
+│   │   └── forecast/               # Prognose-Spreadsheet (v2.31.0)
+│   │       ├── types.ts            # Shared Types + Helpers (formatEUR, parseCentsFromEUR, cn)
+│   │       ├── ForecastSpreadsheet.tsx   # Unified-Tabelle (IST + Prognose)
+│   │       ├── ForecastScenarioBar.tsx   # Szenario-Info + Eröffnungssaldo
+│   │       ├── ForecastSummaryCards.tsx  # 4 KPI-Cards
+│   │       ├── InlineAssumptionRow.tsx   # Annahme als editierbare Tabellenzeile
+│   │       ├── QuickAddRow.tsx           # Inline 4-Felder-Formular
+│   │       ├── AssumptionDetailDrawer.tsx # SlideOver für Methodik & Risiko
+│   │       └── SpreadsheetCell.tsx       # Editierbare Zelle (Tab+Save, Undo)
 │   └── lib/
 │       ├── db.ts                     # Prisma Client
 │       ├── auth.ts                   # Session-Handling

@@ -1569,10 +1569,12 @@ Alle LedgerEntries von Bankkonten mit `isLiquidityRelevant=false` (Geschäftskon
 
 ---
 
-### 4.19 Datenqualitäts-Checks (v2.42.0)
+### 4.19 Datenqualitäts-Checks (v2.42.0, aktualisiert v2.46.0)
 
 **API:** `GET /api/cases/[id]/validate-consistency`
-**Komponente:** `DataQualityBanner.tsx` (auf Case-Dashboard, oberhalb UnklarRiskBanner)
+**Anzeige:** Ausschließlich im **System Health Panel** (`/admin/cases/[id]/system`, Sektion B)
+
+> **Architektur-Regel (ADR-059):** Seit v2.46.0 werden Datenqualitäts-Checks NICHT mehr auf dem Dashboard oder anderen Seiten angezeigt. Das System Health Panel ist der einzige Ort für System-Diagnose. Die ehemaligen Komponenten `DataQualityBanner.tsx` und `DataQualityPanel.tsx` wurden gelöscht.
 
 #### Funktion
 
@@ -1580,14 +1582,14 @@ Automatische Konsistenzprüfung aller IST-LedgerEntries eines Falls. Erkennt Ink
 
 #### 6 Checks
 
-| # | Check | Severity | Anzeige | Beschreibung |
-|---|-------|----------|---------|--------------|
-| 1 | Gegenpartei ↔ Kategorie-Tag | Fehler | Dashboard + System | Entries mit bekannter CP müssen erwarteten categoryTag haben (`COUNTERPARTY_TAG_MAP`) |
-| 2 | Tag ohne Gegenpartei | Warnung | Dashboard + System | Entries mit categoryTag (KV/HZV/PVS) sollten passende CP zugewiesen haben |
-| 3 | estateAllocation ↔ Quartal | Fehler | Dashboard + System | Alt/Neu-Zuordnung muss zum Leistungszeitraum passen (nur KV). Priorität: servicePeriodStart > serviceDate > Beschreibung-Regex |
-| 4 | Pattern-Match | Warnung | Dashboard + System | Buchungstext sollte zum matchPattern der zugewiesenen CP passen (manuelle Zuordnung = legitim) |
-| 5 | Verwaiste Dimensionen | Fehler | Dashboard + System | Alle referenzierten Location/BankAccount/Counterparty-IDs müssen in Stammdaten existieren |
-| 6 | Gegenparteien ohne Pattern | Warnung | **Nur System** | CPs mit 5+ Buchungen ohne matchPattern (v2.44.0, seit v2.46.0 nur im System Health Panel) |
+| # | Check | Severity | Beschreibung |
+|---|-------|----------|--------------|
+| 1 | Gegenpartei ↔ Kategorie-Tag | Fehler | Entries mit bekannter CP müssen erwarteten categoryTag haben (`COUNTERPARTY_TAG_MAP`) |
+| 2 | Tag ohne Gegenpartei | Warnung | Entries mit categoryTag (KV/HZV/PVS) sollten passende CP zugewiesen haben |
+| 3 | estateAllocation ↔ Quartal | Fehler | Alt/Neu-Zuordnung muss zum Leistungszeitraum passen (nur KV). Priorität: servicePeriodStart > serviceDate > Beschreibung-Regex |
+| 4 | Pattern-Match | Warnung | Buchungstext sollte zum matchPattern der zugewiesenen CP passen (manuelle Zuordnung = legitim) |
+| 5 | Verwaiste Dimensionen | Fehler | Alle referenzierten Location/BankAccount/Counterparty-IDs müssen in Stammdaten existieren |
+| 6 | Gegenparteien ohne Pattern | Warnung | CPs mit 5+ Buchungen ohne matchPattern (v2.44.0) |
 
 #### Konfiguration (case-spezifisch)
 
@@ -1609,15 +1611,14 @@ export function getExpectedEstateAllocation(
 ): QuartalEstateRule { ... }
 ```
 
-#### UI-Verhalten
+#### Darstellung im System Health Panel
 
 | Zustand | Darstellung |
 |---------|-------------|
-| Alle Checks bestanden | Kein Banner (versteckt) |
-| Nur Warnungen | Amber-Banner mit aufklappbaren Details |
-| Fehler vorhanden | Rotes Banner mit aufklappbaren Details |
-| API-Fehler | Graues Banner „Check nicht verfügbar" + Retry-Button |
-| Laden | Animiertes Skeleton |
+| Alle Checks bestanden | Grüne Tags, kompakt zusammengefasst |
+| Fehlgeschlagene Checks | Aufklappbar mit Detail-Items und Deep-Links |
+| API-Fehler | Fehlermeldung mit Retry-Möglichkeit |
+| Sortierung | Fehler zuerst, dann Warnungen, dann OK |
 
 #### API-Response
 

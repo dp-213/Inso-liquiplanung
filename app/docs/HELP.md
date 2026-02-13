@@ -236,10 +236,10 @@ PLAN ist der Legacy-Fallback. Er wird angezeigt, wenn:
 - Keine aktiven Annahmen vorhanden sind
 - Bei standortbezogenen Auswertungen (nur GLOBAL nutzt Forecast)
 
-### Datenqualität
+### Datenqualität & System-Diagnose
 
-**Was ist das rote/gelbe Banner auf dem Dashboard?**
-Der automatische Datenqualitäts-Check prüft bei jedem Seitenaufruf 6 Konsistenzregeln:
+**Wo finde ich die Datenqualitäts-Checks?**
+Unter VERWALTUNG → System. Das System Health Panel prüft automatisch 6 Konsistenzregeln (mit Auto-Refresh alle 30 Sekunden):
 1. Gegenpartei ↔ Kategorie-Tag stimmen überein
 2. Buchungen mit Kategorie-Tag haben passende Gegenpartei
 3. Alt/Neu-Zuordnung passt zum Leistungszeitraum (nur KV)
@@ -247,10 +247,10 @@ Der automatische Datenqualitäts-Check prüft bei jedem Seitenaufruf 6 Konsisten
 5. Alle referenzierten Stammdaten (Standort, Bankkonto, Gegenpartei) existieren
 6. Gegenparteien mit 5+ IST-Buchungen haben ein Match-Pattern hinterlegt
 
-Rot = Fehler (müssen korrigiert werden), Gelb = Warnungen (Hinweise). Klicken Sie auf „Details" und dann „Im Ledger zeigen →" um zur betroffenen Buchung zu navigieren.
+Fehlgeschlagene Checks sind aufklappbar mit Detail-Items und Deep-Links zum Zahlungsregister.
 
-**Warum sehe ich „Check nicht verfügbar"?**
-Die API konnte nicht erreicht werden (z.B. Timeout). Klicken Sie auf „Erneut versuchen".
+**Warum sehe ich keine Datenqualitäts-Hinweise auf dem Dashboard?**
+Seit v2.46.0 werden alle System-Diagnose-Informationen zentral im System Health Panel angezeigt (VERWALTUNG → System), nicht mehr auf dem Dashboard oder anderen Seiten.
 
 ### Masse-Zuordnung
 
@@ -305,7 +305,7 @@ Unter Fall bearbeiten → „Freigabe-Einstellungen" kann ein EUR-Betrag definie
 |---------|-----------|
 | **Altmasse** | Vermögenswerte und Verbindlichkeiten vor Insolvenzeröffnung |
 | **Closing Balance** | Endbestand einer Periode (Opening + Einzahlungen + Auszahlungen) |
-| **Datenqualitäts-Check** | Automatische Konsistenzprüfung auf dem Dashboard (6 Regeln, rot/gelb/versteckt) |
+| **Datenqualitäts-Check** | Automatische Konsistenzprüfung im System Health Panel (6 Regeln, aufklappbar mit Deep-Links) |
 | **Employee** | Mitarbeiter eines Falls mit Gehaltsdaten, Standort-Zuordnung und LANR |
 | **Eröffnungssaldo** | Kontostand zu Beginn des Planungszeitraums |
 | **BESCHAFFUNG** | Sidebar-Sektion für Einkauf und Lieferanten (Bestellfreigaben, Kreditoren) |

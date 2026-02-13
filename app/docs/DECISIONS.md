@@ -36,6 +36,15 @@ Check 6 (Gegenparteien ohne Match-Pattern) war im DataQualityBanner platziert, i
 - **Negativ:** 5 parallele API-Calls beim Laden (akzeptabel, da APIs leichtgewichtig)
 - **Offen:** Bei Bedarf weitere Checks/Sektionen ergänzbar (z.B. Classification Rules, Turso-Sync-Status)
 
+### Folgemaßnahme: Bereinigung redundanter Anzeigen
+
+Nach Einführung des System Health Panels wurden alle redundanten Diagnose-Anzeigen entfernt:
+- `DataQualityBanner.tsx` gelöscht (war auf Dashboard)
+- `DataQualityPanel.tsx` gelöscht (war Block 1 auf Berechnungsannahmen)
+- `AggregationStatusBanner.tsx` gelöscht (verwaist)
+
+**Regel für die Zukunft:** System-Diagnose (Datenqualität, Checks, Aggregation, Import-Status, Share-Links) wird ausschließlich im System Health Panel angezeigt. Keine Duplikation auf anderen Seiten. Neue Diagnose-Features gehören in `/system`, nicht in Dashboard oder andere Tabs.
+
 ---
 
 ## ADR-058: Berechnungsannahmen-Tab – 3-Block-Architektur

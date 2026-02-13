@@ -19,8 +19,17 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ### Änderungen
 
-- **DataQualityBanner:** Check 6 (Gegenparteien ohne Match-Pattern) aus dem Dashboard-Banner entfernt – ist jetzt ausschließlich im System Health Panel zu finden. Fehler/Warnungs-Summen werden nur noch für Datenqualitäts-Checks (1–5) berechnet.
 - **Keine neuen API-Endpoints:** System-Seite nutzt 5 bestehende APIs parallel (`data-quality`, `validate-consistency`, `aggregation`, `import-jobs`, `share`)
+
+### Entfernte Features
+
+- **DataQualityBanner:** Vom Dashboard entfernt + Komponente gelöscht. Alle Konsistenz-Checks sind jetzt ausschließlich im System Health Panel.
+- **DataQualityPanel:** Block 1 "Datenqualität" aus Berechnungsannahmen-Seite entfernt. Metriken sind jetzt im System Health Panel Sektion A.
+- **AggregationStatusBanner:** Verwaiste Komponente gelöscht (war nirgends importiert). Aggregations-Status ist im System Health Panel Sektion C.
+
+### Architektur-Regel
+
+**System-Diagnose gehört ausschließlich ins System Health Panel.** Datenqualitäts-Metriken, Konsistenz-Checks und operativer Status werden NICHT auf anderen Seiten (Dashboard, Berechnungsannahmen, etc.) dupliziert. Siehe ADR-059.
 
 ---
 
