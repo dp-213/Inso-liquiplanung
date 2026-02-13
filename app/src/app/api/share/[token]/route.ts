@@ -343,25 +343,33 @@ export async function GET(
       bankAccounts: await (async () => {
         const { balances, totalBalanceCents, totalAvailableCents } =
           await calculateBankAccountBalances(caseData.id, caseData.bankAccounts);
+        const accounts = caseData.bankAccounts.map((acc) => {
+          const bal = balances.get(acc.id);
+          return {
+            id: acc.id,
+            bankName: acc.bankName,
+            accountName: acc.accountName,
+            iban: acc.iban,
+            openingBalanceCents: acc.openingBalanceCents.toString(),
+            currentBalanceCents: (bal?.currentBalanceCents ?? acc.openingBalanceCents).toString(),
+            securityHolder: acc.securityHolder,
+            accountType: acc.accountType,
+            status: acc.status,
+            notes: acc.notes,
+          };
+        });
+        const iskAccounts = accounts.filter(a => a.accountType === "ISK");
+        const iskBalanceCents = iskAccounts.reduce(
+          (sum, a) => sum + BigInt(a.currentBalanceCents), BigInt(0)
+        );
         return {
-          accounts: caseData.bankAccounts.map((acc) => {
-            const bal = balances.get(acc.id);
-            return {
-              id: acc.id,
-              bankName: acc.bankName,
-              accountName: acc.accountName,
-              iban: acc.iban,
-              openingBalanceCents: acc.openingBalanceCents.toString(),
-              currentBalanceCents: (bal?.currentBalanceCents ?? acc.openingBalanceCents).toString(),
-              securityHolder: acc.securityHolder,
-              status: acc.status,
-              notes: acc.notes,
-            };
-          }),
+          accounts,
           summary: {
             totalBalanceCents: totalBalanceCents.toString(),
             totalAvailableCents: totalAvailableCents.toString(),
             accountCount: caseData.bankAccounts.length,
+            iskBalanceCents: iskBalanceCents.toString(),
+            iskAccountCount: iskAccounts.length,
           },
         };
       })(),

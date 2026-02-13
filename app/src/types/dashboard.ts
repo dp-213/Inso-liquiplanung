@@ -87,6 +87,7 @@ export interface BankAccountInfo {
   openingBalanceCents: string;
   currentBalanceCents: string;
   securityHolder: string | null;
+  accountType: string; // "ISK" | "GESCHAEFT" | "DARLEHEN"
   status: string;
   notes: string | null;
 }
@@ -97,6 +98,8 @@ export interface BankAccountsSummary {
     totalBalanceCents: string;
     totalAvailableCents: string;
     accountCount: number;
+    iskBalanceCents: string;
+    iskAccountCount: number;
   };
 }
 

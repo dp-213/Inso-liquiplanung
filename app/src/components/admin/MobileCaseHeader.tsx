@@ -25,6 +25,7 @@ const segmentLabels: Record<string, string> = {
   "business-logic": "Business-Logik",
   kontobewegungen: "IST-Daten",
   "ist-klassifikation": "Klassifikation",
+  performance: "Performance (GuV)",
   zahlungsverifikation: "Verifikation",
   "iv-kommunikation": "IV-Kommunikation",
   freigaben: "Freigaben",

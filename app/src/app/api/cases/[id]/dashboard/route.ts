@@ -387,8 +387,8 @@ export async function GET(
           isActive: e.isActive,
         })),
       },
-      bankAccounts: {
-        accounts: caseData.bankAccounts.map((acc) => {
+      bankAccounts: (() => {
+        const accounts = caseData.bankAccounts.map((acc) => {
           const bal = bankBalancesResult.balances.get(acc.id);
           return {
             id: acc.id,
@@ -398,16 +398,26 @@ export async function GET(
             openingBalanceCents: acc.openingBalanceCents.toString(),
             currentBalanceCents: (bal?.currentBalanceCents ?? acc.openingBalanceCents).toString(),
             securityHolder: acc.securityHolder,
+            accountType: acc.accountType,
             status: acc.status,
             notes: acc.notes,
           };
-        }),
-        summary: {
-          totalBalanceCents: bankBalancesResult.totalBalanceCents.toString(),
-          totalAvailableCents: bankBalancesResult.totalAvailableCents.toString(),
-          accountCount: caseData.bankAccounts.length,
-        },
-      },
+        });
+        const iskAccounts = accounts.filter(a => a.accountType === "ISK");
+        const iskBalanceCents = iskAccounts.reduce(
+          (sum, a) => sum + BigInt(a.currentBalanceCents), BigInt(0)
+        );
+        return {
+          accounts,
+          summary: {
+            totalBalanceCents: bankBalancesResult.totalBalanceCents.toString(),
+            totalAvailableCents: bankBalancesResult.totalAvailableCents.toString(),
+            accountCount: caseData.bankAccounts.length,
+            iskBalanceCents: iskBalanceCents.toString(),
+            iskAccountCount: iskAccounts.length,
+          },
+        };
+      })(),
       ledgerStats,
       // Alt/Neu-Massezuordnung (aus estateAllocation, NICHT aus legalBucket!)
       estateAllocation: estateAllocationData ? {
