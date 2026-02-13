@@ -198,51 +198,53 @@ export async function GET(
     const periodCount = plan.periodCount || 10;
     const startDate = plan.planStartDate ? new Date(plan.planStartDate) : new Date();
 
-    // 2. Load BankAgreements für Kreditlinie
-    const bankAgreements = await prisma.bankAgreement.findMany({
-      where: { caseId, agreementStatus: 'VEREINBART' },
-      include: { bankAccount: { select: { bankName: true } } },
-    });
-    const creditLineCents = bankAgreements.reduce(
-      (sum, a) => sum + (a.creditCapCents || BigInt(0)), BigInt(0)
-    );
-
-    // 3. Load Rückstellungen aus InsolvencyEffects (isAvailabilityOnly=true)
-    const reserveEffects = await prisma.insolvencyEffect.findMany({
-      where: { planId: plan.id, isActive: true, isAvailabilityOnly: true },
-    });
-    const reservesTotalCents = reserveEffects.reduce(
-      (sum, e) => sum + (e.amountCents < 0 ? -e.amountCents : e.amountCents), BigInt(0)
-    );
-
-    // 4. Load LedgerEntries (nur liquidity-relevante Konten + PLAN-Entries)
-    const reviewStatusFilter = includeUnreviewed
-      ? { not: 'REJECTED' }
-      : { in: ['CONFIRMED', 'ADJUSTED'] };
-
     // ISK-Only-Filter: Nur operative Massekonten in der Matrix
     const liquidityAccountIds = existingCase.bankAccounts
       .filter(a => a.isLiquidityRelevant)
       .map(a => a.id);
 
-    const allEntries = await prisma.ledgerEntry.findMany({
-      where: {
-        caseId,
-        ...EXCLUDE_SPLIT_PARENTS,
-        reviewStatus: reviewStatusFilter,
-        OR: [
-          { bankAccountId: { in: liquidityAccountIds } },
-          { bankAccountId: null },
-          { valueType: 'PLAN' },
-        ],
-      },
-      include: {
-        counterparty: { select: { id: true, name: true } },
-        location: { select: { id: true, name: true } },
-        bankAccount: { select: { id: true, bankName: true } },
-      },
-      orderBy: { transactionDate: 'asc' },
-    });
+    const reviewStatusFilter = includeUnreviewed
+      ? { not: 'REJECTED' }
+      : { in: ['CONFIRMED', 'ADJUSTED'] };
+
+    // 2-4. Parallel: BankAgreements + InsolvencyEffects + LedgerEntries
+    const [bankAgreements, reserveEffects, allEntries] = await Promise.all([
+      // 2. BankAgreements für Kreditlinie
+      prisma.bankAgreement.findMany({
+        where: { caseId, agreementStatus: 'VEREINBART' },
+        include: { bankAccount: { select: { bankName: true } } },
+      }),
+      // 3. Rückstellungen aus InsolvencyEffects (isAvailabilityOnly=true)
+      prisma.insolvencyEffect.findMany({
+        where: { planId: plan.id, isActive: true, isAvailabilityOnly: true },
+      }),
+      // 4. LedgerEntries (nur liquidity-relevante Konten + PLAN-Entries)
+      prisma.ledgerEntry.findMany({
+        where: {
+          caseId,
+          ...EXCLUDE_SPLIT_PARENTS,
+          reviewStatus: reviewStatusFilter,
+          OR: [
+            { bankAccountId: { in: liquidityAccountIds } },
+            { bankAccountId: null },
+            { valueType: 'PLAN' },
+          ],
+        },
+        include: {
+          counterparty: { select: { id: true, name: true } },
+          location: { select: { id: true, name: true } },
+          bankAccount: { select: { id: true, bankName: true } },
+        },
+        orderBy: { transactionDate: 'asc' },
+      }),
+    ]);
+
+    const creditLineCents = bankAgreements.reduce(
+      (sum, a) => sum + (a.creditCapCents || BigInt(0)), BigInt(0)
+    );
+    const reservesTotalCents = reserveEffects.reduce(
+      (sum, e) => sum + (e.amountCents < 0 ? -e.amountCents : e.amountCents), BigInt(0)
+    );
 
     // 5. Apply Scope Filter
     const entries = filterEntriesByScope(
@@ -553,7 +555,11 @@ export async function GET(
       },
     };
 
-    return NextResponse.json(response);
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 'private, max-age=30, stale-while-revalidate=300',
+      },
+    });
   } catch (error) {
     console.error('Liquidity Matrix API Error:', error);
     return NextResponse.json(

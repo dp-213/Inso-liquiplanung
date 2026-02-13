@@ -10,7 +10,6 @@ import {
 } from "@/lib/calculation-engine";
 import {
   calculateBankAccountBalances,
-  calculateOpeningBalanceByScope,
 } from "@/lib/bank-accounts/calculate-balances";
 import {
   aggregateLedgerEntries,
@@ -118,16 +117,18 @@ export async function GET(
     const periodType = (plan.periodType as PeriodType) || "WEEKLY";
     const periodCount = plan.periodCount || 13;
 
-    // Check if we have LedgerEntries for this case (new data model)
-    const ledgerEntryCount = await prisma.ledgerEntry.count({
-      where: {
-        caseId: caseData.id,
-        reviewStatus: { in: ["CONFIRMED", "ADJUSTED"] },
-      },
-    });
+    // Parallel: ledgerEntry.count + bankBalances (beide brauchen nur caseId)
+    const [ledgerEntryCount, bankBalancesResult] = await Promise.all([
+      prisma.ledgerEntry.count({
+        where: {
+          caseId: caseData.id,
+          reviewStatus: { in: ["CONFIRMED", "ADJUSTED"] },
+        },
+      }),
+      calculateBankAccountBalances(caseData.id, caseData.bankAccounts),
+    ]);
 
     let result;
-    let useLedgerAggregation = false;
 
     // Variablen für Alt/Neu und Warnungen (nur bei LedgerEntry-Aggregation)
     let estateAllocationData: {
@@ -141,20 +142,32 @@ export async function GET(
       warnings: { type: string; severity: string; message: string; count: number; totalCents: string }[];
     } | null = null;
 
+    // Variablen für ledgerStats
+    let ledgerStats;
+
     if (ledgerEntryCount > 0) {
       // NEW: Use LedgerEntry aggregation
-      useLedgerAggregation = true;
-      const aggregation = await aggregateLedgerEntries(
-        caseData.id,
-        new Date(plan.planStartDate),
-        periodType,
-        periodCount,
-        openingBalanceCents,
-        {
-          scope,
-          excludeSteeringTags: ['INTERNE_UMBUCHUNG']  // Umbuchungen ausblenden
-        }
-      );
+      // Parallel: aggregateLedgerEntries + groupBy (beide unabhängig)
+      const [aggregation, stats] = await Promise.all([
+        aggregateLedgerEntries(
+          caseData.id,
+          new Date(plan.planStartDate),
+          periodType,
+          periodCount,
+          openingBalanceCents,
+          {
+            scope,
+            excludeSteeringTags: ['INTERNE_UMBUCHUNG']  // Umbuchungen ausblenden
+          }
+        ),
+        prisma.ledgerEntry.groupBy({
+          by: ["valueType", "reviewStatus", "legalBucket"],
+          where: { caseId: caseData.id },
+          _count: { id: true },
+          _sum: { amountCents: true },
+        }),
+      ]);
+
       const legacyFormat = convertToLegacyFormat(aggregation);
 
       // Speichere Alt/Neu-Daten für Response
@@ -223,6 +236,25 @@ export async function GET(
         dataHash: aggregation.dataHash,
         calculatedAt: aggregation.calculatedAt,
       };
+
+      // LedgerStats aus dem bereits geladenen groupBy
+      const istCount = stats.filter((s) => s.valueType === "IST").reduce((sum, s) => sum + s._count.id, 0);
+      const planCount = stats.filter((s) => s.valueType === "PLAN").reduce((sum, s) => sum + s._count.id, 0);
+      const confirmedCount = stats.filter((s) => s.reviewStatus === "CONFIRMED" || s.reviewStatus === "ADJUSTED").reduce((sum, s) => sum + s._count.id, 0);
+      const unreviewedCount = stats.filter((s) => s.reviewStatus === "UNREVIEWED").reduce((sum, s) => sum + s._count.id, 0);
+      const masseCount = stats.filter((s) => s.legalBucket === "MASSE").reduce((sum, s) => sum + s._count.id, 0);
+      const absonderungCount = stats.filter((s) => s.legalBucket === "ABSONDERUNG").reduce((sum, s) => sum + s._count.id, 0);
+
+      ledgerStats = {
+        dataSource: "LEDGER" as const,
+        entryCount: istCount + planCount,
+        istCount,
+        planCount,
+        confirmedCount,
+        unreviewedCount,
+        masseCount,
+        absonderungCount,
+      };
     } else {
       // LEGACY: Use old CashflowCategory/Line/PeriodValue structure
       const categories: CategoryInput[] = plan.categories.map((cat) => ({
@@ -263,6 +295,17 @@ export async function GET(
         periodType,
         periodCount
       );
+
+      ledgerStats = {
+        dataSource: "LEGACY" as const,
+        entryCount: 0,
+        istCount: 0,
+        planCount: 0,
+        confirmedCount: 0,
+        unreviewedCount: 0,
+        masseCount: 0,
+        absonderungCount: 0,
+      };
     }
 
     // Group insolvency effects by name for easier display
@@ -290,46 +333,6 @@ export async function GET(
       effectGroup: string;
       periods: { id: string; periodIndex: number; amountCents: string }[];
     }>);
-
-    // Get LedgerEntry statistics for dashboard display
-    let ledgerStats = null;
-    if (useLedgerAggregation) {
-      const stats = await prisma.ledgerEntry.groupBy({
-        by: ["valueType", "reviewStatus", "legalBucket"],
-        where: { caseId: caseData.id },
-        _count: { id: true },
-        _sum: { amountCents: true },
-      });
-
-      const istCount = stats.filter((s) => s.valueType === "IST").reduce((sum, s) => sum + s._count.id, 0);
-      const planCount = stats.filter((s) => s.valueType === "PLAN").reduce((sum, s) => sum + s._count.id, 0);
-      const confirmedCount = stats.filter((s) => s.reviewStatus === "CONFIRMED" || s.reviewStatus === "ADJUSTED").reduce((sum, s) => sum + s._count.id, 0);
-      const unreviewedCount = stats.filter((s) => s.reviewStatus === "UNREVIEWED").reduce((sum, s) => sum + s._count.id, 0);
-      const masseCount = stats.filter((s) => s.legalBucket === "MASSE").reduce((sum, s) => sum + s._count.id, 0);
-      const absonderungCount = stats.filter((s) => s.legalBucket === "ABSONDERUNG").reduce((sum, s) => sum + s._count.id, 0);
-
-      ledgerStats = {
-        dataSource: "LEDGER" as const,
-        entryCount: istCount + planCount,
-        istCount,
-        planCount,
-        confirmedCount,
-        unreviewedCount,
-        masseCount,
-        absonderungCount,
-      };
-    } else {
-      ledgerStats = {
-        dataSource: "LEGACY" as const,
-        entryCount: 0,
-        istCount: 0,
-        planCount: 0,
-        confirmedCount: 0,
-        unreviewedCount: 0,
-        masseCount: 0,
-        absonderungCount: 0,
-      };
-    }
 
     // Prepare response in CaseDashboardData format
     const scopeHint = scope !== "GLOBAL"
@@ -382,31 +385,27 @@ export async function GET(
           isActive: e.isActive,
         })),
       },
-      bankAccounts: await (async () => {
-        const { balances, totalBalanceCents, totalAvailableCents } =
-          await calculateBankAccountBalances(caseData.id, caseData.bankAccounts);
-        return {
-          accounts: caseData.bankAccounts.map((acc) => {
-            const bal = balances.get(acc.id);
-            return {
-              id: acc.id,
-              bankName: acc.bankName,
-              accountName: acc.accountName,
-              iban: acc.iban,
-              openingBalanceCents: acc.openingBalanceCents.toString(),
-              currentBalanceCents: (bal?.currentBalanceCents ?? acc.openingBalanceCents).toString(),
-              securityHolder: acc.securityHolder,
-              status: acc.status,
-              notes: acc.notes,
-            };
-          }),
-          summary: {
-            totalBalanceCents: totalBalanceCents.toString(),
-            totalAvailableCents: totalAvailableCents.toString(),
-            accountCount: caseData.bankAccounts.length,
-          },
-        };
-      })(),
+      bankAccounts: {
+        accounts: caseData.bankAccounts.map((acc) => {
+          const bal = bankBalancesResult.balances.get(acc.id);
+          return {
+            id: acc.id,
+            bankName: acc.bankName,
+            accountName: acc.accountName,
+            iban: acc.iban,
+            openingBalanceCents: acc.openingBalanceCents.toString(),
+            currentBalanceCents: (bal?.currentBalanceCents ?? acc.openingBalanceCents).toString(),
+            securityHolder: acc.securityHolder,
+            status: acc.status,
+            notes: acc.notes,
+          };
+        }),
+        summary: {
+          totalBalanceCents: bankBalancesResult.totalBalanceCents.toString(),
+          totalAvailableCents: bankBalancesResult.totalAvailableCents.toString(),
+          accountCount: caseData.bankAccounts.length,
+        },
+      },
       ledgerStats,
       // Alt/Neu-Massezuordnung (aus estateAllocation, NICHT aus legalBucket!)
       estateAllocation: estateAllocationData ? {
@@ -503,7 +502,11 @@ export async function GET(
       },
     };
 
-    return NextResponse.json(response);
+    return NextResponse.json(response, {
+      headers: {
+        'Cache-Control': 'private, max-age=30, stale-while-revalidate=300',
+      },
+    });
   } catch (error) {
     console.error("Error fetching admin dashboard:", error);
     const errorMessage = error instanceof Error ? error.message : "Unbekannter Fehler";

@@ -72,6 +72,10 @@ export async function GET(
       unklarInflowCents: summary.unklarInflowCents.toString(),
       unklarOutflowCents: summary.unklarOutflowCents.toString(),
       unklarCount: summary.unklarCount,
+    }, {
+      headers: {
+        'Cache-Control': 'private, max-age=30, stale-while-revalidate=300',
+      },
     });
   } catch (error) {
     console.error('Fehler bei Estate-Aggregation:', error);

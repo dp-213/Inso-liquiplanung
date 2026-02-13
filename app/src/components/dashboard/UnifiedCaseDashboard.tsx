@@ -173,6 +173,18 @@ export default function UnifiedCaseDashboard({
   headerContent,
 }: UnifiedCaseDashboardProps) {
   const [activeTab, setActiveTab] = useState(config.tabs[0]?.id || "overview");
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(
+    new Set([config.tabs[0]?.id || "overview"])
+  );
+
+  useEffect(() => {
+    setMountedTabs(prev => {
+      if (prev.has(activeTab)) return prev;
+      const next = new Set(prev);
+      next.add(activeTab);
+      return next;
+    });
+  }, [activeTab]);
   const reportRef = useRef<HTMLDivElement>(null);
 
   // Global scope state for consistent filtering across tabs
@@ -784,10 +796,10 @@ export default function UnifiedCaseDashboard({
           </nav>
         </div>
 
-        {/* Tab Content */}
+        {/* Tab Content – Lazy Mount: Tabs werden erst beim ersten Besuch gemountet, dann keep-alive */}
         {visibleTabs.map((tab) => (
           <div key={tab.id} className={activeTab === tab.id ? "" : "hidden"}>
-            {renderTabContent(tab)}
+            {mountedTabs.has(tab.id) ? renderTabContent(tab) : null}
           </div>
         ))}
 
