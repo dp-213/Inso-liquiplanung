@@ -58,6 +58,11 @@ Für Entries die über COUNTERPARTY_ID auf eine Zeile mit mehreren CATEGORY_TAGs
 `BANK_ACCOUNT_MAPPING` in `breakdown/route.ts` kennt nur BW-Bank ISK-Konten (Uckerath + Velbert). Neue Bankkonten müssen manuell ergänzt werden.
 **Betrifft:** Nur den Zahlbeleg-Upload; Splitting selbst ist bank-agnostisch.
 
+### Split-Engine: Children immer UNREVIEWED
+
+Beim Aufsplitten einer Sammelüberweisung erhalten die Children immer `reviewStatus = 'UNREVIEWED'`, unabhängig vom Parent-Status. Das ist bewusst so (jeder Einzelposten muss separat klassifiziert werden: Counterparty, categoryTag, Location, Estate). Es erfordert aber manuelle Nacharbeit nach jedem Split.
+**Betrifft:** `app/src/app/api/cases/[id]/ledger/[entryId]/split/route.ts` und `breakdown/split/route.ts`.
+
 ### Sammelüberweisungen: 28 ohne Split auf ISK-Konten
 
 28 Sammelüberweisungen auf ISK-Konten (Dez + Jan) haben keine Children und landen im Matrix-FALLBACK „Sonstige Auszahlungen" (-195K EUR). 9 davon haben UPLOADED Zahlbelege (Split-Workflow noch nicht getriggert), ~19 haben noch keine Zahlbelege.

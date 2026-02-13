@@ -4,6 +4,43 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-067: Absolutes Verbot von `prisma db push` auf Datenbanken mit Daten
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Problem
+
+Zweiter Datenverlust-Incident durch `npx prisma db push` auf die lokale SQLite-DB:
+- **07.02.2026:** 1.248 LedgerEntries verloren, 12 Stunden Wiederherstellung aus Time Machine
+- **13.02.2026:** dev.db erneut auf 0 Bytes, Wiederherstellung aus Turso-Backup
+
+`prisma db push` erstellt bei SQLite die Datenbank komplett neu (DROP + CREATE) wenn Schema-Differenzen existieren. Alle Daten gehen unwiderruflich verloren.
+
+### Entscheidung
+
+**`npx prisma db push` ist absolut verboten auf Datenbanken die Daten enthalten.** Stattdessen:
+
+1. **Schema-Änderungen:** Manuell als SQL-Migration schreiben (`ALTER TABLE`)
+2. **Lokal anwenden:** `sqlite3 app/dev.db < migration.sql`
+3. **Turso anwenden:** `turso db shell inso-liquiplanung-v2 < migration.sql`
+4. **Prisma-Client aktualisieren:** `npx prisma generate` (NUR generate, NICHT db push)
+
+Vor jedem `prisma db push` (z.B. auf leere Test-DBs) muss ein Entry-Count-Check erfolgen.
+
+### Begründung
+
+Zwei identische Incidents in 6 Tagen zeigen, dass Warnungen in Dokumentation allein nicht ausreichen. Die Regel muss als absolutes Verbot formuliert sein, nicht als „Vorsicht"-Hinweis.
+
+### Konsequenzen
+
+- Schema-Migrationen dauern etwas länger (manuelles SQL statt automatisch)
+- Dafür: Kein Risiko mehr für versehentlichen Datenverlust
+- `prisma db push` bleibt erlaubt für initialen Setup (leere DB, Count = 0)
+- `prisma generate` ist immer sicher und wird weiter normal verwendet
+
+---
+
 ## ADR-066: Performance-Engine — Ergebnisrechnung (GuV-light) als eigenes Modul
 
 **Datum:** 13. Februar 2026

@@ -4,6 +4,29 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.57.0 – ISK-Children-Klassifikation + dev.db-Schutzregel
+
+**Datum:** 13. Februar 2026
+
+### Daten-Klassifikation
+
+- **47 ISK-Zahlbeleg-Children klassifiziert:** Alle Einzelposten der ISK-Sammelüberweisungen (Uckerath + Velbert) haben jetzt counterpartyId, categoryTag und locationId. Zuvor waren diese als UNREVIEWED ohne jegliche Zuordnung.
+- **8 neue Counterparties angelegt:** Laborgemeinschaft Oberberg Süd-GbR, Laborgemeinschaft Rhein Neckar, HZA Köln (Hauptzollamt), Matthias Baer (Vertreter), Frank Roland, Dr. E. Adolphs, HIZ Alsdorf, Raiffeisen-Warengenossenschaft eG Eitorf
+- **Kategorien-Verteilung:** 27× BETRIEBSKOSTEN, 12× PERSONAL, 2× MIETE, 1× STEUERN, 5× bereits getaggt (nur CP+Location ergänzt)
+- **Mieten in ISK identifiziert:** Bernd Kolle (5.269,21 €/Monat Uckerath) + Michael Krieger (4.438,50 € Velbert)
+
+### Bugfixes / Incidents
+
+- **dev.db-Incident (13.02.):** Lokale SQLite-DB war 0 Bytes – Ursache: `npx prisma db push` in Session 669897ea (09:47 Uhr) hat DB-Schema neu erstellt und alle Daten gelöscht. Wiederherstellung aus Turso-Backup + manuelle Nachtragung der 47 Updates.
+- **Schutzregel in CLAUDE.md:** Dreifach-🚨-Block mit absolutem Verbot für `prisma db push` auf DBs mit Daten. 3-Schritte-Pflichtprotokoll und Alternative (ALTER TABLE + prisma generate).
+
+### Erkenntnis
+
+- **1.438 UNREVIEWED Entries sind Vorinsolvenz-Daten:** apoBank-Geschäftskonten (Jan–Sept 2025), bewusst als Analyse-Material importiert. Haben `suggestedCounterpartyId` aber nie accepted – das ist by design.
+- **Split-Engine setzt Children immer auf UNREVIEWED:** Unabhängig vom Parent-Status. Bewusste Design-Entscheidung (jeder Einzelposten muss separat geprüft werden).
+
+---
+
 ## Version 2.56.0 – Performance-Engine (GuV-light) + Ergebnisrechnung-UI
 
 **Datum:** 13. Februar 2026
