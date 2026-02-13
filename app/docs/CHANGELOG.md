@@ -4,6 +4,36 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.52.0 – Standort-Vergleich: Perspektiven-Modell
+
+**Datum:** 13. Februar 2026
+
+### Neue Funktionen
+
+- **3-Perspektiven-Modell im Standort-Tab:** Umschaltung zwischen „Verfahrensphase" (ISK-Konten, post-insolvency), „Vor Insolvenz" (Geschäftskonten, pre-insolvency) und „Veränderung" (Delta Pre→Post).
+- **Delta-Vergleichstabelle (LocationDeltaView):** Zeigt Ø/Monat-Vergleich mit Farbkodierung – Einnahmen (grün=gestiegen, rot=gefallen), Kosten (invertiert: grün=gesunken), Netto/Deckungsgrad.
+- **`accountType` auf BankAccount:** Semantische Klassifikation ISK vs. GESCHAEFT. ISK = Insolvenz-Sonderkonto (post-insolvency), GESCHAEFT = Geschäftskonto (pre-insolvency).
+- **`perspective`-Parameter auf Location Compare API:** `POST` filtert auf ISK-Konten + operative Entries (null bankAccountId), `PRE` filtert strikt auf Geschäftskonten.
+- **Meta-Daten:** API-Response enthält `meta.hasIskAccounts` und `meta.hasGeschaeftskonten` für UI-Steuerung.
+- **Info-Banner bei Vor-Insolvenz:** Hinweis auf ggf. unkategorisierte Geschäftskonten-Buchungen.
+
+### Verbesserungen
+
+- **Perspektiven-Toggle:** Nur sichtbar wenn Case beide Kontotypen hat. Bei nur einem Typ wird die passende Perspektive fix angezeigt.
+- **Estate-Filter deaktiviert bei PRE:** Pre-Insolvenz kennt kein Alt/Neu, daher Estate-Filter und ViewMode bei PRE/DELTA versteckt.
+- **Getrennte Datenladung:** PRE-Daten werden einmal geladen, POST-Daten reagieren auf Estate-Filter-Änderungen – kein unnötiges Neuladen.
+
+### Technisch
+
+- Schema: `accountType` Feld auf BankAccount (Default: GESCHAEFT)
+- Turso-Migration: `ALTER TABLE bank_accounts ADD COLUMN accountType TEXT NOT NULL DEFAULT 'GESCHAEFT'` + `UPDATE ... SET accountType = 'ISK' WHERE isLiquidityRelevant = 1`
+- API: `perspective` Query-Parameter (POST/PRE), bankAccountId-Filterung per accountType
+- Client: 2 parallele Fetches für Delta-Perspektive, client-seitige Ø/Monat-Delta-Berechnung
+- Neue Datei: `LocationDeltaView.tsx`, Types erweitert in `location-compare-types.ts`
+- 6 Dateien geändert (Schema, Seed, API, Types, LocationView, LocationDeltaView)
+
+---
+
 ## Version 2.51.0 – Admin-Navigation: Dashboard + Liquiditätstabelle
 
 **Datum:** 13. Februar 2026

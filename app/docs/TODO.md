@@ -176,5 +176,5 @@ Leere Seiten (z.B. Zahlungsregister ohne Entries, Prognose ohne Annahmen) zeigen
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-13 (v2.46.0)
+**Letzte Aktualisierung:** 2026-02-13 (v2.52.0)
 

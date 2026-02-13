@@ -4,6 +4,38 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-062: Standort-Vergleich Perspektiven-Modell (accountType + perspective)
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Der Standort-Vergleich mischte ISK-Daten (post-insolvency) mit Geschäftskonten-Daten (pre-insolvency) in einer Ansicht. Das ist fachlich unsauber: Ein IV will wissen (a) ob Standorte im Verfahren tragfähig sind, (b) wie die Lage vor Insolvenz war, und (c) was sich verändert hat.
+
+### Entscheidung
+
+1. **`accountType` auf BankAccount** (ISK | GESCHAEFT) als semantische Klassifikation. Initial abgeleitet aus `isLiquidityRelevant`, aber eigenständiges Konzept (isLiquidityRelevant steuert Matrix-Einbeziehung, accountType klassifiziert den Kontotyp).
+
+2. **`perspective` Query-Parameter** (POST | PRE) auf der Location Compare API. POST filtert auf ISK-Konten + NULL-bankAccountId (operative Entries). PRE filtert strikt auf Geschäftskonten. Estate-Filter nur bei POST aktiv.
+
+3. **Client-seitige Delta-Berechnung** statt separatem DELTA-Endpoint. Client ruft POST und PRE parallel ab, berechnet Ø/Monat-Deltas lokal. Unterschiedliche Monatsanzahlen werden korrekt berücksichtigt.
+
+### Begründung
+
+- **accountType statt Bank-Name-Matching:** Explizites Feld ist robuster als String-Matching auf Bankname/IBAN. Neue Bankkonten werden einmal klassifiziert.
+- **perspective statt getrennte Endpoints:** Ein Endpoint mit Parameter ist einfacher zu warten. Gleiche Aggregationslogik, nur anderer Daten-Scope.
+- **Client-seitiger Delta:** Kein zusätzlicher API-Call nötig, flexibles UI (Toggle zwischen 3 Perspektiven), keine Server-Last für Delta-Berechnung.
+
+### Konsequenzen
+
+- Turso-Migration nötig (einmalig): `ALTER TABLE + UPDATE`
+- Seed-Daten müssen accountType setzen
+- Delta-Perspektive zeigt immer Ø/Monat (keine ViewMode/Estate-Toggle)
+- PRE-Perspektive zeigt Info-Banner über ggf. unkategorisierte Geschäftskonten-Daten
+
+---
+
 ## ADR-061: Estate-Filter im IST/PLAN-Vergleich server-seitig
 
 **Datum:** 13. Februar 2026

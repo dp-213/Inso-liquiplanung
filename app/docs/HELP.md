@@ -1,6 +1,6 @@
 # Hilfe & Anleitungen
 
-> Zuletzt aktualisiert: 2026-02-13 | Version 2.46.0
+> Zuletzt aktualisiert: 2026-02-13 | Version 2.52.0
 
 Dieses Dokument ist die **Source-of-Truth** für die Hilfe-Seite im Admin-Dashboard.
 Bei Änderungen am System wird diese Datei über `/doku` mit-aktualisiert.
@@ -113,7 +113,7 @@ Die Prognose-Seite funktioniert wie eine Excel-Tabelle:
 
 ### Schritt 5: Dashboard ablesen
 
-**Wo:** PLANUNG → Liquiditätsplan (oder Übersicht)
+**Wo:** PLANUNG → Dashboard
 
 - Rolling Forecast Chart: IST (grün) + PROGNOSE (blau gestrichelt)
 - Rolling Forecast Tabelle: Jede Periode mit Quelle-Badge
@@ -160,9 +160,10 @@ Auch FALLDATEN-Seiten haben Live-Suche und sortierbare Spalten.
 
 | Seite | Zweck |
 |-------|-------|
+| **Dashboard** | Rolling Forecast Dashboard (IST + PROGNOSE kombiniert). Identisch mit der Kundenansicht. |
+| **Liquiditätstabelle** | IDW S11-konforme Liquiditätsmatrix als Vollbild-Seite mit Scope-Toggle und Estate-Filtern. |
 | **Berechnungsannahmen** | 3-Block-Ansicht: Datenqualität (auto), Planungsannahmen (Dokumentation), Prognose-Annahmen (read-only). |
 | **Prognose** | Annahmen-Editor für Zukunftswerte. Berechnet Cashflows + Headroom. |
-| **Liquiditätsplan** | Dashboard mit Rolling Forecast (IST + PROGNOSE kombiniert). |
 
 ### ANALYSE
 

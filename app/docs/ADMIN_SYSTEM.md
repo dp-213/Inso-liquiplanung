@@ -505,16 +505,18 @@ model InsolvencyEffect {
 
 ```prisma
 model BankAccount {
-  id              String   @id @default(uuid())
-  caseId          String
-  bankName        String
-  accountName     String
-  iban            String?
-  balanceCents    BigInt
-  availableCents  BigInt
-  securityHolder  String?
-  status          String   // available, blocked, restricted
-  notes           String?
+  id                  String   @id @default(uuid())
+  caseId              String
+  bankName            String
+  accountName         String
+  iban                String?
+  balanceCents        BigInt
+  availableCents      BigInt
+  securityHolder      String?
+  accountType         String   @default("GESCHAEFT")  // ISK | GESCHAEFT (v2.52.0)
+  isLiquidityRelevant Boolean  @default(false)
+  status              String   // available, blocked, restricted
+  notes               String?
 
   case Case @relation(...)
 }

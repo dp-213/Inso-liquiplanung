@@ -2,6 +2,27 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 import { EXCLUDE_SPLIT_PARENTS } from '@/lib/ledger/types';
+import { findMatchingRowWithTrace, HVPLUS_MATRIX_ROWS } from '@/lib/cases/haevg-plus/matrix-config';
+
+// Kategorie-Definitionen für die Vorinsolvenz-Analyse (2-Ebenen-Clustering)
+const VORINSOLVENZ_CATEGORIES = [
+  { id: 'kern_einnahmen', label: 'Kern-Einnahmen (HZV/KV/PVS)', flowType: 'INFLOW' as const, order: 1 },
+  { id: 'sonstige_einnahmen', label: 'Sonstige Einnahmen', flowType: 'INFLOW' as const, order: 2 },
+  { id: 'personal', label: 'Personal', flowType: 'OUTFLOW' as const, order: 1 },
+  { id: 'betriebskosten', label: 'Betriebskosten', flowType: 'OUTFLOW' as const, order: 2 },
+  { id: 'steuern', label: 'Steuern', flowType: 'OUTFLOW' as const, order: 3 },
+  { id: 'sonstige_ausgaben', label: 'Sonstige Ausgaben', flowType: 'OUTFLOW' as const, order: 4 },
+];
+
+// Matrix-Row-ID → Vorinsolvenz-Kategorie
+function mapRowToCategory(rowId: string | null, flowType: 'INFLOW' | 'OUTFLOW'): string {
+  if (!rowId) return flowType === 'INFLOW' ? 'sonstige_einnahmen' : 'sonstige_ausgaben';
+  if (/^cash_in_(hzv|kv|pvs|altforderung)/.test(rowId)) return 'kern_einnahmen';
+  if (/^cash_out_(personal|altverb_personal)/.test(rowId)) return 'personal';
+  if (/^cash_out_(betriebskosten|altverb_betriebskosten)/.test(rowId)) return 'betriebskosten';
+  if (rowId === 'cash_out_steuern') return 'steuern';
+  return flowType === 'INFLOW' ? 'sonstige_einnahmen' : 'sonstige_ausgaben';
+}
 
 export async function GET(
   _request: Request,
@@ -94,7 +115,8 @@ export async function GET(
           avgMonthlyOutflowsCents: '0',
           months: [],
         },
-        counterpartyMonthly: [],
+        inflowCategories: [],
+        outflowCategories: [],
         monthlySummary: [],
         byBankAccount: [],
         unclassified: [],
@@ -132,17 +154,6 @@ export async function GET(
     let classifiedCount = 0;
     const monthSet = new Set<string>();
 
-    // Counterparty → Monat → Summe
-    const cpMonthly = new Map<string, {
-      counterpartyId: string | null;
-      totalCents: bigint;
-      matchCount: number;
-      monthly: Map<string, bigint>;
-      hasInflows: boolean;
-      hasOutflows: boolean;
-      byLocation: Map<string, { totalCents: bigint; monthly: Map<string, bigint> }>;
-    }>();
-
     // Monat → Summen
     const monthlyAgg = new Map<string, {
       inflowsCents: bigint;
@@ -155,6 +166,21 @@ export async function GET(
       inflowsCents: bigint;
       outflowsCents: bigint;
       count: number;
+    }>();
+
+    // Kategorie → Counterparty → Location → Monat (2-Ebenen-Clustering)
+    const categoryAgg = new Map<string, {
+      totalCents: bigint;
+      monthly: Map<string, bigint>;
+      counterparties: Map<string, {
+        counterpartyId: string | null;
+        totalCents: bigint;
+        matchCount: number;
+        monthly: Map<string, bigint>;
+        hasInflows: boolean;
+        hasOutflows: boolean;
+        byLocation: Map<string, { totalCents: bigint; monthly: Map<string, bigint> }>;
+      }>;
     }>();
 
     // Unklassifizierte Entries sammeln
@@ -172,6 +198,7 @@ export async function GET(
     for (const entry of entries) {
       const amount = entry.amountCents;
       const isInflow = amount >= BigInt(0);
+      const flowType: 'INFLOW' | 'OUTFLOW' = isInflow ? 'INFLOW' : 'OUTFLOW';
 
       if (isInflow) {
         totalInflows += amount;
@@ -205,9 +232,36 @@ export async function GET(
         hasZentralEntries = true;
       }
 
+      // --- Matching via Matrix-Engine ---
+      const cpInfo = effectiveCpId ? counterpartyMap.get(effectiveCpId) : null;
+      const matchResult = findMatchingRowWithTrace({
+        description: entry.description,
+        amountCents: amount,
+        counterpartyId: effectiveCpId || null,
+        counterpartyName: cpInfo?.name || null,
+        locationId: baInfo?.locationId || null,
+        bankAccountId: entry.bankAccountId || null,
+        legalBucket: entry.legalBucket || null,
+        categoryTag: entry.categoryTag || null,
+      }, HVPLUS_MATRIX_ROWS, flowType);
+
+      const categoryId = mapRowToCategory(matchResult?.row.id ?? null, flowType);
+
+      // --- Kategorie-Aggregation ---
+      if (!categoryAgg.has(categoryId)) {
+        categoryAgg.set(categoryId, {
+          totalCents: BigInt(0),
+          monthly: new Map(),
+          counterparties: new Map(),
+        });
+      }
+      const catData = categoryAgg.get(categoryId)!;
+      catData.totalCents += amount;
+      catData.monthly.set(monthKey, (catData.monthly.get(monthKey) || BigInt(0)) + amount);
+
       const cpKey = effectiveCpId || '_unclassified';
-      if (!cpMonthly.has(cpKey)) {
-        cpMonthly.set(cpKey, {
+      if (!catData.counterparties.has(cpKey)) {
+        catData.counterparties.set(cpKey, {
           counterpartyId: effectiveCpId,
           totalCents: BigInt(0),
           matchCount: 0,
@@ -217,20 +271,21 @@ export async function GET(
           byLocation: new Map(),
         });
       }
-      const cpData = cpMonthly.get(cpKey)!;
-      cpData.totalCents += amount;
-      cpData.matchCount++;
-      cpData.monthly.set(monthKey, (cpData.monthly.get(monthKey) || BigInt(0)) + amount);
-      if (isInflow) cpData.hasInflows = true;
-      else cpData.hasOutflows = true;
+      const catCpData = catData.counterparties.get(cpKey)!;
+      catCpData.totalCents += amount;
+      catCpData.matchCount++;
+      catCpData.monthly.set(monthKey, (catCpData.monthly.get(monthKey) || BigInt(0)) + amount);
+      if (isInflow) catCpData.hasInflows = true;
+      else catCpData.hasOutflows = true;
 
-      if (!cpData.byLocation.has(locationId)) {
-        cpData.byLocation.set(locationId, { totalCents: BigInt(0), monthly: new Map() });
+      if (!catCpData.byLocation.has(locationId)) {
+        catCpData.byLocation.set(locationId, { totalCents: BigInt(0), monthly: new Map() });
       }
-      const locData = cpData.byLocation.get(locationId)!;
-      locData.totalCents += amount;
-      locData.monthly.set(monthKey, (locData.monthly.get(monthKey) || BigInt(0)) + amount);
+      const catLocData = catCpData.byLocation.get(locationId)!;
+      catLocData.totalCents += amount;
+      catLocData.monthly.set(monthKey, (catLocData.monthly.get(monthKey) || BigInt(0)) + amount);
 
+      // --- Bestehende Aggregationen ---
       if (!monthlyAgg.has(monthKey)) {
         monthlyAgg.set(monthKey, { inflowsCents: BigInt(0), outflowsCents: BigInt(0), count: 0 });
       }
@@ -263,53 +318,82 @@ export async function GET(
       months,
     };
 
-    const counterpartyMonthly = Array.from(cpMonthly.entries())
-      .sort((a, b) => {
-        const absA = a[1].totalCents < BigInt(0) ? -a[1].totalCents : a[1].totalCents;
-        const absB = b[1].totalCents < BigInt(0) ? -b[1].totalCents : b[1].totalCents;
-        if (absB > absA) return 1;
-        if (absB < absA) return -1;
-        return 0;
-      })
-      .map(([key, data]) => {
-        const cpInfo = data.counterpartyId ? counterpartyMap.get(data.counterpartyId) : null;
-        const monthly: Record<string, string> = {};
-        for (const [m, v] of data.monthly) {
-          monthly[m] = v.toString();
-        }
-
-        const byLocation = Array.from(data.byLocation.entries())
-          .sort((a, b) => {
-            const absA = a[1].totalCents < BigInt(0) ? -a[1].totalCents : a[1].totalCents;
-            const absB = b[1].totalCents < BigInt(0) ? -b[1].totalCents : b[1].totalCents;
-            if (absB > absA) return 1;
-            if (absB < absA) return -1;
-            return 0;
-          })
-          .map(([locId, locData]) => {
-            const locMonthly: Record<string, string> = {};
-            for (const [m, v] of locData.monthly) {
-              locMonthly[m] = v.toString();
-            }
+    // === Kategorie-Arrays aufbauen ===
+    function buildCategoryGroups(targetFlowType: 'INFLOW' | 'OUTFLOW') {
+      return VORINSOLVENZ_CATEGORIES
+        .filter(cat => cat.flowType === targetFlowType)
+        .map(cat => {
+          const catData = categoryAgg.get(cat.id);
+          if (!catData) {
             return {
-              locationId: locId,
-              locationName: locId === '_zentral' ? 'HVPlus eG (zentral)' : (locationMap.get(locId) || locId),
-              totalCents: locData.totalCents.toString(),
-              monthly: locMonthly,
+              categoryId: cat.id,
+              categoryLabel: cat.label,
+              totalCents: '0',
+              monthly: {} as Record<string, string>,
+              counterparties: [],
             };
-          });
+          }
 
-        return {
-          counterpartyId: data.counterpartyId,
-          counterpartyName: cpInfo?.name || (key === '_unclassified' ? 'Nicht zugeordnet' : key),
-          counterpartyType: cpInfo?.type || null,
-          flowType: (data.hasInflows && data.hasOutflows ? 'MIXED' : data.hasInflows ? 'INFLOW' : 'OUTFLOW') as 'INFLOW' | 'OUTFLOW' | 'MIXED',
-          totalCents: data.totalCents.toString(),
-          matchCount: data.matchCount,
-          monthly,
-          byLocation,
-        };
-      });
+          const catMonthly: Record<string, string> = {};
+          for (const [m, v] of catData.monthly) catMonthly[m] = v.toString();
+
+          const counterparties = Array.from(catData.counterparties.entries())
+            .sort((a, b) => {
+              const absA = a[1].totalCents < BigInt(0) ? -a[1].totalCents : a[1].totalCents;
+              const absB = b[1].totalCents < BigInt(0) ? -b[1].totalCents : b[1].totalCents;
+              if (absB > absA) return 1;
+              if (absB < absA) return -1;
+              return 0;
+            })
+            .map(([key, data]) => {
+              const cpLookup = data.counterpartyId ? counterpartyMap.get(data.counterpartyId) : null;
+              const monthly: Record<string, string> = {};
+              for (const [m, v] of data.monthly) monthly[m] = v.toString();
+
+              const byLocation = Array.from(data.byLocation.entries())
+                .sort((a, b) => {
+                  const absA = a[1].totalCents < BigInt(0) ? -a[1].totalCents : a[1].totalCents;
+                  const absB = b[1].totalCents < BigInt(0) ? -b[1].totalCents : b[1].totalCents;
+                  if (absB > absA) return 1;
+                  if (absB < absA) return -1;
+                  return 0;
+                })
+                .map(([locId, locData]) => {
+                  const locMonthly: Record<string, string> = {};
+                  for (const [m, v] of locData.monthly) locMonthly[m] = v.toString();
+                  return {
+                    locationId: locId,
+                    locationName: locId === '_zentral' ? 'HVPlus eG (zentral)' : (locationMap.get(locId) || locId),
+                    totalCents: locData.totalCents.toString(),
+                    monthly: locMonthly,
+                  };
+                });
+
+              return {
+                counterpartyId: data.counterpartyId,
+                counterpartyName: cpLookup?.name || (key === '_unclassified' ? 'Nicht zugeordnet' : key),
+                counterpartyType: cpLookup?.type || null,
+                flowType: (data.hasInflows && data.hasOutflows ? 'MIXED' : data.hasInflows ? 'INFLOW' : 'OUTFLOW') as 'INFLOW' | 'OUTFLOW' | 'MIXED',
+                totalCents: data.totalCents.toString(),
+                matchCount: data.matchCount,
+                monthly,
+                byLocation,
+              };
+            });
+
+          return {
+            categoryId: cat.id,
+            categoryLabel: cat.label,
+            totalCents: catData.totalCents.toString(),
+            monthly: catMonthly,
+            counterparties,
+          };
+        })
+        .filter(cat => cat.counterparties.length > 0);
+    }
+
+    const inflowCategories = buildCategoryGroups('INFLOW');
+    const outflowCategories = buildCategoryGroups('OUTFLOW');
 
     const monthlySummary = months.map((month) => {
       const data = monthlyAgg.get(month)!;
@@ -347,7 +431,8 @@ export async function GET(
 
     return NextResponse.json({
       summary,
-      counterpartyMonthly,
+      inflowCategories,
+      outflowCategories,
       monthlySummary,
       byBankAccount,
       unclassified,

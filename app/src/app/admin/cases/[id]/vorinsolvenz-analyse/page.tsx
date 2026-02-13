@@ -22,6 +22,14 @@ interface CounterpartyRow {
   byLocation: LocationBreakdown[];
 }
 
+interface CategoryGroup {
+  categoryId: string;
+  categoryLabel: string;
+  totalCents: string;
+  monthly: Record<string, string>;
+  counterparties: CounterpartyRow[];
+}
+
 interface MonthlySummaryRow {
   month: string;
   inflowsCents: string;
@@ -54,7 +62,8 @@ interface VorinsolvenzData {
     avgMonthlyOutflowsCents: string;
     months: string[];
   };
-  counterpartyMonthly: CounterpartyRow[];
+  inflowCategories: CategoryGroup[];
+  outflowCategories: CategoryGroup[];
   monthlySummary: MonthlySummaryRow[];
   byBankAccount: Array<{
     accountId: string;
@@ -136,8 +145,8 @@ function trendIndicator(value: number, avg: number): { symbol: string; className
 
 function exportCSV(
   months: string[],
-  inflowRows: CounterpartyRow[],
-  outflowRows: CounterpartyRow[],
+  inflowCategories: CategoryGroup[],
+  outflowCategories: CategoryGroup[],
   monthlySummary: MonthlySummaryRow[],
   summary: VorinsolvenzData["summary"],
 ) {
@@ -145,7 +154,6 @@ function exportCSV(
   const monthCount = months.length || 1;
 
   function csvField(value: string): string {
-    // Quoting wenn Semikolon, Anführungszeichen oder Zeilenumbruch enthalten
     if (value.includes(";") || value.includes('"') || value.includes("\n")) {
       return '"' + value.replace(/"/g, '""') + '"';
     }
@@ -165,9 +173,15 @@ function exportCSV(
 
   // Einnahmen
   lines.push("EINNAHMEN");
-  for (const row of inflowRows) {
-    lines.push(rowToCSV(row.counterpartyName, row.monthly, row.totalCents));
+  for (const cat of inflowCategories) {
+    lines.push("");
+    lines.push(csvField(cat.categoryLabel));
+    for (const row of cat.counterparties) {
+      lines.push(rowToCSV("  " + row.counterpartyName, row.monthly, row.totalCents));
+    }
+    lines.push(rowToCSV("Summe " + cat.categoryLabel, cat.monthly, cat.totalCents));
   }
+  lines.push("");
   const inflowMonthly: Record<string, string> = {};
   for (const ms of monthlySummary) inflowMonthly[ms.month] = ms.inflowsCents;
   lines.push(rowToCSV("Summe Einnahmen", inflowMonthly, summary.totalInflowsCents));
@@ -175,9 +189,15 @@ function exportCSV(
 
   // Ausgaben
   lines.push("AUSGABEN");
-  for (const row of outflowRows) {
-    lines.push(rowToCSV(row.counterpartyName, row.monthly, row.totalCents));
+  for (const cat of outflowCategories) {
+    lines.push("");
+    lines.push(csvField(cat.categoryLabel));
+    for (const row of cat.counterparties) {
+      lines.push(rowToCSV("  " + row.counterpartyName, row.monthly, row.totalCents));
+    }
+    lines.push(rowToCSV("Summe " + cat.categoryLabel, cat.monthly, cat.totalCents));
   }
+  lines.push("");
   const outflowMonthly: Record<string, string> = {};
   for (const ms of monthlySummary) outflowMonthly[ms.month] = ms.outflowsCents;
   lines.push(rowToCSV("Summe Ausgaben", outflowMonthly, summary.totalOutflowsCents));
@@ -224,7 +244,14 @@ export default function VorinsolvenzAnalysePage({
           setError(err.error || "Fehler beim Laden");
           return;
         }
-        setData(await res.json());
+        const result: VorinsolvenzData = await res.json();
+        setData(result);
+
+        // Default: alle Kategorien aufgeklappt
+        const defaultExpanded = new Set<string>();
+        for (const cat of result.inflowCategories) defaultExpanded.add(`cat-${cat.categoryId}`);
+        for (const cat of result.outflowCategories) defaultExpanded.add(`cat-${cat.categoryId}`);
+        setExpandedRows(defaultExpanded);
       } catch {
         setError("Verbindungsfehler");
       } finally {
@@ -248,30 +275,64 @@ export default function VorinsolvenzAnalysePage({
     if (!data) return null;
     if (!locationFilter) return data;
 
-    // Counterparty-Rows auf Location filtern
-    const filteredCpMonthly = data.counterpartyMonthly
-      .map(row => {
-        const locData = row.byLocation.find(l => l.locationId === locationFilter);
-        if (!locData) return null;
-        return {
-          ...row,
-          monthly: locData.monthly,
-          totalCents: locData.totalCents,
-          byLocation: [locData],
-        };
-      })
-      .filter((r): r is CounterpartyRow => r !== null);
+    function filterCategories(categories: CategoryGroup[]): CategoryGroup[] {
+      return categories
+        .map(cat => {
+          const filteredCPs = cat.counterparties
+            .map(cp => {
+              const locData = cp.byLocation.find(l => l.locationId === locationFilter);
+              if (!locData) return null;
+              return {
+                ...cp,
+                monthly: locData.monthly,
+                totalCents: locData.totalCents,
+                byLocation: [locData],
+              };
+            })
+            .filter((cp): cp is CounterpartyRow => cp !== null);
+
+          if (filteredCPs.length === 0) return null;
+
+          const catMonthly: Record<string, string> = {};
+          let catTotal = 0;
+          for (const cp of filteredCPs) {
+            catTotal += parseInt(cp.totalCents);
+            for (const [m, v] of Object.entries(cp.monthly)) {
+              catMonthly[m] = String((parseInt(catMonthly[m] || "0")) + parseInt(v));
+            }
+          }
+
+          return {
+            ...cat,
+            totalCents: String(catTotal),
+            monthly: catMonthly,
+            counterparties: filteredCPs,
+          };
+        })
+        .filter((cat): cat is CategoryGroup => cat !== null);
+    }
+
+    const inflowCategories = filterCategories(data.inflowCategories);
+    const outflowCategories = filterCategories(data.outflowCategories);
 
     // Monthly Summary neu berechnen
     const monthlySummary = data.summary.months.map(month => {
       let inflowsCents = 0;
       let outflowsCents = 0;
       let count = 0;
-      for (const row of filteredCpMonthly) {
-        const val = parseInt(row.monthly[month] || "0");
-        if (val >= 0) inflowsCents += val;
-        else outflowsCents += val;
-        if (row.monthly[month]) count++;
+      for (const cat of inflowCategories) {
+        const val = parseInt(cat.monthly[month] || "0");
+        inflowsCents += val;
+        for (const cp of cat.counterparties) {
+          if (cp.monthly[month]) count++;
+        }
+      }
+      for (const cat of outflowCategories) {
+        const val = parseInt(cat.monthly[month] || "0");
+        outflowsCents += val;
+        for (const cp of cat.counterparties) {
+          if (cp.monthly[month]) count++;
+        }
       }
       return {
         month,
@@ -286,11 +347,13 @@ export default function VorinsolvenzAnalysePage({
     let totalInflows = 0;
     let totalOutflows = 0;
     let totalCount = 0;
-    for (const row of filteredCpMonthly) {
-      const val = parseInt(row.totalCents);
-      if (val >= 0) totalInflows += val;
-      else totalOutflows += val;
-      totalCount += row.matchCount;
+    for (const cat of inflowCategories) {
+      totalInflows += parseInt(cat.totalCents);
+      for (const cp of cat.counterparties) totalCount += cp.matchCount;
+    }
+    for (const cat of outflowCategories) {
+      totalOutflows += parseInt(cat.totalCents);
+      for (const cp of cat.counterparties) totalCount += cp.matchCount;
     }
     const mc = data.summary.months.length || 1;
 
@@ -306,7 +369,8 @@ export default function VorinsolvenzAnalysePage({
         totalCount,
         classifiedCount: totalCount,
       },
-      counterpartyMonthly: filteredCpMonthly,
+      inflowCategories,
+      outflowCategories,
       monthlySummary,
     } satisfies VorinsolvenzData;
   }, [data, locationFilter]);
@@ -352,12 +416,8 @@ export default function VorinsolvenzAnalysePage({
     : "0";
   const locationCount = data.locations.length;
 
-  const inflowRows = filtered.counterpartyMonthly.filter(
-    (r) => r.flowType === "INFLOW" || (r.flowType === "MIXED" && parseInt(r.totalCents) >= 0)
-  );
-  const outflowRows = filtered.counterpartyMonthly.filter(
-    (r) => r.flowType === "OUTFLOW" || (r.flowType === "MIXED" && parseInt(r.totalCents) < 0)
-  );
+  const totalInflowCPs = filtered.inflowCategories.reduce((sum, cat) => sum + cat.counterparties.length, 0);
+  const totalOutflowCPs = filtered.outflowCategories.reduce((sum, cat) => sum + cat.counterparties.length, 0);
 
   const netCents = parseInt(filtered.summary.netCents);
   const monthCount = months.length || 1;
@@ -384,7 +444,7 @@ export default function VorinsolvenzAnalysePage({
 
         {/* CSV Export Button */}
         <button
-          onClick={() => exportCSV(months, inflowRows, outflowRows, filtered.monthlySummary, filtered.summary)}
+          onClick={() => exportCSV(months, filtered.inflowCategories, filtered.outflowCategories, filtered.monthlySummary, filtered.summary)}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition-colors whitespace-nowrap"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -517,32 +577,24 @@ export default function VorinsolvenzAnalysePage({
                   colSpan={months.length + 3}
                   className="px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-green-800"
                 >
-                  Einnahmen ({inflowRows.length} Gegenparteien)
+                  Einnahmen ({totalInflowCPs} Gegenparteien)
                 </td>
               </tr>
 
-              {inflowRows.map((row) => {
-                const rowKey = `in-${row.counterpartyId || row.counterpartyName}`;
-                const hasLocations = !locationFilter && row.byLocation.length > 1;
-                const isExpanded = expandedRows.has(rowKey);
-
-                return (
-                  <RowWithLocations
-                    key={rowKey}
-                    row={row}
-                    rowKey={rowKey}
-                    months={months}
-                    monthCount={monthCount}
-                    hasLocations={hasLocations}
-                    isExpanded={isExpanded}
-                    onToggle={toggleRow}
-                    colorClass="text-green-600"
-                    bgClass="bg-white"
-                    insolvencyMonth={insolvencyMonth}
-                    showTrend
-                  />
-                );
-              })}
+              {filtered.inflowCategories.map((cat) => (
+                <CategorySection
+                  key={cat.categoryId}
+                  category={cat}
+                  months={months}
+                  monthCount={monthCount}
+                  expandedRows={expandedRows}
+                  onToggle={toggleRow}
+                  colorClass="text-green-600"
+                  tintClass="bg-green-50/50"
+                  insolvencyMonth={insolvencyMonth}
+                  locationFilter={locationFilter}
+                />
+              ))}
 
               {/* Summe Einnahmen */}
               <SummaryRow
@@ -567,32 +619,24 @@ export default function VorinsolvenzAnalysePage({
                   colSpan={months.length + 3}
                   className="px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-red-800"
                 >
-                  Ausgaben ({outflowRows.length} Gegenparteien)
+                  Ausgaben ({totalOutflowCPs} Gegenparteien)
                 </td>
               </tr>
 
-              {outflowRows.map((row) => {
-                const rowKey = `out-${row.counterpartyId || row.counterpartyName}`;
-                const hasLocations = !locationFilter && row.byLocation.length > 1;
-                const isExpanded = expandedRows.has(rowKey);
-
-                return (
-                  <RowWithLocations
-                    key={rowKey}
-                    row={row}
-                    rowKey={rowKey}
-                    months={months}
-                    monthCount={monthCount}
-                    hasLocations={hasLocations}
-                    isExpanded={isExpanded}
-                    onToggle={toggleRow}
-                    colorClass="text-red-600"
-                    bgClass="bg-white"
-                    insolvencyMonth={insolvencyMonth}
-                    showTrend
-                  />
-                );
-              })}
+              {filtered.outflowCategories.map((cat) => (
+                <CategorySection
+                  key={cat.categoryId}
+                  category={cat}
+                  months={months}
+                  monthCount={monthCount}
+                  expandedRows={expandedRows}
+                  onToggle={toggleRow}
+                  colorClass="text-red-600"
+                  tintClass="bg-red-50/50"
+                  insolvencyMonth={insolvencyMonth}
+                  locationFilter={locationFilter}
+                />
+              ))}
 
               {/* Summe Ausgaben */}
               <SummaryRow
@@ -719,6 +763,90 @@ export default function VorinsolvenzAnalysePage({
   );
 }
 
+// === Sub-Component: Category Section (Ebene 1) ===
+
+function CategorySection({
+  category,
+  months,
+  monthCount,
+  expandedRows,
+  onToggle,
+  colorClass,
+  tintClass,
+  insolvencyMonth,
+  locationFilter,
+}: {
+  category: CategoryGroup;
+  months: string[];
+  monthCount: number;
+  expandedRows: Set<string>;
+  onToggle: (key: string) => void;
+  colorClass: string;
+  tintClass: string;
+  insolvencyMonth: string | null;
+  locationFilter: string | null;
+}) {
+  const catKey = `cat-${category.categoryId}`;
+  const isCatExpanded = expandedRows.has(catKey);
+  const catAvg = String(Math.round(parseInt(category.totalCents) / monthCount));
+
+  return (
+    <>
+      {/* Category Header Row */}
+      <tr
+        className={`border-b border-gray-200 cursor-pointer hover:bg-gray-100/50 ${tintClass}`}
+        onClick={() => onToggle(catKey)}
+      >
+        <td className={`px-4 py-2 sticky left-0 z-10 ${tintClass}`}>
+          <div className="flex items-center gap-2">
+            <span className={`text-gray-400 text-xs transition-transform inline-block ${isCatExpanded ? "rotate-90" : ""}`}>
+              &#9654;
+            </span>
+            <span className="font-semibold text-gray-800">{category.categoryLabel}</span>
+            <span className="text-[10px] text-gray-400">{category.counterparties.length} Pos.</span>
+          </div>
+        </td>
+        {months.map((m) => (
+          <td key={m} className={`px-2 py-2 text-right tabular-nums text-xs font-medium ${insolvencyBorderClass(m, insolvencyMonth)}`}>
+            {category.monthly[m] ? formatCompact(category.monthly[m]) : "–"}
+          </td>
+        ))}
+        <td className={`px-3 py-2 text-right tabular-nums font-semibold ${colorClass} border-l border-gray-200`}>
+          {formatCompact(category.totalCents)}
+        </td>
+        <td className="px-3 py-2 text-right tabular-nums text-xs text-gray-400 border-l border-gray-200">
+          {formatCompact(catAvg)}
+        </td>
+      </tr>
+
+      {/* Counterparties innerhalb der Kategorie */}
+      {isCatExpanded && category.counterparties.map((row) => {
+        const rowKey = `cp-${category.categoryId}-${row.counterpartyId || row.counterpartyName}`;
+        const hasLocations = !locationFilter && row.byLocation.length > 1;
+        const isExpanded = expandedRows.has(rowKey);
+
+        return (
+          <RowWithLocations
+            key={rowKey}
+            row={row}
+            rowKey={rowKey}
+            months={months}
+            monthCount={monthCount}
+            hasLocations={hasLocations}
+            isExpanded={isExpanded}
+            onToggle={onToggle}
+            colorClass={colorClass}
+            bgClass="bg-white"
+            insolvencyMonth={insolvencyMonth}
+            showTrend
+            indented
+          />
+        );
+      })}
+    </>
+  );
+}
+
 // === Sub-Component: Summary Row ===
 
 function SummaryRow({
@@ -785,6 +913,7 @@ function RowWithLocations({
   bgClass,
   insolvencyMonth,
   showTrend,
+  indented = false,
 }: {
   row: CounterpartyRow;
   rowKey: string;
@@ -797,6 +926,7 @@ function RowWithLocations({
   bgClass: string;
   insolvencyMonth: string | null;
   showTrend: boolean;
+  indented?: boolean;
 }) {
   const avg = parseInt(row.totalCents) / monthCount;
   const avgStr = String(Math.round(avg));
@@ -821,7 +951,7 @@ function RowWithLocations({
         className={`border-b border-gray-100 ${hasLocations ? "cursor-pointer" : ""} hover:bg-gray-50`}
         onClick={hasLocations ? () => onToggle(rowKey) : undefined}
       >
-        <td className={`px-4 py-2 sticky left-0 z-10 ${bgClass}`}>
+        <td className={`${indented ? "pl-8 pr-4" : "px-4"} py-2 sticky left-0 z-10 ${bgClass}`}>
           <div className="flex items-center gap-2">
             {hasLocations && (
               <span className={`text-gray-400 text-xs transition-transform inline-block ${isExpanded ? "rotate-90" : ""}`}>
@@ -859,7 +989,7 @@ function RowWithLocations({
         const locAvg = String(Math.round(parseInt(loc.totalCents) / monthCount));
         return (
           <tr key={`${rowKey}-${loc.locationId}`} className="border-b border-gray-50 hover:bg-gray-50">
-            <td className={`px-4 py-1.5 pl-12 sticky left-0 z-10 ${bgClass} text-gray-500 text-xs`}>
+            <td className={`${indented ? "pl-14" : "pl-12"} pr-4 py-1.5 sticky left-0 z-10 ${bgClass} text-gray-500 text-xs`}>
               davon {loc.locationName}
             </td>
             {months.map((m) => {

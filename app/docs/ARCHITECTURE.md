@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.47.0
+**Version:** 2.52.0
 **Stand:** 13. Februar 2026
 
 ---
@@ -230,11 +230,13 @@ model ClassificationRule {
 
 ```prisma
 model BankAccount {
-  id        String  @id @default(cuid())
-  caseId    String
-  name      String
-  iban      String?
-  bankName  String?
+  id                  String  @id @default(cuid())
+  caseId              String
+  name                String
+  iban                String?
+  bankName            String?
+  accountType         String  @default("GESCHAEFT")  // ISK | GESCHAEFT
+  isLiquidityRelevant Boolean @default(false)
 }
 
 model Counterparty {
@@ -529,6 +531,7 @@ GET /api/cases/[id]/ledger?page=1&pageSize=50&counterpartyId=...
 | `/api/cases/[id]/kontobewegungen` | GET | IST-Buchungen gruppiert nach Kontentyp/Standort/Monat |
 | `/api/cases/[id]/zahlungsverifikation` | GET | SOLL/IST-Abgleich pro Planungsperiode mit Ampel |
 | `/api/cases/[id]/validate-consistency` | GET | Datenqualitäts-Check (5 Prüfungen: Tag↔CP, Estate↔Quartal, Pattern, Orphans) |
+| `/api/cases/[id]/dashboard/locations/compare` | GET | Standort-Vergleich mit `perspective` (POST/PRE), `estateFilter`, monatliche Aufschlüsselung, Meta |
 
 ### Klassifikation APIs
 
