@@ -4,6 +4,37 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-068: Mehrstufige Freigabekette (Multi-Approval)
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Problem
+
+Insolvenzverwalter brauchen mehrstufige Freigabeketten: z.B. IV genehmigt erst, dann Sachwalter, dann ggf. Investor. Betrag-Schwellwerte bestimmen, welche Stufen greifen. Bisher konnte jeder Admin/Customer mit Case-Zugang direkt freigeben (Single-Approver).
+
+### Entscheidung
+
+Pro Case konfigurierbare Freigabekette (`ApprovalRule`) mit beliebig vielen Stufen. Bei Order-Einreichung werden die aktiven Rules als `ApprovalStep`-Snapshots fixiert.
+
+**Design-Prinzipien:**
+1. **Revisionssicherheit:** ApprovalSteps speichern Snapshots (roleName, threshold, sequence, approverName) zum Zeitpunkt der Erstellung. Spätere Rule-Änderungen betreffen nur neue Orders.
+2. **Chain-Fixierung:** Betrag zum Einreichungszeitpunkt bestimmt die Stufen. Betragsänderung durch Approver ändert die Kette NICHT.
+3. **Order.status bleibt simpel:** PENDING / APPROVED / REJECTED / AUTO_APPROVED. Detail-Status (welche Stufe?) kommt aus ApprovalSteps.
+4. **Backward Compatibility:** Cases ohne ApprovalRules → Legacy-Modus (jeder kann freigeben). Admin kann immer übersteuern.
+5. **Typisierte Fehler:** Custom Error-Klassen (`ApprovalAuthError`, `ApprovalRuleInactiveError`) statt fragiler String-Matches.
+
+### Konsequenzen
+
+- Zwei neue Tabellen: `approval_rules`, `approval_steps`
+- Neue Bibliothek: `lib/approval-engine.ts` (Kern-Logik, ~300 Zeilen)
+- Neue API: `/api/cases/[id]/approval-rules` (CRUD)
+- Geänderte APIs: approve, reject, company/orders
+- UI-Erweiterungen: Case-Edit (Freigabekette), OrderList (Fortschritt), ApprovalModal (Stufen-Info), Portal (personalisiert)
+- Bekannte Einschränkung: Keine Concurrency-Protection bei gleichzeitigen Approvals (Race Condition theoretisch möglich, in der Praxis unwahrscheinlich bei sequenzieller Kette)
+
+---
+
 ## ADR-067: Absolutes Verbot von `prisma db push` auf Datenbanken mit Daten
 
 **Datum:** 13. Februar 2026

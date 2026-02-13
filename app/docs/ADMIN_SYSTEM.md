@@ -73,6 +73,9 @@ Case (Insolvenzverfahren)
     ├── IngestionJob (Import-Vorgänge)
     ├── ShareLink (Externe Links)
     ├── Order (Bestell-/Zahlfreigaben)
+    │       ↓ has (bei Chain-Modus)
+    │       └── ApprovalStep (Revisionssichere Freigabe-Schritte)
+    ├── ApprovalRule (Freigabestufen-Definition) ← NEU v2.58.0
     ├── CompanyToken (Externe Zugangs-Tokens)
     ├── CaseConfiguration (Dashboard-Konfiguration) ← LEGACY, keine UI seit v2.47.0
     ├── Employee (Mitarbeiter) ← NEU v2.39.0
@@ -1009,6 +1012,89 @@ model CompanyToken {
   note: `Freigegebene ${typeLabel} ...`,
 }
 ```
+
+#### Mehrstufige Freigabekette (v2.58.0)
+
+Pro Case können Freigabestufen (`ApprovalRule`) konfiguriert werden. Bei Order-Einreichung werden die aktiven Rules als revisionssichere `ApprovalStep`-Snapshots fixiert.
+
+```
+ApprovalRule (pro Case konfiguriert)
+    ↓ generiert bei Einreichung
+ApprovalStep (pro Order, revisionssicher)
+    ↓ sequenziell abgearbeitet
+Order.status = APPROVED (erst nach letzter Stufe)
+```
+
+##### Datenmodell
+
+```prisma
+model ApprovalRule {
+  id             String   @id @default(uuid())
+  caseId         String
+  roleName       String   // Freitext: "IV", "Sachwalter", "Investor"
+  customerId     String   // FK → CustomerUser (wer muss freigeben)
+  thresholdCents BigInt   // Ab welchem Betrag greift diese Stufe
+  sequence       Int      // Reihenfolge: 1, 2, 3...
+  isRequired     Boolean  @default(true)
+  isActive       Boolean  @default(true)
+
+  @@unique([caseId, sequence])
+}
+
+model ApprovalStep {
+  id                   String    @id @default(uuid())
+  orderId              String
+  approvalRuleId       String
+  roleNameSnapshot     String    // Snapshot zum Zeitpunkt der Erstellung
+  thresholdSnapshot    BigInt
+  sequenceSnapshot     Int
+  approverNameSnapshot String
+  status               String    @default("PENDING") // PENDING | APPROVED | REJECTED | SKIPPED
+  decidedAt            DateTime?
+  decidedBy            String?
+  comment              String?
+
+  @@unique([orderId, approvalRuleId])
+}
+```
+
+##### Ablauf
+
+| Schritt | Aktion | Status |
+|---------|--------|--------|
+| 1. Einreichung | `createApprovalSteps()` generiert Steps basierend auf Betrag + aktiven Rules | Steps: PENDING |
+| 2. Stufe N genehmigt | `processApproval()` setzt Step auf APPROVED, prüft ob weitere Steps | Order bleibt PENDING |
+| 3. Letzte Stufe | Alle required Steps APPROVED → Order = APPROVED + LedgerEntry | Order: APPROVED |
+| 4. Ablehnung | `processRejection()` → Step REJECTED, weitere Steps SKIPPED | Order: REJECTED |
+
+##### Sicherheitsprüfungen
+
+- Nur zugewiesener Approver oder Admin kann freigeben
+- Inaktive Rules werden mit 409 abgewiesen
+- Steps müssen sequenziell abgearbeitet werden (kein Überspringen)
+- Chain ist fixiert: Spätere Rule-Änderungen betreffen nur neue Orders
+
+##### Konfiguration
+
+**Pfad:** `/admin/cases/[id]/edit` → Abschnitt "Freigabekette"
+
+- Tabelle mit Stufen: Rolle | Person (Dropdown) | Ab Betrag | Pflicht
+- Hinzufügen/Löschen von Stufen
+- Validierung: sequence einzigartig, threshold aufsteigend mit sequence
+
+##### API
+
+| Endpoint | Methode | Funktion |
+|----------|---------|----------|
+| `/api/cases/[id]/approval-rules` | GET | Alle Rules laden |
+| `/api/cases/[id]/approval-rules` | POST | Neue Rule erstellen |
+| `/api/cases/[id]/approval-rules` | PUT | Rule aktualisieren |
+| `/api/cases/[id]/approval-rules` | DELETE | Rule deaktivieren (Soft-Delete) |
+| `/api/cases/[id]/orders/[orderId]/steps` | GET | Steps einer Order laden |
+
+##### Backward-Kompatibilität
+
+Cases ohne ApprovalRules nutzen weiterhin den Legacy-Modus (jeder Admin/Customer kann direkt freigeben).
 
 #### Auto-Freigabe (v2.34.0)
 

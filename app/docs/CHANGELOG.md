@@ -4,6 +4,30 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.58.0 – Mehrstufige Freigabekette (Multi-Approval)
+
+**Datum:** 13. Februar 2026
+
+### Neue Funktionen
+
+- **Mehrstufige Freigabekette:** Pro Case konfigurierbare Approval-Chain mit beliebig vielen Stufen (z.B. IV → Sachwalter → Investor). Sequenzielle Abarbeitung – jede Stufe muss einzeln freigeben.
+- **Datenmodell:** Zwei neue Tabellen `approval_rules` (Stufen-Definition pro Case) und `approval_steps` (revisionssichere Snapshots pro Order). Chain wird beim Einreichen fixiert – spätere Rule-Änderungen betreffen nur neue Orders.
+- **Approval-Engine** (`lib/approval-engine.ts`): Kern-Logik mit `createApprovalSteps()`, `processApproval()`, `processRejection()`, `getCurrentApprover()`. Custom Error-Klassen (`ApprovalAuthError`, `ApprovalRuleInactiveError`) für typisierte Fehlerbehandlung.
+- **ApprovalRules CRUD API** (`/api/cases/[id]/approval-rules`): GET/POST/PUT/DELETE mit Validierung (sequence/threshold aufsteigend, customerId muss Case-Zugang haben).
+- **Approve/Reject-APIs:** Chain-Modus mit Legacy-Fallback. Bei Chain: nur zugewiesener Approver oder Admin kann freigeben. Deaktivierte Rules werden mit 409 abgewiesen.
+- **Company-Orders-API:** Generiert automatisch ApprovalSteps bei Einreichung wenn Chain aktiv.
+- **Case-Edit-Seite:** Neue Sektion "Freigabekette" mit Tabelle (Rolle, Person, Schwellwert, Pflicht), Hinzufügen/Löschen.
+- **OrderList:** Fortschrittsanzeige pro Order (farbige Badges: grün=genehmigt, rot=abgelehnt, amber=aktuell, grau=ausstehend). Approve/Reject-Buttons nur für zugewiesenen Approver oder Admin.
+- **ApprovalModal:** Ketten-Info ("Stufe X von Y"), nächster Approver, Step-Fortschrittsleiste.
+- **Portal:** Personalisierte Ansicht "X Anfragen warten auf Ihre Freigabe", nur eigene Freigaben hervorgehoben.
+
+### Backward-Kompatibilität
+
+- Cases ohne ApprovalRules nutzen weiterhin den Legacy-Modus (jeder Admin/Customer kann direkt freigeben).
+- Admin kann in Chain-Modus immer freigeben (Override für Notfälle, wird im Step als `decidedBy` dokumentiert).
+
+---
+
 ## Version 2.57.0 – ISK-Children-Klassifikation + dev.db-Schutzregel
 
 **Datum:** 13. Februar 2026

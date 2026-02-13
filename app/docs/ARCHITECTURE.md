@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.56.0
+**Version:** 2.58.0
 **Stand:** 13. Februar 2026
 
 ---
@@ -79,6 +79,24 @@
 │                                                                      │
 │   Read-Only Dashboards für Insolvenzverwalter                       │
 │   + Einreichungsformular für Bestell-/Zahlfreigaben                 │
+│   + Mehrstufige Freigabe (Approval Chain) im Portal                 │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                      APPROVAL ENGINE                                 │
+│                      lib/approval-engine.ts                          │
+│                                                                      │
+│   Mehrstufige Freigabekette für Bestell-/Zahlfreigaben              │
+│   - ApprovalRule: Stufen-Definition pro Case (Rolle, Schwellwert)   │
+│   - ApprovalStep: Revisionssichere Snapshots pro Order              │
+│   - createApprovalSteps() – Chain beim Einreichen fixieren          │
+│   - processApproval() – Sequenzielle Kettenverarbeitung             │
+│   - processRejection() – Sofort-Ablehnung + Skip weiterer Steps    │
+│                                                                      │
+│   API: /api/cases/{id}/approval-rules (CRUD)                        │
+│        /api/cases/{id}/orders/{orderId}/steps (GET)                 │
+│   UI:  Case-Edit (Konfiguration), OrderList (Fortschritt),          │
+│        ApprovalModal (Stufen-Info), Portal (personalisiert)         │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 

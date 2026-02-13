@@ -34,6 +34,15 @@ Alle Kunden teilen eine Datenbank. Trennung erfolgt per `caseId`/`customerId`.
 
 ## Funktionale Einschränkungen
 
+### Approval-Chain: Keine Concurrency-Protection
+
+Bei gleichzeitigen Approvals auf denselben Step (z.B. Admin und Customer klicken gleichzeitig) gibt es keine DB-Level-Sperre. Theoretisch könnte ein Step doppelt approved werden. In der Praxis ist das bei sequenzieller Kette (ein Approver pro Stufe) extrem unwahrscheinlich.
+**Workaround:** Keiner nötig – Risiko minimal. Bei Bedarf: Optimistic Locking über `updatedAt`-Feld.
+
+### Approval-Chain: Keine negativen Schwellwerte validiert
+
+Die CRUD-API für ApprovalRules validiert nicht gegen negative `thresholdCents`. Funktional harmlos (Absolute Beträge werden verglichen), aber semantisch unsauber.
+
 ### Keine Währungsumrechnung
 
 Alle Beträge in EUR. Deutsche Insolvenzverfahren sind EUR-basiert.

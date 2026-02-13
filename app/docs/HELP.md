@@ -1,6 +1,6 @@
 # Hilfe & Anleitungen
 
-> Zuletzt aktualisiert: 2026-02-13 | Version 2.52.0
+> Zuletzt aktualisiert: 2026-02-13 | Version 2.58.0
 
 Dieses Dokument ist die **Source-of-Truth** für die Hilfe-Seite im Admin-Dashboard.
 Bei Änderungen am System wird diese Datei über `/doku` mit-aktualisiert.
@@ -293,6 +293,14 @@ Eine Nur-Lese-Ansicht des Dashboards ohne Rolling Forecast (Chart und Tabelle). 
 **Was ist der Auto-Freigabe-Schwellwert?**
 Unter Fall bearbeiten → „Freigabe-Einstellungen" kann ein EUR-Betrag definiert werden. Anfragen bis einschließlich diesem Betrag werden automatisch freigegeben (Status: AUTO_APPROVED) und sofort als PLAN-LedgerEntry verbucht. Anfragen über dem Schwellwert bleiben zur manuellen Prüfung.
 
+**Was ist die Freigabekette (Multi-Approval)?**
+Pro Fall können unter Fall bearbeiten → „Freigabekette" mehrere Freigabestufen konfiguriert werden. Jede Stufe hat eine Rolle (z.B. IV, Sachwalter), eine zugewiesene Person und einen Mindestbetrag. Bei Einreichung einer Anfrage werden automatisch die passenden Stufen als Freigabe-Schritte angelegt. Die Freigabe erfolgt sequenziell – erst wenn alle Pflichtstufen genehmigt haben, wird die Zahlung ausgeführt.
+
+- **Ohne Freigabekette:** Jeder Admin oder Kunde mit Fallzugang kann direkt freigeben (Legacy-Modus).
+- **Mit Freigabekette:** Nur der zugewiesene Approver der aktuellen Stufe kann freigeben. Admins können immer übersteuern.
+- **Ablehnung:** Bei Ablehnung auf einer Stufe wird die gesamte Anfrage abgelehnt. Weitere Stufen werden übersprungen.
+- **Portal:** Kunden sehen im Portal personalisiert, welche Anfragen auf ihre Freigabe warten.
+
 **Was sind Kreditoren und Kostenarten?**
 - **Kreditoren:** Ausgaben-Partner (Lieferanten, Dienstleister, Behörden) unter BESCHAFFUNG. Mit IBAN, USt-ID, Kategorie und Standard-Kostenart.
 - **Kostenarten:** Kategorisierung von Ausgaben (z.B. Personal, Miete, Material) mit optionalem Budget und Mapping auf die Liquiditätsmatrix-Tags.
@@ -305,6 +313,8 @@ Unter Fall bearbeiten → „Freigabe-Einstellungen" kann ein EUR-Betrag definie
 | Begriff | Erklärung |
 |---------|-----------|
 | **Altmasse** | Vermögenswerte und Verbindlichkeiten vor Insolvenzeröffnung |
+| **ApprovalRule** | Freigabestufe pro Fall (Rolle, Person, Schwellwert, Reihenfolge) |
+| **ApprovalStep** | Revisionssicherer Freigabe-Schritt pro Order (Snapshot der Rule bei Einreichung) |
 | **Closing Balance** | Endbestand einer Periode (Opening + Einzahlungen + Auszahlungen) |
 | **Datenqualitäts-Check** | Automatische Konsistenzprüfung im System Health Panel (6 Regeln, aufklappbar mit Deep-Links) |
 | **Employee** | Mitarbeiter eines Falls mit Gehaltsdaten, Standort-Zuordnung und LANR |
