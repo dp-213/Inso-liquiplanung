@@ -4,6 +4,66 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-055: Ledger Fast-Path (DB-Pagination + Aggregate-Stats)
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Die Ledger-Route lud bei jedem Request ALLE LedgerEntries (3.378 bei HVPlus), auch wenn nur eine Seite (50 Entries) angezeigt wurde. Ursache: Der Turso-Adapter-Bug bei Prisma-Date-Filtern (ADR-046) erzwang JS-seitige Filterung, was DB-Pagination unmöglich machte – auch wenn gar kein Datumsfilter aktiv war.
+
+### Entscheidung
+
+Zwei getrennte Pfade in der Ledger-API:
+
+1. **Fast-Path (ohne Datumsfilter):** DB-seitige Pagination (`skip`/`take`) + 3 parallele Aggregate-Queries (`totalCount`, `amountSum`, `reviewStatusCounts`). Das ist der Normalfall beim Seitenaufruf.
+2. **Fallback (mit Datumsfilter):** Alle Entries laden, in JS filtern, dann in JS paginieren – wie bisher, wegen Turso-Adapter-Bug.
+
+Zusätzlich: Dimensions (Bankkonten, Gegenparteien, Standorte) werden in die Ledger-Response eingebettet, statt als separate API-Calls geladen.
+
+### Begründung
+
+1. **Proportionale Lösung:** Der Turso-Bug betrifft nur Date-Filter. Bei allen anderen Filtern (Counterparty, BankAccount, ValueType, etc.) funktioniert Prisma WHERE korrekt → DB-Pagination möglich.
+2. **80/20-Optimierung:** ~80% der Ledger-Aufrufe haben keinen Datumsfilter. Der Fast-Path deckt den Normalfall ab.
+3. **Parallele Aggregate-Queries:** `totalCount`, `amountSum` und `reviewStatusCounts` laufen als 3 separate Prisma-Queries parallel, statt alle Entries zu laden und in JS zu aggregieren.
+4. **Dimensions-Embedding:** Spart 3 API-Roundtrips beim Seitenaufruf (7→4 Calls). Stammdaten ändern sich selten und sind klein.
+
+### Konsequenzen
+
+- Ledger-Seitenaufruf: 1 schwere Query (alle 3.378 Entries) → 5 leichte parallele Queries
+- Frontend: `fetchData` aufgeteilt in statische Daten (Mount) und dynamische Entries (Filter). 400ms Debounce auf Filter-Änderungen.
+- Fallback-Pfad bleibt für Datumsfilter bis Turso-Adapter-Bug gefixt
+
+---
+
+## ADR-054: Vercel Functions Region = fra1 (Frankfurt)
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Vercel Functions liefen in der Default-Region `iad1` (Washington, US East). Die Turso-Datenbank liegt in `aws-eu-west-1` (Frankfurt). Jede DB-Query hatte ~100ms transatlantische Latenz. Bei 8 Queries pro Ledger-Request = ~800ms verschwendete Netzwerkzeit.
+
+### Entscheidung
+
+`vercel.json` mit `"regions": ["fra1"]` konfiguriert. Alle Serverless Functions laufen jetzt in Frankfurt, am selben Standort wie die Turso-DB.
+
+### Begründung
+
+1. **Messbare Verbesserung:** Warm-Start Ledger-Request: 3.2s → 1.2s (~60% schneller).
+2. **Kein Trade-Off für unsere Nutzer:** Alle Nutzer (Insolvenzverwalter, Berater) sitzen in Deutschland. Nähe zum User UND zur DB.
+3. **Minimaler Eingriff:** Eine Zeile in `vercel.json`, kein Code-Change.
+
+### Konsequenzen
+
+- Alle API-Routen laufen in Frankfurt
+- DB-Roundtrip: ~100ms → <5ms
+- Bei internationalen Nutzern (unwahrscheinlich) wäre Latenz höher
+
+---
+
 ## ADR-053: Automatische Datenqualitäts-Checks als Dashboard-Banner
 
 **Datum:** 12. Februar 2026

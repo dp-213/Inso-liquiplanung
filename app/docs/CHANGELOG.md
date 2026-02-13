@@ -4,6 +4,29 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.43.0 – Performance-Optimierung (Ledger & Vercel)
+
+**Datum:** 13. Februar 2026
+
+### Performance
+
+- **4 Composite-Indexes auf LedgerEntry:** `categoryTag`, `estateAllocation`, `importJobId`, `valueType+transactionDate` für schnellere Aggregationen.
+- **Intake-Stats optimiert:** 7 separate DB-Queries → 2 `groupBy`-Queries für Statistik-Berechnung.
+- **Dimensions in Ledger-Response eingebettet:** Bankkonten, Gegenparteien und Standorte werden mit der Ledger-Antwort geliefert → 7→4 API-Calls beim Seitenaufruf.
+- **fetchData aufgeteilt:** Statische Daten (Mount) vs. dynamische Entries (Filter-Änderung) → 1 statt 4 API-Calls bei Filterwechsel. 400ms Debounce auf Filter-Änderungen.
+- **Ledger Fast-Path (DB-Pagination):** Ohne Datumsfilter (Normalfall) nutzt die Route DB-seitige Pagination (`skip`/`take`) + 3 parallele Aggregate-Queries statt alle Entries zu laden. Turso-Datenvolumen drastisch reduziert.
+- **Vercel Functions nach fra1 (Frankfurt) verlegt:** Statt iad1 (Washington) → ~60% schneller (Warm: 3.2s → 1.2s) durch Nähe zur Turso-DB in eu-west-1.
+
+### Bugfixes
+
+- **Suchleiste:** Lupe-Icon überlappt Text nicht mehr (CSS-Spezifitäts-Konflikt mit `input-field` behoben).
+- **Sidebar:** Liquiditätsplan zeigt jetzt auf `/dashboard` statt `/results`.
+- **Sidebar:** Freie Planung unter Steuerung hinzugefügt.
+- **Dashboard:** Redundante Quick-Action-Links und Tab-Switcher entfernt.
+- **Matrix:** Privatpatienten → PVS Tag-Mapping ergänzt.
+
+---
+
 ## Version 2.42.0 – Datenqualitäts-Checks & KV-Pattern-Fix
 
 **Datum:** 12. Februar 2026

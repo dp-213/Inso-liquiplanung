@@ -1,7 +1,7 @@
 # System-Architektur
 
-**Version:** 2.42.0
-**Stand:** 12. Februar 2026
+**Version:** 2.43.0
+**Stand:** 13. Februar 2026
 
 ---
 
@@ -476,7 +476,7 @@ LedgerEntry (UNREVIEWED)
 
 | Endpoint | Methode | Beschreibung |
 |----------|---------|--------------|
-| `/api/cases/[id]/ledger` | GET | Alle LedgerEntries (mit Filtern) |
+| `/api/cases/[id]/ledger` | GET | LedgerEntries (paginiert, mit Filtern + eingebetteten Dimensions) |
 | `/api/cases/[id]/ledger` | POST | Neuen Eintrag erstellen |
 | `/api/cases/[id]/ledger/[entryId]` | GET/PUT/DELETE | Einzelner Eintrag |
 | `/api/cases/[id]/ledger/[entryId]/split` | POST | Entry in Einzelposten aufspalten |
@@ -485,6 +485,34 @@ LedgerEntry (UNREVIEWED)
 | `/api/cases/[id]/ledger/bulk-review` | POST | Massen-Review |
 | `/api/cases/[id]/ledger/suggest-category-tags` | POST | CategoryTag-Vorschläge via Matrix-Matching |
 | `/api/cases/[id]/intake` | POST | Vereinfachter Import |
+
+**Ledger-API Performance-Architektur (v2.43.0):**
+
+```
+GET /api/cases/[id]/ledger?page=1&pageSize=50&counterpartyId=...
+
+┌──────────────────────────────────────────────────────────┐
+│  Hat Datumsfilter?                                        │
+│                                                           │
+│  NEIN (Fast-Path, ~80% der Aufrufe):                     │
+│  ├── Prisma WHERE mit allen Filtern (außer Datum)        │
+│  ├── DB-Pagination: skip/take                             │
+│  └── 3 parallele Aggregate-Queries:                      │
+│      ├── totalCount                                       │
+│      ├── amountSum (Einnahmen/Ausgaben)                  │
+│      └── reviewStatusCounts                               │
+│                                                           │
+│  JA (Fallback, wegen Turso-Adapter-Bug ADR-046):         │
+│  ├── Alle Entries laden                                   │
+│  ├── JS-seitige Datumsfilterung                          │
+│  └── JS-seitige Pagination + Aggregation                 │
+│                                                           │
+│  Response enthält eingebettete Dimensions:                │
+│  ├── bankAccounts[]                                       │
+│  ├── counterparties[]                                     │
+│  └── locations[]                                          │
+└──────────────────────────────────────────────────────────┘
+```
 
 ### Stammdaten APIs
 
