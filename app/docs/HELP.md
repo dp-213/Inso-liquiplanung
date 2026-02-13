@@ -130,7 +130,6 @@ Die Prognose-Seite funktioniert wie eine Excel-Tabelle:
 |-------|-------|
 | **Zahlungsregister** | Alle Buchungen (IST + PLAN) in einer Übersicht. Filtern, Suchen, Bearbeiten. Zahlbeleg-Upload für Sammelüberweisungen. |
 | **Import** | Neue Kontoauszüge als CSV importieren. Spalten-Mapping, Duplikat-Erkennung. |
-| **Bestellfreigaben** | Auszahlungsanweisungen zur Freigabe durch den IV. (ehem. „Freigaben") |
 
 ### STAMMDATEN
 
@@ -140,7 +139,6 @@ Alle Stammdaten-Seiten haben eine **Live-Suchleiste** und **sortierbare Spaltenh
 |-------|-------|
 | **Bankkonten** | Alle Bankkonten des Falls. Liquiditätsrelevanz markieren. |
 | **Gegenparteien** | Einnahmen-Partner (KV, HZV, PVS). Für Klassifikation und Reporting. Typ-Filter. |
-| **Kreditoren** | Ausgaben-Partner (Lieferanten, Dienstleister, Behörden). IBAN, USt-ID, Standard-Kostenart. Kategorie-Filter. |
 | **Kostenarten** | Kategorisierung von Ausgaben mit optionalem Budget. Mapping auf Liquiditätsmatrix-Tags. |
 | **Standorte** | Betriebsstätten des Unternehmens. Für standortbezogene Auswertungen. |
 
@@ -154,12 +152,9 @@ Auch FALLDATEN-Seiten haben Live-Suche und sortierbare Spalten.
 | **Kontakte** | Ansprechpartner (IV, Berater, Buchhaltung, RA) mit E-Mail, Telefon, Notizen. |
 | **Banken & Sicherungsrechte** | Kreditlinien, Sicherungsvereinbarungen. Kreditlinie fließt in Headroom ein. |
 | **Finanzierung** | Finanzierungsstruktur und Massekredite. |
-
-### VERFAHREN
-
-| Seite | Zweck |
-|-------|-------|
 | **Insolvenzeffekte** | Rückstellungen, Sondereffekte. Fließen in Headroom-Berechnung ein. |
+| **Business-Logik** | Regelwerk für Klassifikation und Masse-Zuordnung. |
+| **Freie Planung** | Manuelle Planwerte direkt eingeben (PLAN-LedgerEntries). Für Positionen, die nicht über die Forecast-Engine laufen. |
 
 ### PLANUNG
 
@@ -168,23 +163,29 @@ Auch FALLDATEN-Seiten haben Live-Suche und sortierbare Spalten.
 | **Berechnungsannahmen** | 3-Block-Ansicht: Datenqualität (auto), Planungsannahmen (Dokumentation), Prognose-Annahmen (read-only). |
 | **Prognose** | Annahmen-Editor für Zukunftswerte. Berechnet Cashflows + Headroom. |
 | **Liquiditätsplan** | Dashboard mit Rolling Forecast (IST + PROGNOSE kombiniert). |
-| **Business-Logik** | Regelwerk für Klassifikation und Masse-Zuordnung. |
 
 ### ANALYSE
 
 | Seite | Zweck |
 |-------|-------|
 | **IST-Daten** | Detailansicht aller importierten Kontobewegungen. |
+| **Geschäftskonten** | Vorinsolvenz-Analyse: Kontobewegungen vor und nach Eröffnung nach Kategorie gruppiert, mit Standort-Aufschlüsselung, Trend-Pfeilen und CSV-Export. |
 | **Klassifikation** | Automatische und manuelle Zuordnung von Buchungen. |
 | **Verifikation** | SOLL/IST-Abgleich: Wurden geplante Zahlungen tatsächlich ausgeführt? |
 | **IV-Kommunikation** | Kommunikationshistorie mit dem Insolvenzverwalter. |
+
+### BESCHAFFUNG
+
+| Seite | Zweck |
+|-------|-------|
+| **Bestellfreigaben** | Auszahlungsanweisungen zur Freigabe durch den IV. Auto-Freigabe bei Beträgen unter konfiguriertem Schwellwert. |
+| **Kreditoren** | Ausgaben-Partner (Lieferanten, Dienstleister, Behörden). IBAN, USt-ID, Standard-Kostenart. Kategorie-Filter. |
 
 ### ZUGANG
 
 | Seite | Zweck |
 |-------|-------|
-| **Freigaben** | Kundenzugänge + externe Share-Links verwalten. Neuen Kunden anlegen und Fall freigeben in einem Schritt. |
-| **Externe Ansicht** | Link-basierter Nur-Lese-Zugriff für Gläubigerausschuss, Gericht, etc. |
+| **Freigaben** | Kundenzugänge + externe Share-Links verwalten. Neuen Kunden anlegen und Fall freigeben in einem Schritt. Externe Links für Nur-Lese-Zugriff (Gläubigerausschuss, Gericht). |
 
 ### VERWALTUNG
 
@@ -238,12 +239,13 @@ PLAN ist der Legacy-Fallback. Er wird angezeigt, wenn:
 ### Datenqualität
 
 **Was ist das rote/gelbe Banner auf dem Dashboard?**
-Der automatische Datenqualitäts-Check prüft bei jedem Seitenaufruf 5 Konsistenzregeln:
+Der automatische Datenqualitäts-Check prüft bei jedem Seitenaufruf 6 Konsistenzregeln:
 1. Gegenpartei ↔ Kategorie-Tag stimmen überein
 2. Buchungen mit Kategorie-Tag haben passende Gegenpartei
 3. Alt/Neu-Zuordnung passt zum Leistungszeitraum (nur KV)
 4. Buchungstexte passen zum Pattern der zugewiesenen Gegenpartei
 5. Alle referenzierten Stammdaten (Standort, Bankkonto, Gegenpartei) existieren
+6. Gegenparteien mit 5+ IST-Buchungen haben ein Match-Pattern hinterlegt
 
 Rot = Fehler (müssen korrigiert werden), Gelb = Warnungen (Hinweise). Klicken Sie auf „Details" und dann „Im Ledger zeigen →" um zur betroffenen Buchung zu navigieren.
 
@@ -291,7 +293,7 @@ Eine Nur-Lese-Ansicht des Dashboards ohne Rolling Forecast (Chart und Tabelle). 
 Unter Fall bearbeiten → „Freigabe-Einstellungen" kann ein EUR-Betrag definiert werden. Anfragen bis einschließlich diesem Betrag werden automatisch freigegeben (Status: AUTO_APPROVED) und sofort als PLAN-LedgerEntry verbucht. Anfragen über dem Schwellwert bleiben zur manuellen Prüfung.
 
 **Was sind Kreditoren und Kostenarten?**
-- **Kreditoren:** Ausgaben-Partner (Lieferanten, Dienstleister, Behörden) unter STAMMDATEN. Mit IBAN, USt-ID, Kategorie und Standard-Kostenart.
+- **Kreditoren:** Ausgaben-Partner (Lieferanten, Dienstleister, Behörden) unter BESCHAFFUNG. Mit IBAN, USt-ID, Kategorie und Standard-Kostenart.
 - **Kostenarten:** Kategorisierung von Ausgaben (z.B. Personal, Miete, Material) mit optionalem Budget und Mapping auf die Liquiditätsmatrix-Tags.
 - Beide sind optional: Orders können auch ohne Kreditor/Kostenart-Zuordnung eingereicht werden.
 
@@ -303,11 +305,14 @@ Unter Fall bearbeiten → „Freigabe-Einstellungen" kann ein EUR-Betrag definie
 |---------|-----------|
 | **Altmasse** | Vermögenswerte und Verbindlichkeiten vor Insolvenzeröffnung |
 | **Closing Balance** | Endbestand einer Periode (Opening + Einzahlungen + Auszahlungen) |
-| **Datenqualitäts-Check** | Automatische Konsistenzprüfung auf dem Dashboard (5 Regeln, rot/gelb/versteckt) |
+| **Datenqualitäts-Check** | Automatische Konsistenzprüfung auf dem Dashboard (6 Regeln, rot/gelb/versteckt) |
 | **Employee** | Mitarbeiter eines Falls mit Gehaltsdaten, Standort-Zuordnung und LANR |
 | **Eröffnungssaldo** | Kontostand zu Beginn des Planungszeitraums |
-| **FALLDATEN** | Sidebar-Sektion für fallspezifische Informationen (Personal, Kontakte, Banken, Finanzierung) |
+| **BESCHAFFUNG** | Sidebar-Sektion für Einkauf und Lieferanten (Bestellfreigaben, Kreditoren) |
+| **FALLDATEN** | Sidebar-Sektion für fallspezifische Informationen (Personal, Kontakte, Banken, Finanzierung, Insolvenzeffekte, Business-Logik, Freie Planung) |
+| **Freie Planung** | Manuelle PLAN-LedgerEntries für Positionen außerhalb der Forecast-Engine |
 | **Forecast Engine** | Berechnungsmodul, das aus Annahmen Cashflow-Prognosen erzeugt |
+| **Geschäftskonten** | Vorinsolvenz-Analyse: Kontobewegungen nach Kategorie gruppiert mit Standort-Aufschlüsselung |
 | **Headroom** | Finanzieller Spielraum = Kontostand + Kreditlinie - Rückstellungen |
 | **IST-Daten** | Echte Bankbuchungen aus importierten Kontoauszügen |
 | **IV** | Insolvenzverwalter |
@@ -326,5 +331,6 @@ Unter Fall bearbeiten → „Freigabe-Einstellungen" kann ein EUR-Betrag definie
 | **Rolling Forecast** | Kombination aus IST (Vergangenheit) und PROGNOSE (Zukunft) |
 | **Rückstellung** | Reservierte Mittel für erwartete Verbindlichkeiten |
 | **Slug** | Subdomain-Kennung eines Kunden (z.B. `anchor` → `anchor.cases.gradify.de`) |
+| **System** | Zentrales Diagnose-Dashboard pro Fall: Daten-Übersicht, Konfigurationsprüfungen, Import-Historie |
 | **Subdomain** | Individuelle URL für einen Kunden mit eigenem Login |
 | **Szenario** | Planungskonfiguration (Periodentyp, Zeitraum, Eröffnungssaldo) |

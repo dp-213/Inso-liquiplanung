@@ -16,10 +16,14 @@ interface FaqItem {
 const GLOSSARY = [
   { term: "Altmasse", definition: "Vermögenswerte und Verbindlichkeiten, die vor der Insolvenzeröffnung entstanden sind" },
   { term: "Closing Balance", definition: "Endbestand einer Periode = Opening + Einzahlungen + Auszahlungen" },
+  { term: "Datenqualitäts-Check", definition: "Automatische Konsistenzprüfung auf dem Dashboard (6 Regeln, rot/gelb)" },
   { term: "Eröffnungssaldo", definition: "Kontostand zu Beginn des Planungszeitraums" },
+  { term: "Geschäftskonten", definition: "Vorinsolvenz-Analyse: Kontobewegungen nach Kategorie mit Standort-Aufschlüsselung" },
   { term: "Headroom", definition: "Finanzieller Spielraum = Kontostand + Kreditlinie \u2013 Rückstellungen" },
   { term: "IST", definition: "Echte, bestätigte Bankbuchungen aus importierten Kontoauszügen" },
   { term: "IV", definition: "Insolvenzverwalter \u2013 Ihr Mandant" },
+  { term: "Kostenart", definition: "Kategorisierung von Ausgaben (z.B. Personal, Miete) mit optionalem Budget" },
+  { term: "Kreditor", definition: "Ausgaben-Partner (Lieferant, Dienstleister, Behörde) \u2013 unter Beschaffung" },
   { term: "Kreditlinie", definition: "Vereinbarter Massekredit mit der Bank" },
   { term: "Neumasse", definition: "Vermögenswerte und Verbindlichkeiten, die nach der Insolvenzeröffnung entstanden sind" },
   { term: "Periode", definition: "Zeitabschnitt (Woche oder Monat) in der Liquiditätsplanung" },
@@ -27,6 +31,7 @@ const GLOSSARY = [
   { term: "PROGNOSE", definition: "Berechnete Zukunftswerte, die aus Ihren aktiven Annahmen erzeugt werden" },
   { term: "Rolling Forecast", definition: "Automatisch kombinierte Ansicht: IST (Vergangenheit) + PROGNOSE (Zukunft)" },
   { term: "Rückstellung", definition: "Reservierte Mittel für erwartete Verbindlichkeiten" },
+  { term: "System", definition: "Zentrales Diagnose-Dashboard: Daten-Übersicht, Health-Checks, Import-Historie" },
   { term: "Szenario", definition: "Planungskonfiguration mit Periodentyp, Zeitraum und Eröffnungssaldo" },
 ];
 
@@ -349,6 +354,59 @@ export default function HilfePage() {
               <Link href={`${base}/forecast`} className="text-[var(--primary)] underline font-medium">Prognose-Annahmen</Link>{" "}
               aktiv sind. Sobald Sie mindestens eine Annahme aktivieren, wechselt die Zukunft automatisch auf PROGNOSE (blau).
             </span>
+          ),
+        },
+      ],
+    },
+    {
+      title: "Datenqualität",
+      items: [
+        {
+          question: "Was ist das rote/gelbe Banner auf dem Dashboard?",
+          answer: (
+            <div className="space-y-2">
+              <p>
+                Der automatische Datenqualitäts-Check prüft bei jedem Seitenaufruf <strong>6 Konsistenzregeln</strong>:
+              </p>
+              <ol className="list-decimal list-inside space-y-1 ml-2 text-sm">
+                <li>Gegenpartei ↔ Kategorie-Tag stimmen überein</li>
+                <li>Buchungen mit Kategorie-Tag haben passende Gegenpartei</li>
+                <li>Alt/Neu-Zuordnung passt zum Leistungszeitraum (nur KV)</li>
+                <li>Buchungstexte passen zum Pattern der Gegenpartei</li>
+                <li>Alle referenzierten Stammdaten existieren</li>
+                <li>Gegenparteien mit 5+ Buchungen haben ein Match-Pattern</li>
+              </ol>
+              <p className="text-xs text-[var(--muted)]">
+                Rot = Fehler (korrigieren), Gelb = Warnungen (Hinweise). Details und Deep-Links über das Banner abrufbar.
+              </p>
+            </div>
+          ),
+        },
+      ],
+    },
+    {
+      title: "Beschaffung & Freigaben",
+      items: [
+        {
+          question: "Was ist der Auto-Freigabe-Schwellwert?",
+          answer: (
+            <span>
+              Unter{" "}
+              <Link href={`${base}/edit`} className="text-[var(--primary)] underline font-medium">Fall bearbeiten</Link>{" "}
+              → „Freigabe-Einstellungen" kann ein EUR-Betrag definiert werden.
+              Anfragen bis einschließlich diesem Betrag werden automatisch freigegeben (AUTO_APPROVED)
+              und sofort als PLAN-Buchung verbucht.
+            </span>
+          ),
+        },
+        {
+          question: "Was sind Kreditoren und Kostenarten?",
+          answer: (
+            <div className="space-y-1">
+              <p><strong>Kreditoren</strong> sind Ausgaben-Partner (Lieferanten, Behörden) unter BESCHAFFUNG → <Link href={`${base}/creditors`} className="text-[var(--primary)] underline font-medium">Kreditoren</Link>.</p>
+              <p><strong>Kostenarten</strong> kategorisieren Ausgaben (z.B. Personal, Miete) unter STAMMDATEN → <Link href={`${base}/cost-categories`} className="text-[var(--primary)] underline font-medium">Kostenarten</Link>.</p>
+              <p className="text-xs text-[var(--muted)]">Beide sind optional: Bestellungen können auch ohne Zuordnung eingereicht werden.</p>
+            </div>
           ),
         },
       ],
@@ -703,40 +761,44 @@ export default function HilfePage() {
           {/* DATEN */}
           <div>
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Daten</h3>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2">
               <PageCard href={`${base}/ledger`} icon={icons.list} name="Zahlungsregister" description="Alle Buchungen in einer Übersicht" color="bg-gray-100 text-gray-600" />
               <PageCard href={`${base}/ingestion`} icon={icons.upload} name="Import" description="Kontoauszüge als CSV importieren" color="bg-green-100 text-green-600" />
-              <PageCard href={`${base}/orders`} icon={icons.order} name="Bestellfreigaben" description="Auszahlungen zur IV-Freigabe" color="bg-amber-100 text-amber-600" />
             </div>
           </div>
 
           {/* STAMMDATEN */}
           <div>
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Stammdaten</h3>
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2">
               <PageCard href={`${base}/bank-accounts`} icon={icons.bank} name="Bankkonten" description="Konten und Liquiditätsrelevanz" color="bg-blue-100 text-blue-600" />
-              <PageCard href={`${base}/counterparties`} icon={icons.users} name="Gegenparteien" description="Gläubiger, Lieferanten, Stellen" color="bg-purple-100 text-purple-600" />
+              <PageCard href={`${base}/counterparties`} icon={icons.users} name="Gegenparteien" description="Einnahmen-Partner, Typ-Filter" color="bg-purple-100 text-purple-600" />
+              <PageCard href={`${base}/cost-categories`} icon={icons.tag} name="Kostenarten" description="Ausgaben-Kategorien mit Budget" color="bg-amber-100 text-amber-600" />
               <PageCard href={`${base}/locations`} icon={icons.location} name="Standorte" description="Betriebsstätten des Unternehmens" color="bg-teal-100 text-teal-600" />
             </div>
           </div>
 
-          {/* VERFAHREN */}
+          {/* FALLDATEN */}
           <div>
-            <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Verfahren</h3>
+            <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Falldaten</h3>
             <div className="grid gap-2 sm:grid-cols-2">
-              <PageCard href={`${base}/insolvency-effects`} icon={icons.shield} name="Insolvenzeffekte" description="Rückstellungen und Sondereffekte" color="bg-red-100 text-red-600" />
+              <PageCard href={`${base}/personal`} icon={icons.users} name="Personal" description="Mitarbeiter, Gehälter, LANR" color="bg-blue-100 text-blue-600" />
+              <PageCard href={`${base}/kontakte`} icon={icons.chat} name="Kontakte" description="IV, Berater, Buchhaltung, RA" color="bg-purple-100 text-purple-600" />
               <PageCard href={`${base}/banken-sicherungsrechte`} icon={icons.bank} name="Banken & Sicherungsrechte" description="Kreditlinien, Vereinbarungen" color="bg-indigo-100 text-indigo-600" />
+              <PageCard href={`${base}/finanzierung`} icon={icons.bank} name="Finanzierung" description="Massekredite und Struktur" color="bg-blue-100 text-blue-600" />
+              <PageCard href={`${base}/insolvency-effects`} icon={icons.shield} name="Insolvenzeffekte" description="Rückstellungen und Sondereffekte" color="bg-red-100 text-red-600" />
+              <PageCard href={`${base}/business-logic`} icon={icons.cog} name="Business-Logik" description="Klassifikations-Regelwerk" color="bg-gray-100 text-gray-600" />
+              <PageCard href={`${base}/planung`} icon={icons.doc} name="Freie Planung" description="Manuelle PLAN-Werte eingeben" color="bg-amber-100 text-amber-600" />
             </div>
           </div>
 
           {/* PLANUNG */}
           <div>
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Planung</h3>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <PageCard href={`${base}/assumptions`} icon={icons.doc} name="Prämissen" description="Planungsgrundlagen dokumentieren" color="bg-amber-100 text-amber-600" />
+            <div className="grid gap-2 sm:grid-cols-3">
+              <PageCard href={`${base}/assumptions`} icon={icons.doc} name="Berechnungsannahmen" description="Datenqualität, Prämissen, Prognose" color="bg-amber-100 text-amber-600" />
               <PageCard href={`${base}/forecast`} icon={icons.calc} name="Prognose" description="Annahmen-Editor, Headroom-Analyse" color="bg-blue-100 text-blue-600" />
               <PageCard href={`${base}/results`} icon={icons.chart} name="Liquiditätsplan" description="Dashboard mit Rolling Forecast" color="bg-indigo-100 text-indigo-600" />
-              <PageCard href={`${base}/business-logic`} icon={icons.cog} name="Business-Logik" description="Klassifikations-Regelwerk" color="bg-gray-100 text-gray-600" />
             </div>
           </div>
 
@@ -745,9 +807,19 @@ export default function HilfePage() {
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Analyse</h3>
             <div className="grid gap-2 sm:grid-cols-2">
               <PageCard href={`${base}/kontobewegungen`} icon={icons.eye} name="IST-Daten" description="Alle importierten Kontobewegungen" color="bg-green-100 text-green-600" />
+              <PageCard href={`${base}/vorinsolvenz-analyse`} icon={icons.chart} name="Geschäftskonten" description="Vorinsolvenz-Analyse mit Trends" color="bg-gray-100 text-gray-600" />
               <PageCard href={`${base}/ist-klassifikation`} icon={icons.tag} name="Klassifikation" description="Buchungen zuordnen und bestätigen" color="bg-amber-100 text-amber-600" />
               <PageCard href={`${base}/zahlungsverifikation`} icon={icons.check} name="Verifikation" description="SOLL/IST-Abgleich mit Ampelsystem" color="bg-emerald-100 text-emerald-600" />
               <PageCard href={`${base}/iv-kommunikation`} icon={icons.chat} name="IV-Kommunikation" description="Austausch mit dem Insolvenzverwalter" color="bg-purple-100 text-purple-600" />
+            </div>
+          </div>
+
+          {/* BESCHAFFUNG */}
+          <div>
+            <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Beschaffung</h3>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <PageCard href={`${base}/orders`} icon={icons.order} name="Bestellfreigaben" description="Auszahlungen zur IV-Freigabe" color="bg-amber-100 text-amber-600" />
+              <PageCard href={`${base}/creditors`} icon={icons.users} name="Kreditoren" description="Lieferanten, IBAN, Kostenart" color="bg-gray-100 text-gray-600" />
             </div>
           </div>
 
@@ -755,7 +827,16 @@ export default function HilfePage() {
           <div>
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Zugang</h3>
             <div className="grid gap-2 sm:grid-cols-2">
-              <PageCard href={`${base}/freigaben`} icon={icons.link} name="Freigaben" description="Kundenzugänge und externe Links verwalten" color="bg-gray-100 text-gray-600" />
+              <PageCard href={`${base}/freigaben`} icon={icons.link} name="Freigaben" description="Kundenzugänge und externe Links" color="bg-gray-100 text-gray-600" />
+            </div>
+          </div>
+
+          {/* VERWALTUNG */}
+          <div>
+            <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Verwaltung</h3>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <PageCard href={`${base}/system`} icon={icons.shield} name="System" description="Diagnose-Dashboard, Health-Checks" color="bg-green-100 text-green-600" />
+              <PageCard href={`${base}/edit`} icon={icons.cog} name="Fall bearbeiten" description="Name, Status, Datumsfelder" color="bg-gray-100 text-gray-600" />
             </div>
           </div>
         </div>
