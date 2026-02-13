@@ -320,7 +320,7 @@ async function main() {
   console.log(`  Assumptions: ${assumpts}`);
 
   console.log('\nDashboard-URL:');
-  console.log(`http://localhost:3000/admin/cases/${CASE_ID}/results`);
+  console.log(`http://localhost:3000/admin/cases/${CASE_ID}/dashboard`);
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

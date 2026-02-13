@@ -95,7 +95,7 @@ export default function CaseCalculationPreview({ caseId }: CalculationPreviewPro
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-medium text-[var(--foreground)]">Planungsvorschau</h3>
         <Link
-          href={`/admin/cases/${caseId}/results`}
+          href={`/admin/cases/${caseId}/dashboard`}
           className="text-xs text-[var(--primary)] hover:underline"
         >
           Details anzeigen

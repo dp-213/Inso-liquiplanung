@@ -233,7 +233,7 @@ export default function ForecastPage() {
 
           <div className="flex items-center bg-blue-50 rounded-lg p-1 border-2 border-blue-300">
             <Link
-              href={`/admin/cases/${caseId}/results`}
+              href={`/admin/cases/${caseId}/dashboard`}
               className="px-4 py-2 text-sm font-semibold rounded-md transition-colors text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-white/50"
             >
               Dashboard
@@ -255,7 +255,7 @@ export default function ForecastPage() {
             <p className="font-medium">Diese Annahmen fließen automatisch in das Dashboard ein.</p>
             <p className="text-blue-600 mt-1">
               Das{" "}
-              <Link href={`/admin/cases/${caseId}/results`} className="underline font-medium hover:text-blue-800">
+              <Link href={`/admin/cases/${caseId}/dashboard`} className="underline font-medium hover:text-blue-800">
                 Dashboard
               </Link>
               {" "}zeigt IST-Daten und Ihre Prognose-Annahmen kombiniert an.

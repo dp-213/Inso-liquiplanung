@@ -574,7 +574,7 @@ export default function CustomerDetailPage({
                     </td>
                     <td>
                       <Link
-                        href={`/admin/cases/${ownedCase.id}/results`}
+                        href={`/admin/cases/${ownedCase.id}/dashboard`}
                         className="text-xs text-[var(--primary)] hover:underline"
                       >
                         Dashboard

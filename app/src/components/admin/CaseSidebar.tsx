@@ -83,9 +83,10 @@ export default function CaseSidebar({
     {
       label: "PLANUNG",
       items: [
+        { name: "Dashboard", href: `${base}/dashboard` },
+        { name: "Liquiditätstabelle", href: `${base}/liquiditaetsmatrix` },
         { name: "Berechnungsannahmen", href: `${base}/assumptions` },
         { name: "Prognose", href: `${base}/forecast` },
-        { name: "Liquiditätsplan", href: `${base}/results` },
       ],
     },
     {

@@ -306,7 +306,7 @@ export default function HilfePage() {
               Aus Ihren Annahmen auf der{" "}
               <Link href={`${base}/forecast`} className="text-[var(--primary)] underline font-medium">Prognose-Seite</Link>.
               Jede aktive Annahme erzeugt automatisch Cashflows für zukünftige Perioden, die im{" "}
-              <Link href={`${base}/results`} className="text-[var(--primary)] underline font-medium">Dashboard</Link>{" "}
+              <Link href={`${base}/dashboard`} className="text-[var(--primary)] underline font-medium">Dashboard</Link>{" "}
               als blaue Linie erscheinen.
             </span>
           ),
@@ -606,7 +606,7 @@ export default function HilfePage() {
           </Link>
 
           {/* Step 5 */}
-          <Link href={`${base}/results`} className="group flex items-center gap-4 p-4 rounded-xl border-2 border-blue-300 bg-blue-50/50 hover:border-blue-500 hover:shadow-lg transition-all">
+          <Link href={`${base}/dashboard`} className="group flex items-center gap-4 p-4 rounded-xl border-2 border-blue-300 bg-blue-50/50 hover:border-blue-500 hover:shadow-lg transition-all">
             <div className="w-12 h-12 rounded-xl bg-blue-500 text-white flex items-center justify-center text-xl font-bold flex-shrink-0 group-hover:bg-blue-600 transition-colors">
               5
             </div>
@@ -685,7 +685,7 @@ export default function HilfePage() {
           {/* Zwei Perspektiven */}
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
             <Link
-              href={`${base}/results`}
+              href={`${base}/dashboard`}
               className="group p-4 rounded-xl border-2 border-gray-200 hover:border-[var(--primary)] transition-all"
             >
               <div className="flex items-center gap-2 mb-2">
@@ -730,7 +730,7 @@ export default function HilfePage() {
             { label: "Klassifikation", sub: "Zuordnung", color: "bg-amber-50 border-amber-300 text-amber-700", href: `${base}/ist-klassifikation` },
             { label: "IST-Daten", sub: "Bestätigt", color: "bg-green-100 border-green-400 text-green-800", href: `${base}/kontobewegungen` },
             { label: "+ Prognose", sub: "Annahmen", color: "bg-blue-100 border-blue-400 text-blue-800", href: `${base}/forecast` },
-            { label: "Dashboard", sub: "Ergebnis", color: "bg-indigo-100 border-indigo-400 text-indigo-800", href: `${base}/results` },
+            { label: "Dashboard", sub: "Ergebnis", color: "bg-indigo-100 border-indigo-400 text-indigo-800", href: `${base}/dashboard` },
           ].map((step, i, arr) => (
             <div key={step.label} className="flex items-center gap-1 flex-shrink-0">
               <Link
@@ -797,7 +797,7 @@ export default function HilfePage() {
             <div className="grid gap-2 sm:grid-cols-3">
               <PageCard href={`${base}/assumptions`} icon={icons.doc} name="Berechnungsannahmen" description="Datenqualität, Prämissen, Prognose" color="bg-amber-100 text-amber-600" />
               <PageCard href={`${base}/forecast`} icon={icons.calc} name="Prognose" description="Annahmen-Editor, Headroom-Analyse" color="bg-blue-100 text-blue-600" />
-              <PageCard href={`${base}/results`} icon={icons.chart} name="Liquiditätsplan" description="Dashboard mit Rolling Forecast" color="bg-indigo-100 text-indigo-600" />
+              <PageCard href={`${base}/dashboard`} icon={icons.chart} name="Liquiditätsplan" description="Dashboard mit Rolling Forecast" color="bg-indigo-100 text-indigo-600" />
             </div>
           </div>
 

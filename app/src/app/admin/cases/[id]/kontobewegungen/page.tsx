@@ -257,7 +257,7 @@ export default function KontobewegungPage({
           <Link href={`/admin/cases/${id}/ledger?valueType=IST`} className="btn-secondary">
             Zur Detailansicht
           </Link>
-          <Link href={`/admin/cases/${id}/results`} className="btn-primary">
+          <Link href={`/admin/cases/${id}/dashboard`} className="btn-primary">
             Dashboard
           </Link>
         </div>

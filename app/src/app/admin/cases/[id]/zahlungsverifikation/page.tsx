@@ -143,7 +143,7 @@ export default function ZahlungsverifikationPage({
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold text-[var(--foreground)]">Zahlungsverifikation</h1>
-          <Link href={`/admin/cases/${id}/results`} className="btn-primary">
+          <Link href={`/admin/cases/${id}/dashboard`} className="btn-primary">
             Dashboard
           </Link>
         </div>
@@ -180,7 +180,7 @@ export default function ZahlungsverifikationPage({
           <Link href={`/admin/cases/${id}/kontobewegungen`} className="btn-secondary">
             IST-Daten
           </Link>
-          <Link href={`/admin/cases/${id}/results`} className="btn-primary">
+          <Link href={`/admin/cases/${id}/dashboard`} className="btn-primary">
             Dashboard
           </Link>
         </div>

@@ -350,13 +350,15 @@ await tx.periodValue.upsert({
 
 ---
 
-### ~~4.4 Dashboard (Legacy)~~ ENTFERNT (v2.47.0)
+### 4.4 Dashboard
 
-**Ehemaliger Pfad:** `/admin/cases/[id]/dashboard`
+**Pfad:** `/admin/cases/[id]/dashboard`
 
-> **Gelöscht in v2.47.0 (ADR-060).** Das alte `ConfigurableDashboard` mit `EditableCategoryTable` wurde durch `UnifiedCaseDashboard` ersetzt (seit v2.29.0). Die aktive Dashboard-Ansicht läuft über `/admin/cases/[id]/results` mit LedgerEntry-Aggregation statt CashflowCategory/Line/PeriodValue.
+Zeigt das `UnifiedCaseDashboard` mit `accessMode="admin"` – identisch mit der Kundenansicht. Nutzt LedgerEntry-Aggregation über `/api/cases/[id]/dashboard`.
+
+> **Historie:** In v2.47.0 (ADR-060) wurde das alte `ConfigurableDashboard` gelöscht. In v2.51.0 wurde `/dashboard` als neue Route wiederhergestellt (vorher unter `/results`). `/results` leitet per Redirect auf `/dashboard` weiter.
 >
-> Zugehörige Legacy API-Routen ebenfalls gelöscht: `plan/categories`, `plan/lines`, `plan/values`, `plan/opening-balance`.
+> Zugehörige Legacy API-Routen gelöscht: `plan/categories`, `plan/lines`, `plan/values`, `plan/opening-balance`.
 
 ---
 

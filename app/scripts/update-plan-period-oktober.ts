@@ -73,7 +73,7 @@ async function main() {
   }
 
   console.log('\n=== FERTIG ===');
-  console.log('Dashboard-URL: http://localhost:3000/admin/cases/' + hvCase.id + '/results');
+  console.log('Dashboard-URL: http://localhost:3000/admin/cases/' + hvCase.id + '/dashboard');
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect());

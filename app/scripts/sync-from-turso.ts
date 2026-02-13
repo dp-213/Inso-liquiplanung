@@ -226,7 +226,7 @@ async function main() {
   
   console.log('\n=== SYNC ABGESCHLOSSEN ===');
   console.log('Case ID:', newCase.id);
-  console.log('Dashboard: http://localhost:3000/admin/cases/' + newCase.id + '/results');
+  console.log('Dashboard: http://localhost:3000/admin/cases/' + newCase.id + '/dashboard');
 }
 
 main()

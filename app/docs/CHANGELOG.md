@@ -4,6 +4,29 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.51.0 – Admin-Navigation: Dashboard + Liquiditätstabelle
+
+**Datum:** 13. Februar 2026
+
+### Neue Funktionen
+
+- **Dashboard als eigene Route:** `/dashboard` zeigt die Kundenansicht (UnifiedCaseDashboard) direkt in der Admin-Sidebar unter PLANUNG.
+- **Liquiditätstabelle als Standalone-Seite:** `/liquiditaetsmatrix` rendert die IDW S11-konforme Liquiditätsmatrix als Vollbild-Seite mit eigenem Scope-Toggle und Filtern.
+
+### Verbesserungen
+
+- **Sidebar-Neustrukturierung:** PLANUNG-Sektion zeigt jetzt: Dashboard → Liquiditätstabelle → Berechnungsannahmen → Prognose. Der alte „Liquiditätsplan"-Link wurde entfernt.
+- **Redirect für Lesezeichen:** `/results` leitet automatisch auf `/dashboard` weiter – bestehende Links, Lesezeichen und Doku-Referenzen funktionieren weiterhin.
+- **16 interne Verweise aktualisiert:** Alle Dashboard-Links in 10 Dateien (Zahlungsverifikation, Kontobewegungen, Prognose, Ledger, Hilfe etc.) zeigen auf die neue Route.
+
+### Technisch
+
+- 2 neue Routen, 1 Redirect, 10 Dateien mit Link-Updates
+- Kein Schema-Change, kein API-Change
+- Kunden-Portal bleibt unverändert
+
+---
+
 ## Version 2.50.0 – IST/PLAN-Vergleich: ISK-Bugfix + Filter
 
 **Datum:** 13. Februar 2026
