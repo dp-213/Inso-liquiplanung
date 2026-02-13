@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.46.0
+**Version:** 2.47.0
 **Stand:** 13. Februar 2026
 
 ---

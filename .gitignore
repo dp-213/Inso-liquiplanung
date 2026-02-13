@@ -15,3 +15,17 @@ Thumbs.db
 
 # Case data (sensitive, not for git) - NUR im Root-Verzeichnis!
 /Cases/
+
+# Temporary & build artifacts
+tmp/
+app/tmp/
+app/dev.db.backup-empty
+app/prisma/dev.db.BACKUP-*
+backups/
+
+# Next.js build cache
+.next/
+
+# Backup files
+*.backup
+*.phase2-backup

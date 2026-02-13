@@ -236,57 +236,62 @@ async function main() {
 
   const assumptions = [
     {
-      categoryName: 'Datenbasis',
+      title: 'Datenbasis: IST Nov-Dez 2025, PLAN Nov 25 - Jul 26',
       source: 'Systemstand',
       description: 'IST-Daten: Nov-Dez 2025 (Kontoauszüge ISK). PLAN-Daten: Nov 2025 - Jul 2026. KEINE Daten für Aug-Okt 2025.',
-      riskLevel: 'LOW'
+      status: 'VERIFIZIERT',
     },
     {
-      categoryName: 'Alt/Neu-Zuordnung',
+      title: 'Alt/Neu-Zuordnung noch nicht angewendet',
       source: 'Massekreditvertrag (bekannt, nicht angewendet)',
       description: 'Regeln bekannt (KV: 1/3 Alt Q4, HZV: 28/31 Alt Okt), aber NOCH NICHT auf Buchungen angewendet. Fachliche Einzelfallprüfung erforderlich.',
-      riskLevel: 'MEDIUM'
+      status: 'ANNAHME',
+      linkedModule: 'business-logic',
     },
     {
-      categoryName: 'Sparkasse Velbert',
+      title: 'Sparkasse Velbert: Massekredit vereinbart',
       source: 'Massekreditvertrag (unterzeichnet)',
       description: 'Globalzession auf Velbert-Forderungen. Fortführungsbeitrag 10% zzgl. USt. Max. 137.000 € Massekredit. Laufzeit bis 31.08.2026.',
-      riskLevel: 'LOW'
+      status: 'VERIFIZIERT',
+      linkedModule: 'banken',
     },
     {
-      categoryName: 'apoBank (RISIKO!)',
+      title: 'apoBank: KEINE Vereinbarung!',
       source: 'IV-Kommunikation',
       description: 'KEINE Vereinbarung mit apoBank! Abtretung existiert, aber Bank verweigert Kooperation. Blockiert möglicherweise KV-Auszahlungen Uckerath/Eitorf.',
-      riskLevel: 'HIGH'
+      status: 'ANNAHME',
+      linkedModule: 'banken',
     },
     {
-      categoryName: 'PVS-Zuordnung',
+      title: 'PVS-Zuordnung über Einzelfallprüfung',
       source: 'Massekreditvertrag §1(2)c',
       description: 'Alt/Neu nach Behandlungsdatum - aus Kontoauszügen NICHT ableitbar. Alle PVS-Buchungen als UNKLAR markiert.',
-      riskLevel: 'MEDIUM'
+      status: 'ANNAHME',
+      linkedModule: 'business-logic',
     },
     {
-      categoryName: 'Insolvenz-spezifische Effekte',
+      title: 'Insolvenz-spezifische Effekte geschätzt',
       source: 'PLAN-Daten + Schätzung',
       description: 'Insolvenzgeld, Sachaufnahme, IV-Vergütung separat erfasst. Werte teilweise geschätzt und als "nur zur Anzeige" markiert.',
-      riskLevel: 'MEDIUM'
+      status: 'ANNAHME',
     },
   ];
 
   for (const a of assumptions) {
     await prisma.planningAssumption.create({
       data: {
-        planId: PLAN_ID,
-        categoryName: a.categoryName,
+        caseId: CASE_ID,
+        title: a.title,
         source: a.source,
         description: a.description,
-        riskLevel: a.riskLevel,
+        status: a.status,
+        linkedModule: ('linkedModule' in a) ? (a as { linkedModule: string }).linkedModule : null,
         createdBy: 'fix-dashboard-complete',
         updatedBy: 'fix-dashboard-complete',
       }
     });
   }
-  console.log(`   ✓ ${assumptions.length} Prämissen (ehrlich formuliert)`);
+  console.log(`   ✓ ${assumptions.length} Planungsannahmen erstellt`);
 
   // =====================================================
   // 6. ZUSAMMENFASSUNG

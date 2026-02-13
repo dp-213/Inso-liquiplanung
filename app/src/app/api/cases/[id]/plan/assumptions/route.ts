@@ -4,7 +4,7 @@ import { getSession } from "@/lib/auth";
 
 // GET /api/cases/[id]/plan/assumptions - Get all planning assumptions for a case
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -15,45 +15,19 @@ export async function GET(
 
     const { id: caseId } = await params;
 
-    // Get the active plan for the case
-    const caseData = await prisma.case.findUnique({
-      where: { id: caseId },
-      include: {
-        plans: {
-          where: { isActive: true },
-          include: {
-            assumptions: {
-              orderBy: { categoryName: "asc" },
-            },
-          },
-          take: 1,
-        },
-      },
+    // Case-Level: Direkt über caseId abfragen
+    const assumptions = await prisma.planningAssumption.findMany({
+      where: { caseId },
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     });
 
-    if (!caseData) {
-      return NextResponse.json(
-        { error: "Fall nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    const activePlan = caseData.plans[0];
-    if (!activePlan) {
-      return NextResponse.json(
-        { error: "Kein aktiver Plan gefunden" },
-        { status: 404 }
-      );
-    }
-
     return NextResponse.json({
-      planId: activePlan.id,
-      assumptions: activePlan.assumptions,
+      assumptions,
     });
   } catch (error) {
     console.error("Error fetching planning assumptions:", error);
     return NextResponse.json(
-      { error: "Fehler beim Laden der Planungsprämissen" },
+      { error: "Fehler beim Laden der Planungsannahmen" },
       { status: 500 }
     );
   }
@@ -72,84 +46,61 @@ export async function POST(
 
     const { id: caseId } = await params;
     const body = await request.json();
-    const { categoryName, source, description, riskLevel } = body;
+    const { id: assumptionId, title, source, description, status, linkedModule, linkedEntityId } = body;
 
     // Validate required fields
-    if (!categoryName || !source || !description || !riskLevel) {
+    if (!title || !source || !description) {
       return NextResponse.json(
-        { error: "Alle Felder sind erforderlich: categoryName, source, description, riskLevel" },
+        { error: "Pflichtfelder: title, source, description" },
         { status: 400 }
       );
     }
 
-    // Validate riskLevel
-    const validRiskLevels = ["conservative", "low", "medium", "high", "aggressive"];
-    if (!validRiskLevels.includes(riskLevel)) {
+    // Validate status
+    const validStatuses = ["ANNAHME", "VERIFIZIERT", "WIDERLEGT"];
+    if (status && !validStatuses.includes(status)) {
       return NextResponse.json(
-        { error: `riskLevel muss einer der folgenden Werte sein: ${validRiskLevels.join(", ")}` },
+        { error: `Status muss einer der folgenden Werte sein: ${validStatuses.join(", ")}` },
         { status: 400 }
       );
     }
 
-    // Get the active plan for the case
-    const caseData = await prisma.case.findUnique({
-      where: { id: caseId },
-      include: {
-        plans: {
-          where: { isActive: true },
-          take: 1,
+    if (assumptionId) {
+      // Update existing
+      const assumption = await prisma.planningAssumption.update({
+        where: { id: assumptionId },
+        data: {
+          title: title.trim(),
+          source: source.trim(),
+          description: description.trim(),
+          status: status || "ANNAHME",
+          linkedModule: linkedModule || null,
+          linkedEntityId: linkedEntityId || null,
+          updatedBy: session.username,
         },
-      },
-    });
-
-    if (!caseData) {
-      return NextResponse.json(
-        { error: "Fall nicht gefunden" },
-        { status: 404 }
-      );
-    }
-
-    const activePlan = caseData.plans[0];
-    if (!activePlan) {
-      return NextResponse.json(
-        { error: "Kein aktiver Plan gefunden" },
-        { status: 404 }
-      );
-    }
-
-    // Upsert the assumption (create or update based on planId + categoryName)
-    const assumption = await prisma.planningAssumption.upsert({
-      where: {
-        planId_categoryName: {
-          planId: activePlan.id,
-          categoryName,
+      });
+      return NextResponse.json({ success: true, assumption });
+    } else {
+      // Create new
+      const assumption = await prisma.planningAssumption.create({
+        data: {
+          caseId,
+          title: title.trim(),
+          source: source.trim(),
+          description: description.trim(),
+          status: status || "ANNAHME",
+          linkedModule: linkedModule || null,
+          linkedEntityId: linkedEntityId || null,
+          createdBy: session.username,
+          updatedBy: session.username,
         },
-      },
-      create: {
-        planId: activePlan.id,
-        categoryName,
-        source: source.trim(),
-        description: description.trim(),
-        riskLevel,
-        createdBy: session.username,
-        updatedBy: session.username,
-      },
-      update: {
-        source: source.trim(),
-        description: description.trim(),
-        riskLevel,
-        updatedBy: session.username,
-      },
-    });
-
-    return NextResponse.json({
-      success: true,
-      assumption,
-    });
+      });
+      return NextResponse.json({ success: true, assumption }, { status: 201 });
+    }
   } catch (error) {
     console.error("Error saving planning assumption:", error);
     return NextResponse.json(
-      { error: "Fehler beim Speichern der Planungsprämisse" },
+      { error: "Fehler beim Speichern der Planungsannahme" },
       { status: 500 }
     );
   }
@@ -177,26 +128,21 @@ export async function DELETE(
       );
     }
 
-    // Verify the assumption belongs to an active plan of this case
+    // Verify the assumption belongs to this case
     const assumption = await prisma.planningAssumption.findUnique({
       where: { id: assumptionId },
-      include: {
-        plan: {
-          select: { caseId: true, isActive: true },
-        },
-      },
     });
 
     if (!assumption) {
       return NextResponse.json(
-        { error: "Planungsprämisse nicht gefunden" },
+        { error: "Planungsannahme nicht gefunden" },
         { status: 404 }
       );
     }
 
-    if (assumption.plan.caseId !== caseId || !assumption.plan.isActive) {
+    if (assumption.caseId !== caseId) {
       return NextResponse.json(
-        { error: "Planungsprämisse gehört nicht zu diesem Fall" },
+        { error: "Planungsannahme gehört nicht zu diesem Fall" },
         { status: 403 }
       );
     }
@@ -207,12 +153,12 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: "Planungsprämisse gelöscht",
+      message: "Planungsannahme gelöscht",
     });
   } catch (error) {
     console.error("Error deleting planning assumption:", error);
     return NextResponse.json(
-      { error: "Fehler beim Löschen der Planungsprämisse" },
+      { error: "Fehler beim Löschen der Planungsannahme" },
       { status: 500 }
     );
   }

@@ -4,6 +4,45 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-060: Legacy-Dashboard-Code entfernen
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Nach dem Umbau auf `UnifiedCaseDashboard` (v2.29.0) und `ForecastSpreadsheet` (v2.31.0) existierten zwei parallele Dashboard-Systeme:
+- **ALT:** `ConfigurableDashboard` + `EditableCategoryTable` (CashflowCategory/Line/PeriodValue UI)
+- **NEU:** `UnifiedCaseDashboard` + LedgerEntry-Aggregation + ForecastAssumptions
+
+Das alte System war seit Wochen vollständig ersetzt, aber ~8.800 Zeilen toter Code existierten noch.
+
+### Entscheidung
+
+Alle 26 Legacy-Dateien löschen:
+- 2 Seiten (`dashboard/page.tsx`, `config/page.tsx`)
+- 10 Legacy-Komponenten (ConfigurableDashboard, EditableCategoryTable, PlanStructureManager, etc.)
+- 4 verwaiste Komponenten (CustomerAccessManager, ShareLinksManager, LineageViewer)
+- 6 API-Routen (plan/categories, plan/lines, plan/values, plan/opening-balance)
+- 4 Library-Dateien (lib/case-dashboard/)
+- 1 Barrel Export
+
+### Begründung
+
+- **Kein aktiver Code importiert** eine der gelöschten Dateien (per Grep verifiziert)
+- Sidebar-Links waren bereits entfernt
+- Toter Code erhöht Verwirrung und Build-Größe
+- CashflowCategory/Line/PeriodValue **Prisma-Modelle bleiben erhalten** (werden von `/api/calculate`, Share-API und Customer-API genutzt)
+
+### Konsequenzen
+
+- ~8.800 Zeilen weniger Code
+- `/admin/cases/[id]/config` und `/admin/cases/[id]/dashboard` existieren nicht mehr als Routen
+- 6 API-Endpunkte weniger
+- `lib/case-dashboard/` existiert nicht mehr
+
+---
+
 ## ADR-059: System Health Panel als eigene Route
 
 **Datum:** 13. Februar 2026

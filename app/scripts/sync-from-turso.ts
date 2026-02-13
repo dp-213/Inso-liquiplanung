@@ -169,18 +169,23 @@ async function main() {
     console.log('   ', plan.name);
     
     for (const ass of plan.assumptions) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const a = ass as any;
       await local.planningAssumption.create({
         data: {
-          id: ass.id,
+          id: a.id,
+          caseId: tursoCase.id,
           planId: plan.id,
-          categoryName: ass.categoryName,
-          source: ass.source,
-          description: ass.description,
-          riskLevel: ass.riskLevel,
-          createdBy: ass.createdBy,
-          updatedBy: ass.updatedBy,
-          createdAt: ass.createdAt,
-          updatedAt: ass.updatedAt,
+          title: a.title || a.categoryName || 'Unbekannt',
+          source: a.source,
+          description: a.description,
+          status: a.status || 'ANNAHME',
+          linkedModule: a.linkedModule || null,
+          linkedEntityId: a.linkedEntityId || null,
+          createdBy: a.createdBy,
+          updatedBy: a.updatedBy,
+          createdAt: a.createdAt,
+          updatedAt: a.updatedAt,
         }
       });
     }

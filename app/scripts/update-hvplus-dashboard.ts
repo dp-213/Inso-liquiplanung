@@ -381,17 +381,17 @@ async function main() {
   for (const a of assumptions) {
     await prisma.planningAssumption.create({
       data: {
-        planId: PLAN_ID,
-        categoryName: a.categoryName,
+        caseId: CASE_ID,
+        title: a.categoryName,
         source: a.source,
         description: a.description,
-        riskLevel: a.riskLevel,
+        status: a.riskLevel === 'CONFIRMED' ? 'VERIFIZIERT' : 'ANNAHME',
         createdBy: 'update-hvplus-dashboard',
         updatedBy: 'update-hvplus-dashboard',
       }
     });
   }
-  console.log(`   ${assumptions.length} Prämissen angelegt`);
+  console.log(`   ${assumptions.length} Planungsannahmen angelegt`);
 
   // =====================================================
   // 6. Summary

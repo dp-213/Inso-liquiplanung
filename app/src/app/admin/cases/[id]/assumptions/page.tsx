@@ -34,7 +34,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: string; color: string
 };
 
 const MODULE_LINKS: Record<string, { label: string; path: string }> = {
-  banken: { label: "Banken & Sicherungsrechte", path: "banken-sicherungsrechte" },
+  banken: { label: "Finanzierung & Banken", path: "finanzierung" },
   personal: { label: "Personal", path: "personal" },
   "business-logic": { label: "Business-Logik", path: "business-logic" },
   counterparties: { label: "Gegenparteien", path: "counterparties" },

@@ -61,6 +61,7 @@ model Case {
   costCategories       CostCategory[]       // Kostenarten für Ausgaben-Planung
   employees            Employee[]           // Mitarbeiter (Personal)
   caseContacts         CaseContact[]        // Ansprechpartner
+  planningAssumptions  PlanningAssumption[] // Planungsannahmen (Case-Level)
 
   // === FREIGABE-EINSTELLUNGEN ===
   approvalThresholdCents BigInt?            // Betrag in Cent, unter dem Auto-Approve greift (null = immer manuell)
@@ -589,24 +590,29 @@ model AiPreprocessingLog {
 // PLANNING DOCUMENTATION (no cashflows, only metadata)
 // =============================================================================
 
-// PlanningAssumption - Documentation of planning assumptions with risk assessment
+// PlanningAssumption - Case-level documentation of planning assumptions
 // IMPORTANT: This is ONLY metadata/documentation - it does NOT create any cashflows
-// Links to categories but does NOT contain amountCents
+// Case-bound (not plan-bound) - assumptions persist across plan changes
 model PlanningAssumption {
-  id            String   @id @default(uuid())
-  planId        String
-  categoryName  String   // Links to CashflowCategory name
-  source        String   // e.g., "OP-Debitorenliste zum 05.01.2026"
-  description   String   // Detailed description of the planning assumption
-  riskLevel     String   // conservative, low, medium, high, aggressive
-  createdAt     DateTime @default(now())
-  createdBy     String
-  updatedAt     DateTime @updatedAt
-  updatedBy     String?
+  id             String    @id @default(uuid())
+  caseId         String    // Case-Level statt Plan-Level
+  planId         String?   // Legacy: optional, wird nicht mehr für neue Einträge gesetzt
+  title          String    // Freier Titel (z.B. "Fortführung aller Praxen bis Ende Q1/2026")
+  description    String    // Detaillierte Beschreibung der Annahme
+  source         String    // Quellenangabe (z.B. "IV-Gespräch 09.02.2026")
+  status         String    @default("ANNAHME") // ANNAHME, VERIFIZIERT, WIDERLEGT
+  linkedModule   String?   // z.B. "banken", "personal", "business-logic", "counterparties", "iv-notes"
+  linkedEntityId String?   // Optional FK zum verlinkten Datensatz
+  lastReviewedAt DateTime?
+  createdAt      DateTime  @default(now())
+  createdBy      String
+  updatedAt      DateTime  @updatedAt
+  updatedBy      String?
 
-  plan LiquidityPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  case Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  plan LiquidityPlan? @relation(fields: [planId], references: [id], onDelete: Cascade)
 
-  @@unique([planId, categoryName])
+  @@index([caseId])
   @@index([planId])
   @@map("planning_assumptions")
 }
@@ -1147,6 +1153,21 @@ model ForecastAssumption {
   endPeriodIndex        Int
   isActive              Boolean   @default(true)
   sortOrder             Int       @default(0)
+
+  // === METHODIK ===
+  method                String?   // Wie wurde der Betrag hergeleitet? (z.B. "Durchschnitt IST Dez–Jan")
+  baseReferencePeriod   String?   // z.B. "IST Dez 2025 – Jan 2026"
+  scenarioSensitivity   String?   // Sensitivität bei Parameteränderung
+
+  // === QUANTITATIVES RISIKO ===
+  riskProbability       Float?    // Abweichungswahrscheinlichkeit 0.0–1.0
+  riskImpactCents       BigInt?   // EUR-Auswirkung bei Eintritt (positiv = Zufluss, negativ = Abfluss)
+  riskComment           String?   // Qualitative Risikobegründung
+
+  // === REVIEW ===
+  lastReviewedAt        DateTime? // Wann zuletzt geprüft?
+  visibilityScope       String?   // "INTERN" | "EXTERN" (für Portal-Sichtbarkeit)
+
   createdAt             DateTime  @default(now())
   createdBy             String    @default("admin")
   updatedAt             DateTime  @updatedAt

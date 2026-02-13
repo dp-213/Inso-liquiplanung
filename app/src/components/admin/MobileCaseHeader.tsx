@@ -17,7 +17,7 @@ const segmentLabels: Record<string, string> = {
   "cost-categories": "Kostenarten",
   locations: "Standorte",
   "insolvency-effects": "Insolvenzeffekte",
-  "banken-sicherungsrechte": "Banken & Sicherungsrechte",
+  finanzierung: "Finanzierung & Banken",
   assumptions: "Prämissen",
   forecast: "Prognose",
   results: "Liquiditätsplan",

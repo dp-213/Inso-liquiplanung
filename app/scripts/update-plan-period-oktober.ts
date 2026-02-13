@@ -57,8 +57,8 @@ async function main() {
   // Update assumption about data availability
   const existingAssumption = await prisma.planningAssumption.findFirst({
     where: {
-      planId: plan.id,
-      categoryName: 'Datenbasis'
+      caseId: hvCase.id,
+      title: { contains: 'Datenbasis' },
     }
   });
 
@@ -69,7 +69,7 @@ async function main() {
         description: 'IST-Daten: Okt-Dez 2025 (Kontoauszüge Sparkasse + apoBank). PLAN-Daten: Okt 2025 - Aug 2026. KEINE Daten für Jan-Sep 2025 (vor Insolvenz).',
       }
     });
-    console.log('\nPrämisse "Datenbasis" aktualisiert');
+    console.log('\nAnnahme "Datenbasis" aktualisiert');
   }
 
   console.log('\n=== FERTIG ===');

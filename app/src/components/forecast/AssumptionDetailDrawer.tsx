@@ -43,6 +43,20 @@ export default function AssumptionDetailDrawer({
   );
   const [startPeriod, setStartPeriod] = useState(assumption.startPeriodIndex);
   const [endPeriod, setEndPeriod] = useState(assumption.endPeriodIndex);
+  // Neue Felder: Methodik & Risiko
+  const [method, setMethod] = useState(assumption.method || "");
+  const [baseReferencePeriod, setBaseReferencePeriod] = useState(assumption.baseReferencePeriod || "");
+  const [riskProbability, setRiskProbability] = useState(
+    assumption.riskProbability !== null && assumption.riskProbability !== undefined
+      ? String(Math.round(assumption.riskProbability * 100))
+      : ""
+  );
+  const [riskImpactCents, setRiskImpactCents] = useState(
+    assumption.riskImpactCents ? formatEURInput(assumption.riskImpactCents) : ""
+  );
+  const [riskComment, setRiskComment] = useState(assumption.riskComment || "");
+  const [visibilityScope, setVisibilityScope] = useState(assumption.visibilityScope || "INTERN");
+
   const [saving, setSaving] = useState(false);
 
   // Escape schließt Drawer
@@ -75,6 +89,13 @@ export default function AssumptionDetailDrawer({
         growthFactorPercent: growthFactor ? parseFloat(growthFactor.replace(",", ".")) : null,
         startPeriodIndex: startPeriod,
         endPeriodIndex: endPeriod,
+        // Neue Felder
+        method: method || null,
+        baseReferencePeriod: baseReferencePeriod || null,
+        riskProbability: riskProbability ? parseFloat(riskProbability) / 100 : null,
+        riskImpactCents: riskImpactCents ? parseCentsFromEUR(riskImpactCents) : null,
+        riskComment: riskComment || null,
+        visibilityScope: visibilityScope || null,
       });
       onClose();
     } catch (err) {
@@ -219,6 +240,84 @@ export default function AssumptionDetailDrawer({
                 />
               </div>
             )}
+
+            {/* === Methodik & Risiko (neue Sektion) === */}
+            <div className="pt-3 border-t border-[var(--border)]">
+              <h3 className="text-xs font-bold text-[var(--foreground)] uppercase tracking-wide mb-3">Methodik & Risiko</h3>
+
+              {/* Methode */}
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Methode</label>
+                <input
+                  type="text"
+                  value={method}
+                  onChange={(e) => setMethod(e.target.value)}
+                  placeholder="z.B. Durchschnitt IST Dez–Jan"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
+                />
+              </div>
+
+              {/* Referenzzeitraum */}
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Referenzzeitraum</label>
+                <input
+                  type="text"
+                  value={baseReferencePeriod}
+                  onChange={(e) => setBaseReferencePeriod(e.target.value)}
+                  placeholder="z.B. IST Dez 2025 – Jan 2026"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
+                />
+              </div>
+
+              {/* Risiko: Wahrscheinlichkeit + Auswirkung */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Abw.-Wahrscheinlichkeit (%)</label>
+                  <input
+                    type="text"
+                    value={riskProbability}
+                    onChange={(e) => setRiskProbability(e.target.value)}
+                    placeholder="z.B. 15"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Auswirkung (EUR)</label>
+                  <input
+                    type="text"
+                    value={riskImpactCents}
+                    onChange={(e) => setRiskImpactCents(e.target.value)}
+                    placeholder="z.B. -4.800,00"
+                    className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Risiko-Kommentar */}
+              <div className="mb-3">
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Risiko-Begründung</label>
+                <input
+                  type="text"
+                  value={riskComment}
+                  onChange={(e) => setRiskComment(e.target.value)}
+                  placeholder="z.B. Versichertenzahlen bei Arztwechsel"
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
+                />
+              </div>
+
+              {/* Sichtbarkeit */}
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Sichtbarkeit</label>
+                <select
+                  value={visibilityScope}
+                  onChange={(e) => setVisibilityScope(e.target.value)}
+                  className="w-full px-3 py-2 border border-[var(--border)] rounded-lg text-sm"
+                >
+                  <option value="INTERN">Nur intern</option>
+                  <option value="EXTERN">Auch im Portal sichtbar</option>
+                </select>
+              </div>
+            </div>
 
             {/* Perioden-Range mit Monatsnamen */}
             <div className="grid grid-cols-2 gap-3">

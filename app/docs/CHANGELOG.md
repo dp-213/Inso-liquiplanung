@@ -4,6 +4,25 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.47.0 – Legacy-Dashboard Cleanup
+
+**Datum:** 13. Februar 2026
+
+### Entfernte Features
+
+- **Legacy-Dashboard gelöscht:** Komplettes altes `ConfigurableDashboard` + `EditableCategoryTable`-System entfernt (~8.800 Zeilen, 26 Dateien). War seit v2.29.0 durch `UnifiedCaseDashboard` + `ForecastSpreadsheet` ersetzt.
+- **Config-Seite gelöscht:** `/admin/cases/[id]/config` (Dashboard-Konfiguration für altes System) samt zugehöriger API-Route.
+- **6 Legacy API-Routen gelöscht:** `plan/categories`, `plan/categories/[categoryId]`, `plan/lines`, `plan/lines/[lineId]`, `plan/values`, `plan/opening-balance` – alle nur vom alten Dashboard genutzt.
+- **Legacy Library gelöscht:** `lib/case-dashboard/` (types, loader, defaults, index) – Datenlade-Logik für altes CashflowCategory/Line/PeriodValue-Dashboard.
+- **Verwaiste Komponenten gelöscht:** `CustomerAccessManager`, `ShareLinksManager`, `LineageViewer` – nirgends importiert.
+- **Barrel Export gelöscht:** `components/dashboard/index.ts` – exportierte nur Legacy-Komponenten.
+
+### Architektur
+
+Aktives Dashboard-System ist ausschließlich `UnifiedCaseDashboard` mit LedgerEntry-Aggregation. CashflowCategory/Line/PeriodValue-Modelle bleiben als Prisma-Modelle erhalten (werden noch von `/api/calculate`, Share-API und Customer-API genutzt), aber haben keine eigene UI mehr.
+
+---
+
 ## Version 2.46.0 – System Health Panel
 
 **Datum:** 13. Februar 2026

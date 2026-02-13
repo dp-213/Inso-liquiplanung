@@ -12,9 +12,9 @@ Code-Struktur verbessern, um Dashboard-Änderungen und Debugging zu erleichtern.
 
 **Hauptprobleme aktuell:**
 1. ⚠️ API-Routen noch groß, aber Aggregationslogik bereits extrahiert nach `lib/liquidity-matrix/aggregate.ts` (v2.18.0)
-2. ❌ Dashboard-Änderungen aufwendig (Logik verstreut)
+2. ✅ Dashboard-Änderungen vereinfacht (v2.47.0: Legacy-Dashboard komplett entfernt, nur noch UnifiedCaseDashboard)
 3. ❌ Scope-Logik mehrfach implementiert (5 Stellen)
-4. ✅ Dashboard-Komponenten konsolidiert (v2.29.0: Portal-Standalone-Seiten eliminiert, nur noch UnifiedCaseDashboard)
+4. ✅ Dashboard-Komponenten konsolidiert (v2.29.0: Portal-Standalone-Seiten eliminiert, v2.47.0: ~8.800 Zeilen Legacy-Code entfernt)
 
 ---
 

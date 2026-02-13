@@ -1229,7 +1229,15 @@ export const COUNTERPARTY_TAG_MAP: Record<string, string> = {
   'cp-kreiskasse-rhein-sieg': 'KV',
   'cp-haevg-hzv': 'HZV',
   'cp-haevg-pvs': 'PVS',
-  'cp-privatpatienten': 'PVS',
+};
+
+/**
+ * Zusätzliche CPs die für Check 2 (inverse Prüfung) als gültig gelten.
+ * Diese CPs haben einen Tag, sind aber keine Abrechnungsstellen
+ * (z.B. cp-privatpatienten hat PVS-Entries, ist aber kein PVS-Partner).
+ */
+export const ADDITIONAL_TAG_COUNTERPARTIES: Record<string, string[]> = {
+  'PVS': ['cp-privatpatienten'],
 };
 
 /**

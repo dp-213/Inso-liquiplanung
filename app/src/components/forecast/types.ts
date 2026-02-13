@@ -72,6 +72,17 @@ export interface AssumptionJSON {
   endPeriodIndex: number;
   isActive: boolean;
   sortOrder: number;
+  // Methodik
+  method: string | null;
+  baseReferencePeriod: string | null;
+  scenarioSensitivity: string | null;
+  // Risiko
+  riskProbability: number | null;
+  riskImpactCents: string | null;
+  riskComment: string | null;
+  // Review
+  lastReviewedAt: string | null;
+  visibilityScope: string | null;
 }
 
 // ============================================================================

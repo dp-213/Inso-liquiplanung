@@ -6,5 +6,5 @@ interface PageProps {
 
 export default async function SecurityRightsRedirect({ params }: PageProps) {
   const { id } = await params;
-  redirect(`/admin/cases/${id}/banken-sicherungsrechte`);
+  redirect(`/admin/cases/${id}/finanzierung`);
 }

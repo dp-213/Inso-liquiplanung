@@ -6,11 +6,17 @@
  * beide Werte werden für alle Perioden angezeigt, um den Vergleich zu ermöglichen.
  *
  * GET /api/cases/[id]/dashboard/ist-plan-comparison
+ * Query-Parameter:
+ * - scope: GLOBAL | LOCATION_VELBERT | LOCATION_UCKERATH_EITORF
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { EXCLUDE_SPLIT_PARENTS } from '@/lib/ledger/types';
+import {
+  filterEntriesByScope,
+  type LiquidityScope,
+} from '@/lib/cases/haevg-plus/matrix-config';
 
 // =============================================================================
 // TYPES
@@ -37,6 +43,8 @@ export interface ComparisonPeriod {
   deviationInflowsPercent: number | null;  // null wenn PLAN = 0
   deviationOutflowsPercent: number | null;
   deviationNetPercent: number | null;
+  // Kumulierte Abweichung
+  cumulativeDeviationNetCents: string;
   // Status
   hasIst: boolean;
   hasPlan: boolean;
@@ -45,6 +53,7 @@ export interface ComparisonPeriod {
 export interface IstPlanComparisonData {
   caseId: string;
   caseName: string;
+  scope: LiquidityScope;
   periods: ComparisonPeriod[];
   // Kumulative Summen
   totals: {
@@ -57,6 +66,9 @@ export interface IstPlanComparisonData {
     deviationInflowsCents: string;
     deviationOutflowsCents: string;
     deviationNetCents: string;
+    deviationInflowsPercent: number | null;
+    deviationOutflowsPercent: number | null;
+    deviationNetPercent: number | null;
   };
   meta: {
     periodType: string;
@@ -110,6 +122,13 @@ export async function GET(
 ) {
   try {
     const { id: caseId } = await params;
+    const { searchParams } = new URL(request.url);
+
+    // Scope-Parameter
+    const scopeParam = searchParams.get('scope') || 'GLOBAL';
+    const scope: LiquidityScope = ['GLOBAL', 'LOCATION_VELBERT', 'LOCATION_UCKERATH_EITORF'].includes(scopeParam)
+      ? (scopeParam as LiquidityScope)
+      : 'GLOBAL';
 
     // 1. Load Case with Plan settings
     const existingCase = await prisma.case.findUnique({
@@ -136,7 +155,7 @@ export async function GET(
     const startDate = plan.planStartDate ? new Date(plan.planStartDate) : new Date();
 
     // 2. Load all LedgerEntries (nur geprüfte: CONFIRMED, ADJUSTED)
-    const entries = await prisma.ledgerEntry.findMany({
+    const allEntries = await prisma.ledgerEntry.findMany({
       where: {
         caseId,
         ...EXCLUDE_SPLIT_PARENTS,
@@ -145,7 +164,10 @@ export async function GET(
       orderBy: { transactionDate: 'asc' },
     });
 
-    // 3. Initialize period aggregations
+    // 3. Scope-Filterung anwenden
+    const entries = filterEntriesByScope(allEntries, scope);
+
+    // 4. Initialize period aggregations
     interface PeriodAggregation {
       istInflows: bigint;
       istOutflows: bigint;
@@ -167,7 +189,7 @@ export async function GET(
       });
     }
 
-    // 4. Aggregate entries - BEIDE IST und PLAN, ohne Vorrang
+    // 5. Aggregate entries - BEIDE IST und PLAN, ohne Vorrang
     let totalIstEntries = 0;
     let totalPlanEntries = 0;
 
@@ -197,12 +219,13 @@ export async function GET(
       }
     }
 
-    // 5. Build response periods
+    // 6. Build response periods mit kumulierter Abweichung
     const periods: ComparisonPeriod[] = [];
     let totalIstInflows = BigInt(0);
     let totalIstOutflows = BigInt(0);
     let totalPlanInflows = BigInt(0);
     let totalPlanOutflows = BigInt(0);
+    let cumulativeDeviationNet = BigInt(0);
 
     for (let i = 0; i < periodCount; i++) {
       const data = periodData.get(i)!;
@@ -212,6 +235,11 @@ export async function GET(
       const deviationInflows = data.istInflows - data.planInflows;
       const deviationOutflows = data.istOutflows - data.planOutflows;
       const deviationNet = istNet - planNet;
+
+      // Kumulierte Abweichung nur für Perioden mit IST-Daten
+      if (data.istCount > 0) {
+        cumulativeDeviationNet += deviationNet;
+      }
 
       totalIstInflows += data.istInflows;
       totalIstOutflows += data.istOutflows;
@@ -239,19 +267,25 @@ export async function GET(
         deviationInflowsPercent: calculatePercent(deviationInflows, data.planInflows),
         deviationOutflowsPercent: calculatePercent(deviationOutflows, data.planOutflows),
         deviationNetPercent: calculatePercent(deviationNet, planNet),
+        // Kumuliert
+        cumulativeDeviationNetCents: cumulativeDeviationNet.toString(),
         // Status
         hasIst: data.istCount > 0,
         hasPlan: data.planCount > 0,
       });
     }
 
-    // 6. Calculate totals
+    // 7. Calculate totals
     const totalIstNet = totalIstInflows + totalIstOutflows;
     const totalPlanNet = totalPlanInflows + totalPlanOutflows;
+    const totalDeviationInflows = totalIstInflows - totalPlanInflows;
+    const totalDeviationOutflows = totalIstOutflows - totalPlanOutflows;
+    const totalDeviationNet = totalIstNet - totalPlanNet;
 
     const response: IstPlanComparisonData = {
       caseId,
       caseName: existingCase.debtorName,
+      scope,
       periods,
       totals: {
         istInflowsCents: totalIstInflows.toString(),
@@ -260,9 +294,12 @@ export async function GET(
         planInflowsCents: totalPlanInflows.toString(),
         planOutflowsCents: totalPlanOutflows.toString(),
         planNetCents: totalPlanNet.toString(),
-        deviationInflowsCents: (totalIstInflows - totalPlanInflows).toString(),
-        deviationOutflowsCents: (totalIstOutflows - totalPlanOutflows).toString(),
-        deviationNetCents: (totalIstNet - totalPlanNet).toString(),
+        deviationInflowsCents: totalDeviationInflows.toString(),
+        deviationOutflowsCents: totalDeviationOutflows.toString(),
+        deviationNetCents: totalDeviationNet.toString(),
+        deviationInflowsPercent: calculatePercent(totalDeviationInflows, totalPlanInflows),
+        deviationOutflowsPercent: calculatePercent(totalDeviationOutflows, totalPlanOutflows),
+        deviationNetPercent: calculatePercent(totalDeviationNet, totalPlanNet),
       },
       meta: {
         periodType,

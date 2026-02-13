@@ -340,7 +340,7 @@ export default function HilfePage() {
               Headroom = Kontostand + Kreditlinie \u2013 Rückstellungen.
               Es ist Ihr finanzieller Spielraum. Wird er negativ, droht Zahlungsunfähigkeit.
               Kreditlinien pflegen Sie unter{" "}
-              <Link href={`${base}/banken-sicherungsrechte`} className="text-[var(--primary)] underline font-medium">Banken &amp; Sicherungsrechte</Link>,
+              <Link href={`${base}/finanzierung`} className="text-[var(--primary)] underline font-medium">Finanzierung &amp; Banken</Link>,
               Rückstellungen unter{" "}
               <Link href={`${base}/insolvency-effects`} className="text-[var(--primary)] underline font-medium">Insolvenzeffekte</Link>.
             </span>
@@ -784,8 +784,7 @@ export default function HilfePage() {
             <div className="grid gap-2 sm:grid-cols-2">
               <PageCard href={`${base}/personal`} icon={icons.users} name="Personal" description="Mitarbeiter, Gehälter, LANR" color="bg-blue-100 text-blue-600" />
               <PageCard href={`${base}/kontakte`} icon={icons.chat} name="Kontakte" description="IV, Berater, Buchhaltung, RA" color="bg-purple-100 text-purple-600" />
-              <PageCard href={`${base}/banken-sicherungsrechte`} icon={icons.bank} name="Banken & Sicherungsrechte" description="Kreditlinien, Vereinbarungen" color="bg-indigo-100 text-indigo-600" />
-              <PageCard href={`${base}/finanzierung`} icon={icons.bank} name="Finanzierung" description="Massekredite und Struktur" color="bg-blue-100 text-blue-600" />
+              <PageCard href={`${base}/finanzierung`} icon={icons.bank} name="Finanzierung & Banken" description="Bankenspiegel, Sicherungsrechte, Massekredit" color="bg-indigo-100 text-indigo-600" />
               <PageCard href={`${base}/insolvency-effects`} icon={icons.shield} name="Insolvenzeffekte" description="Rückstellungen und Sondereffekte" color="bg-red-100 text-red-600" />
               <PageCard href={`${base}/business-logic`} icon={icons.cog} name="Business-Logik" description="Klassifikations-Regelwerk" color="bg-gray-100 text-gray-600" />
               <PageCard href={`${base}/planung`} icon={icons.doc} name="Freie Planung" description="Manuelle PLAN-Werte eingeben" color="bg-amber-100 text-amber-600" />

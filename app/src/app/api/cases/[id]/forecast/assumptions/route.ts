@@ -2,27 +2,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getSession } from '@/lib/auth';
 
-function serializeAssumption(a: {
-  id: string;
-  scenarioId: string;
-  caseId: string;
-  categoryKey: string;
-  categoryLabel: string;
-  flowType: string;
-  assumptionType: string;
-  baseAmountCents: bigint;
-  baseAmountSource: string;
-  baseAmountNote: string | null;
-  growthFactorPercent: unknown;
-  seasonalProfile: string | null;
-  startPeriodIndex: number;
-  endPeriodIndex: number;
-  isActive: boolean;
-  sortOrder: number;
-  createdAt: Date;
-  createdBy: string;
-  updatedAt: Date;
-}) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function serializeAssumption(a: any) {
   return {
     id: a.id,
     scenarioId: a.scenarioId,
@@ -40,6 +21,17 @@ function serializeAssumption(a: {
     endPeriodIndex: a.endPeriodIndex,
     isActive: a.isActive,
     sortOrder: a.sortOrder,
+    // Neue Felder: Methodik
+    method: a.method ?? null,
+    baseReferencePeriod: a.baseReferencePeriod ?? null,
+    scenarioSensitivity: a.scenarioSensitivity ?? null,
+    // Neue Felder: Risiko
+    riskProbability: a.riskProbability ?? null,
+    riskImpactCents: a.riskImpactCents !== null && a.riskImpactCents !== undefined ? a.riskImpactCents.toString() : null,
+    riskComment: a.riskComment ?? null,
+    // Neue Felder: Review
+    lastReviewedAt: a.lastReviewedAt ? a.lastReviewedAt.toISOString() : null,
+    visibilityScope: a.visibilityScope ?? null,
     createdAt: a.createdAt.toISOString(),
     createdBy: a.createdBy,
     updatedAt: a.updatedAt.toISOString(),
@@ -189,6 +181,21 @@ export async function PUT(
         ...(body.endPeriodIndex !== undefined && { endPeriodIndex: body.endPeriodIndex }),
         ...(body.isActive !== undefined && { isActive: body.isActive }),
         ...(body.sortOrder !== undefined && { sortOrder: body.sortOrder }),
+        // Neue Felder: Methodik
+        ...(body.method !== undefined && { method: body.method }),
+        ...(body.baseReferencePeriod !== undefined && { baseReferencePeriod: body.baseReferencePeriod }),
+        ...(body.scenarioSensitivity !== undefined && { scenarioSensitivity: body.scenarioSensitivity }),
+        // Neue Felder: Risiko
+        ...(body.riskProbability !== undefined && { riskProbability: body.riskProbability }),
+        ...(body.riskImpactCents !== undefined && {
+          riskImpactCents: body.riskImpactCents !== null ? BigInt(body.riskImpactCents) : null,
+        }),
+        ...(body.riskComment !== undefined && { riskComment: body.riskComment }),
+        // Neue Felder: Review
+        ...(body.lastReviewedAt !== undefined && {
+          lastReviewedAt: body.lastReviewedAt ? new Date(body.lastReviewedAt) : null,
+        }),
+        ...(body.visibilityScope !== undefined && { visibilityScope: body.visibilityScope }),
       },
     });
 

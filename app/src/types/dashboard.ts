@@ -102,10 +102,11 @@ export interface BankAccountsSummary {
 
 export interface AssumptionInfo {
   id: string;
-  categoryName: string;
+  title: string;
   source: string;
   description: string;
-  riskLevel: string;
+  status: string;
+  linkedModule: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -294,7 +295,7 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
     },
     {
       id: "banks-security",
-      label: "Banken & Sicherungsrechte",
+      label: "Finanzierung & Banken",
       icon: "bank",
       panels: [
         { type: "bank-accounts", visible: true, order: 1 },
@@ -339,7 +340,7 @@ export const DEFAULT_DASHBOARD_CONFIG: DashboardConfig = {
     },
     {
       id: "assumptions",
-      label: "Prämissen",
+      label: "Berechnungsannahmen",
       icon: "document",
       panels: [
         { type: "assumptions", visible: true, order: 1 },

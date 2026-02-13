@@ -13,9 +13,9 @@
 3. [Fälle (Cases)](#3-fälle-cases)
 4. [Case Admin Dashboard](#4-case-admin-dashboard)
    - [4.1 Bearbeiten](#41-bearbeiten)
-   - [4.2 Konfiguration](#42-konfiguration)
+   - [~~4.2 Konfiguration~~](#42-konfiguration) *(entfernt v2.47.0)*
    - [4.3 Datenimport](#43-datenimport)
-   - [4.4 Dashboard](#44-dashboard)
+   - [~~4.4 Dashboard~~](#44-dashboard) *(entfernt v2.47.0)*
    - [4.5 Berechnungsannahmen](#45-berechnungsannahmen)
    - [4.6 Insolvenzeffekte](#46-insolvenzeffekte)
    - [4.7 Bankenspiegel](#47-bankenspiegel)
@@ -73,7 +73,7 @@ Case (Insolvenzverfahren)
     ├── ShareLink (Externe Links)
     ├── Order (Bestell-/Zahlfreigaben)
     ├── CompanyToken (Externe Zugangs-Tokens)
-    ├── CaseConfiguration (Dashboard-Konfiguration)
+    ├── CaseConfiguration (Dashboard-Konfiguration) ← LEGACY, keine UI seit v2.47.0
     ├── Employee (Mitarbeiter) ← NEU v2.39.0
     │       ↓ has
     │       └── EmployeeSalaryMonth (Monatliche Gehaltsdaten)
@@ -239,60 +239,11 @@ PUT /api/cases/[id]
 
 ---
 
-### 4.2 Konfiguration
+### ~~4.2 Konfiguration~~ ENTFERNT (v2.47.0)
 
-**Pfad:** `/admin/cases/[id]/config`
+**Ehemaliger Pfad:** `/admin/cases/[id]/config`
 
-#### Funktion
-Steuert die **Präsentation** des Dashboards – NICHT die Berechnung.
-
-#### Konfigurations-Tabs
-
-**1. Kategorien**
-- Sichtbarkeit von Einzahlungs-/Auszahlungskategorien
-- Reihenfolge per Drag & Drop
-- Umbenennung (Labels)
-- Hervorhebung (Emphasized)
-
-**2. Anzeige**
-- Tabelleneinstellungen (Wochennummern, Datumsbereiche, etc.)
-- Aggregationen (Zwischensummen, laufender Saldo)
-- KPIs (Mindestliquidität, Gesamteinnahmen, etc.)
-- Ansichtsvarianten (intern vs. extern)
-
-**3. Diagramme**
-- Welche Charts sichtbar
-- Standard-Diagramm
-- Legende, Datenbeschriftungen
-
-**4. Styling**
-- Firmenname, Logo-URL
-- Primär- und Akzentfarben
-- Fußzeile
-
-**5. PDF-Texte**
-- Rechtliche Vorbemerkungen
-- Datenquellen
-- Vorbemerkungen zur Liquiditätsplanung
-- Vollständigkeitserklärung
-- Vertraulichkeitshinweis
-
-**6. Erweitert**
-- Benutzerdefinierte Titel
-- Metadaten, Notizen
-- Raw JSON (read-only)
-
-#### Datenmodell-Wirkung
-```
-CaseConfiguration {
-  caseId: string
-  configType: "DASHBOARD_CONFIG"
-  configData: JSON (CaseDashboardConfig)
-}
-```
-
-#### Wichtig
-> Konfiguration ändert **nur die Darstellung**, nie die Berechnungslogik. Die Calculation Engine ist immutabel.
+> **Gelöscht in v2.47.0 (ADR-060).** Die Config-Seite steuerte die Präsentation des alten `ConfigurableDashboard`, das seit v2.29.0 durch `UnifiedCaseDashboard` ersetzt ist. Seite, API-Route (`/api/cases/[id]/config`) und alle zugehörigen Komponenten wurden entfernt.
 
 ---
 
@@ -399,52 +350,13 @@ await tx.periodValue.upsert({
 
 ---
 
-### 4.4 Dashboard
+### ~~4.4 Dashboard (Legacy)~~ ENTFERNT (v2.47.0)
 
-**Pfad:** `/admin/cases/[id]/dashboard`
+**Ehemaliger Pfad:** `/admin/cases/[id]/dashboard`
 
-#### Funktion
-Interaktive Ansicht der Liquiditätsplanung.
-
-#### Datenquellen
-- **PeriodValue:** Aggregierte Wochenwerte (aus LedgerEntry abgeleitet)
-- **InsolvencyEffect:** Insolvenzspezifische Effekte
-- **BankAccount:** Liquide Mittel (Eröffnungssaldo)
-- **CaseConfiguration:** Präsentationseinstellungen
-
-#### Berechnungslogik (immutabel)
-
-```
-Pro Woche (periodIndex 0-12):
-
-Einzahlungen
-  - Kategorie 1 (INFLOW, ALTMASSE)
-  - Kategorie 2 (INFLOW, NEUMASSE)
-  = Summe Einzahlungen
-
-Auszahlungen
-  - Kategorie 3 (OUTFLOW, ALTMASSE)
-  - Kategorie 4 (OUTFLOW, NEUMASSE)
-  = Summe Auszahlungen
-
-Cashflow (vor Insolvenzeffekten) = Einzahlungen - Auszahlungen
-
-Insolvenzeffekte
-  + Anfechtungen
-  - Verfahrenskosten
-  = Summe Insolvenzeffekte
-
-Cashflow (nach Insolvenzeffekten) = Cashflow + Insolvenzeffekte
-
-Endbestand = Anfangsbestand + Cashflow
-
-→ Endbestand Woche n = Anfangsbestand Woche n+1
-```
-
-#### Ansichten
-- IST-Werte: Tatsächliche Zahlungen (vergangene Wochen)
-- PLAN-Werte: Prognostizierte Zahlungen (zukünftige Wochen)
-- Vergleich IST/PLAN mit Abweichungen
+> **Gelöscht in v2.47.0 (ADR-060).** Das alte `ConfigurableDashboard` mit `EditableCategoryTable` wurde durch `UnifiedCaseDashboard` ersetzt (seit v2.29.0). Die aktive Dashboard-Ansicht läuft über `/admin/cases/[id]/results` mit LedgerEntry-Aggregation statt CashflowCategory/Line/PeriodValue.
+>
+> Zugehörige Legacy API-Routen ebenfalls gelöscht: `plan/categories`, `plan/lines`, `plan/values`, `plan/opening-balance`.
 
 ---
 
@@ -1854,10 +1766,10 @@ Zusätzlich am Plan hängend:
 - `PUT /api/cases/[id]` - Fall aktualisieren
 - `DELETE /api/cases/[id]` - Fall archivieren/löschen
 
-### Konfiguration
-- `GET /api/cases/[id]/config` - Dashboard-Konfiguration
-- `PUT /api/cases/[id]/config` - Konfiguration speichern
-- `DELETE /api/cases/[id]/config` - Auf Standard zurücksetzen
+### ~~Konfiguration~~ ENTFERNT (v2.47.0)
+- ~~`GET /api/cases/[id]/config`~~ - Gelöscht (ADR-060)
+- ~~`PUT /api/cases/[id]/config`~~ - Gelöscht (ADR-060)
+- ~~`DELETE /api/cases/[id]/config`~~ - Gelöscht (ADR-060)
 
 ### Import
 - `POST /api/ingestion` - Datei hochladen
@@ -1873,7 +1785,7 @@ Zusätzlich am Plan hängend:
 
 ### Dashboard-Daten
 - `GET /api/cases/[id]/dashboard` - Berechnete Daten
-- `GET /api/cases/[id]/plan/categories` - Kategorien + Lines
+- ~~`GET /api/cases/[id]/plan/categories`~~ - Gelöscht (v2.47.0, ADR-060)
 - `GET /api/cases/[id]/data-quality` - Datenqualitäts-Metriken (Block 1)
 - `GET/POST/DELETE /api/cases/[id]/plan/assumptions` - Berechnungsannahmen (Block 2)
 - `GET /api/cases/[id]/forecast/assumptions` - Prognose-Annahmen (Block 3)

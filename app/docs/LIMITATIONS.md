@@ -163,6 +163,16 @@ Bei aktivem Standort-Filter werden unklassifizierte Entries komplett ausgeblende
 `COUNTERPARTY_TAG_MAP` und `QUARTAL_CHECK_TAGS` liegen in der case-spezifischen `matrix-config.ts`. Jeder neue Fall muss seine eigene Map pflegen. Ohne Map laufen Check 1–3 leer (= „allPassed", keine Fehler erkannt).
 **Workaround:** Beim Onboarding neuer Fälle `COUNTERPARTY_TAG_MAP` in der matrix-config anlegen.
 
+### Datenqualitäts-Checks: Check 6 Schwellwert ist global
+
+Check 6 (Gegenparteien ohne Match-Pattern) nutzt eine feste Schwelle von 5 Entries. CPs mit 1-4 Entries werden nie gewarnt, auch wenn sie falsch zugeordnet sind. Die Schwelle ist nicht pro Fall konfigurierbar.
+**Workaround:** Manuell CPs mit <5 Entries prüfen, wenn Verdacht auf Fehlzuordnung besteht.
+
+### Keine automatische Lokal↔Turso Synchronisierung
+
+Daten-Imports und Script-Ausführungen schreiben nur in die lokale SQLite-DB. Der Sync zu Turso-Production muss manuell erfolgen. Es gibt keine automatische Drift-Erkennung.
+**Workaround:** Nach jedem Import/Script: Entry-Count-Abgleich zwischen lokaler DB und Turso (ADR-056). Langfristig automatisierten Check im Dashboard einbauen.
+
 ### Datenqualitäts-Checks: Check 3 nur für KV-Buchungen
 
 estateAllocation-Quartal-Check gilt nur für `categoryTag = 'KV'`. HZV und PVS haben andere Abrechnungsregeln (Vormonat bzw. Behandlungsdatum), die nicht durch einfache Quartal-Logik validierbar sind.
@@ -315,4 +325,4 @@ Rebranding zu "Gradify Cases | Structured Case Management" mit OG-Image für Soc
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.42.0)
+**Letzte Aktualisierung:** 2026-02-13 (v2.47.0)

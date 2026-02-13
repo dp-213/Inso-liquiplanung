@@ -664,7 +664,7 @@ export default function UnifiedCaseDashboard({
         return (
           <div className="space-y-6">
             {caseId ? (
-              <IstPlanComparisonTable caseId={caseId} />
+              <IstPlanComparisonTable caseId={caseId} scope={scope} />
             ) : (
               <div className="admin-card p-6 text-center text-gray-500">
                 Case-ID nicht verfügbar

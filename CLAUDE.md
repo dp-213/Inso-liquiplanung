@@ -285,6 +285,19 @@ cd app && npm run build
 | `importRowNumber === 0` ist falsy | JavaScript: `0` ist falsy! Bei Bedingungen `!== null` oder `!== undefined` verwenden, NICHT `if (value)` |
 | AI-extrahierte IBANs/Beträge falsch | AI halluziniert regelmäßig IBANs, Kontonummern, Beträge! **JEDES** PDF einzeln lesen und Cent-genau gegen JSON prüfen. Incident 12.02: 100% der 19 IBANs waren fabriziert! (ADR-042) |
 | Prisma Date-Filter auf Turso liefert 0 Ergebnisse | `@prisma/adapter-libsql` v6.19.2 Bug: `transactionDate: { gte, lte }` in Prisma WHERE funktioniert NICHT auf Turso! Date-Filter IMMER in JS statt Prisma. Siehe ADR-046. `grep -r "Turso adapter date comparison bug"` |
+| Lokale DB-Änderung in falscher Datei | **Lokale DB ist `app/dev.db`**, NICHT `app/prisma/dev.db`! `DATABASE_URL="file:./dev.db"` ist relativ zu `app/`. Falls `prisma/dev.db` existiert → löschen, ist ein Artefakt. Bei `sqlite3`-Befehlen IMMER Pfad `app/dev.db` verwenden. |
+| Daten nur lokal importiert, Turso vergessen | **NACH JEDEM Import/Script: Turso-Sync prüfen!** Entry-Count vergleichen: `sqlite3 app/dev.db "SELECT COUNT(*) FROM ledger_entries WHERE valueType='IST'"` vs. `turso db shell inso-liquiplanung-v2 "SELECT COUNT(*) FROM ledger_entries WHERE valueType='IST'"`. Incident 13.02: 47 Entries, 91 CPs, 56 Breakdowns nur lokal! (ADR-056) |
+
+### 🚨 PFLICHT: Turso-Synchronisation nach Daten-Änderungen
+
+**Nach JEDEM lokalen Daten-Import oder Script das Daten schreibt:**
+
+1. **Count-Abgleich:** `SELECT COUNT(*) FROM ledger_entries WHERE valueType='IST'` auf BEIDEN DBs
+2. **Bei Differenz:** Sofort synchronisieren (lokal → Turso), nie ignorieren
+3. **Betroffene Tabellen prüfen:** `ledger_entries`, `counterparties`, `payment_breakdown_items`, `payment_breakdown_sources`
+4. **Sync-Methode:** `sqlite3 app/dev.db ".mode insert" "SELECT * FROM table WHERE ..."` → `turso db shell` pipen
+
+**Daten sind die heilige Kuh!** Stiller Drift zwischen lokal und Turso ist gefährlicher als lauter Fehler. (ADR-056)
 
 ### Daten-Import Sicherheitsregeln
 
@@ -294,10 +307,14 @@ cd app && npm run build
 3. Classification Engine NACH Import ausführen (ADR-028) – Import ohne Klassifikation ist unvollständig
 4. Bei Duplikaten: Clean Slate Re-Import (ADR-020) – NICHT selektiv löschen
 
+**NACH jedem Import prüfen:**
+5. **Turso-Sync!** Entry-Count lokal vs. Turso vergleichen und Differenz synchronisieren (siehe oben)
+
 **Import-Script Schwächen (bekannt):**
 - Kein File-Level-Tracking (keine ingestion_jobs-Referenz)
 - Nur exakter String-Match bei Description für Duplikat-Erkennung
 - Keine automatische Bankformat-Erkennung
+- Kein automatischer Turso-Sync (muss manuell erfolgen)
 
 ---
 

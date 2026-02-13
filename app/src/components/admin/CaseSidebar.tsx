@@ -74,8 +74,7 @@ export default function CaseSidebar({
       items: [
         { name: "Personal", href: `${base}/personal` },
         { name: "Kontakte", href: `${base}/kontakte` },
-        { name: "Banken & Sicherungsrechte", href: `${base}/banken-sicherungsrechte` },
-        { name: "Finanzierung", href: `${base}/finanzierung` },
+        { name: "Finanzierung & Banken", href: `${base}/finanzierung` },
         { name: "Insolvenzeffekte", href: `${base}/insolvency-effects` },
         { name: "Business-Logik", href: `${base}/business-logic` },
         { name: "Freie Planung", href: `${base}/planung` },

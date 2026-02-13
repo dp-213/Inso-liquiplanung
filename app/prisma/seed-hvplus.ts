@@ -107,32 +107,34 @@ const BANK_ACCOUNTS = [
 
 const PLANNING_GAPS = [
   {
-    categoryName: 'Dauerschuldverhältnisse',
+    title: 'Dauerschuldverhältnisse noch zu analysieren',
     source: 'Datenraum - noch zu analysieren',
     description:
       'Laufende Kosten (Miete, Strom, etc.) noch nicht aus Datenraum extrahiert. Quelle: Aufstellung Dauerschuldverhältnisse.xlsx',
-    riskLevel: 'high',
+    status: 'ANNAHME',
   },
   {
-    categoryName: 'Pre-Insolvency IST-Daten',
+    title: 'Pre-Insolvency IST-Daten fehlen',
     source: 'Sparkasse/apoBank Jan-Okt 2025',
     description:
       'Sparkasse/ApoBank Jan-Okt 2025 für Vergleich noch nicht importiert. Für IST vs PLAN Abweichungsanalyse erforderlich.',
-    riskLevel: 'medium',
+    status: 'ANNAHME',
   },
   {
-    categoryName: 'apoBank Vereinbarung',
+    title: 'apoBank Vereinbarung ausstehend',
     source: 'Verhandlungen laufend',
     description:
       'KEINE Vereinbarung mit apoBank - KV-Zahlungen für Uckerath/Eitorf evtl. blockiert. Status: Verhandlungen laufen.',
-    riskLevel: 'high', // Geändert von 'aggressive' - kritisches Risiko für Liquidität
+    status: 'ANNAHME',
+    linkedModule: 'banken',
   },
   {
-    categoryName: 'Dr. Martina Kamler',
+    title: 'Dr. Martina Kamler in IST-Daten verifizieren',
     source: 'LANR und hvg nummer.png',
     description:
       'Neu identifiziert aus LANR-Liste (Velbert, LANR 7729639) - in IST-Daten verifizieren ob HZV-Zahlungen eingehen.',
-    riskLevel: 'low',
+    status: 'ANNAHME',
+    linkedModule: 'personal',
   },
 ];
 
@@ -331,32 +333,33 @@ async function seed() {
     console.log(`   [CREATED] ${hvplusPlan.name} (${hvplusPlan.id})`);
   }
 
-  // 8. Create PlanningAssumptions (offene Lücken)
-  console.log('\n8. Erstelle offene Lücken (PlanningAssumptions)...');
+  // 8. Create PlanningAssumptions (Case-Level)
+  console.log('\n8. Erstelle Planungsannahmen (PlanningAssumptions)...');
 
   for (const gap of PLANNING_GAPS) {
     const existingGap = await prisma.planningAssumption.findFirst({
       where: {
-        planId: hvplusPlan.id,
-        categoryName: gap.categoryName,
+        caseId: hvplusCase.id,
+        title: gap.title,
       },
     });
 
     if (existingGap) {
-      console.log(`   [EXISTS] ${gap.categoryName}`);
+      console.log(`   [EXISTS] ${gap.title}`);
     } else {
       await prisma.planningAssumption.create({
         data: {
-          planId: hvplusPlan.id,
-          categoryName: gap.categoryName,
+          caseId: hvplusCase.id,
+          title: gap.title,
           source: gap.source,
           description: gap.description,
-          riskLevel: gap.riskLevel,
+          status: gap.status,
+          linkedModule: ('linkedModule' in gap) ? (gap as { linkedModule: string }).linkedModule : null,
           createdBy: 'seed-hvplus',
           updatedBy: 'seed-hvplus',
         },
       });
-      console.log(`   [CREATED] ${gap.categoryName}`);
+      console.log(`   [CREATED] ${gap.title}`);
     }
   }
 

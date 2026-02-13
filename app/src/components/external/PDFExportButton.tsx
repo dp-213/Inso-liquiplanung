@@ -975,14 +975,18 @@ export default function PDFExportButton({ data, pdfTexts }: PDFExportButtonProps
         yPos += 10;
 
         // Assumptions table
-        const assumptionHeaders = ["Position", "Informationsquelle", "Planungsprämisse", "Risiko"];
+        const assumptionHeaders = ["Annahme", "Quelle", "Beschreibung", "Status"];
+        const STATUS_LABELS: Record<string, string> = {
+          ANNAHME: "○ Annahme",
+          VERIFIZIERT: "✓ Verifiziert",
+          WIDERLEGT: "✗ Widerlegt",
+        };
         const assumptionData = data.assumptions.map((a) => {
-          const risk = RISK_CONFIG[a.riskLevel] || RISK_CONFIG.medium;
           return [
-            a.categoryName,
+            a.title || "",
             a.source,
             a.description,
-            `${risk.symbol} ${risk.label}`,
+            STATUS_LABELS[a.status || "ANNAHME"] || "–",
           ];
         });
 

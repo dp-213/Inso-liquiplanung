@@ -64,9 +64,6 @@ export async function GET(
               },
               orderBy: { displayOrder: "asc" },
             },
-            assumptions: {
-              orderBy: { categoryName: "asc" },
-            },
             insolvencyEffects: {
               where: { isActive: true },
               orderBy: [
@@ -79,6 +76,9 @@ export async function GET(
         },
         bankAccounts: {
           orderBy: { displayOrder: "asc" },
+        },
+        planningAssumptions: {
+          orderBy: [{ status: "asc" }, { createdAt: "desc" }],
         },
       },
     });
@@ -312,13 +312,14 @@ export async function GET(
         versionNumber: latestVersion?.versionNumber ?? 0,
         versionDate: latestVersion?.snapshotDate ?? null,
       },
-      // Planungsprämissen und Dokumentation
-      assumptions: plan.assumptions.map((a) => ({
+      // Planungsannahmen (Case-Level)
+      assumptions: (caseData.planningAssumptions || []).map((a) => ({
         id: a.id,
-        categoryName: a.categoryName,
+        title: a.title,
         source: a.source,
         description: a.description,
-        riskLevel: a.riskLevel,
+        status: a.status,
+        linkedModule: a.linkedModule,
         createdAt: a.createdAt.toISOString(),
         updatedAt: a.updatedAt.toISOString(),
       })),
