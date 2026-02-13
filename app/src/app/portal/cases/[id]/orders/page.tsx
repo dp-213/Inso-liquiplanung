@@ -32,7 +32,7 @@ export default async function PortalOrdersPage({ params }: PageProps) {
 
     if (!caseData) return <div>Fall nicht gefunden</div>;
 
-    // Orders laden (OHNE documentContent – wird nur via Download-API geladen)
+    // Orders laden (MIT ApprovalSteps für Chain-Darstellung)
     const orders = await prisma.order.findMany({
         where: { caseId },
         orderBy: { createdAt: "desc" },
@@ -57,6 +57,24 @@ export default async function PortalOrdersPage({ params }: PageProps) {
             rejectionReason: true,
             ledgerEntryId: true,
             createdAt: true,
+            approvalSteps: {
+                select: {
+                    id: true,
+                    roleNameSnapshot: true,
+                    approverNameSnapshot: true,
+                    sequenceSnapshot: true,
+                    status: true,
+                    decidedAt: true,
+                    comment: true,
+                    approvalRule: {
+                        select: {
+                            customerId: true,
+                            isRequired: true,
+                        },
+                    },
+                },
+                orderBy: { sequenceSnapshot: "asc" },
+            },
         },
     });
 
@@ -67,6 +85,14 @@ export default async function PortalOrdersPage({ params }: PageProps) {
 
     const pendingOrders = serializedOrders.filter((o: { status: string }) => o.status === "PENDING");
     const historyOrders = serializedOrders.filter((o: { status: string }) => o.status !== "PENDING");
+
+    // Zähle wie viele Anfragen auf DIESEN User warten
+    const myPendingCount = pendingOrders.filter((o: { approvalSteps?: Array<{ status: string; approvalRule: { customerId: string } }> }) => {
+        const steps = o.approvalSteps;
+        if (!steps || steps.length === 0) return true; // Legacy: alle sichtbar
+        const currentStep = steps.find((s: { status: string }) => s.status === "PENDING");
+        return currentStep?.approvalRule.customerId === session.customerId;
+    }).length;
 
     return (
         <div className="space-y-6">
@@ -82,6 +108,18 @@ export default async function PortalOrdersPage({ params }: PageProps) {
                 <h1 className="text-2xl font-bold text-[var(--foreground)]">Bestell- & Zahlfreigaben</h1>
             </div>
 
+            {/* Persönlicher Hinweis */}
+            {myPendingCount > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                    <p className="text-sm font-medium text-amber-800">
+                        {myPendingCount === 1
+                            ? "1 Anfrage wartet auf Ihre Freigabe"
+                            : `${myPendingCount} Anfragen warten auf Ihre Freigabe`
+                        }
+                    </p>
+                </div>
+            )}
+
             <CompanyTokenManager caseId={caseId} />
 
             <div className="admin-card overflow-hidden">
@@ -92,7 +130,7 @@ export default async function PortalOrdersPage({ params }: PageProps) {
                     </h3>
                 </div>
                 <div className="p-0">
-                    <OrderList orders={pendingOrders} caseId={caseId} isPending={true} />
+                    <OrderList orders={pendingOrders} caseId={caseId} isPending={true} currentUserId={session.customerId} />
                 </div>
             </div>
 
@@ -104,7 +142,7 @@ export default async function PortalOrdersPage({ params }: PageProps) {
                         </h3>
                     </div>
                     <div className="p-0">
-                        <OrderList orders={historyOrders} caseId={caseId} isPending={false} />
+                        <OrderList orders={historyOrders} caseId={caseId} isPending={false} currentUserId={session.customerId} />
                     </div>
                 </div>
             )}

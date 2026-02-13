@@ -49,6 +49,24 @@ export default async function AdminOrdersPage({ params }: PageProps) {
                 rejectionReason: true,
                 ledgerEntryId: true,
                 createdAt: true,
+                approvalSteps: {
+                    select: {
+                        id: true,
+                        roleNameSnapshot: true,
+                        approverNameSnapshot: true,
+                        sequenceSnapshot: true,
+                        status: true,
+                        decidedAt: true,
+                        comment: true,
+                        approvalRule: {
+                            select: {
+                                customerId: true,
+                                isRequired: true,
+                            },
+                        },
+                    },
+                    orderBy: { sequenceSnapshot: "asc" },
+                },
             },
         }),
         prisma.creditor.findMany({
@@ -90,7 +108,7 @@ export default async function AdminOrdersPage({ params }: PageProps) {
                     </h3>
                 </div>
                 <div className="p-0">
-                    <OrderList orders={pendingOrders} caseId={caseId} isPending={true} creditors={serializedCreditors} costCategories={serializedCostCategories} />
+                    <OrderList orders={pendingOrders} caseId={caseId} isPending={true} creditors={serializedCreditors} costCategories={serializedCostCategories} isAdmin={true} />
                 </div>
             </div>
 
@@ -102,7 +120,7 @@ export default async function AdminOrdersPage({ params }: PageProps) {
                         </h3>
                     </div>
                     <div className="p-0">
-                        <OrderList orders={historyOrders} caseId={caseId} isPending={false} creditors={serializedCreditors} costCategories={serializedCostCategories} />
+                        <OrderList orders={historyOrders} caseId={caseId} isPending={false} creditors={serializedCreditors} costCategories={serializedCostCategories} isAdmin={true} />
                     </div>
                 </div>
             )}

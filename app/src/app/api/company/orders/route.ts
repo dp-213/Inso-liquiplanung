@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { createApprovalSteps, hasApprovalChain } from "@/lib/approval-engine";
 
 // Maximale Dateigröße: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -180,7 +181,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Kein Auto-Approve: Normal als PENDING erstellen
+    // Kein Auto-Approve: Normal als PENDING erstellen + ggf. ApprovalSteps generieren
     const order = await prisma.order.create({
       data: {
         caseId: companyToken.caseId,
@@ -200,12 +201,22 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // ApprovalSteps generieren wenn Chain-Modus aktiv
+    const chainActive = await hasApprovalChain(companyToken.caseId);
+    let stepsCreated = 0;
+    if (chainActive) {
+      stepsCreated = await createApprovalSteps(order.id, companyToken.caseId, amountBigInt);
+    }
+
     const typeLabel = type === "BESTELLUNG" ? "Bestellanfrage" : "Zahlungsanfrage";
 
     return NextResponse.json({
       success: true,
       orderId: order.id,
-      message: `${typeLabel} erfolgreich eingereicht`,
+      stepsCreated,
+      message: stepsCreated > 0
+        ? `${typeLabel} eingereicht (${stepsCreated} Freigabestufen)`
+        : `${typeLabel} erfolgreich eingereicht`,
     });
 
   } catch (error) {

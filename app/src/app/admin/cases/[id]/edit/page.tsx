@@ -1,17 +1,9 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-interface PlanData {
-  id: string;
-  name: string;
-  periodType: string;
-  periodCount: number;
-  planStartDate: string;
-  description: string | null;
-}
+import { Trash2, Plus, Loader2 } from "lucide-react";
 
 interface CaseData {
   id: string;
@@ -20,8 +12,8 @@ interface CaseData {
   courtName: string;
   filingDate: string;
   openingDate: string | null;
-  cutoffDate: string | null;  // Stichtag für Alt/Neu-Masse
-  approvalThresholdCents: string | null; // BigInt als String
+  cutoffDate: string | null;
+  approvalThresholdCents: string | null;
   status: string;
   owner: { id: string; name: string; email: string };
   plans: Array<{
@@ -33,6 +25,22 @@ interface CaseData {
     description: string | null;
     isActive: boolean;
   }>;
+}
+
+interface ApprovalRuleData {
+  id: string;
+  roleName: string;
+  customerId: string;
+  thresholdCents: string;
+  sequence: number;
+  isRequired: boolean;
+  customer: { id: string; name: string; email: string };
+}
+
+interface CustomerOption {
+  id: string;
+  name: string;
+  email: string;
 }
 
 
@@ -54,9 +62,9 @@ export default function CaseEditPage({
     courtName: "",
     filingDate: "",
     openingDate: "",
-    cutoffDate: "",  // Stichtag für Alt/Neu-Masse
+    cutoffDate: "",
     status: "",
-    approvalThresholdEur: "",  // Freigabe-Schwellwert in EUR
+    approvalThresholdEur: "",
   });
   const [planFormData, setPlanFormData] = useState({
     name: "",
@@ -68,9 +76,62 @@ export default function CaseEditPage({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
 
+  // Freigabekette State
+  const [approvalRules, setApprovalRules] = useState<ApprovalRuleData[]>([]);
+  const [availableCustomers, setAvailableCustomers] = useState<CustomerOption[]>([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
+  const [rulesSaving, setRulesSaving] = useState(false);
+  const [newRule, setNewRule] = useState({ roleName: "", customerId: "", thresholdEur: "", isRequired: true });
+
+  const fetchApprovalRules = useCallback(async () => {
+    try {
+      setRulesLoading(true);
+      const res = await fetch(`/api/cases/${id}/approval-rules`);
+      if (res.ok) {
+        const data = await res.json();
+        setApprovalRules(data);
+      }
+    } catch (err) {
+      console.error("Error fetching approval rules:", err);
+    } finally {
+      setRulesLoading(false);
+    }
+  }, [id]);
+
+  const fetchCustomers = useCallback(async () => {
+    try {
+      // Lade Case-Owner + Kunden mit Zugang
+      const [caseRes, accessRes] = await Promise.all([
+        fetch(`/api/cases/${id}`),
+        fetch(`/api/cases/${id}/customers`),
+      ]);
+
+      const customers: CustomerOption[] = [];
+      if (caseRes.ok) {
+        const data = await caseRes.json();
+        if (data.owner) {
+          customers.push({ id: data.owner.id, name: data.owner.name, email: data.owner.email });
+        }
+      }
+      if (accessRes.ok) {
+        const accessData = await accessRes.json();
+        for (const acc of accessData) {
+          if (acc.isActive && acc.customer && !customers.some((c) => c.id === acc.customer.id)) {
+            customers.push({ id: acc.customer.id, name: acc.customer.name, email: acc.customer.email });
+          }
+        }
+      }
+      setAvailableCustomers(customers);
+    } catch (err) {
+      console.error("Error fetching customers:", err);
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchData();
-  }, [id]);
+    fetchApprovalRules();
+    fetchCustomers();
+  }, [id, fetchApprovalRules, fetchCustomers]);
 
   const fetchData = async () => {
     try {
@@ -97,7 +158,6 @@ export default function CaseEditPage({
             ? (Number(data.approvalThresholdCents) / 100).toFixed(2)
             : "",
         });
-        // Set plan data if active plan exists
         const activePlan = data.plans?.find((p: { isActive: boolean }) => p.isActive);
         if (activePlan) {
           setPlanFormData({
@@ -127,7 +187,6 @@ export default function CaseEditPage({
     setError(null);
 
     try {
-      // Save case data
       const approvalThresholdCents = formData.approvalThresholdEur
         ? Math.round(parseFloat(formData.approvalThresholdEur) * 100)
         : null;
@@ -153,7 +212,6 @@ export default function CaseEditPage({
         return;
       }
 
-      // Save plan settings
       const planRes = await fetch(`/api/cases/${id}/plan/settings`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -173,10 +231,66 @@ export default function CaseEditPage({
       }
 
       router.push(`/admin/cases/${id}`);
-    } catch (err) {
+    } catch {
       setError("Netzwerkfehler beim Speichern");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAddRule = async () => {
+    if (!newRule.roleName || !newRule.customerId || !newRule.thresholdEur) {
+      setError("Bitte alle Felder der neuen Freigabestufe ausfüllen");
+      return;
+    }
+
+    setRulesSaving(true);
+    setError(null);
+    try {
+      const nextSequence = approvalRules.length > 0
+        ? Math.max(...approvalRules.map((r) => r.sequence)) + 1
+        : 1;
+
+      const res = await fetch(`/api/cases/${id}/approval-rules`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roleName: newRule.roleName,
+          customerId: newRule.customerId,
+          thresholdCents: Math.round(parseFloat(newRule.thresholdEur) * 100),
+          sequence: nextSequence,
+          isRequired: newRule.isRequired,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Fehler beim Erstellen der Freigabestufe");
+        return;
+      }
+
+      setNewRule({ roleName: "", customerId: "", thresholdEur: "", isRequired: true });
+      fetchApprovalRules();
+    } catch {
+      setError("Netzwerkfehler");
+    } finally {
+      setRulesSaving(false);
+    }
+  };
+
+  const handleDeleteRule = async (ruleId: string) => {
+    setRulesSaving(true);
+    try {
+      const res = await fetch(`/api/cases/${id}/approval-rules?ruleId=${ruleId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        fetchApprovalRules();
+      }
+    } catch {
+      setError("Fehler beim Löschen");
+    } finally {
+      setRulesSaving(false);
     }
   };
 
@@ -199,7 +313,7 @@ export default function CaseEditPage({
         setError(data.error || "Fehler beim Löschen");
         setShowDeleteConfirm(false);
       }
-    } catch (err) {
+    } catch {
       setError("Netzwerkfehler beim Löschen");
     } finally {
       setSaving(false);
@@ -459,10 +573,148 @@ export default function CaseEditPage({
                 <li>• Ein LedgerEntry wird automatisch erstellt (PLAN, Neumasse)</li>
                 <li>• Der Status wird auf <strong>AUTO_APPROVED</strong> gesetzt</li>
                 <li>• Anfragen <strong>über</strong> dem Schwellwert bleiben zur manuellen Prüfung</li>
-                <li>• Beispiel: Schwellwert 500 € → Anfrage über 500 € = manuell</li>
               </ul>
             </div>
           </div>
+        </div>
+
+        {/* Freigabekette (Multi-Approval) */}
+        <div className="pt-6 border-t border-[var(--border)]">
+          <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">Freigabekette</h3>
+          <p className="text-sm text-[var(--muted)] mb-4">
+            Mehrstufige Freigabe: Jede Stufe muss sequenziell genehmigen. Ohne Regeln kann jeder Berechtigte direkt freigeben.
+          </p>
+
+          {rulesLoading ? (
+            <div className="flex items-center gap-2 text-sm text-[var(--muted)] py-4">
+              <Loader2 className="h-4 w-4 animate-spin" /> Lade Freigabekette...
+            </div>
+          ) : (
+            <>
+              {/* Bestehende Regeln */}
+              {approvalRules.length > 0 && (
+                <div className="overflow-x-auto mb-4">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-[var(--border)]">
+                        <th className="text-left py-2 px-3 font-medium text-[var(--muted)]">#</th>
+                        <th className="text-left py-2 px-3 font-medium text-[var(--muted)]">Rolle</th>
+                        <th className="text-left py-2 px-3 font-medium text-[var(--muted)]">Person</th>
+                        <th className="text-right py-2 px-3 font-medium text-[var(--muted)]">Ab Betrag</th>
+                        <th className="text-center py-2 px-3 font-medium text-[var(--muted)]">Pflicht</th>
+                        <th className="text-right py-2 px-3 font-medium text-[var(--muted)]"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {approvalRules.map((rule) => (
+                        <tr key={rule.id} className="border-b border-[var(--border)] hover:bg-gray-50">
+                          <td className="py-2 px-3 text-[var(--muted)]">{rule.sequence}</td>
+                          <td className="py-2 px-3 font-medium">{rule.roleName}</td>
+                          <td className="py-2 px-3">
+                            <div>{rule.customer.name}</div>
+                            <div className="text-xs text-[var(--muted)]">{rule.customer.email}</div>
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            {(Number(rule.thresholdCents) / 100).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            {rule.isRequired ? (
+                              <span className="text-green-600 font-medium">Ja</span>
+                            ) : (
+                              <span className="text-[var(--muted)]">Optional</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRule(rule.id)}
+                              disabled={rulesSaving}
+                              className="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                              title="Stufe entfernen"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {approvalRules.length === 0 && (
+                <div className="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-4 mb-4 text-center text-sm text-[var(--muted)]">
+                  Keine Freigabekette konfiguriert. Jeder Berechtigte kann direkt freigeben.
+                </div>
+              )}
+
+              {/* Neue Stufe hinzufügen */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-[var(--foreground)] mb-3">Neue Stufe hinzufügen</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+                  <div>
+                    <label className="block text-xs text-[var(--muted)] mb-1">Rolle</label>
+                    <input
+                      type="text"
+                      value={newRule.roleName}
+                      onChange={(e) => setNewRule({ ...newRule, roleName: e.target.value })}
+                      className="input-field text-sm"
+                      placeholder="z.B. IV, Sachwalter"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[var(--muted)] mb-1">Person</label>
+                    <select
+                      value={newRule.customerId}
+                      onChange={(e) => setNewRule({ ...newRule, customerId: e.target.value })}
+                      className="input-field text-sm"
+                    >
+                      <option value="">Auswählen...</option>
+                      {availableCustomers.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name} ({c.email})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[var(--muted)] mb-1">Ab Betrag (EUR)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={newRule.thresholdEur}
+                      onChange={(e) => setNewRule({ ...newRule, thresholdEur: e.target.value })}
+                      className="input-field text-sm"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={newRule.isRequired}
+                        onChange={(e) => setNewRule({ ...newRule, isRequired: e.target.checked })}
+                        className="rounded border-gray-300"
+                      />
+                      <span className="text-[var(--muted)]">Pflicht</span>
+                    </label>
+                  </div>
+                  <div>
+                    <button
+                      type="button"
+                      onClick={handleAddRule}
+                      disabled={rulesSaving || !newRule.roleName || !newRule.customerId || !newRule.thresholdEur}
+                      className="btn-primary text-sm w-full flex items-center justify-center gap-1 disabled:opacity-50"
+                    >
+                      {rulesSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                      Hinzufügen
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Plan Settings Section */}

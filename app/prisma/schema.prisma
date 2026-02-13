@@ -54,6 +54,7 @@ model Case {
   ivNotes              IVNote[]             // IV-Kommunikation (Notizen an Insolvenzverwalter)
   casePlanning         CasePlanning?        // Strukturierte Liquiditätsplanung (JSON)
   orders               Order[]              // Bestell- und Zahlfreigaben
+  approvalRules        ApprovalRule[]       // Mehrstufige Freigabekette
   companyTokens        CompanyToken[]       // Token-Zugänge für externe Firmen
   forecastScenarios    ForecastScenario[]   // Prognose-Szenarien
   paymentBreakdownSources PaymentBreakdownSource[] // Zahlbeleg-Aufschlüsselungen
@@ -417,6 +418,7 @@ model CustomerUser {
   caseAccess        CustomerCaseAccess[] // Additional access to other customers' cases
   sessions          CustomerSession[]
   auditLogs         CustomerAuditLog[]
+  approvalRules     ApprovalRule[]       // Zugewiesene Freigabe-Stufen
 
   @@index([email])
   @@index([isActive])
@@ -1079,6 +1081,7 @@ model Order {
   case            Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
   creditorRef     Creditor?     @relation(fields: [creditorId], references: [id], onDelete: SetNull)
   costCategory    CostCategory? @relation(fields: [costCategoryId], references: [id], onDelete: SetNull)
+  approvalSteps   ApprovalStep[] // Mehrstufige Freigabe-Schritte
 
   createdAt       DateTime @default(now())
 
@@ -1371,4 +1374,55 @@ model CaseContact {
 
   @@index([caseId])
   @@map("case_contacts")
+}
+
+// =============================================================================
+// APPROVAL CHAIN - Mehrstufige Freigabekette
+// =============================================================================
+
+// ApprovalRule - Definiert eine Stufe in der Freigabekette eines Falls
+model ApprovalRule {
+  id             String   @id @default(uuid())
+  caseId         String
+  roleName       String   // Freitext: "IV", "Sachwalter", "Investor", "Geschäftsführer"
+  customerId     String   // FK → CustomerUser (wer muss freigeben)
+  thresholdCents BigInt   // Ab welchem Betrag greift diese Stufe (in Cent)
+  sequence       Int      // Reihenfolge: 1, 2, 3...
+  isRequired     Boolean  @default(true)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  case           Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  customer       CustomerUser @relation(fields: [customerId], references: [id])
+  approvalSteps  ApprovalStep[]
+
+  @@index([caseId])
+  @@unique([caseId, sequence])
+  @@map("approval_rules")
+}
+
+// ApprovalStep - Einzelner Freigabe-Schritt für eine Order (revisionssicher)
+model ApprovalStep {
+  id             String    @id @default(uuid())
+  orderId        String
+  approvalRuleId String
+
+  // Snapshots der Rule zum Zeitpunkt der Step-Erstellung (revisionssicher)
+  roleNameSnapshot     String   // Kopie von Rule.roleName
+  thresholdSnapshot    BigInt   // Kopie von Rule.thresholdCents
+  sequenceSnapshot     Int      // Kopie von Rule.sequence
+  approverNameSnapshot String   // Name des zugewiesenen Approvers zum Zeitpunkt
+
+  status         String    @default("PENDING") // PENDING, APPROVED, REJECTED, SKIPPED
+  decidedAt      DateTime?
+  decidedBy      String?   // CustomerUser ID der tatsächlich entschieden hat
+  comment        String?
+  createdAt      DateTime  @default(now())
+
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  approvalRule   ApprovalRule @relation(fields: [approvalRuleId], references: [id])
+
+  @@index([orderId])
+  @@unique([orderId, approvalRuleId])
+  @@map("approval_steps")
 }

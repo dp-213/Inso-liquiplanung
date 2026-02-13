@@ -6,6 +6,20 @@ import { Check, X, FileText, Loader2, AlertCircle, ShoppingCart, CreditCard, Dow
 import { RejectionModal } from "./RejectionModal";
 import { ApprovalModal } from "./ApprovalModal";
 
+interface ApprovalStepData {
+    id: string;
+    roleNameSnapshot: string;
+    approverNameSnapshot: string;
+    sequenceSnapshot: number;
+    status: string;
+    decidedAt: string | null;
+    comment: string | null;
+    approvalRule: {
+        customerId: string;
+        isRequired: boolean;
+    };
+}
+
 interface SerializedOrder {
     id: string;
     type: string;
@@ -22,6 +36,7 @@ interface SerializedOrder {
     status: string;
     createdAt: string;
     rejectionReason?: string | null;
+    approvalSteps?: ApprovalStepData[];
 }
 
 interface CreditorRef {
@@ -42,13 +57,15 @@ interface OrderListProps {
     isPending: boolean;
     creditors?: CreditorRef[];
     costCategories?: CostCategoryRef[];
+    isAdmin?: boolean;
+    currentUserId?: string;
 }
 
 type SortField = "date" | "amount" | "creditor";
 type SortDir = "asc" | "desc";
 type TypeFilter = "ALL" | "BESTELLUNG" | "ZAHLUNG";
 
-export function OrderList({ orders, caseId, isPending, creditors = [], costCategories = [] }: OrderListProps) {
+export function OrderList({ orders, caseId, isPending, creditors = [], costCategories = [], isAdmin = false, currentUserId }: OrderListProps) {
     const router = useRouter();
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [rejectingOrder, setRejectingOrder] = useState<SerializedOrder | null>(null);
@@ -129,6 +146,28 @@ export function OrderList({ orders, caseId, isPending, creditors = [], costCateg
         );
     }
 
+    function canApproveOrder(order: SerializedOrder): boolean {
+        const steps = order.approvalSteps;
+        if (!steps || steps.length === 0) return true; // Legacy-Modus: jeder kann
+        if (isAdmin) return true; // Admin kann immer
+        if (!currentUserId) return false;
+
+        // Finde den aktuellen PENDING Step
+        const currentStep = steps.find(s => s.status === "PENDING");
+        if (!currentStep) return false;
+        return currentStep.approvalRule.customerId === currentUserId;
+    }
+
+    function getChainStatusLabel(order: SerializedOrder): string | null {
+        const steps = order.approvalSteps;
+        if (!steps || steps.length === 0) return null;
+
+        const currentStep = steps.find(s => s.status === "PENDING");
+        if (!currentStep) return null;
+
+        return `Warte auf ${currentStep.roleNameSnapshot} (${currentStep.approverNameSnapshot})`;
+    }
+
     function openApproveModal(order: SerializedOrder) {
         setApprovingOrder(order);
         setIsApprovalModalOpen(true);
@@ -149,12 +188,15 @@ export function OrderList({ orders, caseId, isPending, creditors = [], costCateg
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
             });
-            if (!res.ok) throw new Error("Fehler beim Freigeben");
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || "Fehler beim Freigeben");
+            }
             setIsApprovalModalOpen(false);
             setApprovingOrder(null);
             router.refresh();
         } catch (err) {
-            alert("Fehler: " + err);
+            alert("Fehler: " + (err instanceof Error ? err.message : err));
         } finally {
             setProcessingId(null);
         }
@@ -176,13 +218,16 @@ export function OrderList({ orders, caseId, isPending, creditors = [], costCateg
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ reason }),
             });
-            if (!res.ok) throw new Error("Fehler beim Ablehnen");
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || "Fehler beim Ablehnen");
+            }
 
             setIsRejectionModalOpen(false);
             setRejectingOrder(null);
             router.refresh();
         } catch (err) {
-            alert("Fehler: " + err);
+            alert("Fehler: " + (err instanceof Error ? err.message : err));
         } finally {
             setProcessingId(null);
         }
@@ -222,6 +267,7 @@ export function OrderList({ orders, caseId, isPending, creditors = [], costCateg
                     onConfirm={handleApprove}
                     isProcessing={processingId === approvingOrder.id}
                     order={approvingOrder}
+                    approvalSteps={approvingOrder.approvalSteps}
                 />
             )}
 
@@ -307,6 +353,10 @@ export function OrderList({ orders, caseId, isPending, creditors = [], costCateg
                             const approvedAmount = order.approvedAmountCents ? Number(order.approvedAmountCents) / 100 : null;
                             const isProcessing = processingId === order.id;
                             const fmt = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
+                            const steps = order.approvalSteps;
+                            const hasChain = steps && steps.length > 0;
+                            const chainLabel = getChainStatusLabel(order);
+                            const userCanApprove = canApproveOrder(order);
 
                             return (
                                 <tr key={order.id} className={`transition-colors duration-150 ${isPending ? "hover:bg-amber-50/30" : "bg-gray-50/50"}`}>
@@ -350,6 +400,26 @@ export function OrderList({ orders, caseId, isPending, creditors = [], costCateg
                                                 <span>{order.rejectionReason}</span>
                                             </div>
                                         )}
+                                        {/* Approval-Chain Fortschritt */}
+                                        {hasChain && (
+                                            <div className="mt-2 flex flex-wrap items-center gap-1">
+                                                {steps.map((step, idx) => (
+                                                    <span key={step.id} className="inline-flex items-center">
+                                                        {idx > 0 && <span className="text-gray-300 mx-0.5">&rarr;</span>}
+                                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                                            step.status === "APPROVED" ? "bg-green-100 text-green-700" :
+                                                            step.status === "REJECTED" ? "bg-red-100 text-red-700" :
+                                                            step.status === "SKIPPED" ? "bg-gray-100 text-gray-400 line-through" :
+                                                            "bg-amber-100 text-amber-700"
+                                                        }`}>
+                                                            {step.status === "APPROVED" && <Check className="h-2.5 w-2.5 mr-0.5" />}
+                                                            {step.status === "REJECTED" && <X className="h-2.5 w-2.5 mr-0.5" />}
+                                                            {step.roleNameSnapshot}
+                                                        </span>
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
                                         <div className="font-bold text-gray-900">
@@ -384,26 +454,32 @@ export function OrderList({ orders, caseId, isPending, creditors = [], costCateg
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                         {isPending ? (
-                                            <div className="flex justify-end space-x-2">
-                                                <button
-                                                    onClick={() => openApproveModal(order)}
-                                                    disabled={isProcessing}
-                                                    className="group flex items-center justify-center p-2 rounded-full text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-700 transition-all shadow-sm hover:shadow active:scale-95 disabled:opacity-50 disabled:shadow-none"
-                                                    title="Freigeben"
-                                                >
-                                                    {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
-                                                    <span className="sr-only">Freigeben</span>
-                                                </button>
-                                                <button
-                                                    onClick={() => openRejectModal(order)}
-                                                    disabled={isProcessing}
-                                                    className="group flex items-center justify-center p-2 rounded-full text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 transition-all shadow-sm hover:shadow active:scale-95 disabled:opacity-50 disabled:shadow-none"
-                                                    title="Ablehnen"
-                                                >
-                                                    <X className="h-5 w-5" />
-                                                    <span className="sr-only">Ablehnen</span>
-                                                </button>
-                                            </div>
+                                            userCanApprove ? (
+                                                <div className="flex justify-end space-x-2">
+                                                    <button
+                                                        onClick={() => openApproveModal(order)}
+                                                        disabled={isProcessing}
+                                                        className="group flex items-center justify-center p-2 rounded-full text-green-600 bg-green-50 hover:bg-green-100 hover:text-green-700 transition-all shadow-sm hover:shadow active:scale-95 disabled:opacity-50 disabled:shadow-none"
+                                                        title="Freigeben"
+                                                    >
+                                                        {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />}
+                                                        <span className="sr-only">Freigeben</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => openRejectModal(order)}
+                                                        disabled={isProcessing}
+                                                        className="group flex items-center justify-center p-2 rounded-full text-red-600 bg-red-50 hover:bg-red-100 hover:text-red-700 transition-all shadow-sm hover:shadow active:scale-95 disabled:opacity-50 disabled:shadow-none"
+                                                        title="Ablehnen"
+                                                    >
+                                                        <X className="h-5 w-5" />
+                                                        <span className="sr-only">Ablehnen</span>
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                                                    {chainLabel || "Ausstehend"}
+                                                </span>
+                                            )
                                         ) : (
                                             <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${
                                                 order.status === "APPROVED"

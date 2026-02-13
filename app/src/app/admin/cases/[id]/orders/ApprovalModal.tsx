@@ -3,6 +3,18 @@
 import { useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 
+interface ApprovalStepData {
+    id: string;
+    roleNameSnapshot: string;
+    approverNameSnapshot: string;
+    sequenceSnapshot: number;
+    status: string;
+    approvalRule: {
+        customerId: string;
+        isRequired: boolean;
+    };
+}
+
 interface ApprovalModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -14,6 +26,7 @@ interface ApprovalModalProps {
         amountCents: string | number;
         type: string;
     };
+    approvalSteps?: ApprovalStepData[];
 }
 
 export function ApprovalModal({
@@ -22,6 +35,7 @@ export function ApprovalModal({
     onConfirm,
     isProcessing,
     order,
+    approvalSteps,
 }: ApprovalModalProps) {
     const originalAmount = Number(order.amountCents) / 100;
     const [useCustomAmount, setUseCustomAmount] = useState(false);
@@ -31,6 +45,22 @@ export function ApprovalModal({
 
     const fmt = new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" });
     const typeLabel = order.type === "BESTELLUNG" ? "Bestellanfrage" : "Zahlungsanfrage";
+
+    // Chain-Info
+    const steps = approvalSteps ?? [];
+    const hasChain = steps.length > 0;
+    const currentStep = hasChain ? steps.find(s => s.status === "PENDING") : null;
+    const totalSteps = steps.length;
+    const currentStepIndex = currentStep
+        ? steps.findIndex(s => s.id === currentStep.id) + 1
+        : 0;
+    const remainingPending = hasChain
+        ? steps.filter(s => s.status === "PENDING" && s.approvalRule.isRequired).length
+        : 0;
+    const isLastStep = remainingPending <= 1;
+    const nextStep = hasChain && !isLastStep
+        ? steps.find(s => s.status === "PENDING" && s.id !== currentStep?.id && s.approvalRule.isRequired)
+        : null;
 
     function handleConfirm() {
         if (useCustomAmount) {
@@ -65,6 +95,40 @@ export function ApprovalModal({
                                     Angefragter Betrag: <span className="font-bold text-gray-900">{fmt.format(originalAmount)}</span>
                                 </div>
                             </div>
+
+                            {/* Chain-Info */}
+                            {hasChain && currentStep && (
+                                <div className="mt-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                    <div className="text-sm font-medium text-blue-800">
+                                        Stufe {currentStepIndex} von {totalSteps}: {currentStep.roleNameSnapshot}
+                                    </div>
+                                    <div className="text-xs text-blue-600 mt-1">
+                                        {isLastStep ? (
+                                            "Nach Ihrer Freigabe wird die Zahlung ausgeführt."
+                                        ) : nextStep ? (
+                                            `Nach Ihrer Freigabe geht die Anfrage weiter an ${nextStep.roleNameSnapshot} (${nextStep.approverNameSnapshot}).`
+                                        ) : (
+                                            "Nach Ihrer Freigabe wird die Zahlung ausgeführt."
+                                        )}
+                                    </div>
+                                    {/* Step-Leiste */}
+                                    <div className="flex items-center gap-1 mt-2">
+                                        {steps.map((step, idx) => (
+                                            <span key={step.id} className="inline-flex items-center">
+                                                {idx > 0 && <span className="text-blue-300 mx-0.5">&rarr;</span>}
+                                                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                                                    step.status === "APPROVED" ? "bg-green-100 text-green-700" :
+                                                    step.status === "PENDING" && step.id === currentStep.id ? "bg-amber-200 text-amber-800 ring-1 ring-amber-400" :
+                                                    "bg-gray-100 text-gray-400"
+                                                }`}>
+                                                    {step.status === "APPROVED" && <Check className="inline h-2.5 w-2.5 mr-0.5" />}
+                                                    {step.roleNameSnapshot}
+                                                </span>
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="mt-4 border-t pt-4">
                                 <label className="flex items-center gap-2 text-sm cursor-pointer">
