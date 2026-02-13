@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.41.0
+**Version:** 2.42.0
 **Stand:** 12. Februar 2026
 
 ---
@@ -500,6 +500,7 @@ LedgerEntry (UNREVIEWED)
 |----------|---------|--------------|
 | `/api/cases/[id]/kontobewegungen` | GET | IST-Buchungen gruppiert nach Kontentyp/Standort/Monat |
 | `/api/cases/[id]/zahlungsverifikation` | GET | SOLL/IST-Abgleich pro Planungsperiode mit Ampel |
+| `/api/cases/[id]/validate-consistency` | GET | Datenqualitäts-Check (5 Prüfungen: Tag↔CP, Estate↔Quartal, Pattern, Orphans) |
 
 ### Klassifikation APIs
 
@@ -587,6 +588,10 @@ Workflow:
 │   │   │   ├── CaseSidebarDrawer.tsx # Mobile Drawer-Wrapper (v2.35.0)
 │   │   │   ├── MobileCaseHeader.tsx  # Sticky Mobile Case-Header (v2.35.0)
 │   │   │   └── TableToolbar.tsx      # Such-Toolbar + SortableHeader für CRUD-Listen (v2.40.0)
+│   │   ├── dashboard/
+│   │   │   ├── DataQualityBanner.tsx  # Datenqualitäts-Prüfung (rot/amber/hidden) (v2.42.0)
+│   │   │   ├── UnifiedCaseDashboard.tsx # Haupt-Dashboard
+│   │   │   └── UnklarRiskBanner.tsx    # UNKLAR-Risiko-Banner
 │   │   ├── forecast/               # Prognose-Spreadsheet (v2.31.0)
 │   │   │   ├── types.ts            # Shared Types + Helpers (formatEUR, parseCentsFromEUR, cn)
 │   │   │   ├── ForecastSpreadsheet.tsx   # Unified-Tabelle (IST + Prognose)
@@ -611,7 +616,8 @@ Workflow:
 │       │   └── allocation.ts         # Estate Allocation, AllocationSource
 │       ├── cases/                    # Case-spezifische Konfigurationen
 │       │   └── haevg-plus/           # HAEVG PLUS eG
-│       │       └── config.ts         # Abrechnungsstellen, Banken, Split-Regeln
+│       │       ├── config.ts         # Abrechnungsstellen, Banken, Split-Regeln
+│       │       └── matrix-config.ts  # Liquiditätsmatrix-Zeilen + COUNTERPARTY_TAG_MAP + Quartal-Regeln
 │       ├── forecast/                 # Prognose-Engine
 │       │   ├── engine.ts            # Cashflow-Berechnung aus Annahmen
 │       │   ├── load-and-calculate.ts # Laden + berechnen für Dashboard

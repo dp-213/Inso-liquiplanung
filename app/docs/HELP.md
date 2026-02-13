@@ -1,6 +1,6 @@
 # Hilfe & Anleitungen
 
-> Zuletzt aktualisiert: 2026-02-12 | Version 2.40.0
+> Zuletzt aktualisiert: 2026-02-12 | Version 2.42.0
 
 Dieses Dokument ist die **Source-of-Truth** für die Hilfe-Seite im Admin-Dashboard.
 Bei Änderungen am System wird diese Datei über `/doku` mit-aktualisiert.
@@ -226,6 +226,21 @@ PLAN ist der Legacy-Fallback. Er wird angezeigt, wenn:
 - Keine aktiven Annahmen vorhanden sind
 - Bei standortbezogenen Auswertungen (nur GLOBAL nutzt Forecast)
 
+### Datenqualität
+
+**Was ist das rote/gelbe Banner auf dem Dashboard?**
+Der automatische Datenqualitäts-Check prüft bei jedem Seitenaufruf 5 Konsistenzregeln:
+1. Gegenpartei ↔ Kategorie-Tag stimmen überein
+2. Buchungen mit Kategorie-Tag haben passende Gegenpartei
+3. Alt/Neu-Zuordnung passt zum Leistungszeitraum (nur KV)
+4. Buchungstexte passen zum Pattern der zugewiesenen Gegenpartei
+5. Alle referenzierten Stammdaten (Standort, Bankkonto, Gegenpartei) existieren
+
+Rot = Fehler (müssen korrigiert werden), Gelb = Warnungen (Hinweise). Klicken Sie auf „Details" und dann „Im Ledger zeigen →" um zur betroffenen Buchung zu navigieren.
+
+**Warum sehe ich „Check nicht verfügbar"?**
+Die API konnte nicht erreicht werden (z.B. Timeout). Klicken Sie auf „Erneut versuchen".
+
 ### Masse-Zuordnung
 
 **Wie wird entschieden, ob eine Zahlung Alt- oder Neumasse ist?**
@@ -279,6 +294,7 @@ Unter Fall bearbeiten → „Freigabe-Einstellungen" kann ein EUR-Betrag definie
 |---------|-----------|
 | **Altmasse** | Vermögenswerte und Verbindlichkeiten vor Insolvenzeröffnung |
 | **Closing Balance** | Endbestand einer Periode (Opening + Einzahlungen + Auszahlungen) |
+| **Datenqualitäts-Check** | Automatische Konsistenzprüfung auf dem Dashboard (5 Regeln, rot/gelb/versteckt) |
 | **Employee** | Mitarbeiter eines Falls mit Gehaltsdaten, Standort-Zuordnung und LANR |
 | **Eröffnungssaldo** | Kontostand zu Beginn des Planungszeitraums |
 | **FALLDATEN** | Sidebar-Sektion für fallspezifische Informationen (Personal, Kontakte, Banken, Finanzierung) |

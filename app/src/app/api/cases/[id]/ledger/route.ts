@@ -410,6 +410,25 @@ export async function GET(
       })),
     }));
 
+    // Dimensions-Lookup für Frontend einbetten (spart 3 separate API-Calls)
+    const [bankAccounts, counterparties, locations] = await Promise.all([
+      prisma.bankAccount.findMany({
+        where: { caseId },
+        select: { id: true, bankName: true, accountName: true },
+        orderBy: { displayOrder: 'asc' },
+      }),
+      prisma.counterparty.findMany({
+        where: { caseId },
+        select: { id: true, name: true },
+        orderBy: { displayOrder: 'asc' },
+      }),
+      prisma.location.findMany({
+        where: { caseId },
+        select: { id: true, name: true },
+        orderBy: { displayOrder: 'asc' },
+      }),
+    ]);
+
     return NextResponse.json({
       entries: response,
       totalCount: total,
@@ -417,6 +436,11 @@ export async function GET(
       totalOutflows: totalOutflows.toString(),
       netAmount: netAmount.toString(),
       transferVolume: transferVolume.toString(),
+      dimensions: {
+        bankAccounts,
+        counterparties,
+        locations,
+      },
       limit,
       offset,
     });

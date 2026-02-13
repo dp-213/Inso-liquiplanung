@@ -340,7 +340,46 @@ export default function CaseLedgerPage({
   const [sortBy, setSortBy] = useState<SortField>("transactionDate");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
-  const fetchData = useCallback(async () => {
+  // Statische Daten (Case, Intake-Stats, ImportJobs) - nur einmal beim Mount laden
+  const fetchStaticData = useCallback(async () => {
+    try {
+      const [caseRes, intakeRes, importJobsRes] = await Promise.all([
+        fetch(`/api/cases/${id}`, { credentials: 'include' }),
+        fetch(`/api/cases/${id}/intake`, { credentials: 'include' }),
+        fetch(`/api/cases/${id}/import-jobs`, { credentials: 'include' }),
+      ]);
+
+      if (caseRes.ok) {
+        const data = await caseRes.json();
+        setCaseData(data);
+      } else {
+        const errorData = await caseRes.json().catch(() => ({}));
+        if (caseRes.status === 401) {
+          setError("Nicht angemeldet - bitte neu einloggen");
+        } else if (caseRes.status === 404) {
+          setError("Fall nicht gefunden");
+        } else {
+          setError(errorData.error || `Fehler: ${caseRes.status}`);
+        }
+        return;
+      }
+
+      if (intakeRes.ok) {
+        const intakeData = await intakeRes.json();
+        setClassificationStats(intakeData);
+      }
+      if (importJobsRes.ok) {
+        const data = await importJobsRes.json();
+        setImportJobs(data.importJobs || []);
+      }
+    } catch (err) {
+      console.error("Error fetching static data:", err);
+      setError("Fehler beim Laden der Daten");
+    }
+  }, [id]);
+
+  // Dynamische Daten (Ledger-Entries + Dimensions) - bei jeder Filter-Änderung laden
+  const fetchEntries = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -368,30 +407,7 @@ export default function CaseLedgerPage({
       const queryString = queryParams.toString();
       const url = `/api/cases/${id}/ledger${queryString ? `?${queryString}` : ""}`;
 
-      const [caseRes, ledgerRes, intakeRes, bankRes, counterpartyRes, locationRes, importJobsRes] = await Promise.all([
-        fetch(`/api/cases/${id}`, { credentials: 'include' }),
-        fetch(url, { credentials: 'include' }),
-        fetch(`/api/cases/${id}/intake`, { credentials: 'include' }),
-        fetch(`/api/cases/${id}/bank-accounts`, { credentials: 'include' }),
-        fetch(`/api/cases/${id}/counterparties`, { credentials: 'include' }),
-        fetch(`/api/cases/${id}/locations`, { credentials: 'include' }),
-        fetch(`/api/cases/${id}/import-jobs`, { credentials: 'include' }),
-      ]);
-
-      if (caseRes.ok) {
-        const data = await caseRes.json();
-        setCaseData(data);
-      } else {
-        const errorData = await caseRes.json().catch(() => ({}));
-        if (caseRes.status === 401) {
-          setError("Nicht angemeldet - bitte neu einloggen");
-        } else if (caseRes.status === 404) {
-          setError("Fall nicht gefunden");
-        } else {
-          setError(errorData.error || `Fehler: ${caseRes.status}`);
-        }
-        return;
-      }
+      const ledgerRes = await fetch(url, { credentials: 'include' });
 
       if (ledgerRes.ok) {
         const data = await ledgerRes.json();
@@ -402,56 +418,70 @@ export default function CaseLedgerPage({
           totalOutflows: data.totalOutflows || "0",
           netAmount: data.netAmount || "0",
         });
+
+        // Dimensions aus Ledger-Response (spart 3 separate API-Calls)
+        if (data.dimensions) {
+          const { bankAccounts: ba, counterparties: cp, locations: loc } = data.dimensions;
+          if (ba) {
+            setBankAccountsList(ba);
+            const map = new Map<string, string>();
+            ba.forEach((acc: BankAccount) => map.set(acc.id, `${acc.bankName} - ${acc.accountName}`));
+            setBankAccountsMap(map);
+          }
+          if (cp) {
+            setCounterpartiesList(cp);
+            const map = new Map<string, string>();
+            cp.forEach((c: Counterparty) => map.set(c.id, c.name));
+            setCounterpartiesMap(map);
+          }
+          if (loc) {
+            setLocationsList(loc);
+            const map = new Map<string, string>();
+            loc.forEach((l: Location) => map.set(l.id, l.name));
+            setLocationsMap(map);
+          }
+        }
       } else {
         setError("Fehler beim Laden der Ledger-Einträge");
       }
-
-      // Lade Klassifikations-Statistiken
-      if (intakeRes.ok) {
-        const intakeData = await intakeRes.json();
-        setClassificationStats(intakeData);
-      }
-
-      // Lade Dimensionen für Name-Lookup
-      if (bankRes.ok) {
-        const data = await bankRes.json();
-        const accounts = data.accounts || [];
-        setBankAccountsList(accounts);
-        const map = new Map<string, string>();
-        accounts.forEach((acc: BankAccount) => map.set(acc.id, `${acc.bankName} - ${acc.accountName}`));
-        setBankAccountsMap(map);
-      }
-      if (counterpartyRes.ok) {
-        const data = await counterpartyRes.json();
-        const cps = data.counterparties || [];
-        setCounterpartiesList(cps);
-        const map = new Map<string, string>();
-        cps.forEach((cp: Counterparty) => map.set(cp.id, cp.name));
-        setCounterpartiesMap(map);
-      }
-      if (locationRes.ok) {
-        const data = await locationRes.json();
-        const locs = data.locations || [];
-        setLocationsList(locs);
-        const map = new Map<string, string>();
-        locs.forEach((loc: Location) => map.set(loc.id, loc.name));
-        setLocationsMap(map);
-      }
-      if (importJobsRes.ok) {
-        const data = await importJobsRes.json();
-        setImportJobs(data.importJobs || []);
-      }
     } catch (err) {
-      console.error("Error fetching data:", err);
+      console.error("Error fetching entries:", err);
       setError("Fehler beim Laden der Daten");
     } finally {
       setLoading(false);
     }
   }, [id, filterValueTypes, filterLegalBuckets, filterReviewStatuses, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountIds, filterCounterpartyIds, filterLocationIds, filterImportJobIds, filterEstateAllocations, filterCategoryTags, filterIsTransfer]);
 
+  // Kombifunktion für vollständiges Refresh (nach Mutationen)
+  const fetchData = useCallback(async () => {
+    await Promise.all([fetchStaticData(), fetchEntries()]);
+  }, [fetchStaticData, fetchEntries]);
+
+  // Mount: Statische Daten + Entries laden
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchStaticData();
+    fetchEntries();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Filter-Änderungen: Nur Entries neu laden (mit Debounce)
+  const filterDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isInitialMount = useRef(true);
+  useEffect(() => {
+    // Beim ersten Mount überspringen (wird oben bereits geladen)
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+    // Debounce: 400ms warten bis Filter sich stabilisieren
+    if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current);
+    filterDebounceRef.current = setTimeout(() => {
+      fetchEntries();
+    }, 400);
+    return () => {
+      if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current);
+    };
+  }, [fetchEntries]);
 
   // Debounce für globale Suche (300ms)
   useEffect(() => {

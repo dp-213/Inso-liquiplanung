@@ -4,6 +4,32 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.42.0 – Datenqualitäts-Checks & KV-Pattern-Fix
+
+**Datum:** 12. Februar 2026
+
+### Neue Funktionen
+
+- **Automatische Datenqualitäts-Prüfung:** Neuer API-Endpoint `/api/cases/[id]/validate-consistency` mit 5 deterministischen Checks:
+  1. **Gegenpartei ↔ Kategorie-Tag** (Fehler): Prüft ob Entries mit bekannter Counterparty den erwarteten categoryTag haben.
+  2. **Tag ohne Gegenpartei** (Warnung): Prüft ob Entries mit categoryTag (KV/HZV/PVS) die passende Counterparty zugewiesen haben.
+  3. **estateAllocation ↔ Leistungszeitraum** (Fehler): Prüft ob Alt/Neu-Zuordnung zum Quartal passt (nur KV). Datenquellen-Priorität: servicePeriodStart > serviceDate > Beschreibung-Regex.
+  4. **Pattern-Match-Validierung** (Warnung): Prüft ob Buchungstexte zum Regex-Pattern der zugewiesenen Gegenpartei passen.
+  5. **Verwaiste Dimensionen** (Fehler): Prüft ob alle referenzierten Standorte, Bankkonten und Gegenparteien in den Stammdaten existieren.
+- **DataQualityBanner:** Prominentes Dashboard-Banner (rot bei Fehlern, amber bei Warnungen, versteckt wenn alles OK). Aufklappbare Details mit „Im Ledger zeigen →"-Links. Loading-Skeleton, Error-State mit Retry-Button.
+- **Case-Config-Erweiterung:** `COUNTERPARTY_TAG_MAP`, `QUARTAL_CHECK_TAGS` und `getExpectedEstateAllocation()` in matrix-config.ts für deterministische Quartal-basierte Alt/Neu-Validierung.
+
+### Änderungen
+
+- **Sidebar-Restructuring:** Neue BESCHAFFUNG-Sektion (Bestellfreigaben + Kreditoren). Business-Logik nach PLANUNG verschoben. Geschäftskonten-Analyse in ANALYSE.
+
+### Bugfixes
+
+- **KV-Pattern False Positives behoben:** matchPattern von `(KV|KVNO|Kassenärztliche)` auf `(\bKV\b|KVNO|Kassenärztliche)` geändert. Verhindert fälschliche Matches auf „PKV Institut" und „ADAC...KV624910". Fix in matrix-config.ts, seed-hvplus.ts, lokaler DB und Turso.
+- **UTC-sichere Datumsvergleiche:** Quartal-Berechnung für estateAllocation-Check nutzt `getUTCMonth()`/`Date.UTC()` statt lokale Zeitzone.
+
+---
+
 ## Version 2.41.0 – Geschäftskonten-Analyse v2 (LiquidityMatrix-Style)
 
 **Datum:** 12. Februar 2026

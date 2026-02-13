@@ -221,48 +221,49 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Fall nicht gefunden' }, { status: 404 });
     }
 
-    // Zähle Entries nach Status
-    const [total, unreviewed, confirmed, adjusted] = await Promise.all([
-      prisma.ledgerEntry.count({ where: { caseId } }),
-      prisma.ledgerEntry.count({ where: { caseId, reviewStatus: 'UNREVIEWED' } }),
-      prisma.ledgerEntry.count({ where: { caseId, reviewStatus: 'CONFIRMED' } }),
-      prisma.ledgerEntry.count({ where: { caseId, reviewStatus: 'ADJUSTED' } }),
-    ]);
-
-    // Zähle Entries mit Klassifikations-Vorschlägen
-    const [withSuggestion, withoutSuggestion] = await Promise.all([
-      prisma.ledgerEntry.count({
-        where: { caseId, reviewStatus: 'UNREVIEWED', suggestedLegalBucket: { not: null } },
+    // 2 Queries statt 7: groupBy reviewStatus + groupBy suggestedLegalBucket
+    const [byReviewStatusRaw, bySuggestedBucketRaw] = await Promise.all([
+      prisma.ledgerEntry.groupBy({
+        by: ['reviewStatus'],
+        where: { caseId },
+        _count: true,
       }),
-      prisma.ledgerEntry.count({
-        where: { caseId, reviewStatus: 'UNREVIEWED', suggestedLegalBucket: null },
+      prisma.ledgerEntry.groupBy({
+        by: ['suggestedLegalBucket'],
+        where: { caseId, reviewStatus: 'UNREVIEWED' },
+        _count: true,
       }),
     ]);
 
-    // Zähle nach Legal Bucket
-    const byLegalBucket = await prisma.ledgerEntry.groupBy({
-      by: ['suggestedLegalBucket'],
-      where: { caseId, reviewStatus: 'UNREVIEWED' },
-      _count: true,
-    });
+    // Derive counts from groupBy results
+    const byReviewStatus: Record<string, number> = { UNREVIEWED: 0, CONFIRMED: 0, ADJUSTED: 0 };
+    let total = 0;
+    for (const row of byReviewStatusRaw) {
+      byReviewStatus[row.reviewStatus] = row._count;
+      total += row._count;
+    }
+
+    // Derive suggestion stats from suggestedLegalBucket groupBy
+    let withSuggestion = 0;
+    let withoutSuggestion = 0;
+    const byLegalBucket: Record<string, number> = {};
+    for (const row of bySuggestedBucketRaw) {
+      const key = row.suggestedLegalBucket || 'null';
+      byLegalBucket[key] = row._count;
+      if (row.suggestedLegalBucket === null) {
+        withoutSuggestion = row._count;
+      } else {
+        withSuggestion += row._count;
+      }
+    }
 
     return NextResponse.json({
       total,
-      byReviewStatus: {
-        UNREVIEWED: unreviewed,
-        CONFIRMED: confirmed,
-        ADJUSTED: adjusted,
-      },
+      byReviewStatus,
       classification: {
         withSuggestion,
         withoutSuggestion,
-        byLegalBucket: byLegalBucket.reduce(
-          (acc, item) => {
-            acc[item.suggestedLegalBucket || 'null'] = item._count;
-            return acc;
-          },
-          {} as Record<string, number>
-        ),
+        byLegalBucket,
       },
     });
   } catch (error) {

@@ -33,6 +33,7 @@
    - [4.16 Personal (Mitarbeiter)](#416-personal-mitarbeiter-v2390)
    - [4.17 Kontakte (Ansprechpartner)](#417-kontakte-ansprechpartner-v2390)
    - [4.18 Geschäftskonten-Analyse](#418-geschäftskonten-analyse-v2410)
+   - [4.19 Datenqualitäts-Checks](#419-datenqualitäts-checks-v2420)
 5. [Datenmodell-Diagramm](#5-datenmodell-diagramm)
 6. [Datenfluss: Import bis Anzeige](#6-datenfluss-import-bis-anzeige)
 
@@ -1534,6 +1535,77 @@ Monatliche Cashflow-Analyse aller Geschäftskonten (Bankkonten mit `isLiquidityR
 #### Datenquelle
 
 Alle LedgerEntries von Bankkonten mit `isLiquidityRelevant=false` (Geschäftskonten). Location-Zuordnung über `bankAccountId → bankAccount.locationId`. Kein Schema-spezifischer Filter (`allocationSource` wird ignoriert).
+
+---
+
+### 4.19 Datenqualitäts-Checks (v2.42.0)
+
+**API:** `GET /api/cases/[id]/validate-consistency`
+**Komponente:** `DataQualityBanner.tsx` (auf Case-Dashboard, oberhalb UnklarRiskBanner)
+
+#### Funktion
+
+Automatische Konsistenzprüfung aller IST-LedgerEntries eines Falls. Erkennt Inkonsistenzen zwischen Dimensionen (Counterparty ↔ Tag, Estate ↔ Quartal, Pattern ↔ Beschreibung) und verwaiste Referenzen.
+
+#### 5 Checks
+
+| # | Check | Severity | Beschreibung |
+|---|-------|----------|--------------|
+| 1 | Gegenpartei ↔ Kategorie-Tag | Fehler | Entries mit bekannter CP müssen erwarteten categoryTag haben (`COUNTERPARTY_TAG_MAP`) |
+| 2 | Tag ohne Gegenpartei | Warnung | Entries mit categoryTag (KV/HZV/PVS) sollten passende CP zugewiesen haben |
+| 3 | estateAllocation ↔ Quartal | Fehler | Alt/Neu-Zuordnung muss zum Leistungszeitraum passen (nur KV). Priorität: servicePeriodStart > serviceDate > Beschreibung-Regex |
+| 4 | Pattern-Match | Warnung | Buchungstext sollte zum matchPattern der zugewiesenen CP passen (manuelle Zuordnung = legitim) |
+| 5 | Verwaiste Dimensionen | Fehler | Alle referenzierten Location/BankAccount/Counterparty-IDs müssen in Stammdaten existieren |
+
+#### Konfiguration (case-spezifisch)
+
+In `lib/cases/haevg-plus/matrix-config.ts`:
+
+```typescript
+export const COUNTERPARTY_TAG_MAP: Record<string, string> = {
+  'cp-haevg-kv': 'KV',
+  'cp-kreiskasse-rhein-sieg': 'KV',
+  'cp-haevg-hzv': 'HZV',
+  'cp-haevg-pvs': 'PVS',
+};
+
+export const QUARTAL_CHECK_TAGS = ['KV'];
+
+export function getExpectedEstateAllocation(
+  servicePeriodStart: Date,
+  openingDate: Date
+): QuartalEstateRule { ... }
+```
+
+#### UI-Verhalten
+
+| Zustand | Darstellung |
+|---------|-------------|
+| Alle Checks bestanden | Kein Banner (versteckt) |
+| Nur Warnungen | Amber-Banner mit aufklappbaren Details |
+| Fehler vorhanden | Rotes Banner mit aufklappbaren Details |
+| API-Fehler | Graues Banner „Check nicht verfügbar" + Retry-Button |
+| Laden | Animiertes Skeleton |
+
+#### API-Response
+
+```json
+{
+  "caseId": "...",
+  "validatedAt": "2026-02-12T...",
+  "allPassed": false,
+  "summary": { "errors": 1, "warnings": 2, "passed": 2, "skipped": 3 },
+  "checks": {
+    "counterpartyTagConsistency": { "id": "...", "title": "...", "severity": "error", "passed": false, "checked": 45, "failed": 3, "skipped": 0, "items": [...] },
+    "tagWithoutCounterparty": { ... },
+    "estateAllocationQuarter": { ... },
+    "patternMatchValidation": { ... },
+    "orphanedDimensions": { ... }
+  }
+}
+```
+
+Max. 20 Items pro Check in der Response (`totalItems` zeigt Gesamtzahl).
 
 ---
 

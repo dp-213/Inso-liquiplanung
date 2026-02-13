@@ -158,6 +158,16 @@ Kunden ohne Slug können nicht über eine individuelle Subdomain zugreifen. Logi
 Bei aktivem Standort-Filter werden unklassifizierte Entries komplett ausgeblendet, da ihnen keine Location-Zuordnung möglich ist (kein `locationId` auf Entry-Ebene, und ohne Counterparty kann kein Location-Bezug hergestellt werden).
 **Workaround:** Standort-Filter deaktivieren um unklassifizierte Entries zu sehen.
 
+### Datenqualitäts-Checks: Case-spezifische Konfiguration erforderlich
+
+`COUNTERPARTY_TAG_MAP` und `QUARTAL_CHECK_TAGS` liegen in der case-spezifischen `matrix-config.ts`. Jeder neue Fall muss seine eigene Map pflegen. Ohne Map laufen Check 1–3 leer (= „allPassed", keine Fehler erkannt).
+**Workaround:** Beim Onboarding neuer Fälle `COUNTERPARTY_TAG_MAP` in der matrix-config anlegen.
+
+### Datenqualitäts-Checks: Check 3 nur für KV-Buchungen
+
+estateAllocation-Quartal-Check gilt nur für `categoryTag = 'KV'`. HZV und PVS haben andere Abrechnungsregeln (Vormonat bzw. Behandlungsdatum), die nicht durch einfache Quartal-Logik validierbar sind.
+**Status:** Bewusste Einschränkung, HZV/PVS-Checks bei Bedarf ergänzen.
+
 ### Zahlungsverifikation: Kein Drill-Down pro Kategorie
 
 SOLL/IST-Abgleich zeigt nur aggregierte Netto-Werte pro Periode. Aufschlüsselung nach einzelnen CashflowCategories oder Einnahmen/Ausgaben getrennt ist nicht verfügbar.
@@ -305,4 +315,4 @@ Rebranding zu "Gradify Cases | Structured Case Management" mit OG-Image für Soc
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-12 (v2.41.0)
+**Letzte Aktualisierung:** 2026-02-12 (v2.42.0)

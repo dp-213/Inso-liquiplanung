@@ -4,6 +4,50 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-053: Automatische Datenqualitäts-Checks als Dashboard-Banner
+
+**Datum:** 12. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+In der manuellen Datenprüfung wurden drei Kategorien von Inkonsistenzen gefunden:
+1. 12 KV-Entries mit `counterpartyId` aber ohne `categoryTag` → Altforderungen-Zeile in Matrix leer
+2. 2 Entries fälschlich als KV klassifiziert (PKV Institut, ADAC) weil Regex `(KV|KVNO|Kassenärztliche)` zu breit
+3. 5 KV-Entries mit falschem `estateAllocation` (Quartal nicht korrekt berücksichtigt)
+
+Kein System erkannte diese Probleme proaktiv – sie wurden erst zufällig bei der Matrix-Prüfung entdeckt.
+
+### Entscheidung
+
+Automatische, deterministische Konsistenzprüfung mit 5 Checks:
+
+1. **counterpartyId ↔ categoryTag** (Fehler): `COUNTERPARTY_TAG_MAP` definiert erwarteten Tag pro Counterparty
+2. **categoryTag ohne Counterparty** (Warnung): Inverse Prüfung
+3. **estateAllocation ↔ Leistungszeitraum** (Fehler): Quartal-basierte Validierung gegen `case.openingDate`, nur für `QUARTAL_CHECK_TAGS = ['KV']`
+4. **Pattern-Match-Validierung** (Warnung): Entry-Beschreibung gegen Counterparty-`matchPattern` (manuelle Zuordnung ist legitim)
+5. **Verwaiste Dimensionen** (Fehler): Alle referenzierten IDs müssen in Stammdaten existieren
+
+UI: `DataQualityBanner` auf Case-Dashboard (rot/amber/hidden), nach Vorbild `UnklarRiskBanner`.
+
+### Begründung
+
+1. **Case-spezifische Config:** `COUNTERPARTY_TAG_MAP` liegt in `matrix-config.ts` (bereits case-spezifisch). Jeder neue Fall bekommt seine eigene Map.
+2. **Deterministisch:** Keine Heuristiken, kein AI – reiner Regelabgleich gegen definierte Erwartungen.
+3. **Severity-Trennung:** Echte Fehler (Tag-Mismatch, falsche Masse-Zuordnung) vs. Warnungen (Pattern-Abweichung = manuelle Zuordnung möglich).
+4. **Leistungszeitraum-Priorität:** `servicePeriodStart` > `serviceDate` > Beschreibung-Regex (Fallback). Entries ohne bestimmbares Quartal werden als „skipped" gezählt, nicht als Fehler.
+5. **MIXED-Status:** Bei Quartal das Eröffnungsdatum enthält: Nur Status MIXED prüfen, Ratio nicht validieren (vertraglich, nicht geometrisch berechenbar).
+6. **KV-Pattern-Fix:** `\bKV\b` statt `KV` verhindert False Positives auf „PKV", „KV624910". Angewendet in matrix-config, seed-hvplus, lokaler DB und Turso.
+
+### Konsequenzen
+
+- Dashboard zeigt proaktiv Datenqualitätsprobleme
+- Neue Fälle brauchen eigene `COUNTERPARTY_TAG_MAP` in ihrer matrix-config
+- API-Response begrenzt auf max. 20 Items pro Check (Performance)
+- UTC-sichere Datumsvergleiche für Quartal-Berechnung
+
+---
+
 ## ADR-052: Geschäftskonten-Analyse filtert über isLiquidityRelevant statt allocationSource
 
 **Datum:** 12. Februar 2026
