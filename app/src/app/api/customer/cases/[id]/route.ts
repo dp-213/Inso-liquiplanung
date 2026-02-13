@@ -16,6 +16,7 @@ import {
   aggregateLedgerEntries,
   convertToLegacyFormat,
 } from "@/lib/ledger-aggregation";
+import { getDashboardMassekreditSummary } from "@/lib/credit/dashboard-massekredit-summary";
 
 // GET /api/customer/cases/[id] - Get case details and calculation
 export async function GET(
@@ -109,13 +110,16 @@ export async function GET(
     const periodType = (plan.periodType as PeriodType) || "WEEKLY";
     const periodCount = plan.periodCount || 13;
 
-    // Check if we have LedgerEntries for this case (new data model)
-    const ledgerEntryCount = await prisma.ledgerEntry.count({
-      where: {
-        caseId: caseData.id,
-        reviewStatus: { in: ["CONFIRMED", "ADJUSTED"] },
-      },
-    });
+    // Parallel: LedgerEntry count + Massekredit-Summary
+    const [ledgerEntryCount, massekreditResult] = await Promise.all([
+      prisma.ledgerEntry.count({
+        where: {
+          caseId: caseData.id,
+          reviewStatus: { in: ["CONFIRMED", "ADJUSTED"] },
+        },
+      }),
+      getDashboardMassekreditSummary(caseData.id),
+    ]);
 
     let result;
     let useLedgerAggregation = false;
@@ -362,6 +366,18 @@ export async function GET(
         };
       })(),
       ledgerStats,
+      // Massekredit-Summary für bereinigte Liquidität
+      massekreditSummary: massekreditResult ? {
+        hasBankAgreements: true,
+        altforderungenBruttoCents: massekreditResult.altforderungenBruttoCents.toString(),
+        fortfuehrungsbeitragCents: massekreditResult.fortfuehrungsbeitragCents.toString(),
+        fortfuehrungsbeitragUstCents: massekreditResult.fortfuehrungsbeitragUstCents.toString(),
+        massekreditAltforderungenCents: massekreditResult.massekreditAltforderungenCents.toString(),
+        hasUncertainBanks: massekreditResult.hasUncertainBanks,
+        bereinigteEndLiquiditaetCents: (
+          result.finalClosingBalanceCents - massekreditResult.massekreditAltforderungenCents
+        ).toString(),
+      } : undefined,
       calculation: {
         openingBalanceCents: result.openingBalanceCents.toString(),
         totalInflowsCents: result.totalInflowsCents.toString(),

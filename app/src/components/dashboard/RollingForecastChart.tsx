@@ -53,6 +53,8 @@ interface ForecastData {
 interface RollingForecastChartProps {
   caseId: string;
   scope?: "GLOBAL" | "LOCATION_VELBERT" | "LOCATION_UCKERATH_EITORF";
+  /** Bankforderungen als Referenzlinie (nur bei GLOBAL sinnvoll) */
+  bankClaimsCents?: bigint;
 }
 
 // Format currency
@@ -159,6 +161,7 @@ interface ChartDataPoint {
 export default function RollingForecastChart({
   caseId,
   scope = "GLOBAL",
+  bankClaimsCents,
 }: RollingForecastChartProps) {
   const pathname = usePathname();
   const isAdminContext = pathname?.startsWith("/admin");
@@ -233,10 +236,13 @@ export default function RollingForecastChart({
     return data.periods[data.todayPeriodIndex]?.periodLabel;
   }, [data]);
 
-  // Calculate min/max for Y axis
+  // Calculate min/max for Y axis (inkl. Bankforderungen-Linie falls vorhanden)
   const { minBalance, maxBalance } = useMemo(() => {
     if (chartData.length === 0) return { minBalance: 0, maxBalance: 100000 };
     const balances = chartData.map((d) => d.balance);
+    if (bankClaimsCents && bankClaimsCents > BigInt(0)) {
+      balances.push(Number(bankClaimsCents) / 100);
+    }
     const min = Math.min(...balances);
     const max = Math.max(...balances);
     const padding = (max - min) * 0.1 || 10000;
@@ -244,7 +250,7 @@ export default function RollingForecastChart({
       minBalance: min - padding,
       maxBalance: max + padding,
     };
-  }, [chartData]);
+  }, [chartData, bankClaimsCents]);
 
   if (loading) {
     return (
@@ -364,6 +370,24 @@ export default function RollingForecastChart({
                   fill: "#f59e0b",
                   fontSize: 11,
                   fontWeight: 600,
+                }}
+              />
+            )}
+
+            {/* Bankforderungen-Referenzlinie */}
+            {bankClaimsCents && bankClaimsCents > BigInt(0) && (
+              <ReferenceLine
+                y={Number(bankClaimsCents) / 100}
+                stroke="#ef4444"
+                strokeDasharray="8 4"
+                strokeWidth={1.5}
+                strokeOpacity={0.7}
+                label={{
+                  value: "Bankforderungen",
+                  position: "right",
+                  fill: "#ef4444",
+                  fontSize: 10,
+                  fontWeight: 500,
                 }}
               />
             )}

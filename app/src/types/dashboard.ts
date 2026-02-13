@@ -168,6 +168,22 @@ export interface EstateAllocationData {
 }
 
 // =============================================================================
+// Massekredit Summary (für bereinigte Liquidität)
+// =============================================================================
+
+export interface MassekreditSummaryData {
+  hasBankAgreements: boolean;
+  altforderungenBruttoCents: string;
+  fortfuehrungsbeitragCents: string;
+  fortfuehrungsbeitragUstCents: string;
+  /** Was die Banken zurückbekommen = brutto - beitrag - ust */
+  massekreditAltforderungenCents: string;
+  hasUncertainBanks: boolean;
+  /** End-Liquidität MINUS Bankforderungen */
+  bereinigteEndLiquiditaetCents: string;
+}
+
+// =============================================================================
 // Dashboard Data Structure
 // =============================================================================
 
@@ -181,6 +197,7 @@ export interface CaseDashboardData {
   insolvencyEffects?: InsolvencyEffectsData;
   ledgerStats?: LedgerStats;
   estateAllocation?: EstateAllocationData;
+  massekreditSummary?: MassekreditSummaryData;
 }
 
 // =============================================================================

@@ -4,9 +4,10 @@ import { LedgerStats } from "@/types/dashboard";
 
 interface DataSourceLegendProps {
   ledgerStats: LedgerStats;
+  compact?: boolean;
 }
 
-export default function DataSourceLegend({ ledgerStats }: DataSourceLegendProps) {
+export default function DataSourceLegend({ ledgerStats, compact = false }: DataSourceLegendProps) {
   const { dataSource, istCount, planCount, unreviewedCount, entryCount } = ledgerStats;
 
   // Berechne IST/PLAN-Quote
@@ -35,6 +36,25 @@ export default function DataSourceLegend({ ledgerStats }: DataSourceLegendProps)
   };
 
   const quality = getQualityLevel();
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-4 text-xs text-[var(--muted)] px-1">
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-medium ${quality.bgColor} ${quality.color}`}>
+          {quality.label}
+        </span>
+        {dataSource === "LEDGER" && (
+          <>
+            <span>IST: {istCount} ({istQuote.toFixed(0)}%)</span>
+            <span>PLAN: {planCount}</span>
+            {unreviewedCount > 0 && (
+              <span className="text-amber-600">{unreviewedCount} ungeprüft</span>
+            )}
+          </>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="admin-card p-6">

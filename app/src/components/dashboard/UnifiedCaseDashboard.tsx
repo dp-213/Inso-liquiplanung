@@ -11,15 +11,11 @@ import {
   getPeriods,
   formatCurrency,
   getStatusLabel,
-  getPlanTitle,
   getPeriodLabelRange,
   TabConfig,
 } from "@/types/dashboard";
 
 // Import existing components
-import KPICards from "@/components/external/KPICards";
-import LiquidityTable from "@/components/external/LiquidityTable";
-import BalanceChart, { ChartMarker } from "@/components/external/BalanceChart";
 import PDFExportButton from "@/components/external/PDFExportButton";
 import EstateComparisonChart from "@/components/external/EstateComparisonChart";
 import PlanningAssumptions from "@/components/external/PlanningAssumptions";
@@ -28,7 +24,6 @@ import WaterfallChart from "@/components/external/WaterfallChart";
 import RevenueTabContent from "@/components/dashboard/RevenueTabContent";
 import SecurityRightsChart from "@/components/dashboard/SecurityRightsChart";
 import RollingForecastChart from "@/components/dashboard/RollingForecastChart";
-import RollingForecastTable from "@/components/dashboard/RollingForecastTable";
 import MasseCreditTab from "@/components/dashboard/MasseCreditTab";
 import LocationView from "@/components/dashboard/iv-views/LocationView";
 import LiquidityMatrixTable, { LiquidityScope, SCOPE_LABELS } from "@/components/dashboard/LiquidityMatrixTable";
@@ -125,27 +120,6 @@ function TabIcon({ icon }: { icon: string }) {
 }
 
 // =============================================================================
-// Status Badge
-// =============================================================================
-
-function getStatusBadge(status: string) {
-  switch (status) {
-    case "verfügbar":
-      return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Verfügbar</span>;
-    case "gesperrt":
-      return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Gesperrt</span>;
-    case "offen":
-      return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">Offen</span>;
-    case "vereinbarung":
-      return <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">In Vereinbarung</span>;
-    case "abgerechnet":
-      return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Abgerechnet</span>;
-    default:
-      return <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">{status}</span>;
-  }
-}
-
-// =============================================================================
 // Props Interface
 // =============================================================================
 
@@ -210,41 +184,24 @@ export default function UnifiedCaseDashboard({
   // Memoized calculations
   const periods = useMemo(() => getPeriods(data), [data]);
 
-  const { currentCash, minCash, runwayPeriod } = useMemo(() => {
-    if (periods.length === 0) return { currentCash: BigInt(0), minCash: BigInt(0), runwayPeriod: -1 };
+  const { minCash, minCashPeriodLabel } = useMemo(() => {
+    if (periods.length === 0) return { minCash: BigInt(0), minCashPeriodLabel: "" };
     const current = BigInt(periods[0]?.openingBalanceCents || "0");
-    const min = periods.reduce((m, period) => {
+    let min = current;
+    let minLabel = periods[0]?.periodLabel || periods[0]?.weekLabel || "";
+    for (const period of periods) {
       const balance = BigInt(period.closingBalanceCents);
-      return balance < m ? balance : m;
-    }, current);
-    const runway = periods.findIndex((period) => BigInt(period.closingBalanceCents) <= BigInt(0));
-    return { currentCash: current, minCash: min, runwayPeriod: runway };
+      if (balance < min) {
+        min = balance;
+        minLabel = period.periodLabel || period.weekLabel || "";
+      }
+    }
+    return { minCash: min, minCashPeriodLabel: minLabel };
   }, [periods]);
 
   const formatCurrencyFn = useCallback((cents: bigint | string): string => {
     return formatCurrency(cents);
   }, []);
-
-  const paymentMarkers = useMemo((): ChartMarker[] => {
-    if (periods.length === 0) return [];
-    const markers: ChartMarker[] = [];
-    const periodType = data.calculation.periodType || data.plan.periodType || "WEEKLY";
-    if (periodType === "MONTHLY") {
-      const kvMonths = ["Mrz", "Jun", "Sep", "Dez"];
-      const hzvMonths = ["Dez", "Jan"];
-      periods.forEach((period) => {
-        const label = period.periodLabel || period.weekLabel || "";
-        const monthAbbrev = label.split(" ")[0];
-        if (kvMonths.some((m) => monthAbbrev.startsWith(m))) {
-          markers.push({ periodLabel: label, label: "KV", color: "#10b981", type: "event" });
-        }
-        if (hzvMonths.some((m) => monthAbbrev.startsWith(m))) {
-          markers.push({ periodLabel: label, label: "HZV", color: "#8b5cf6", type: "event" });
-        }
-      });
-    }
-    return markers;
-  }, [periods, data.calculation.periodType, data.plan.periodType]);
 
   // Load estate allocation data from API (IST LedgerEntries, not PLAN categories)
   useEffect(() => {
@@ -274,19 +231,6 @@ export default function UnifiedCaseDashboard({
 
     fetchEstateData();
   }, [caseId, scope]);
-
-  // Bank account totals
-  const bankAccountData = useMemo(() => {
-    const accounts = data.bankAccounts?.accounts || [];
-    return {
-      accounts,
-      totalBalance: accounts.reduce((sum, acc) => sum + BigInt(acc.currentBalanceCents || "0"), BigInt(0)),
-      totalAvailable: accounts.reduce(
-        (sum, acc) => acc.status !== "blocked" ? sum + BigInt(acc.currentBalanceCents || "0") : sum,
-        BigInt(0)
-      ),
-    };
-  }, [data.bankAccounts]);
 
   // Tabs die interne APIs mit Session-Auth benötigen
   const tabsRequiringInternalApi = new Set([
@@ -328,91 +272,54 @@ export default function UnifiedCaseDashboard({
     });
   }, [config.tabs, data.insolvencyEffects, data.assumptions, accessMode, scope]);
 
-  // Legacy data adapters for components expecting 'weeks'
-  const weeksData = useMemo(() => {
-    return periods.map((p) => ({
-      weekOffset: p.periodIndex,
-      weekLabel: p.periodLabel || p.weekLabel || "",
-      openingBalanceCents: p.openingBalanceCents,
-      totalInflowsCents: p.totalInflowsCents,
-      totalOutflowsCents: p.totalOutflowsCents,
-      netCashflowCents: p.netCashflowCents,
-      closingBalanceCents: p.closingBalanceCents,
-    }));
-  }, [periods]);
-
   // Render tab content
   const renderTabContent = (tab: TabConfig) => {
     switch (tab.id) {
-      case "overview":
+      case "overview": {
+        const firstPeriodLabel = periods[0]?.periodLabel || periods[0]?.weekLabel || "";
+        const lastPeriodLabel = periods[periods.length - 1]?.periodLabel || periods[periods.length - 1]?.weekLabel || "";
+        const bankClaimsCents = data.massekreditSummary
+          ? BigInt(data.massekreditSummary.massekreditAltforderungenCents)
+          : undefined;
+
         return (
           <div className="space-y-6">
-            {/* Executive Summary - Neue kompakte Übersicht */}
+            {/* Executive Summary – KPI-Karten */}
             <ExecutiveSummary
-              currentCash={currentCash}
-              minCash={minCash}
-              periods={periods}
-              bankAccountData={bankAccountData}
-              formatCurrency={(cents: bigint) => formatCurrencyFn(cents)}
               bankBalanceCents={data.bankAccounts ? BigInt(data.bankAccounts.summary.totalBalanceCents) : null}
+              bankAccountCount={data.bankAccounts?.accounts.length ?? 0}
+              minCash={minCash}
+              minCashPeriodLabel={minCashPeriodLabel}
+              finalBalance={BigInt(data.calculation.finalClosingBalanceCents)}
+              massekreditSummary={data.massekreditSummary ? {
+                massekreditAltforderungenCents: BigInt(data.massekreditSummary.massekreditAltforderungenCents),
+                bereinigteEndLiquiditaetCents: BigInt(data.massekreditSummary.bereinigteEndLiquiditaetCents),
+                hasUncertainBanks: data.massekreditSummary.hasUncertainBanks,
+                fortfuehrungsbeitragCents: BigInt(data.massekreditSummary.fortfuehrungsbeitragCents),
+              } : undefined}
+              periodRange={`${firstPeriodLabel} – ${lastPeriodLabel}`}
+              formatCurrency={(cents: bigint) => formatCurrencyFn(cents)}
             />
 
-            {/* Datenherkunft und Qualität */}
-            {data.ledgerStats && <DataSourceLegend ledgerStats={data.ledgerStats} />}
+            {/* Datenherkunft – Kompakt-Banner */}
+            {data.ledgerStats && <DataSourceLegend ledgerStats={data.ledgerStats} compact={true} />}
 
-            {/* Rolling Forecast Chart - PROMINENT, GROSS - IST (Vergangenheit) + PLAN (Zukunft) - NUR für angemeldete Nutzer */}
+            {/* Rolling Forecast Chart – Hero-Visual */}
             {accessMode !== "external" && caseId && (
               <div className="admin-card p-8">
                 <h2 className="text-xl font-bold text-[var(--foreground)] mb-6">Liquiditätsentwicklung</h2>
                 <div className="h-[500px]">
-                  <RollingForecastChart caseId={caseId} scope={scope} />
+                  <RollingForecastChart
+                    caseId={caseId}
+                    scope={scope}
+                    bankClaimsCents={scope === "GLOBAL" ? bankClaimsCents : undefined}
+                  />
                 </div>
               </div>
             )}
-
-            {/* Wasserfall-Darstellung */}
-            <div className="admin-card p-6">
-              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">Wasserfall-Darstellung</h2>
-              <p className="text-sm text-[var(--secondary)] mb-4">
-                Zeigt die Zusammensetzung der Cashflows pro Periode: Einzahlungen (grün), Auszahlungen (rot) und Endbestand (blaue Linie).
-              </p>
-              <WaterfallChart
-                data={periods.map((period) => ({
-                  periodLabel: period.periodLabel || period.weekLabel || "",
-                  openingBalance: Number(BigInt(period.openingBalanceCents)) / 100,
-                  inflows: Number(BigInt(period.totalInflowsCents)) / 100,
-                  outflows: Number(BigInt(period.totalOutflowsCents)) / 100,
-                  insolvencyEffects: 0,
-                  closingBalance: Number(BigInt(period.closingBalanceCents)) / 100,
-                }))}
-                showInsolvencyEffects={false}
-              />
-            </div>
-
-            {/* Rolling Forecast Tabelle - zeigt IST/PLAN pro Periode - NUR für angemeldete Nutzer */}
-            {accessMode !== "external" && caseId && (
-              <div className="admin-card">
-                <div className="px-6 py-4 border-b border-[var(--border)]">
-                  <h2 className="text-lg font-semibold text-[var(--foreground)]">Liquiditätsübersicht</h2>
-                </div>
-                <RollingForecastTable caseId={caseId} />
-              </div>
-            )}
-
-            {/* 10-Monatsplanung Kategorien-Tabelle */}
-            <div className="admin-card">
-              <div className="px-6 py-4 border-b border-[var(--border)]">
-                <h2 className="text-lg font-semibold text-[var(--foreground)]">{getPlanTitle(data)}</h2>
-              </div>
-              <LiquidityTable
-                weeks={weeksData}
-                categories={data.calculation.categories}
-                openingBalance={BigInt(data.calculation.openingBalanceCents)}
-                compact={true}
-              />
-            </div>
           </div>
         );
+      }
 
       case "liquidity-matrix":
         return (
@@ -675,6 +582,25 @@ export default function UnifiedCaseDashboard({
       case "compare":
         return (
           <div className="space-y-6">
+            {/* Wasserfall-Darstellung */}
+            <div className="admin-card p-6">
+              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">Wasserfall-Darstellung</h2>
+              <p className="text-sm text-[var(--secondary)] mb-4">
+                Zeigt die Zusammensetzung der Cashflows pro Periode: Einzahlungen (grün), Auszahlungen (rot) und Endbestand (blaue Linie).
+              </p>
+              <WaterfallChart
+                data={periods.map((period) => ({
+                  periodLabel: period.periodLabel || period.weekLabel || "",
+                  openingBalance: Number(BigInt(period.openingBalanceCents)) / 100,
+                  inflows: Number(BigInt(period.totalInflowsCents)) / 100,
+                  outflows: Number(BigInt(period.totalOutflowsCents)) / 100,
+                  insolvencyEffects: 0,
+                  closingBalance: Number(BigInt(period.closingBalanceCents)) / 100,
+                }))}
+                showInsolvencyEffects={false}
+              />
+            </div>
+
             {caseId ? (
               <IstPlanComparisonTable caseId={caseId} scope={scope} />
             ) : (
@@ -708,7 +634,7 @@ export default function UnifiedCaseDashboard({
         );
 
       case "business-logik":
-        return <BusinessLogicContent insolvencyDate={data.case.openingDate || undefined} />;
+        return caseId ? <BusinessLogicContent caseId={caseId} /> : null;
 
       default:
         return null;

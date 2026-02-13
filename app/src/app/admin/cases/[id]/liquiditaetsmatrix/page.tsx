@@ -15,7 +15,7 @@ export default function LiquiditaetsmatrixPage() {
       <div>
         <h1 className="text-xl font-bold text-[var(--foreground)]">Liquiditätstabelle</h1>
         <p className="text-sm text-[var(--secondary)] mt-1">
-          IDW S11-konforme Liquiditätsmatrix mit IST/PLAN-Darstellung
+          Liquiditätsmatrix mit IST/PLAN-Darstellung
         </p>
       </div>
       <LiquidityMatrixTable caseId={caseId} />

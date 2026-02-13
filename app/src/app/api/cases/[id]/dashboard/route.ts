@@ -15,6 +15,7 @@ import {
   aggregateLedgerEntries,
   convertToLegacyFormat,
 } from "@/lib/ledger-aggregation";
+import { getDashboardMassekreditSummary } from "@/lib/credit/dashboard-massekredit-summary";
 
 type LiquidityScope = "GLOBAL" | "LOCATION_VELBERT" | "LOCATION_UCKERATH_EITORF";
 
@@ -117,8 +118,8 @@ export async function GET(
     const periodType = (plan.periodType as PeriodType) || "WEEKLY";
     const periodCount = plan.periodCount || 13;
 
-    // Parallel: ledgerEntry.count + bankBalances (beide brauchen nur caseId)
-    const [ledgerEntryCount, bankBalancesResult] = await Promise.all([
+    // Parallel: ledgerEntry.count + bankBalances + massekreditSummary (alle unabhängig)
+    const [ledgerEntryCount, bankBalancesResult, massekreditResult] = await Promise.all([
       prisma.ledgerEntry.count({
         where: {
           caseId: caseData.id,
@@ -126,6 +127,7 @@ export async function GET(
         },
       }),
       calculateBankAccountBalances(caseData.id, caseData.bankAccounts),
+      getDashboardMassekreditSummary(caseData.id),
     ]);
 
     let result;
@@ -421,6 +423,18 @@ export async function GET(
         // Warnungen (z.B. UNKLAR-Buchungen)
         warnings: estateAllocationData.warnings,
       } : null,
+      // Massekredit-Summary für bereinigte Liquidität
+      massekreditSummary: massekreditResult ? {
+        hasBankAgreements: true,
+        altforderungenBruttoCents: massekreditResult.altforderungenBruttoCents.toString(),
+        fortfuehrungsbeitragCents: massekreditResult.fortfuehrungsbeitragCents.toString(),
+        fortfuehrungsbeitragUstCents: massekreditResult.fortfuehrungsbeitragUstCents.toString(),
+        massekreditAltforderungenCents: massekreditResult.massekreditAltforderungenCents.toString(),
+        hasUncertainBanks: massekreditResult.hasUncertainBanks,
+        bereinigteEndLiquiditaetCents: (
+          result.finalClosingBalanceCents - massekreditResult.massekreditAltforderungenCents
+        ).toString(),
+      } : undefined,
       calculation: {
         openingBalanceCents: result.openingBalanceCents.toString(),
         totalInflowsCents: result.totalInflowsCents.toString(),
