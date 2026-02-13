@@ -1229,6 +1229,7 @@ export const COUNTERPARTY_TAG_MAP: Record<string, string> = {
   'cp-kreiskasse-rhein-sieg': 'KV',
   'cp-haevg-hzv': 'HZV',
   'cp-haevg-pvs': 'PVS',
+  'cp-privatpatienten': 'PVS',
 };
 
 /**

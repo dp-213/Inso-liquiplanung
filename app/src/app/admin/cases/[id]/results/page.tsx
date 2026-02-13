@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import UnifiedCaseDashboard from "@/components/dashboard/UnifiedCaseDashboard";
 import { CaseDashboardData } from "@/types/dashboard";
 
@@ -70,53 +69,10 @@ export default function AdminDashboardPage() {
   if (!data) return null;
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-end">
-        {/* Tab Switcher: Dashboard / Planung */}
-        <div className="flex items-center bg-blue-50 rounded-lg p-1 border-2 border-blue-300">
-          <Link
-            href={`/admin/cases/${caseId}/results`}
-            className="px-4 py-2 text-sm font-semibold rounded-md transition-colors bg-white text-[var(--foreground)] shadow-sm"
-          >
-            📊 Dashboard
-          </Link>
-          <Link
-            href={`/admin/cases/${caseId}/planung`}
-            className="px-4 py-2 text-sm font-semibold rounded-md transition-colors text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-white/50"
-          >
-            📋 Planung
-          </Link>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="flex items-center justify-end gap-2">
-        <Link
-          href={`/admin/cases/${caseId}/kontobewegungen`}
-          className="btn-secondary text-sm py-1.5 px-3 flex items-center"
-        >
-          <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-          IST
-        </Link>
-        <Link
-          href={`/admin/cases/${caseId}/ledger`}
-          className="btn-secondary text-sm py-1.5 px-3 flex items-center"
-        >
-          <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-          </svg>
-          Ledger
-        </Link>
-      </div>
-
-      {/* Dashboard Content */}
-      <UnifiedCaseDashboard
-        data={data}
-        accessMode="admin"
-        caseId={caseId}
-      />
-    </div>
+    <UnifiedCaseDashboard
+      data={data}
+      accessMode="admin"
+      caseId={caseId}
+    />
   );
 }
