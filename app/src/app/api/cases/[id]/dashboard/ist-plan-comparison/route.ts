@@ -8,6 +8,8 @@
  * GET /api/cases/[id]/dashboard/ist-plan-comparison
  * Query-Parameter:
  * - scope: GLOBAL | LOCATION_VELBERT | LOCATION_UCKERATH_EITORF
+ * - includeUnreviewed: true | false (default: false)
+ * - estateFilter: GESAMT | ALTMASSE | NEUMASSE | UNKLAR (default: GESAMT)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -79,6 +81,9 @@ export interface IstPlanComparisonData {
     planStartDate: string;
     istEntryCount: number;
     planEntryCount: number;
+    includeUnreviewed: boolean;
+    estateFilter: string;
+    unreviewedCount: number;
     generatedAt: string;
   };
 }
@@ -149,13 +154,21 @@ export async function GET(
       }
     }
 
-    // Scope-Parameter
+    // Query-Parameter
     const scopeParam = searchParams.get('scope') || 'GLOBAL';
     const scope: LiquidityScope = ['GLOBAL', 'LOCATION_VELBERT', 'LOCATION_UCKERATH_EITORF'].includes(scopeParam)
       ? (scopeParam as LiquidityScope)
       : 'GLOBAL';
 
-    // 1. Load Case with Plan settings
+    const includeUnreviewed = searchParams.get('includeUnreviewed') === 'true';
+
+    type EstateFilter = 'GESAMT' | 'ALTMASSE' | 'NEUMASSE' | 'UNKLAR';
+    const estateParam = searchParams.get('estateFilter') || 'GESAMT';
+    const estateFilter: EstateFilter = ['GESAMT', 'ALTMASSE', 'NEUMASSE', 'UNKLAR'].includes(estateParam)
+      ? (estateParam as EstateFilter)
+      : 'GESAMT';
+
+    // 1. Load Case with Plan settings + bank accounts
     const existingCase = await prisma.case.findUnique({
       where: { id: caseId },
       include: {
@@ -163,6 +176,7 @@ export async function GET(
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
+        bankAccounts: true,
       },
     });
 
@@ -179,20 +193,52 @@ export async function GET(
     const periodCount = plan.periodCount || 10;
     const startDate = plan.planStartDate ? new Date(plan.planStartDate) : new Date();
 
-    // 2. Load all LedgerEntries (nur geprüfte: CONFIRMED, ADJUSTED)
+    // 2. Load LedgerEntries (nur liquidity-relevante Konten + PLAN-Entries)
+    const reviewStatusFilter = includeUnreviewed
+      ? { not: 'REJECTED' }
+      : { in: ['CONFIRMED', 'ADJUSTED'] };
+
+    // ISK-Only-Filter: Nur operative Massekonten (gleiche Logik wie liquidity-matrix)
+    const liquidityAccountIds = existingCase.bankAccounts
+      .filter(a => a.isLiquidityRelevant)
+      .map(a => a.id);
+
     const allEntries = await prisma.ledgerEntry.findMany({
       where: {
         caseId,
         ...EXCLUDE_SPLIT_PARENTS,
-        reviewStatus: { in: ['CONFIRMED', 'ADJUSTED'] },
+        reviewStatus: reviewStatusFilter,
+        OR: [
+          { bankAccountId: { in: liquidityAccountIds } },
+          { bankAccountId: null },
+          { valueType: 'PLAN' },
+        ],
       },
       orderBy: { transactionDate: 'asc' },
     });
 
     // 3. Scope-Filterung anwenden
-    const entries = filterEntriesByScope(allEntries, scope);
+    const scopedEntries = filterEntriesByScope(allEntries, scope);
 
-    // 4. Initialize period aggregations
+    // 4. Estate-Filterung (server-seitig, da keine benannten Zeilen wie in der Matrix)
+    const entries = estateFilter === 'GESAMT'
+      ? scopedEntries
+      : scopedEntries.filter(entry => {
+          if (entry.valueType === 'PLAN') return true; // PLAN immer behalten
+          if (estateFilter === 'UNKLAR') {
+            return entry.estateAllocation === 'UNKLAR' || !entry.estateAllocation;
+          }
+          if (entry.estateAllocation === estateFilter) return true;
+          if (entry.estateAllocation === 'MIXED') return true; // MIXED in beide Sichten
+          return false;
+        });
+
+    // Unreviewed zählen (für Meta-Daten)
+    const unreviewedCount = entries.filter(e =>
+      e.reviewStatus === 'UNREVIEWED' && e.valueType === 'IST'
+    ).length;
+
+    // 6. Initialize period aggregations
     interface PeriodAggregation {
       istInflows: bigint;
       istOutflows: bigint;
@@ -214,7 +260,7 @@ export async function GET(
       });
     }
 
-    // 5. Aggregate entries - BEIDE IST und PLAN, ohne Vorrang
+    // 7. Aggregate entries - BEIDE IST und PLAN, ohne Vorrang
     let totalIstEntries = 0;
     let totalPlanEntries = 0;
 
@@ -244,7 +290,7 @@ export async function GET(
       }
     }
 
-    // 6. Build response periods mit kumulierter Abweichung
+    // 8. Build response periods mit kumulierter Abweichung
     const periods: ComparisonPeriod[] = [];
     let cumulativeDeviationNet = BigInt(0);
 
@@ -300,7 +346,7 @@ export async function GET(
       });
     }
 
-    // 7. Totals nur über Overlap-Perioden (vergleichbare Basis)
+    // 9. Totals nur über Overlap-Perioden (vergleichbare Basis)
     const overlapIstNet = overlapIstInflows + overlapIstOutflows;
     const overlapPlanNet = overlapPlanInflows + overlapPlanOutflows;
     const overlapDeviationInflows = overlapIstInflows - overlapPlanInflows;
@@ -333,6 +379,9 @@ export async function GET(
         planStartDate: startDate.toISOString().split('T')[0],
         istEntryCount: totalIstEntries,
         planEntryCount: totalPlanEntries,
+        includeUnreviewed,
+        estateFilter,
+        unreviewedCount,
         generatedAt: new Date().toISOString(),
       },
     };

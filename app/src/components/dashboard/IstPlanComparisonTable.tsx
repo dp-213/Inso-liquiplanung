@@ -22,6 +22,8 @@ import type {
 // TYPES
 // =============================================================================
 
+type EstateFilter = "GESAMT" | "ALTMASSE" | "NEUMASSE" | "UNKLAR";
+
 interface IstPlanComparisonTableProps {
   caseId: string;
   scope?: LiquidityScope;
@@ -289,14 +291,21 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
   const [data, setData] = useState<IstPlanComparisonData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [estateFilter, setEstateFilter] = useState<EstateFilter>("GESAMT");
+  const [includeUnreviewed, setIncludeUnreviewed] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
+        const params = new URLSearchParams({
+          scope,
+          estateFilter,
+          includeUnreviewed: includeUnreviewed.toString(),
+        });
         const res = await fetch(
-          `/api/cases/${caseId}/dashboard/ist-plan-comparison?scope=${scope}`,
+          `/api/cases/${caseId}/dashboard/ist-plan-comparison?${params}`,
           { credentials: "include" }
         );
 
@@ -315,7 +324,7 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
     };
 
     fetchData();
-  }, [caseId, scope]);
+  }, [caseId, scope, estateFilter, includeUnreviewed]);
 
   const periodsWithData = useMemo(() => {
     if (!data) return [];
@@ -375,10 +384,47 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
             <span className="w-2 h-2 rounded-full bg-blue-500" />
             {data.meta.planEntryCount} PLAN
           </span>
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gray-50 text-gray-500 border border-gray-200">
-            Nur geprüfte Buchungen
+          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border ${
+            includeUnreviewed
+              ? "bg-amber-50 text-amber-700 border-amber-200"
+              : "bg-gray-50 text-gray-500 border-gray-200"
+          }`}>
+            {includeUnreviewed ? "inkl. ungeprüfte" : "Nur geprüfte Buchungen"}
           </span>
         </div>
+      </div>
+
+      {/* Filter-Leiste */}
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Estate Filter */}
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+          {(["GESAMT", "ALTMASSE", "NEUMASSE", "UNKLAR"] as EstateFilter[]).map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setEstateFilter(filter)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                estateFilter === filter
+                  ? "bg-white shadow-sm text-gray-900"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              {filter === "GESAMT" ? "Gesamt" : filter === "ALTMASSE" ? "Alt" : filter === "NEUMASSE" ? "Neu" : "Unklar"}
+            </button>
+          ))}
+        </div>
+
+        {/* Unreviewed Toggle */}
+        <label className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg border cursor-pointer transition-colors bg-gray-50 border-gray-200 hover:bg-gray-100">
+          <input
+            type="checkbox"
+            checked={includeUnreviewed}
+            onChange={(e) => setIncludeUnreviewed(e.target.checked)}
+            className="w-3.5 h-3.5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+          />
+          <span className={includeUnreviewed ? "text-amber-700" : "text-gray-600"}>
+            inkl. ungeprüfte
+          </span>
+        </label>
       </div>
 
       {/* Chart: IST Netto vs PLAN Netto + kumulierte Abweichungslinie */}
