@@ -1974,7 +1974,8 @@ export default function CaseLedgerPage({
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
               placeholder="Suche in Beschreibung, Gegenpartei, Notiz, IBAN..."
-              className="input-field w-full pl-10 pr-24"
+              className="input-field w-full"
+              style={{ paddingLeft: '2.5rem', paddingRight: '6rem' }}
             />
             <span className="absolute right-10 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
               {debouncedSearch ? `${visibleTopLevelEntries.length} von ${totalTopLevelCount}` : ""}
