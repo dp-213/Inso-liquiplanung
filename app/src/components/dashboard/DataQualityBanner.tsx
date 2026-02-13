@@ -103,17 +103,28 @@ export default function DataQualityBanner({ caseId }: DataQualityBannerProps) {
     );
   }
 
-  // allPassed → kein Banner
-  if (!data || data.allPassed) {
-    return null;
-  }
+  // Konfigurations-Checks rausfiltern (gehören ins System Health Panel)
+  const SYSTEM_HEALTH_CHECK_IDS = ["counterpartiesWithoutPattern"];
 
-  const { summary, checks } = data;
-  const totalProblems = summary.errors + summary.warnings;
-  const hasErrors = summary.errors > 0;
+  if (!data) return null;
+
+  const { checks } = data;
+  const dataQualityChecks = Object.values(checks).filter(
+    (c) => !SYSTEM_HEALTH_CHECK_IDS.includes(c.id)
+  );
+
+  // Summen nur für Datenqualitäts-Checks berechnen
+  const errors = dataQualityChecks.filter((c) => c.severity === "error" && !c.passed).length;
+  const warnings = dataQualityChecks.filter((c) => c.severity === "warning" && !c.passed).length;
+  const allPassed = errors === 0 && warnings === 0;
+
+  if (allPassed) return null;
+
+  const totalProblems = errors + warnings;
+  const hasErrors = errors > 0;
 
   // Sortiere: Fehler zuerst, dann Warnungen, dann OK
-  const sortedChecks = Object.values(checks).sort((a, b) => {
+  const sortedChecks = dataQualityChecks.sort((a, b) => {
     if (a.passed !== b.passed) return a.passed ? 1 : -1;
     if (a.severity !== b.severity) return a.severity === "error" ? -1 : 1;
     return 0;
@@ -149,14 +160,14 @@ export default function DataQualityBanner({ caseId }: DataQualityBannerProps) {
           <span className={`text-sm font-semibold ${hasErrors ? "text-red-800" : "text-amber-800"}`}>
             {totalProblems} Datenqualitäts-{totalProblems === 1 ? "Problem" : "Probleme"} gefunden
           </span>
-          {summary.errors > 0 && (
+          {errors > 0 && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-200 text-red-900">
-              {summary.errors} Fehler
+              {errors} Fehler
             </span>
           )}
-          {summary.warnings > 0 && (
+          {warnings > 0 && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-200 text-amber-900">
-              {summary.warnings} {summary.warnings === 1 ? "Warnung" : "Warnungen"}
+              {warnings} {warnings === 1 ? "Warnung" : "Warnungen"}
             </span>
           )}
         </div>
@@ -215,20 +226,16 @@ export default function DataQualityBanner({ caseId }: DataQualityBannerProps) {
               </div>
               {check.skipped > 0 && (
                 <p className="text-xs mt-1 opacity-75">
-                  ({check.skipped} übersprungen{check.id === "estateAllocationQuarter" ? ": Quartal nicht bestimmbar" : check.id === "patternMatchValidation" ? ": ohne Pattern" : check.id === "counterpartiesWithoutPattern" ? ": unter Schwelle" : ""})
+                  ({check.skipped} übersprungen{check.id === "estateAllocationQuarter" ? ": Quartal nicht bestimmbar" : check.id === "patternMatchValidation" ? ": ohne Pattern" : ""})
                 </p>
               )}
               {!check.passed && (
                 <div className="mt-1">
                   <Link
-                    href={check.id === "counterpartiesWithoutPattern"
-                      ? `/admin/cases/${caseId}/counterparties?filter=NO_PATTERN`
-                      : `/admin/cases/${caseId}/ledger`}
+                    href={`/admin/cases/${caseId}/ledger`}
                     className="text-xs underline font-medium hover:opacity-80"
                   >
-                    {check.id === "counterpartiesWithoutPattern"
-                      ? "Gegenparteien verwalten →"
-                      : "Im Ledger zeigen →"}
+                    Im Ledger zeigen →
                   </Link>
                 </div>
               )}
