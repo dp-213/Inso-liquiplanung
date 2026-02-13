@@ -325,4 +325,4 @@ Rebranding zu "Gradify Cases | Structured Case Management" mit OG-Image für Soc
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-13 (v2.47.0)
+**Letzte Aktualisierung:** 2026-02-13 (v2.50.0)

@@ -4,6 +4,35 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-061: Estate-Filter im IST/PLAN-Vergleich server-seitig
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Kontext
+
+Die Liquiditätsmatrix hat einen Estate-Filter (Gesamt/Alt/Neu/Unklar), der **client-seitig** funktioniert: Zeilen werden nach Row-ID gefiltert (z.B. `altforderung_*` ausblenden). Der IST/PLAN-Vergleich hat keine benannten Zeilen – er aggregiert Perioden-Buckets direkt aus LedgerEntries.
+
+### Entscheidung
+
+Estate-Filter im IST/PLAN-Vergleich wird **server-seitig** angewandt:
+- Filterung auf `estateAllocation` in der API-Route
+- PLAN-Entries werden immer behalten (Estate-Allocation ist nur für IST relevant)
+- MIXED-Entries erscheinen in beiden Sichten (Alt und Neu)
+- UNKLAR-Filter fängt auch `null`-Werte ab
+
+### Begründung
+
+Client-seitiger Filter ist nicht möglich, weil die Aggregation (Inflows/Outflows pro Periode) bereits in der API passiert. Die API müsste entweder alle Entries einzeln zurückgeben (zu groß) oder pro Estate-Variante eigene Aggregationen berechnen (unnötig komplex). Server-seitiger Filter vor der Aggregation ist die einfachste und korrekteste Lösung.
+
+### Konsequenzen
+
+- Estate-Filter löst einen neuen API-Request aus (statt client-seitiger Toggle)
+- Dafür: Korrekte Aggregation garantiert, keine redundanten Daten im Response
+- Konsistenz mit Matrix-Filter: Gleiche Button-Labels, gleiches UX-Verhalten
+
+---
+
 ## ADR-060: Legacy-Dashboard-Code entfernen
 
 **Datum:** 13. Februar 2026

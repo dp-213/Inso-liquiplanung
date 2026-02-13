@@ -4,6 +4,30 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.50.0 – IST/PLAN-Vergleich: ISK-Bugfix + Filter
+
+**Datum:** 13. Februar 2026
+
+### Bugfixes
+
+- **ISK-Filter für IST/PLAN-Vergleich:** API lud bisher ALLE LedgerEntries ohne Bankkonten-Filter, während die Liquiditätsmatrix nur ISK-Konten (`isLiquidityRelevant`) einbezog. Schuldnerkonten (apoBank, Sparkasse Geschäftskonto) flossen fälschlich in den Vergleich ein → falsche Zahlen. Jetzt gleiche ISK-Only-Logik wie die Matrix.
+
+### Neue Funktionen
+
+- **Estate-Filter (Alt/Neu/Unklar):** Server-seitige Filterung nach `estateAllocation` im IST/PLAN-Vergleich. PLAN-Entries werden immer behalten, MIXED-Entries in beiden Sichten angezeigt.
+- **Ungeprüfte-Toggle:** Checkbox zum Ein-/Ausblenden ungeprüfter Buchungen (`includeUnreviewed`), gleiche Logik wie Liquiditätsmatrix.
+- **Filter-Leiste:** Estate-Buttons + Unreviewed-Checkbox zwischen Header und Chart, exakt gleiches Styling wie `LiquidityMatrixTable`.
+- **Dynamischer Info-Badge:** Wechselt zwischen grau „Nur geprüfte Buchungen" und amber „inkl. ungeprüfte" je nach Toggle-Status.
+
+### Technisch
+
+- API-Parameter: `estateFilter` (GESAMT/ALTMASSE/NEUMASSE/UNKLAR), `includeUnreviewed` (true/false)
+- Estate-Filter server-seitig (ADR-061), da IST/PLAN-Vergleich keine benannten Zeilen hat
+- Meta-Daten um `includeUnreviewed`, `estateFilter`, `unreviewedCount` erweitert
+- Nur 2 Dateien geändert: API-Route + Komponente, kein Schema-Change
+
+---
+
 ## Version 2.49.0 – IST/PLAN-Vergleich Redesign + Standort-Vergleich
 
 **Datum:** 13. Februar 2026
