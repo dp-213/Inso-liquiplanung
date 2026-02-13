@@ -27,6 +27,7 @@ interface KPIItem {
  * Configurable KPI display component
  */
 export default function KPIDisplay({ config, data }: KPIDisplayProps) {
+  const totalPeriods = data.weeks.length;
   // Format currency
   const formatCurrency = (cents: bigint): string => {
     const euros = Number(cents) / 100;
@@ -133,7 +134,7 @@ export default function KPIDisplay({ config, data }: KPIDisplayProps) {
             subtext:
               kpis.negativeWeeksCount === 0
                 ? "Keine Unterdeckung"
-                : `von 13 Wochen`,
+                : `von ${totalPeriods} Perioden`,
             isNegative: kpis.negativeWeeksCount > 0,
             isWarning: kpis.negativeWeeksCount > 0,
             icon: "count",

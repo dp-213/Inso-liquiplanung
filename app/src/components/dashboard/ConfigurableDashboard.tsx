@@ -174,8 +174,8 @@ export default function ConfigurableDashboard({
                 Liquiditaetsengpass prognostiziert
               </h3>
               <p className="text-sm text-red-700 mt-1">
-                In {calculationData.kpis.negativeWeeksCount} von 13 Wochen wird ein negativer
-                Kontostand erwartet. Der tiefste Stand wird in Woche{" "}
+                In {calculationData.kpis.negativeWeeksCount} von {calculationData.weeks.length} Perioden wird ein negativer
+                Kontostand erwartet. Der tiefste Stand wird in Periode{" "}
                 {calculationData.kpis.minBalanceWeek + 1} erreicht.
               </p>
             </div>
@@ -194,7 +194,7 @@ export default function ConfigurableDashboard({
       <DashboardCard
         title={
           config.aggregations.groupBy === "week"
-            ? "13-Wochen Liquiditätsplan"
+            ? `${calculationData.weeks.length}-Wochen Liquiditätsplan`
             : "Monatliche Übersicht"
         }
         subtitle={`${formatDate(calculationData.caseInfo.planStartDate)} - ${formatDate(

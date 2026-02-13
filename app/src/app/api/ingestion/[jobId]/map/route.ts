@@ -205,7 +205,7 @@ export async function POST(
               weekOffset = result.weekOffset;
               if (result.isOutOfRange) {
                 warnings.push(
-                  `Datum liegt ausserhalb des 13-Wochen-Zeitraums, wurde auf Woche ${weekOffset} begrenzt`
+                  `Datum liegt ausserhalb des Planungszeitraums, wurde auf Periode ${weekOffset} begrenzt`
                 );
               }
             }

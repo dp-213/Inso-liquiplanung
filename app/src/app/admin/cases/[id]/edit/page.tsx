@@ -499,7 +499,7 @@ export default function CaseEditPage({
                 onChange={(e) => setPlanFormData({ ...planFormData, periodType: e.target.value })}
                 className="input-field"
               >
-                <option value="WEEKLY">Wöchentlich (13 Wochen Standard)</option>
+                <option value="WEEKLY">Wöchentlich</option>
                 <option value="MONTHLY">Monatlich</option>
               </select>
             </div>

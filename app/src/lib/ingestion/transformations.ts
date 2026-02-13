@@ -359,7 +359,7 @@ export function executeFieldTransformation(
         return {
           success: true,
           value: result.weekOffset,
-          warning: `Datum liegt ausserhalb des 13-Wochen-Zeitraums, wurde auf Woche ${result.weekOffset} begrenzt`,
+          warning: `Datum liegt ausserhalb des Planungszeitraums, wurde auf Periode ${result.weekOffset} begrenzt`,
           confidence: 0.7,
         };
       }

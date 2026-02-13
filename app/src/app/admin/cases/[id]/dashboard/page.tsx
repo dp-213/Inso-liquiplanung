@@ -305,24 +305,6 @@ export default function CaseDashboardPage({
 
       {/* Controls */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <div className="flex items-center gap-4">
-          {/* Tab Switcher: Dashboard / Planung - PROMINENT oben links */}
-          <div className="flex items-center bg-blue-50 rounded-lg p-1 border border-blue-200">
-            <Link
-              href={`/admin/cases/${id}/dashboard`}
-              className="px-4 py-1.5 text-sm font-medium rounded-md transition-colors bg-white text-[var(--foreground)] shadow-sm"
-            >
-              📊 Dashboard
-            </Link>
-            <Link
-              href={`/admin/cases/${id}/planung`}
-              className="px-4 py-1.5 text-sm font-medium rounded-md transition-colors text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-white/50"
-            >
-              📋 Planung
-            </Link>
-          </div>
-        </div>
-
         <div className="flex items-center gap-3">
           {/* Edit Mode Toggle */}
           <button

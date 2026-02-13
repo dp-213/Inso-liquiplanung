@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 
 interface PlanungData {
   titel: string;
@@ -157,25 +156,6 @@ export default function PlanungPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header mit Tab-Switcher */}
-      <div className="flex items-center justify-end">
-        {/* Tab Switcher: Dashboard / Planung */}
-        <div className="flex items-center bg-blue-50 rounded-lg p-1 border-2 border-blue-300">
-          <Link
-            href={`/admin/cases/${caseId}/results`}
-            className="px-4 py-2 text-sm font-semibold rounded-md transition-colors text-[var(--muted)] hover:text-[var(--foreground)] hover:bg-white/50"
-          >
-            📊 Dashboard
-          </Link>
-          <Link
-            href={`/admin/cases/${caseId}/planung`}
-            className="px-4 py-2 text-sm font-semibold rounded-md transition-colors bg-white text-[var(--foreground)] shadow-sm"
-          >
-            📋 Planung
-          </Link>
-        </div>
-      </div>
-
       {/* Info-Banner */}
       <div className="admin-card bg-blue-50 border-2 border-blue-200 p-4">
         <div className="flex items-start gap-3">

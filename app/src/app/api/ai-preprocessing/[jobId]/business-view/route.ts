@@ -234,6 +234,10 @@ export async function GET(
   }
 }
 
+// AI-Preprocessing Vorschau: periodCount wird hier als Default 13 verwendet,
+// da die Vorschau vor der Plan-Zuordnung stattfindet.
+const AI_PREVIEW_PERIOD_COUNT = 13;
+
 function buildCategoryAggregations(
   rows: ParsedRow[],
   flowType: "INFLOW" | "OUTFLOW",
@@ -254,7 +258,7 @@ function buildCategoryAggregations(
 
     // Build weekly breakdown
     const weeklyTotals: CategoryAggregation["weeklyTotals"] = [];
-    for (let week = 0; week < 13; week++) {
+    for (let week = 0; week < AI_PREVIEW_PERIOD_COUNT; week++) {
       const weekRows = categoryRows.filter(
         (r) => r.aiSuggestion.weekOffset === week
       );
@@ -334,10 +338,10 @@ function buildCategoryAggregations(
 }
 
 function calculateWeeklyTotals(rows: ParsedRow[]): number[] {
-  const totals: number[] = Array(13).fill(0);
+  const totals: number[] = Array(AI_PREVIEW_PERIOD_COUNT).fill(0);
   for (const row of rows) {
     const week = row.aiSuggestion.weekOffset;
-    if (week !== undefined && week >= 0 && week < 13) {
+    if (week !== undefined && week >= 0 && week < AI_PREVIEW_PERIOD_COUNT) {
       totals[week] += Math.round((row.aiSuggestion.amount || 0) * 100);
     }
   }

@@ -388,7 +388,7 @@ export const VALIDATION_WARNING_CODES = {
   },
   DATE_OUTSIDE_RANGE: {
     code: 'WARN_DATE_RANGE',
-    message: 'Datum liegt ausserhalb des 13-Wochen-Planungszeitraums.',
+    message: 'Datum liegt ausserhalb des Planungszeitraums.',
   },
 } as const;
 

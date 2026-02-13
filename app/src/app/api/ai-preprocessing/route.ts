@@ -373,18 +373,18 @@ function findDescriptionColumn(headers: string[]): string | null {
 }
 
 /**
- * Convert monthly value to weekly (pro rata for 13 weeks)
+ * Convert monthly value to weekly (pro rata for periodCount weeks)
  */
-function monthlyToWeekly(monthlyAmount: number): { weeklyAmounts: number[]; explanation: string } {
+function monthlyToWeekly(monthlyAmount: number, periodCount = 13): { weeklyAmounts: number[]; explanation: string } {
   // Simple pro rata: monthly / 4.33 weeks per month
   const weeklyAmount = monthlyAmount / 4.33;
 
-  // Distribute across 13 weeks
-  const weeklyAmounts = Array(13).fill(0).map(() => Math.round(weeklyAmount * 100) / 100);
+  // Distribute across periodCount weeks
+  const weeklyAmounts = Array(periodCount).fill(0).map(() => Math.round(weeklyAmount * 100) / 100);
 
   return {
     weeklyAmounts,
-    explanation: `Monatswert ${monthlyAmount.toFixed(2)} EUR anteilig auf 13 Wochen verteilt (${weeklyAmount.toFixed(2)} EUR/Woche)`,
+    explanation: `Monatswert ${monthlyAmount.toFixed(2)} EUR anteilig auf ${periodCount} Wochen verteilt (${weeklyAmount.toFixed(2)} EUR/Woche)`,
   };
 }
 
@@ -1463,7 +1463,7 @@ function createBasicParsedRow(
         suggestion.weekUncertainty = "WAHRSCHEINLICH";
       } else {
         suggestion.weekUncertainty = "UNSICHER";
-        suggestion.uncertaintyExplanation = `Datum ${dateStr} liegt ausserhalb des 13-Wochen-Planungshorizonts`;
+        suggestion.uncertaintyExplanation = `Datum ${dateStr} liegt ausserhalb des Planungshorizonts`;
       }
     } else {
       suggestion.weekUncertainty = "UNBEKANNT";

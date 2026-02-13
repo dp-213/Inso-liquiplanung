@@ -237,7 +237,7 @@ export const TARGET_FIELD_LABELS: Record<TargetField, string> = {
 };
 
 export const TARGET_FIELD_REQUIREMENTS: Record<TargetField, { required: boolean; description: string }> = {
-  week_offset: { required: true, description: 'In welche der 13 Wochen fällt dieser Wert (0-12)' },
+  week_offset: { required: true, description: 'In welche Periode fällt dieser Wert (0-basiert)' },
   amount_cents: { required: true, description: 'Der Betrag in Euro-Cent' },
   line_name: { required: true, description: 'Name der Position' },
   flow_type: { required: true, description: 'INFLOW (Einzahlung) oder OUTFLOW (Auszahlung)' },
@@ -269,7 +269,7 @@ export const REVIEW_REASON_CODES = {
 export type ReviewReasonCode = typeof REVIEW_REASON_CODES[keyof typeof REVIEW_REASON_CODES];
 
 export const REVIEW_REASON_LABELS: Record<ReviewReasonCode, string> = {
-  DATE_OUTSIDE_RANGE: 'Datum außerhalb des 13-Wochen-Zeitraums',
+  DATE_OUTSIDE_RANGE: 'Datum außerhalb des Planungszeitraums',
   AMOUNT_UNUSUAL: 'Ungewöhnlicher Betrag',
   CATEGORY_NOT_FOUND: 'Kategorie nicht gefunden',
   CATEGORY_AUTO_ASSIGNED: 'Kategorie wurde automatisch zugewiesen',

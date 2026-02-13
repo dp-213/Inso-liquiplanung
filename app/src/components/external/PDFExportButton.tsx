@@ -314,7 +314,7 @@ export default function PDFExportButton({ data, pdfTexts }: PDFExportButtonProps
         weeks.length > 0 ? `${weeks[0].periodLabel || weeks[0].weekLabel || ""} - ${weeks[weeks.length - 1].periodLabel || weeks[weeks.length - 1].weekLabel || ""}` : "-",
         valueX, detailsY + 36
       );
-      doc.text(periodType === "WEEKLY" ? "Wöchentlich (13 Wochen)" : "Monatlich", valueX, detailsY + 45);
+      doc.text(periodType === "WEEKLY" ? `Wöchentlich (${weeks.length} Wochen)` : `Monatlich (${weeks.length} Monate)`, valueX, detailsY + 45);
 
       // Version and date info at bottom
       doc.setFontSize(9);
