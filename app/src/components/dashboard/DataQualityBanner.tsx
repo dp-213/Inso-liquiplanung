@@ -213,18 +213,22 @@ export default function DataQualityBanner({ caseId }: DataQualityBannerProps) {
                   )}
                 </div>
               </div>
-              {check.skipped > 0 && !check.passed && (
+              {check.skipped > 0 && (
                 <p className="text-xs mt-1 opacity-75">
-                  ({check.skipped} übersprungen: Quartal nicht bestimmbar)
+                  ({check.skipped} übersprungen{check.id === "estateAllocationQuarter" ? ": Quartal nicht bestimmbar" : check.id === "patternMatchValidation" ? ": ohne Pattern" : check.id === "counterpartiesWithoutPattern" ? ": unter Schwelle" : ""})
                 </p>
               )}
               {!check.passed && (
                 <div className="mt-1">
                   <Link
-                    href={`/admin/cases/${caseId}/ledger`}
+                    href={check.id === "counterpartiesWithoutPattern"
+                      ? `/admin/cases/${caseId}/counterparties?filter=NO_PATTERN`
+                      : `/admin/cases/${caseId}/ledger`}
                     className="text-xs underline font-medium hover:opacity-80"
                   >
-                    Im Ledger zeigen →
+                    {check.id === "counterpartiesWithoutPattern"
+                      ? "Gegenparteien verwalten →"
+                      : "Im Ledger zeigen →"}
                   </Link>
                 </div>
               )}

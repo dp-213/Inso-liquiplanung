@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useTableControls } from "@/hooks/useTableControls";
 import { TableToolbar, SortableHeader } from "@/components/admin/TableToolbar";
 
@@ -25,6 +25,7 @@ const TYPE_OPTIONS = [
 
 export default function CounterpartiesPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const caseId = params.id as string;
 
   const [counterparties, setCounterparties] = useState<Counterparty[]>([]);
@@ -147,11 +148,14 @@ export default function CounterpartiesPage() {
     });
   }
 
-  const [filterType, setFilterType] = useState<string>("ALL");
+  const initialFilter = searchParams.get("filter") || "ALL";
+  const [filterType, setFilterType] = useState<string>(initialFilter);
 
   const preFiltered = filterType === "ALL"
     ? counterparties
-    : counterparties.filter((c) => c.type === filterType);
+    : filterType === "NO_PATTERN"
+      ? counterparties.filter((c) => !c.matchPattern)
+      : counterparties.filter((c) => c.type === filterType);
 
   const { search, setSearch, sortKey, sortDir, toggleSort, result } = useTableControls(preFiltered, {
     searchFields: ["name", "shortName", "matchPattern", "type"],
@@ -197,7 +201,7 @@ export default function CounterpartiesPage() {
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="admin-card p-4">
           <p className="text-sm text-[var(--muted)]">Gesamt</p>
           <p className="text-2xl font-bold text-[var(--foreground)]">{counterparties.length}</p>
@@ -218,6 +222,12 @@ export default function CounterpartiesPage() {
           <p className="text-sm text-[var(--muted)]">Lieferanten</p>
           <p className="text-2xl font-bold text-purple-600">
             {counterparties.filter(c => c.type === "SUPPLIER").length}
+          </p>
+        </div>
+        <div className="admin-card p-4">
+          <p className="text-sm text-[var(--muted)]">Ohne Pattern</p>
+          <p className="text-2xl font-bold text-amber-600">
+            {counterparties.filter(c => !c.matchPattern).length}
           </p>
         </div>
       </div>
@@ -338,6 +348,7 @@ export default function CounterpartiesPage() {
             className="input text-sm py-1.5"
           >
             <option value="ALL">Alle Typen</option>
+            <option value="NO_PATTERN">Ohne Pattern</option>
             {TYPE_OPTIONS.map((t) => (
               <option key={t.value} value={t.value}>{t.label}</option>
             ))}
@@ -373,7 +384,9 @@ export default function CounterpartiesPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm font-mono text-[var(--secondary)]">
-                        {counterparty.matchPattern || "-"}
+                        {counterparty.matchPattern || (
+                          <span className="text-amber-500 text-xs font-sans">Kein Pattern</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {counterparty.isTopPayer && (

@@ -3,6 +3,7 @@ import prisma from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import {
   COUNTERPARTY_TAG_MAP,
+  ADDITIONAL_TAG_COUNTERPARTIES,
   QUARTAL_CHECK_TAGS,
   getExpectedEstateAllocation,
 } from "@/lib/cases/haevg-plus/matrix-config";
@@ -109,6 +110,7 @@ export async function GET(
         serviceDate: true,
         servicePeriodStart: true,
         servicePeriodEnd: true,
+        transferPartnerEntryId: true,
       },
     });
 
@@ -120,11 +122,15 @@ export async function GET(
 
     const counterpartyMap = new Map(counterparties.map(cp => [cp.id, cp]));
 
-    // Invertierung: TAG → erwartete CounterpartyIds
+    // Invertierung: TAG → erwartete CounterpartyIds (inkl. ADDITIONAL_TAG_COUNTERPARTIES)
     const tagCounterpartyMap: Record<string, string[]> = {};
     for (const [cpId, tag] of Object.entries(COUNTERPARTY_TAG_MAP)) {
       if (!tagCounterpartyMap[tag]) tagCounterpartyMap[tag] = [];
       tagCounterpartyMap[tag].push(cpId);
+    }
+    for (const [tag, cpIds] of Object.entries(ADDITIONAL_TAG_COUNTERPARTIES)) {
+      if (!tagCounterpartyMap[tag]) tagCounterpartyMap[tag] = [];
+      tagCounterpartyMap[tag].push(...cpIds);
     }
 
     // =======================================================================
@@ -419,6 +425,57 @@ export async function GET(
     };
 
     // =======================================================================
+    // Check 6: Gegenparteien ohne Match-Pattern
+    // =======================================================================
+    const MIN_ENTRIES_FOR_PATTERN = 5;
+    const check6Items: CheckItem[] = [];
+
+    // Zähle IST-Entries pro CP (ohne interne Transfers)
+    const cpEntryCounts = new Map<string, number>();
+    for (const entry of entries) {
+      if (entry.counterpartyId && !entry.transferPartnerEntryId) {
+        cpEntryCounts.set(entry.counterpartyId, (cpEntryCounts.get(entry.counterpartyId) || 0) + 1);
+      }
+    }
+
+    // Finde CPs mit >= 5 Entries aber ohne Pattern
+    let check6AboveThreshold = 0;
+    let check6BelowThreshold = 0;
+    for (const [cpId, count] of cpEntryCounts) {
+      if (count < MIN_ENTRIES_FOR_PATTERN) {
+        check6BelowThreshold++;
+        continue;
+      }
+      check6AboveThreshold++;
+      const cp = counterpartyMap.get(cpId);
+      if (cp && !cp.matchPattern) {
+        check6Items.push({
+          entryId: `cp:${cpId}`,
+          description: `„${cp.name}" – ${count} Buchungen ohne Match-Pattern`,
+          counterpartyName: cp.name,
+          counterpartyId: cpId,
+          entryCount: count,
+        });
+      }
+    }
+
+    check6Items.sort((a, b) => (b.entryCount as number) - (a.entryCount as number));
+
+    const check6: CheckResult = {
+      id: "counterpartiesWithoutPattern",
+      title: "Gegenparteien ohne Match-Pattern",
+      severity: "warning",
+      passed: check6Items.length === 0,
+      checked: check6AboveThreshold,
+      failed: check6Items.length,
+      skipped: check6BelowThreshold,
+      totalItems: check6Items.length,
+      shownItems: Math.min(check6Items.length, MAX_ITEMS),
+      items: check6Items.slice(0, MAX_ITEMS),
+      description: `Gegenparteien mit ${MIN_ENTRIES_FOR_PATTERN}+ Buchungen sollten ein Match-Pattern haben (für automatische Validierung).`,
+    };
+
+    // =======================================================================
     // Zusammenfassung
     // =======================================================================
     const checks = {
@@ -427,6 +484,7 @@ export async function GET(
       estateAllocationQuarter: check3,
       patternMatchValidation: check4,
       orphanedDimensions: check5,
+      counterpartiesWithoutPattern: check6,
     };
 
     const errors = Object.values(checks).filter(c => c.severity === "error" && !c.passed).length;
