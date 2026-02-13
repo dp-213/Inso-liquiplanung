@@ -16,7 +16,9 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 - **Monatliche Entwicklung:** Pro Standort Einnahmen/Kosten/Netto/Deckungsgrad über alle Monate mit Trend-Spalte (erster vs. letzter Monat)
 - **Ø Monat / Gesamt Toggle:** Vergleichstabelle und Coverage-Cards umschaltbar zwischen Monatsdurchschnitt und Gesamtsummen
 - **Standort-Merge:** Uckerath + Eitorf werden automatisch als "Uckerath/Eitorf" zusammengefasst (gemeinsame BSNR)
-- **Revenue-Kategorie-Drawer:** Detail-Ansicht pro Einnahmekategorie mit Tabelle
+- **Revenue-Kategorie-Drawer:** Klick auf Einnahmen-Karte öffnet Slide-over mit allen Buchungen (Datum, Quelle, Standort, Betrag, Alt/Neu-Split)
+- **Revenue Monats-Filter:** Toggle-Buttons für Zeitraum (3 / 6 / 12 Monate / Alle), dezente Lade-Animation beim Wechsel
+- **Revenue ISK-Filter (Bug-Fix):** `aggregateByCounterparty()` filtert jetzt nach `isLiquidityRelevant` – alte Schuldnerkonten (apoBank, Sparkasse Geschäftskonto) werden ausgeschlossen, "Ohne Kategorie" sinkt drastisch
 
 ### Neue API-Endpunkte
 
@@ -29,6 +31,8 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 - Monatliche Gruppierung in JavaScript statt Prisma (Turso datetime-Bug ADR-046)
 - Client-seitiger Standort-Merge via Name-Pattern-Matching (kein Schema-Change)
 - IST/PLAN-Vergleich: Auth-Check, Scope-Support, Overlap-only Totals
+- Revenue API: `liquidityRelevantOnly` Option, `months=0` für alle IST-Daten ab Plan-Start
+- AbortController im Revenue-Fetch gegen Race Conditions bei schnellem Zeitraum-Wechsel
 
 ---
 
