@@ -186,14 +186,15 @@ export default function UnifiedCaseDashboard({
 
   const { minCash, minCashPeriodLabel } = useMemo(() => {
     if (periods.length === 0) return { minCash: BigInt(0), minCashPeriodLabel: "" };
-    const current = BigInt(periods[0]?.openingBalanceCents || "0");
-    let min = current;
+    // Nur Endbestände vergleichen – Opening Balance (immer 0 bei cashflow-basierter Planung)
+    // würde sonst irreführend "Tiefster Stand: 0 EUR" anzeigen
+    let min = BigInt(periods[0].closingBalanceCents);
     let minLabel = periods[0]?.periodLabel || periods[0]?.weekLabel || "";
-    for (const period of periods) {
-      const balance = BigInt(period.closingBalanceCents);
+    for (let i = 1; i < periods.length; i++) {
+      const balance = BigInt(periods[i].closingBalanceCents);
       if (balance < min) {
         min = balance;
-        minLabel = period.periodLabel || period.weekLabel || "";
+        minLabel = periods[i].periodLabel || periods[i].weekLabel || "";
       }
     }
     return { minCash: min, minCashPeriodLabel: minLabel };
