@@ -72,7 +72,7 @@ export async function GET(
     // Get active plan for case
     const plan = await prisma.liquidityPlan.findFirst({
       where: { caseId, isActive: true },
-      select: { id: true },
+      select: { id: true, planStartDate: true },
     });
 
     if (!plan) {
@@ -84,8 +84,12 @@ export async function GET(
 
     // Calculate date range
     const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - months);
+    const startDate = months === 0
+      ? new Date(plan.planStartDate) // "Alle" = ab Plan-Start (Verfahrenseröffnung)
+      : new Date();
+    if (months > 0) {
+      startDate.setMonth(startDate.getMonth() - months);
+    }
 
     if (shouldSummarize) {
       // Return summarized data per counterparty
@@ -93,6 +97,7 @@ export async function GET(
         startDate,
         endDate,
         scope,
+        liquidityRelevantOnly: true,
       });
 
       // Convert BigInt to string for JSON serialization
@@ -117,6 +122,7 @@ export async function GET(
         endDate,
         flowType: 'INFLOW',
         scope,
+        liquidityRelevantOnly: true,
       });
 
       // Convert BigInt to string for JSON serialization

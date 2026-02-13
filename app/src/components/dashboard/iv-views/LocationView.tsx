@@ -1,17 +1,193 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import LocationPnL from "./LocationPnL";
+import { formatCurrency } from "@/types/dashboard";
 import LocationCoverageCards from "./LocationCoverageCards";
 import LocationCompareTable from "./LocationCompareTable";
 import LocationMonthlyTrend from "./LocationMonthlyTrend";
-import type { LocationCompareResponse } from "./LocationCoverageCards";
+import type {
+  LocationCompareResponse,
+  LocationCompareItem,
+  MonthData,
+} from "./location-compare-types";
 
 type EstateFilter = "NEUMASSE" | "ALTMASSE" | "GESAMT";
+type ViewMode = "total" | "average";
 
 interface LocationViewProps {
   caseId: string;
 }
+
+// =============================================================================
+// Standort-Gruppierung (Merge-Konfiguration)
+// =============================================================================
+
+interface MergeGroup {
+  patterns: string[]; // shortName/name muss eines davon enthalten
+  displayName: string;
+  displayShortName: string;
+}
+
+/** Standorte die zusammengefasst dargestellt werden */
+const LOCATION_MERGE_GROUPS: MergeGroup[] = [
+  {
+    patterns: ["Uckerath", "Eitorf"],
+    displayName: "Praxis Uckerath/Eitorf",
+    displayShortName: "Uckerath/Eitorf",
+  },
+];
+
+function matchesGroup(loc: LocationCompareItem, group: MergeGroup): boolean {
+  const label = loc.shortName || loc.name;
+  return group.patterns.some((p) => label.includes(p));
+}
+
+function addRevenue(
+  a: MonthData["revenue"],
+  b: MonthData["revenue"],
+): MonthData["revenue"] {
+  return {
+    kv: (BigInt(a.kv) + BigInt(b.kv)).toString(),
+    hzv: (BigInt(a.hzv) + BigInt(b.hzv)).toString(),
+    pvs: (BigInt(a.pvs) + BigInt(b.pvs)).toString(),
+    other: (BigInt(a.other) + BigInt(b.other)).toString(),
+  };
+}
+
+function addCosts(
+  a: MonthData["costs"],
+  b: MonthData["costs"],
+): MonthData["costs"] {
+  return {
+    personal: (BigInt(a.personal) + BigInt(b.personal)).toString(),
+    betriebskosten: (BigInt(a.betriebskosten) + BigInt(b.betriebskosten)).toString(),
+    other: (BigInt(a.other) + BigInt(b.other)).toString(),
+  };
+}
+
+function coverageBps(revCents: bigint, costCents: bigint): number {
+  if (costCents === 0n) return revCents > 0n ? 10000 : 0;
+  return Number((revCents * 10000n) / costCents);
+}
+
+function mergeItems(
+  items: LocationCompareItem[],
+  name: string,
+  shortName: string,
+): LocationCompareItem {
+  const zero = { kv: "0", hzv: "0", pvs: "0", other: "0" };
+  const zeroCosts = { personal: "0", betriebskosten: "0", other: "0" };
+
+  let totalRev = 0n;
+  let totalCost = 0n;
+  let entryCount = 0;
+  let revenue = { ...zero };
+  let costs = { ...zeroCosts };
+  let employees = { total: 0, doctors: 0 };
+
+  for (const item of items) {
+    totalRev += BigInt(item.totals.revenueCents);
+    totalCost += BigInt(item.totals.costsCents);
+    entryCount += item.totals.entryCount;
+    revenue = addRevenue(revenue, item.revenue);
+    costs = addCosts(costs, item.costs);
+    employees.total += item.employees.total;
+    employees.doctors += item.employees.doctors;
+  }
+
+  // Merge monthly data
+  const allMonths = new Set<string>();
+  for (const item of items) {
+    for (const ym of Object.keys(item.months)) allMonths.add(ym);
+  }
+
+  const months: Record<string, MonthData> = {};
+  for (const ym of allMonths) {
+    let mRev = { ...zero };
+    let mCost = { ...zeroCosts };
+    for (const item of items) {
+      const m = item.months[ym];
+      if (m) {
+        mRev = addRevenue(mRev, m.revenue);
+        mCost = addCosts(mCost, m.costs);
+      }
+    }
+    const mRevTotal = BigInt(mRev.kv) + BigInt(mRev.hzv) + BigInt(mRev.pvs) + BigInt(mRev.other);
+    const mCostTotal = BigInt(mCost.personal) + BigInt(mCost.betriebskosten) + BigInt(mCost.other);
+    months[ym] = {
+      revenueCents: mRevTotal.toString(),
+      costsCents: mCostTotal.toString(),
+      netCents: (mRevTotal - mCostTotal).toString(),
+      coverageBps: coverageBps(mRevTotal, mCostTotal),
+      revenue: mRev,
+      costs: mCost,
+    };
+  }
+
+  return {
+    id: items[0].id, // Drill-Down nutzt den primären Standort
+    name,
+    shortName,
+    totals: {
+      revenueCents: totalRev.toString(),
+      costsCents: totalCost.toString(),
+      netCents: (totalRev - totalCost).toString(),
+      coverageBps: coverageBps(totalRev, totalCost),
+      entryCount,
+    },
+    revenue,
+    costs,
+    months,
+    employees,
+  };
+}
+
+/** Fasst Standort-Gruppen zusammen, behält Reihenfolge */
+function mergeLocationGroups(data: LocationCompareResponse): LocationCompareResponse {
+  const result: LocationCompareItem[] = [];
+  const mergedIds = new Set<string>();
+  const insertedGroups = new Set<number>();
+
+  // Bestimme welche IDs zu welcher Gruppe gehören
+  const idToGroup = new Map<string, number>();
+  for (const loc of data.locations) {
+    for (let gi = 0; gi < LOCATION_MERGE_GROUPS.length; gi++) {
+      if (matchesGroup(loc, LOCATION_MERGE_GROUPS[gi])) {
+        idToGroup.set(loc.id, gi);
+        break;
+      }
+    }
+  }
+
+  // Zähle Matches pro Gruppe - nur mergen wenn >1 Match
+  const groupCounts = new Map<number, number>();
+  for (const gi of idToGroup.values()) {
+    groupCounts.set(gi, (groupCounts.get(gi) || 0) + 1);
+  }
+
+  for (const loc of data.locations) {
+    const gi = idToGroup.get(loc.id);
+    if (gi !== undefined && (groupCounts.get(gi) || 0) > 1) {
+      // Gehört zu einer Merge-Gruppe
+      if (!insertedGroups.has(gi)) {
+        const group = LOCATION_MERGE_GROUPS[gi];
+        const matching = data.locations.filter((l) => matchesGroup(l, group));
+        result.push(mergeItems(matching, group.displayName, group.displayShortName));
+        insertedGroups.add(gi);
+      }
+      mergedIds.add(loc.id);
+    } else {
+      result.push(loc);
+    }
+  }
+
+  return { ...data, locations: result };
+}
+
+// =============================================================================
+// LocationView Component
+// =============================================================================
 
 /**
  * LocationView - Standort-Vergleichsansicht
@@ -25,11 +201,12 @@ interface LocationViewProps {
  * D) Monatliche Entwicklung pro Standort
  */
 export default function LocationView({ caseId }: LocationViewProps) {
-  const [data, setData] = useState<LocationCompareResponse | null>(null);
+  const [rawData, setRawData] = useState<LocationCompareResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [estateFilter, setEstateFilter] = useState<EstateFilter>("NEUMASSE");
+  const [viewMode, setViewMode] = useState<ViewMode>("average");
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -43,7 +220,7 @@ export default function LocationView({ caseId }: LocationViewProps) {
         throw new Error("Fehler beim Laden der Standort-Daten");
       }
       const json = await res.json();
-      setData(json);
+      setRawData(json);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unbekannter Fehler");
     } finally {
@@ -54,6 +231,12 @@ export default function LocationView({ caseId }: LocationViewProps) {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Merge-Logik: Eitorf+Uckerath zusammenfassen
+  const data = useMemo(() => {
+    if (!rawData) return null;
+    return mergeLocationGroups(rawData);
+  }, [rawData]);
 
   if (loading) {
     return (
@@ -104,30 +287,63 @@ export default function LocationView({ caseId }: LocationViewProps) {
     );
   }
 
+  const monthCount = data.monthLabels.length;
+
   return (
     <div className="space-y-6">
-      {/* Header mit Estate-Filter */}
+      {/* Header mit Filtern */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-[var(--foreground)]">Standort-Vergleich</h2>
           <p className="text-sm text-[var(--secondary)]">
             Wirtschaftliche Tragfähigkeit pro Standort
+            {viewMode === "average" && monthCount > 0 && (
+              <span className="ml-1 text-[var(--muted)]">
+                (Ø {monthCount} Monate)
+              </span>
+            )}
           </p>
         </div>
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-          {(["NEUMASSE", "ALTMASSE", "GESAMT"] as EstateFilter[]).map((filter) => (
+        <div className="flex items-center gap-3">
+          {/* Zeitraum-Toggle */}
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
             <button
-              key={filter}
-              onClick={() => setEstateFilter(filter)}
+              onClick={() => setViewMode("average")}
               className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                estateFilter === filter
+                viewMode === "average"
                   ? "bg-white shadow-sm text-gray-900"
                   : "text-gray-600 hover:text-gray-900"
               }`}
             >
-              {filter === "NEUMASSE" ? "Neumasse" : filter === "ALTMASSE" ? "Altmasse" : "Gesamt"}
+              Ø Monat
             </button>
-          ))}
+            <button
+              onClick={() => setViewMode("total")}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                viewMode === "total"
+                  ? "bg-white shadow-sm text-gray-900"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Gesamt
+            </button>
+          </div>
+          {/* Estate-Toggle */}
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            {(["NEUMASSE", "ALTMASSE", "GESAMT"] as EstateFilter[]).map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setEstateFilter(filter)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  estateFilter === filter
+                    ? "bg-white shadow-sm text-gray-900"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {filter === "NEUMASSE" ? "Neumasse" : filter === "ALTMASSE" ? "Altmasse" : "Gesamt"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -143,7 +359,7 @@ export default function LocationView({ caseId }: LocationViewProps) {
                 {data.unassigned.count} Buchung{data.unassigned.count !== 1 ? "en" : ""} ohne Standort-Zuordnung
               </h4>
               <p className="text-sm text-amber-700 mt-1">
-                Summe: {formatCurrencyInline(data.unassigned.totalCents)} &mdash; Diese Buchungen sind in der Vergleichstabelle nicht enthalten.
+                Summe: {formatCurrency(data.unassigned.totalCents)} &mdash; Diese Buchungen sind in der Vergleichstabelle nicht enthalten.
               </p>
             </div>
           </div>
@@ -151,10 +367,14 @@ export default function LocationView({ caseId }: LocationViewProps) {
       )}
 
       {/* Sektion B: Deckungsgrad-Cards */}
-      <LocationCoverageCards data={data} monthCount={data.monthLabels.length} />
+      <LocationCoverageCards data={data} monthCount={monthCount} viewMode={viewMode} />
 
       {/* Sektion C: Vergleichstabelle */}
-      <LocationCompareTable data={data} onSelectLocation={setSelectedLocation} />
+      <LocationCompareTable
+        data={data}
+        onSelectLocation={setSelectedLocation}
+        viewMode={viewMode}
+      />
 
       {/* Sektion D: Monatliche Entwicklung */}
       {data.monthLabels.length > 1 && (
@@ -186,15 +406,4 @@ export default function LocationView({ caseId }: LocationViewProps) {
       )}
     </div>
   );
-}
-
-function formatCurrencyInline(cents: string): string {
-  const value = BigInt(cents);
-  const euros = Number(value) / 100;
-  return euros.toLocaleString("de-DE", {
-    style: "currency",
-    currency: "EUR",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
 }

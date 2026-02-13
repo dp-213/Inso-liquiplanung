@@ -1,39 +1,7 @@
 "use client";
 
 import { formatCurrency } from "@/types/dashboard";
-
-export interface LocationCompareItem {
-  id: string;
-  name: string;
-  shortName: string | null;
-  totals: {
-    revenueCents: string;
-    costsCents: string;
-    netCents: string;
-    coverageBps: number;
-    entryCount: number;
-  };
-  revenue: { kv: string; hzv: string; pvs: string; other: string };
-  costs: { personal: string; betriebskosten: string; other: string };
-  months: Record<string, MonthData>;
-  employees: { total: number; doctors: number };
-}
-
-export interface MonthData {
-  revenueCents: string;
-  costsCents: string;
-  netCents: string;
-  coverageBps: number;
-  revenue: { kv: string; hzv: string; pvs: string; other: string };
-  costs: { personal: string; betriebskosten: string; other: string };
-}
-
-export interface LocationCompareResponse {
-  locations: LocationCompareItem[];
-  unassigned: { count: number; totalCents: string };
-  monthLabels: string[];
-  estateFilter: string;
-}
+import type { LocationCompareResponse } from "./location-compare-types";
 
 function coverageColor(bps: number): { bg: string; text: string; bar: string } {
   if (bps >= 10000) return { bg: "bg-green-50", text: "text-green-700", bar: "bg-green-500" };
@@ -49,22 +17,30 @@ function formatBps(bps: number): string {
 interface LocationCoverageCardsProps {
   data: LocationCompareResponse;
   monthCount: number;
+  viewMode: "total" | "average";
 }
 
-export default function LocationCoverageCards({ data, monthCount }: LocationCoverageCardsProps) {
-  // Filter out locations with 0 entries
+export default function LocationCoverageCards({ data, monthCount, viewMode }: LocationCoverageCardsProps) {
   const activeLocations = data.locations.filter((l) => l.totals.entryCount > 0);
-
   if (activeLocations.length === 0) return null;
+
+  const isAvg = viewMode === "average" && monthCount > 0;
+  const mc = BigInt(monthCount);
+
+  const av = (cents: string): bigint => {
+    const val = BigInt(cents);
+    return isAvg ? val / mc : val;
+  };
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {activeLocations.map((loc) => {
         const bps = loc.totals.coverageBps;
         const colors = coverageColor(bps);
-        const barWidth = Math.min(bps / 100, 100); // cap at 100%
-        const netCents = BigInt(loc.totals.netCents);
-        const monthlyDeficit = monthCount > 0 ? netCents / BigInt(monthCount) : 0n;
+        const barWidth = Math.min(bps / 100, 100);
+        const netCents = av(loc.totals.netCents);
+        const revCents = av(loc.totals.revenueCents);
+        const costCents = av(loc.totals.costsCents);
 
         return (
           <div key={loc.id} className={`admin-card p-5 ${colors.bg} border`}>
@@ -87,32 +63,39 @@ export default function LocationCoverageCards({ data, monthCount }: LocationCove
 
             <div className="space-y-1.5 text-sm">
               <div className="flex justify-between">
-                <span className="text-[var(--secondary)]">Einnahmen</span>
+                <span className="text-[var(--secondary)]">
+                  Einnahmen{isAvg ? " /Monat" : ""}
+                </span>
                 <span className="font-medium text-green-600">
-                  {formatCurrency(loc.totals.revenueCents)}
+                  {formatCurrency(revCents.toString())}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[var(--secondary)]">Kosten</span>
+                <span className="text-[var(--secondary)]">
+                  Kosten{isAvg ? " /Monat" : ""}
+                </span>
                 <span className="font-medium text-red-600">
-                  -{formatCurrency(loc.totals.costsCents)}
+                  -{formatCurrency(costCents.toString())}
                 </span>
               </div>
               <div className="flex justify-between pt-1 border-t border-gray-200">
-                <span className="text-[var(--secondary)]">Netto gesamt</span>
+                <span className="text-[var(--secondary)]">
+                  {isAvg ? "Netto /Monat" : "Netto gesamt"}
+                </span>
                 <span className={`font-bold ${netCents >= 0n ? "text-green-600" : "text-red-600"}`}>
-                  {formatCurrency(loc.totals.netCents)}
+                  {formatCurrency(netCents.toString())}
                 </span>
               </div>
-              {monthCount > 0 && netCents < 0n && (
+              {/* Fehlbetrag/Monat nur im Gesamt-Modus (im Durchschnitt IST Netto schon pro Monat) */}
+              {!isAvg && monthCount > 0 && netCents < 0n && (
                 <div className="flex justify-between">
                   <span className="text-[var(--secondary)]">Fehlbetrag/Monat</span>
                   <span className="font-medium text-red-600">
-                    {formatCurrency(monthlyDeficit.toString())}
+                    {formatCurrency((BigInt(loc.totals.netCents) / mc).toString())}
                   </span>
                 </div>
               )}
-              {(loc.employees.total > 0) && (
+              {loc.employees.total > 0 && (
                 <div className="flex justify-between pt-1 border-t border-gray-200">
                   <span className="text-[var(--secondary)]">Mitarbeiter</span>
                   <span className="font-medium text-[var(--foreground)]">

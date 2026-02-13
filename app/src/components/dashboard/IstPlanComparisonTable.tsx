@@ -2,9 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  BarChart,
   Bar,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -12,6 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
   ComposedChart,
+  Line,
 } from "recharts";
 import type { LiquidityScope } from "@/components/dashboard/LiquidityMatrixTable";
 import type {
@@ -54,30 +53,36 @@ function fmtCurrency(centsStr: string): string {
 
 function fmtPercent(value: number | null): string {
   if (value === null) return "\u2013";
-  const sign = value >= 0 ? "+" : "";
-  return `${sign}${value.toFixed(1)} %`;
+  if (value === 0) return "0,0 %";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(1).replace(".", ",")} %`;
 }
 
-/** Bestimmt ob eine Abweichung "gut" ist */
-function isGoodDeviation(centsStr: string, type: "inflow" | "outflow" | "net"): boolean | null {
+/**
+ * Farbcodierung für Abweichungen: positiv = grün, negativ = rot.
+ * Gilt einheitlich für Einnahmen, Ausgaben und Netto, weil Outflows
+ * bereits als negative Beträge gespeichert sind. deviation = IST - PLAN:
+ * +5k bei Outflows = IST weniger negativ = weniger ausgegeben = gut.
+ */
+function deviationColor(centsStr: string): string {
   const cents = BigInt(centsStr);
-  if (cents === BigInt(0)) return null;
-  const isPositive = cents > BigInt(0);
-  // Einnahmen: positiv = gut, Ausgaben: positiv = schlecht (mehr Ausgaben), Netto: positiv = gut
-  return type === "outflow" ? !isPositive : isPositive;
-}
-
-function deviationColor(centsStr: string, type: "inflow" | "outflow" | "net"): string {
-  const good = isGoodDeviation(centsStr, type);
-  if (good === null) return "text-gray-400";
-  return good ? "text-green-700" : "text-red-600";
+  if (cents === BigInt(0)) return "text-gray-400";
+  return cents > BigInt(0) ? "text-green-700" : "text-red-600";
 }
 
 function deviationSign(centsStr: string): string {
-  const cents = BigInt(centsStr);
-  if (cents > BigInt(0)) return "+";
-  return "";
+  return BigInt(centsStr) > BigInt(0) ? "+" : "";
 }
+
+// Opake Hintergrundfarben für Sticky-Spalten (kein Durchscheinen beim Scrollen)
+const STICKY_BG = {
+  default: "bg-white",
+  ist: "bg-emerald-50",
+  plan: "bg-blue-50",
+  sectionHeader: "bg-gray-50",
+  cumulative: "bg-gray-50",
+  totalCol: "bg-gray-100",
+} as const;
 
 // =============================================================================
 // CHART COMPONENT
@@ -89,11 +94,9 @@ function ComparisonChart({ data }: { data: IstPlanComparisonData }) {
       .filter((p) => p.hasIst || p.hasPlan)
       .map((p) => ({
         name: p.periodLabel,
-        istInflows: p.hasIst ? Number(BigInt(p.istInflowsCents)) / 100 : null,
-        planInflows: p.hasPlan ? Number(BigInt(p.planInflowsCents)) / 100 : null,
-        istOutflows: p.hasIst ? Math.abs(Number(BigInt(p.istOutflowsCents))) / 100 : null,
-        planOutflows: p.hasPlan ? Math.abs(Number(BigInt(p.planOutflowsCents))) / 100 : null,
-        deviationNet: p.hasIst && p.hasPlan ? Number(BigInt(p.deviationNetCents)) / 100 : null,
+        istNetto: p.hasIst ? Number(BigInt(p.istNetCents)) / 100 : null,
+        planNetto: p.hasPlan ? Number(BigInt(p.planNetCents)) / 100 : null,
+        abweichung: p.hasIst && p.hasPlan ? Number(BigInt(p.cumulativeDeviationNetCents)) / 100 : null,
       }));
   }, [data.periods]);
 
@@ -105,25 +108,21 @@ function ComparisonChart({ data }: { data: IstPlanComparisonData }) {
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis
-              dataKey="name"
-              tick={{ fontSize: 11 }}
-              tickLine={false}
-            />
+            <XAxis dataKey="name" tick={{ fontSize: 11 }} tickLine={false} />
             <YAxis
               tick={{ fontSize: 11 }}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`}
+              tickFormatter={(v: number) =>
+                Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
+              }
             />
             <Tooltip
               formatter={(value, name) => {
                 const labels: Record<string, string> = {
-                  istInflows: "IST Einnahmen",
-                  planInflows: "PLAN Einnahmen",
-                  istOutflows: "IST Ausgaben",
-                  planOutflows: "PLAN Ausgaben",
-                  deviationNet: "Netto-Abweichung",
+                  istNetto: "IST Netto",
+                  planNetto: "PLAN Netto",
+                  abweichung: "Kum. Abweichung",
                 };
                 const num = typeof value === "number" ? value : 0;
                 return [
@@ -138,22 +137,18 @@ function ComparisonChart({ data }: { data: IstPlanComparisonData }) {
               wrapperStyle={{ fontSize: 11 }}
               formatter={(value: string) => {
                 const labels: Record<string, string> = {
-                  istInflows: "IST Einnahmen",
-                  planInflows: "PLAN Einnahmen",
-                  istOutflows: "IST Ausgaben",
-                  planOutflows: "PLAN Ausgaben",
-                  deviationNet: "Netto-Abweichung",
+                  istNetto: "IST Netto",
+                  planNetto: "PLAN Netto",
+                  abweichung: "Kum. Abweichung",
                 };
                 return labels[value] || value;
               }}
             />
-            <Bar dataKey="istInflows" fill="#10b981" opacity={0.8} radius={[2, 2, 0, 0]} barSize={16} />
-            <Bar dataKey="planInflows" fill="#6366f1" opacity={0.5} radius={[2, 2, 0, 0]} barSize={16} />
-            <Bar dataKey="istOutflows" fill="#ef4444" opacity={0.8} radius={[2, 2, 0, 0]} barSize={16} />
-            <Bar dataKey="planOutflows" fill="#f59e0b" opacity={0.5} radius={[2, 2, 0, 0]} barSize={16} />
+            <Bar dataKey="istNetto" fill="#10b981" opacity={0.85} radius={[3, 3, 0, 0]} barSize={24} />
+            <Bar dataKey="planNetto" fill="#6366f1" opacity={0.55} radius={[3, 3, 0, 0]} barSize={24} />
             <Line
               type="monotone"
-              dataKey="deviationNet"
+              dataKey="abweichung"
               stroke="#8b5cf6"
               strokeWidth={2}
               strokeDasharray="5 3"
@@ -176,7 +171,7 @@ function DataRow({
   label,
   periods,
   getValue,
-  className = "",
+  rowBg,
   valueClassName = "",
   showSign = false,
   totalValue,
@@ -185,15 +180,15 @@ function DataRow({
   label: string;
   periods: ComparisonPeriod[];
   getValue: (p: ComparisonPeriod) => string | null;
-  className?: string;
+  rowBg: string;
   valueClassName?: string | ((p: ComparisonPeriod) => string);
   showSign?: boolean;
   totalValue?: string | null;
   totalClassName?: string;
 }) {
   return (
-    <tr className={className}>
-      <td className="py-2 px-3 text-sm whitespace-nowrap sticky left-0 z-10 bg-inherit">
+    <tr className={rowBg}>
+      <td className={`py-2 px-3 text-sm whitespace-nowrap sticky left-0 z-10 ${rowBg}`}>
         {label}
       </td>
       {periods.map((p) => {
@@ -212,7 +207,7 @@ function DataRow({
           </td>
         );
       })}
-      <td className={`py-2 px-3 text-sm text-right tabular-nums font-medium border-l border-gray-200 ${totalClassName}`}>
+      <td className={`py-2 px-3 text-sm text-right tabular-nums font-medium border-l border-gray-200 ${STICKY_BG.totalCol} ${totalClassName}`}>
         {totalValue === null || totalValue === undefined ? (
           <span className="text-gray-300">{"\u2013"}</span>
         ) : (
@@ -231,18 +226,18 @@ function PercentRow({
   label,
   periods,
   getPercent,
-  className = "",
+  rowBg,
   totalPercent,
 }: {
   label: string;
   periods: ComparisonPeriod[];
   getPercent: (p: ComparisonPeriod) => number | null;
-  className?: string;
+  rowBg: string;
   totalPercent?: number | null;
 }) {
   return (
-    <tr className={className}>
-      <td className="py-1.5 px-3 text-xs whitespace-nowrap sticky left-0 z-10 bg-inherit text-gray-500">
+    <tr className={`${rowBg} border-b border-gray-200`}>
+      <td className={`py-1.5 px-3 text-xs whitespace-nowrap sticky left-0 z-10 ${rowBg} text-gray-500`}>
         {label}
       </td>
       {periods.map((p) => {
@@ -252,18 +247,18 @@ function PercentRow({
             {pct === null ? (
               <span className="text-gray-300">{"\u2013"}</span>
             ) : (
-              <span className={pct >= 0 ? "text-green-600" : "text-red-500"}>
+              <span className={pct === 0 ? "text-gray-400" : pct > 0 ? "text-green-600" : "text-red-500"}>
                 {fmtPercent(pct)}
               </span>
             )}
           </td>
         );
       })}
-      <td className="py-1.5 px-3 text-xs text-right tabular-nums text-gray-500 border-l border-gray-200">
+      <td className={`py-1.5 px-3 text-xs text-right tabular-nums text-gray-500 border-l border-gray-200 ${STICKY_BG.totalCol}`}>
         {totalPercent === null || totalPercent === undefined ? (
           <span className="text-gray-300">{"\u2013"}</span>
         ) : (
-          <span className={totalPercent >= 0 ? "text-green-600" : "text-red-500"}>
+          <span className={totalPercent === 0 ? "text-gray-400" : totalPercent > 0 ? "text-green-600" : "text-red-500"}>
             {fmtPercent(totalPercent)}
           </span>
         )}
@@ -273,18 +268,12 @@ function PercentRow({
 }
 
 /** Section Header Zeile */
-function SectionHeader({
-  label,
-  colSpan,
-}: {
-  label: string;
-  colSpan: number;
-}) {
+function SectionHeader({ label, colSpan }: { label: string; colSpan: number }) {
   return (
-    <tr className="bg-gray-50 border-y border-gray-200">
+    <tr className={`${STICKY_BG.sectionHeader} border-y border-gray-200`}>
       <td
         colSpan={colSpan}
-        className="py-2 px-3 text-xs font-bold text-gray-600 uppercase tracking-wider sticky left-0 z-10 bg-gray-50"
+        className={`py-2 px-3 text-xs font-bold text-gray-600 uppercase tracking-wider sticky left-0 z-10 ${STICKY_BG.sectionHeader}`}
       >
         {label}
       </td>
@@ -328,7 +317,6 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
     fetchData();
   }, [caseId, scope]);
 
-  // Nur Perioden mit Daten anzeigen
   const periodsWithData = useMemo(() => {
     if (!data) return [];
     return data.periods.filter((p) => p.hasIst || p.hasPlan);
@@ -370,7 +358,7 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
 
   return (
     <div className="space-y-4">
-      {/* Header mit Info-Badge */}
+      {/* Header mit Info-Badges */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h2 className="text-lg font-semibold text-gray-900">IST/PLAN-Vergleich</h2>
@@ -393,17 +381,16 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
         </div>
       </div>
 
-      {/* Chart */}
+      {/* Chart: IST Netto vs PLAN Netto + kumulierte Abweichungslinie */}
       <ComparisonChart data={data} />
 
       {/* Vergleichstabelle: Monate als Spalten */}
       <div className="admin-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
-            {/* Header: Perioden-Labels */}
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="py-2.5 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 z-20 bg-gray-50 min-w-[160px]">
+              <tr className={`${STICKY_BG.sectionHeader} border-b border-gray-200`}>
+                <th className={`py-2.5 px-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 z-20 ${STICKY_BG.sectionHeader} min-w-[160px]`}>
                   in EUR
                 </th>
                 {periodsWithData.map((p) => (
@@ -423,8 +410,11 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
                     </div>
                   </th>
                 ))}
-                <th className="py-2.5 px-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[110px] border-l border-gray-200 bg-gray-100">
-                  Gesamt
+                <th className={`py-2.5 px-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] border-l border-gray-200 ${STICKY_BG.totalCol}`}>
+                  <div>{"\u03A3"} Vergleich</div>
+                  <div className="mt-0.5 font-normal normal-case text-gray-400" title="Nur Perioden mit IST- und PLAN-Daten">
+                    {data.totals.overlapPeriodCount} von {periodsWithData.length} Per.
+                  </div>
                 </th>
               </tr>
             </thead>
@@ -433,110 +423,97 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
               {/* ── EINNAHMEN ────────────────────────────────────── */}
               <SectionHeader label="Einnahmen" colSpan={totalColumns} />
 
-              {/* IST Einnahmen */}
               <DataRow
                 label="IST"
                 periods={periodsWithData}
                 getValue={(p) => (p.hasIst ? p.istInflowsCents : null)}
-                className="bg-emerald-50/40"
+                rowBg={STICKY_BG.ist}
                 valueClassName="text-gray-900"
                 totalValue={data.totals.istInflowsCents}
                 totalClassName="text-gray-900"
               />
-
-              {/* PLAN Einnahmen */}
               <DataRow
                 label="PLAN"
                 periods={periodsWithData}
                 getValue={(p) => (p.hasPlan ? p.planInflowsCents : null)}
-                className="bg-blue-50/40"
+                rowBg={STICKY_BG.plan}
                 valueClassName="text-gray-900"
                 totalValue={data.totals.planInflowsCents}
                 totalClassName="text-gray-900"
               />
-
-              {/* Abweichung Einnahmen */}
               <DataRow
                 label="Abweichung"
                 periods={periodsWithData}
                 getValue={(p) => (p.hasIst && p.hasPlan ? p.deviationInflowsCents : null)}
-                className="border-b border-gray-100"
+                rowBg={STICKY_BG.default}
                 valueClassName={(p) =>
                   p.hasIst && p.hasPlan
-                    ? `font-medium ${deviationColor(p.deviationInflowsCents, "inflow")}`
+                    ? `font-medium ${deviationColor(p.deviationInflowsCents)}`
                     : ""
                 }
                 showSign
                 totalValue={data.totals.deviationInflowsCents}
-                totalClassName={`font-medium ${deviationColor(data.totals.deviationInflowsCents, "inflow")}`}
+                totalClassName={`font-medium ${deviationColor(data.totals.deviationInflowsCents)}`}
               />
-
               <PercentRow
                 label="Abweichung %"
                 periods={periodsWithData}
-                getPercent={(p) => (p.hasIst && p.hasPlan ? p.deviationInflowsPercent : null)}
-                className="border-b border-gray-200"
+                getPercent={(p) => p.deviationInflowsPercent}
+                rowBg={STICKY_BG.default}
                 totalPercent={data.totals.deviationInflowsPercent}
               />
 
               {/* ── AUSGABEN ─────────────────────────────────────── */}
               <SectionHeader label="Ausgaben" colSpan={totalColumns} />
 
-              {/* IST Ausgaben */}
               <DataRow
                 label="IST"
                 periods={periodsWithData}
                 getValue={(p) => (p.hasIst ? p.istOutflowsCents : null)}
-                className="bg-emerald-50/40"
+                rowBg={STICKY_BG.ist}
                 valueClassName="text-gray-900"
                 totalValue={data.totals.istOutflowsCents}
                 totalClassName="text-gray-900"
               />
-
-              {/* PLAN Ausgaben */}
               <DataRow
                 label="PLAN"
                 periods={periodsWithData}
                 getValue={(p) => (p.hasPlan ? p.planOutflowsCents : null)}
-                className="bg-blue-50/40"
+                rowBg={STICKY_BG.plan}
                 valueClassName="text-gray-900"
                 totalValue={data.totals.planOutflowsCents}
                 totalClassName="text-gray-900"
               />
-
-              {/* Abweichung Ausgaben */}
               <DataRow
                 label="Abweichung"
                 periods={periodsWithData}
                 getValue={(p) => (p.hasIst && p.hasPlan ? p.deviationOutflowsCents : null)}
-                className="border-b border-gray-100"
+                rowBg={STICKY_BG.default}
                 valueClassName={(p) =>
                   p.hasIst && p.hasPlan
-                    ? `font-medium ${deviationColor(p.deviationOutflowsCents, "outflow")}`
+                    ? `font-medium ${deviationColor(p.deviationOutflowsCents)}`
                     : ""
                 }
                 showSign
                 totalValue={data.totals.deviationOutflowsCents}
-                totalClassName={`font-medium ${deviationColor(data.totals.deviationOutflowsCents, "outflow")}`}
+                totalClassName={`font-medium ${deviationColor(data.totals.deviationOutflowsCents)}`}
               />
-
               <PercentRow
                 label="Abweichung %"
                 periods={periodsWithData}
-                getPercent={(p) => (p.hasIst && p.hasPlan ? p.deviationOutflowsPercent : null)}
-                className="border-b border-gray-200"
+                getPercent={(p) => p.deviationOutflowsPercent}
+                rowBg={STICKY_BG.default}
                 totalPercent={data.totals.deviationOutflowsPercent}
               />
 
               {/* ── NETTO CASHFLOW ───────────────────────────────── */}
               <SectionHeader label="Netto-Cashflow" colSpan={totalColumns} />
 
-              {/* IST Netto */}
               <DataRow
                 label="IST"
                 periods={periodsWithData}
                 getValue={(p) => (p.hasIst ? p.istNetCents : null)}
-                className="bg-emerald-50/40"
+                rowBg={STICKY_BG.ist}
                 valueClassName={(p) =>
                   p.hasIst
                     ? BigInt(p.istNetCents) >= 0
@@ -547,13 +524,11 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
                 totalValue={data.totals.istNetCents}
                 totalClassName={BigInt(data.totals.istNetCents) >= 0 ? "text-green-700" : "text-red-600"}
               />
-
-              {/* PLAN Netto */}
               <DataRow
                 label="PLAN"
                 periods={periodsWithData}
                 getValue={(p) => (p.hasPlan ? p.planNetCents : null)}
-                className="bg-blue-50/40"
+                rowBg={STICKY_BG.plan}
                 valueClassName={(p) =>
                   p.hasPlan
                     ? BigInt(p.planNetCents) >= 0
@@ -564,34 +539,31 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
                 totalValue={data.totals.planNetCents}
                 totalClassName={BigInt(data.totals.planNetCents) >= 0 ? "text-blue-700" : "text-red-600"}
               />
-
-              {/* Abweichung Netto */}
               <DataRow
                 label="Abweichung"
                 periods={periodsWithData}
                 getValue={(p) => (p.hasIst && p.hasPlan ? p.deviationNetCents : null)}
-                className="border-b border-gray-100"
+                rowBg={STICKY_BG.default}
                 valueClassName={(p) =>
                   p.hasIst && p.hasPlan
-                    ? `font-semibold ${deviationColor(p.deviationNetCents, "net")}`
+                    ? `font-semibold ${deviationColor(p.deviationNetCents)}`
                     : ""
                 }
                 showSign
                 totalValue={data.totals.deviationNetCents}
-                totalClassName={`font-semibold ${deviationColor(data.totals.deviationNetCents, "net")}`}
+                totalClassName={`font-semibold ${deviationColor(data.totals.deviationNetCents)}`}
               />
-
               <PercentRow
                 label="Abweichung %"
                 periods={periodsWithData}
-                getPercent={(p) => (p.hasIst && p.hasPlan ? p.deviationNetPercent : null)}
-                className="border-b border-gray-200"
+                getPercent={(p) => p.deviationNetPercent}
+                rowBg={STICKY_BG.default}
                 totalPercent={data.totals.deviationNetPercent}
               />
 
               {/* ── KUMULIERTE ABWEICHUNG ────────────────────────── */}
-              <tr className="bg-gray-50 border-t-2 border-gray-300">
-                <td className="py-2.5 px-3 text-sm font-semibold text-gray-700 whitespace-nowrap sticky left-0 z-10 bg-gray-50">
+              <tr className={`${STICKY_BG.cumulative} border-t-2 border-gray-300`}>
+                <td className={`py-2.5 px-3 text-sm font-semibold text-gray-700 whitespace-nowrap sticky left-0 z-10 ${STICKY_BG.cumulative}`}>
                   Kumulierte Abweichung
                 </td>
                 {periodsWithData.map((p) => {
@@ -600,7 +572,7 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
                     <td
                       key={p.periodIndex}
                       className={`py-2.5 px-3 text-sm text-right tabular-nums font-semibold ${
-                        hasBoth ? deviationColor(p.cumulativeDeviationNetCents, "net") : "text-gray-300"
+                        hasBoth ? deviationColor(p.cumulativeDeviationNetCents) : "text-gray-300"
                       }`}
                     >
                       {hasBoth ? (
@@ -614,13 +586,12 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
                     </td>
                   );
                 })}
-                <td className="py-2.5 px-3 text-sm text-right tabular-nums font-semibold border-l border-gray-200 bg-gray-100">
-                  {/* Gesamt = letzte kumulierte Abweichung */}
+                <td className={`py-2.5 px-3 text-sm text-right tabular-nums font-semibold border-l border-gray-200 ${STICKY_BG.totalCol}`}>
                   {(() => {
                     const lastWithBoth = [...periodsWithData].reverse().find((p) => p.hasIst && p.hasPlan);
                     if (!lastWithBoth) return "\u2013";
                     return (
-                      <span className={deviationColor(lastWithBoth.cumulativeDeviationNetCents, "net")}>
+                      <span className={deviationColor(lastWithBoth.cumulativeDeviationNetCents)}>
                         {deviationSign(lastWithBoth.cumulativeDeviationNetCents)}
                         {fmtNum(lastWithBoth.cumulativeDeviationNetCents)}
                       </span>
@@ -635,44 +606,44 @@ export default function IstPlanComparisonTable({ caseId, scope = "GLOBAL" }: Ist
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {/* Einnahmen-Abweichung */}
         <div className="admin-card p-4">
-          <div className="text-xs text-gray-500 mb-1">Gesamt-Abweichung Einnahmen</div>
-          <div className={`text-xl font-bold ${deviationColor(data.totals.deviationInflowsCents, "inflow")}`}>
+          <div className="text-xs text-gray-500 mb-1">Abweichung Einnahmen</div>
+          <div className={`text-xl font-bold ${deviationColor(data.totals.deviationInflowsCents)}`}>
             {deviationSign(data.totals.deviationInflowsCents)}{fmtCurrency(data.totals.deviationInflowsCents)}
           </div>
           <div className="text-xs text-gray-500 mt-1">
             {data.totals.deviationInflowsPercent !== null
               ? fmtPercent(data.totals.deviationInflowsPercent)
-              : "Kein PLAN"}
+              : "Kein Vergleich möglich"}
           </div>
         </div>
 
-        {/* Ausgaben-Abweichung */}
         <div className="admin-card p-4">
-          <div className="text-xs text-gray-500 mb-1">Gesamt-Abweichung Ausgaben</div>
-          <div className={`text-xl font-bold ${deviationColor(data.totals.deviationOutflowsCents, "outflow")}`}>
+          <div className="text-xs text-gray-500 mb-1">Abweichung Ausgaben</div>
+          <div className={`text-xl font-bold ${deviationColor(data.totals.deviationOutflowsCents)}`}>
             {deviationSign(data.totals.deviationOutflowsCents)}{fmtCurrency(data.totals.deviationOutflowsCents)}
           </div>
           <div className="text-xs text-gray-500 mt-1">
             {data.totals.deviationOutflowsPercent !== null
               ? fmtPercent(data.totals.deviationOutflowsPercent)
-              : "Kein PLAN"}
+              : "Kein Vergleich möglich"}
           </div>
         </div>
 
-        {/* Netto-Abweichung */}
         <div className={`admin-card p-4 border-l-4 ${
           BigInt(data.totals.deviationNetCents) >= 0 ? "border-green-500" : "border-red-500"
         }`}>
           <div className="text-xs text-gray-500 mb-1">Netto-Abweichung</div>
-          <div className={`text-xl font-bold ${deviationColor(data.totals.deviationNetCents, "net")}`}>
+          <div className={`text-xl font-bold ${deviationColor(data.totals.deviationNetCents)}`}>
             {deviationSign(data.totals.deviationNetCents)}{fmtCurrency(data.totals.deviationNetCents)}
           </div>
           <div className="text-xs text-gray-500 mt-1">
             {data.totals.deviationNetPercent !== null
               ? fmtPercent(data.totals.deviationNetPercent)
-              : "Kein PLAN"}
+              : "Kein Vergleich möglich"}
+            {data.totals.overlapPeriodCount > 0 && (
+              <span className="ml-1">({data.totals.overlapPeriodCount} Perioden)</span>
+            )}
           </div>
         </div>
       </div>

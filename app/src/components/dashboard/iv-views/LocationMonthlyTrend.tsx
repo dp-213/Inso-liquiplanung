@@ -1,7 +1,7 @@
 "use client";
 
 import { formatCurrency } from "@/types/dashboard";
-import type { LocationCompareResponse, LocationCompareItem } from "./LocationCoverageCards";
+import type { LocationCompareResponse, LocationCompareItem } from "./location-compare-types";
 
 const MONTH_NAMES = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
@@ -21,12 +21,18 @@ function coverageColorClass(bps: number): string {
   return "text-red-600";
 }
 
+/**
+ * Berechnet prozentuale Veränderung von first zu last.
+ * Dividiert durch |first| für korrekte Vorzeichen auch bei negativen Werten.
+ *
+ * Beispiel: -53.600 → -44.600 = +16,8 % (Verbesserung)
+ */
 function computeTrend(first: bigint, last: bigint): string | null {
   if (first === 0n) return null;
   const diff = Number(last - first);
-  const base = Number(first);
+  const base = Math.abs(Number(first));
   if (base === 0) return null;
-  const pct = (diff / Math.abs(base)) * 100;
+  const pct = (diff / base) * 100;
   const sign = pct >= 0 ? "+" : "";
   return `${sign}${pct.toFixed(1).replace(".", ",")} %`;
 }
@@ -59,26 +65,8 @@ function LocationMonthTable({ location, monthLabels }: { location: LocationCompa
 
   const revTrend = computeTrend(firstRev, lastRev);
   const costTrend = computeTrend(firstCost, lastCost);
-  const netTrend = computeTrend(
-    firstNet < 0n ? -firstNet : firstNet,
-    lastNet < 0n ? -lastNet : lastNet
-  );
+  const netTrend = computeTrend(firstNet, lastNet);
   const covTrend = computeTrendPP(firstCov, lastCov);
-
-  // Correct net trend sign: improvement means less negative
-  let netTrendDisplay = netTrend;
-  if (firstNet < 0n && lastNet < 0n) {
-    // Both negative: if absolute value decreased, that's improvement
-    const absFirst = -firstNet;
-    const absLast = -lastNet;
-    netTrendDisplay = computeTrend(absFirst, absLast);
-    // Invert: less negative = positive trend
-    if (netTrendDisplay) {
-      if (netTrendDisplay.startsWith("+")) {
-        netTrendDisplay = netTrendDisplay; // getting more negative = bad (keep +)
-      }
-    }
-  }
 
   return (
     <div className="admin-card overflow-x-auto">
@@ -146,7 +134,7 @@ function LocationMonthTable({ location, monthLabels }: { location: LocationCompa
               );
             })}
             <td className="px-3 py-1.5 text-right text-xs font-medium text-[var(--secondary)]">
-              {netTrendDisplay || "--"}
+              {netTrend || "--"}
             </td>
           </tr>
           <tr>

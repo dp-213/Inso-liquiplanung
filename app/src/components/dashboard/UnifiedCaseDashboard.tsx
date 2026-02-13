@@ -448,7 +448,7 @@ export default function UnifiedCaseDashboard({
 
       case "revenue":
         return caseId ? (
-          <RevenueTabContent caseId={caseId} months={6} scope={scope} />
+          <RevenueTabContent caseId={caseId} scope={scope} />
         ) : null;
 
       case "estate":

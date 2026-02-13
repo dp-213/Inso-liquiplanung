@@ -704,6 +704,7 @@ export async function aggregateByCounterparty(
     endDate?: Date;
     flowType?: 'INFLOW' | 'OUTFLOW' | 'ALL';
     scope?: LiquidityScope;
+    liquidityRelevantOnly?: boolean;
   }
 ): Promise<RevenueBySource[]> {
   const plan = await prisma.liquidityPlan.findUnique({
@@ -716,6 +717,7 @@ export async function aggregateByCounterparty(
 
   const flowType = options?.flowType || 'INFLOW';
   const scope = options?.scope || 'GLOBAL';
+  const liquidityRelevantOnly = options?.liquidityRelevantOnly || false;
 
   // Build location filter based on scope
   const locationFilter: { in?: string[] } | undefined =
@@ -732,6 +734,7 @@ export async function aggregateByCounterparty(
       ...(flowType === 'INFLOW' ? { amountCents: { gt: 0 } } : {}),
       ...(flowType === 'OUTFLOW' ? { amountCents: { lt: 0 } } : {}),
       ...(locationFilter ? { locationId: locationFilter } : {}),
+      ...(liquidityRelevantOnly ? { bankAccount: { isLiquidityRelevant: true } } : {}),
     },
     include: {
       counterparty: true,
@@ -799,6 +802,7 @@ export async function summarizeByCounterparty(
     startDate?: Date;
     endDate?: Date;
     scope?: LiquidityScope;
+    liquidityRelevantOnly?: boolean;
   }
 ): Promise<Array<{
   counterpartyId: string | null;
@@ -809,7 +813,10 @@ export async function summarizeByCounterparty(
   entryCount: number;
 }>> {
   const entries = await aggregateByCounterparty(prisma, caseId, planId, {
-    ...options,
+    startDate: options?.startDate,
+    endDate: options?.endDate,
+    scope: options?.scope,
+    liquidityRelevantOnly: options?.liquidityRelevantOnly,
     flowType: 'INFLOW',
   });
 

@@ -517,6 +517,82 @@ Alle Falldaten liegen unter `/Cases/<Case-Name>/`:
 
 **Wichtig:** Bei Arbeit an einem Fall IMMER zuerst `case-context.json` lesen. Dort stehen alle Kontakte, Bankverbindungen, Standorte, LANR-Zuordnungen, Abrechnungsregeln und offene Datenanforderungen.
 
+### Datenraum-Abgleich-Workflow
+
+Wenn der Datenraum eines Falls aktualisiert wurde:
+
+#### Prinzip: Richtigkeit vor Geschwindigkeit
+
+Jede neue Datei wird einzeln, gründlich und Cent-genau verarbeitet. Keine Abkürzungen, keine Annahmen. Bekannte Fehlerquellen (ADR-042, ADR-046, ADR-056) aktiv vermeiden.
+
+#### Phase 1: Technischer Abgleich
+
+1. **User lädt Datenraum herunter** → in `01-raw/Datenraum/_sync/` ablegen
+2. **"Datenraum aktualisiert – bitte abgleichen"** sagen
+3. **Claude scannt `_sync/`** und vergleicht gegen `datenraum-manifest.json`
+4. **Delta-Report:** Neue Dateien, geänderte Dateien, unveränderte Dateien
+5. **Neue/geänderte Dateien** → in bestehende Datenraum-Struktur übernehmen
+6. **`_sync/` löschen** (User manuell, da rm -rf) → kein Datenmüll
+7. **Manifest aktualisieren** (`datenraum-manifest.json`)
+
+#### Phase 2: Dokumentation (PFLICHT, vor jeder Verarbeitung)
+
+8. **Delta-Report in `_INDEX.md` eintragen** – jede neue/geänderte Datei mit Datum, Quelle, Inhalt, Status
+9. **Kategorisierung der neuen Dateien:**
+
+| Kategorie | Beispiel | Aktion |
+|-----------|----------|--------|
+| **Kontoauszüge/Belege** | Bankbelege, ISK-Zahlungen | Extrahieren → `02-extracted/`, dann DB-Import prüfen |
+| **Rechnungen** | Lieferantenrechnungen | Dokumentieren, ggf. für Zahlungsabgleich |
+| **Listen/Übersichten** | Freigabelisten, Debitoren/Kreditoren | Extrahieren, mit bestehendem Stand vergleichen |
+| **Verträge/Korrespondenz** | Neue Vertragsunterlagen | Analysieren, `case-context.json` aktualisieren |
+| **Format-Updates** | Gleiche Datei, nur kleiner/neu gespeichert | Nur Manifest aktualisieren, keine Verarbeitung |
+
+#### Phase 3: Verarbeitung (einzeln, gründlich)
+
+10. **Jede relevante Datei einzeln verarbeiten:**
+    - Datei lesen (PDF/Excel)
+    - Inhalte prüfen und gegen bekanntes Wissen abgleichen
+    - Extraktion nach `02-extracted/` (strukturiertes JSON)
+    - **JEDE Zahl Cent-genau prüfen** (keine AI-Halluzinationen bei Beträgen/IBANs!)
+11. **`case-context.json` aktualisieren** mit neuen Erkenntnissen (Kontakte, Beträge, offene Punkte)
+12. **DB-Import nur bei verifizierter Korrektheit** (LedgerEntries, Counterparties etc.)
+13. **Nach DB-Import: Turso-Sync prüfen** (lokal vs. Production)
+
+#### Dateien
+
+| Datei | Zweck |
+|-------|-------|
+| `datenraum-manifest.json` | MD5-Hashes + Größe aller bekannten Datenraum-Dateien |
+| `01-raw/Datenraum/_sync/` | Temporärer Staging-Ordner (wird nach Abgleich gelöscht) |
+| `01-raw/_INDEX.md` | Manueller Katalog aller Raw-Dateien mit Status |
+
+#### Manifest-Format
+
+```json
+{
+  "generatedAt": "2026-02-13T...",
+  "basePath": "01-raw/Datenraum/Hausärztliche Versorgung PLUS eG - DR",
+  "fileCount": 684,
+  "files": {
+    "01 Bestell- und Zahlwesen/135_....pdf": {
+      "sizeBytes": 12345,
+      "md5": "abc123..."
+    }
+  }
+}
+```
+
+#### Checkliste nach Abgleich
+
+- [ ] `_sync/` gelöscht (kein Datenmüll)
+- [ ] Manifest aktualisiert (neue fileCount stimmt)
+- [ ] `_INDEX.md` um neue Dateien ergänzt
+- [ ] Jede relevante Datei einzeln gelesen und geprüft
+- [ ] `case-context.json` bei neuen Erkenntnissen aktualisiert
+- [ ] DB-Import nur bei verifizierter Korrektheit
+- [ ] Turso-Sync nach DB-Änderungen
+
 ---
 
 ### Fall: Hausärztliche Versorgung PLUS eG (HVPlus)

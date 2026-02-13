@@ -5,8 +5,11 @@ import { formatCurrency } from "@/types/dashboard";
 import {
   groupByCategoryTag,
   REVENUE_COLORS,
+  OHNE_TAG,
+  SONSTIGE_TAG,
   type RevenueEntryForGrouping,
 } from "@/lib/revenue-helpers";
+import RevenueCategoryDrawer from "./RevenueCategoryDrawer";
 
 interface RevenueEntry extends RevenueEntryForGrouping {
   counterpartyId: string | null;
@@ -32,9 +35,33 @@ export default function RevenueTable({
   const [viewMode, setViewMode] = useState<"summary" | "details">(
     showSummary ? "summary" : "details"
   );
+  const [selectedCategory, setSelectedCategory] = useState<{
+    tag: string;
+    label: string;
+    colorIndex: number;
+  } | null>(null);
 
   // Summary: gruppiert nach categoryTag via shared helper
   const grouped = useMemo(() => groupByCategoryTag(entries, 5), [entries]);
+
+  // Entries für ausgewählte Kategorie filtern
+  const drawerEntries = useMemo(() => {
+    if (!selectedCategory) return [];
+    const tag = selectedCategory.tag;
+    // Die Tags aus groupByCategoryTag: __OHNE_TAG__ für null, __SONSTIGE__ für Rest
+    if (tag === SONSTIGE_TAG) {
+      // Alle Tags, die NICHT in den Top-Gruppen sind (außer Sonstige selbst)
+      const topTags = new Set(grouped.filter((g) => g.tag !== SONSTIGE_TAG).map((g) => g.tag));
+      return entries.filter((e) => {
+        const entryTag = e.categoryTag || OHNE_TAG;
+        return !topTags.has(entryTag);
+      });
+    }
+    if (tag === OHNE_TAG) {
+      return entries.filter((e) => !e.categoryTag);
+    }
+    return entries.filter((e) => e.categoryTag === tag);
+  }, [selectedCategory, entries, grouped]);
 
   // Group entries by month for details view
   const entriesByMonth = useMemo(() => {
@@ -57,6 +84,9 @@ export default function RevenueTable({
     grandNeumasseTotal: entries.reduce((sum, e) => sum + BigInt(e.neumasseAmountCents), BigInt(0)),
     grandAltmasseTotal: entries.reduce((sum, e) => sum + BigInt(e.altmasseAmountCents), BigInt(0)),
   }), [entries]);
+
+  // Dynamischer Grand-Total Text
+  const totalLabel = months === 0 ? "Gesamteinnahmen (gesamt)" : `Gesamteinnahmen (${months} Monate)`;
 
   if (entries.length === 0) {
     return (
@@ -105,7 +135,14 @@ export default function RevenueTable({
             {grouped.map((group, idx) => (
               <div
                 key={group.tag}
-                className="p-4 rounded-lg border border-[var(--border)] bg-gray-50"
+                onClick={() =>
+                  setSelectedCategory({
+                    tag: group.tag,
+                    label: group.label,
+                    colorIndex: idx,
+                  })
+                }
+                className="p-4 rounded-lg border border-[var(--border)] bg-gray-50 cursor-pointer hover:shadow-md hover:border-[var(--primary)] transition-all"
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -152,7 +189,7 @@ export default function RevenueTable({
           {/* Grand Total */}
           <div className="p-4 rounded-lg bg-[var(--primary)] text-white space-y-2">
             <div className="flex items-center justify-between">
-              <span className="font-medium">Gesamteinnahmen ({months} Monate)</span>
+              <span className="font-medium">{totalLabel}</span>
               <span className="text-2xl font-bold">{formatCurrency(grandTotal)}</span>
             </div>
             <div className="flex items-center justify-between text-sm opacity-90 pt-2 border-t border-white/20">
@@ -245,6 +282,16 @@ export default function RevenueTable({
             </tfoot>
           </table>
         </div>
+      )}
+
+      {/* Category Detail Drawer */}
+      {selectedCategory && (
+        <RevenueCategoryDrawer
+          categoryLabel={selectedCategory.label}
+          colorIndex={selectedCategory.colorIndex}
+          entries={drawerEntries}
+          onClose={() => setSelectedCategory(null)}
+        />
       )}
     </div>
   );

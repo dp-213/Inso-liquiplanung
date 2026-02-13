@@ -12,6 +12,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { getSession } from '@/lib/auth';
+import { getCustomerSession, checkCaseAccess } from '@/lib/customer-auth';
 import { EXCLUDE_SPLIT_PARENTS } from '@/lib/ledger/types';
 import {
   filterEntriesByScope,
@@ -55,7 +57,7 @@ export interface IstPlanComparisonData {
   caseName: string;
   scope: LiquidityScope;
   periods: ComparisonPeriod[];
-  // Kumulative Summen
+  // Totals: NUR über Perioden wo IST UND PLAN vorliegen (Overlap)
   totals: {
     istInflowsCents: string;
     istOutflowsCents: string;
@@ -69,6 +71,7 @@ export interface IstPlanComparisonData {
     deviationInflowsPercent: number | null;
     deviationOutflowsPercent: number | null;
     deviationNetPercent: number | null;
+    overlapPeriodCount: number; // Anzahl Perioden mit IST+PLAN
   };
   meta: {
     periodType: string;
@@ -107,9 +110,16 @@ function getPeriodLabel(periodIndex: number, startDate: Date, periodType: string
   }
 }
 
+/**
+ * Prozentuale Abweichung: actual / |baseline| * 100
+ * Wir dividieren durch den Absolutwert, damit das Vorzeichen des Prozents
+ * immer dem Vorzeichen der Abweichung folgt – auch bei negativen Baselines
+ * (Outflows). Ohne abs() wäre z.B. +5k / -35k = -14,3% (falsch negativ).
+ */
 function calculatePercent(actual: bigint, baseline: bigint): number | null {
   if (baseline === BigInt(0)) return null;
-  return Number((actual * BigInt(10000)) / baseline) / 100;
+  const absBaseline = baseline < BigInt(0) ? -baseline : baseline;
+  return Number((actual * BigInt(10000)) / absBaseline) / 100;
 }
 
 // =============================================================================
@@ -123,6 +133,21 @@ export async function GET(
   try {
     const { id: caseId } = await params;
     const { searchParams } = new URL(request.url);
+
+    // Auth: Prüfe Admin- ODER Customer-Session
+    const adminSession = await getSession();
+    const customerSession = await getCustomerSession();
+
+    if (!adminSession && !customerSession) {
+      return NextResponse.json({ error: 'Nicht autorisiert' }, { status: 401 });
+    }
+
+    if (customerSession && !adminSession) {
+      const access = await checkCaseAccess(customerSession.customerId, caseId);
+      if (!access.hasAccess) {
+        return NextResponse.json({ error: 'Zugriff verweigert' }, { status: 403 });
+      }
+    }
 
     // Scope-Parameter
     const scopeParam = searchParams.get('scope') || 'GLOBAL';
@@ -206,7 +231,7 @@ export async function GET(
         if (amount >= 0) {
           data.istInflows += amount;
         } else {
-          data.istOutflows += amount;  // Negativ
+          data.istOutflows += amount;
         }
       } else {
         totalPlanEntries++;
@@ -214,73 +239,73 @@ export async function GET(
         if (amount >= 0) {
           data.planInflows += amount;
         } else {
-          data.planOutflows += amount;  // Negativ
+          data.planOutflows += amount;
         }
       }
     }
 
     // 6. Build response periods mit kumulierter Abweichung
     const periods: ComparisonPeriod[] = [];
-    let totalIstInflows = BigInt(0);
-    let totalIstOutflows = BigInt(0);
-    let totalPlanInflows = BigInt(0);
-    let totalPlanOutflows = BigInt(0);
     let cumulativeDeviationNet = BigInt(0);
+
+    // Overlap-Totals: nur Perioden wo IST UND PLAN existieren
+    let overlapIstInflows = BigInt(0);
+    let overlapIstOutflows = BigInt(0);
+    let overlapPlanInflows = BigInt(0);
+    let overlapPlanOutflows = BigInt(0);
+    let overlapPeriodCount = 0;
 
     for (let i = 0; i < periodCount; i++) {
       const data = periodData.get(i)!;
 
-      const istNet = data.istInflows + data.istOutflows;  // outflows ist negativ
+      const istNet = data.istInflows + data.istOutflows;
       const planNet = data.planInflows + data.planOutflows;
       const deviationInflows = data.istInflows - data.planInflows;
       const deviationOutflows = data.istOutflows - data.planOutflows;
       const deviationNet = istNet - planNet;
 
-      // Kumulierte Abweichung nur für Perioden mit IST-Daten
-      if (data.istCount > 0) {
-        cumulativeDeviationNet += deviationNet;
-      }
+      const hasIst = data.istCount > 0;
+      const hasPlan = data.planCount > 0;
 
-      totalIstInflows += data.istInflows;
-      totalIstOutflows += data.istOutflows;
-      totalPlanInflows += data.planInflows;
-      totalPlanOutflows += data.planOutflows;
+      // Kumulierte Abweichung nur für Overlap-Perioden
+      if (hasIst && hasPlan) {
+        cumulativeDeviationNet += deviationNet;
+        overlapIstInflows += data.istInflows;
+        overlapIstOutflows += data.istOutflows;
+        overlapPlanInflows += data.planInflows;
+        overlapPlanOutflows += data.planOutflows;
+        overlapPeriodCount++;
+      }
 
       periods.push({
         periodIndex: i,
         periodLabel: getPeriodLabel(i, startDate, periodType),
-        // IST
         istInflowsCents: data.istInflows.toString(),
         istOutflowsCents: data.istOutflows.toString(),
         istNetCents: istNet.toString(),
         istEntryCount: data.istCount,
-        // PLAN
         planInflowsCents: data.planInflows.toString(),
         planOutflowsCents: data.planOutflows.toString(),
         planNetCents: planNet.toString(),
         planEntryCount: data.planCount,
-        // Abweichung
         deviationInflowsCents: deviationInflows.toString(),
         deviationOutflowsCents: deviationOutflows.toString(),
         deviationNetCents: deviationNet.toString(),
-        // Prozent
-        deviationInflowsPercent: calculatePercent(deviationInflows, data.planInflows),
-        deviationOutflowsPercent: calculatePercent(deviationOutflows, data.planOutflows),
-        deviationNetPercent: calculatePercent(deviationNet, planNet),
-        // Kumuliert
+        deviationInflowsPercent: (hasIst && hasPlan) ? calculatePercent(deviationInflows, data.planInflows) : null,
+        deviationOutflowsPercent: (hasIst && hasPlan) ? calculatePercent(deviationOutflows, data.planOutflows) : null,
+        deviationNetPercent: (hasIst && hasPlan) ? calculatePercent(deviationNet, planNet) : null,
         cumulativeDeviationNetCents: cumulativeDeviationNet.toString(),
-        // Status
-        hasIst: data.istCount > 0,
-        hasPlan: data.planCount > 0,
+        hasIst,
+        hasPlan,
       });
     }
 
-    // 7. Calculate totals
-    const totalIstNet = totalIstInflows + totalIstOutflows;
-    const totalPlanNet = totalPlanInflows + totalPlanOutflows;
-    const totalDeviationInflows = totalIstInflows - totalPlanInflows;
-    const totalDeviationOutflows = totalIstOutflows - totalPlanOutflows;
-    const totalDeviationNet = totalIstNet - totalPlanNet;
+    // 7. Totals nur über Overlap-Perioden (vergleichbare Basis)
+    const overlapIstNet = overlapIstInflows + overlapIstOutflows;
+    const overlapPlanNet = overlapPlanInflows + overlapPlanOutflows;
+    const overlapDeviationInflows = overlapIstInflows - overlapPlanInflows;
+    const overlapDeviationOutflows = overlapIstOutflows - overlapPlanOutflows;
+    const overlapDeviationNet = overlapIstNet - overlapPlanNet;
 
     const response: IstPlanComparisonData = {
       caseId,
@@ -288,18 +313,19 @@ export async function GET(
       scope,
       periods,
       totals: {
-        istInflowsCents: totalIstInflows.toString(),
-        istOutflowsCents: totalIstOutflows.toString(),
-        istNetCents: totalIstNet.toString(),
-        planInflowsCents: totalPlanInflows.toString(),
-        planOutflowsCents: totalPlanOutflows.toString(),
-        planNetCents: totalPlanNet.toString(),
-        deviationInflowsCents: totalDeviationInflows.toString(),
-        deviationOutflowsCents: totalDeviationOutflows.toString(),
-        deviationNetCents: totalDeviationNet.toString(),
-        deviationInflowsPercent: calculatePercent(totalDeviationInflows, totalPlanInflows),
-        deviationOutflowsPercent: calculatePercent(totalDeviationOutflows, totalPlanOutflows),
-        deviationNetPercent: calculatePercent(totalDeviationNet, totalPlanNet),
+        istInflowsCents: overlapIstInflows.toString(),
+        istOutflowsCents: overlapIstOutflows.toString(),
+        istNetCents: overlapIstNet.toString(),
+        planInflowsCents: overlapPlanInflows.toString(),
+        planOutflowsCents: overlapPlanOutflows.toString(),
+        planNetCents: overlapPlanNet.toString(),
+        deviationInflowsCents: overlapDeviationInflows.toString(),
+        deviationOutflowsCents: overlapDeviationOutflows.toString(),
+        deviationNetCents: overlapDeviationNet.toString(),
+        deviationInflowsPercent: calculatePercent(overlapDeviationInflows, overlapPlanInflows),
+        deviationOutflowsPercent: calculatePercent(overlapDeviationOutflows, overlapPlanOutflows),
+        deviationNetPercent: calculatePercent(overlapDeviationNet, overlapPlanNet),
+        overlapPeriodCount,
       },
       meta: {
         periodType,
