@@ -4,6 +4,25 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.48.0 – Finanzierung & Banken
+
+**Datum:** 13. Februar 2026
+
+### Änderungen
+
+- **Sidebar zusammengeführt:** Zwei Einträge ("Banken & Sicherungsrechte" + "Finanzierung") zu einem: **"Finanzierung & Banken"**
+- **Route umgedreht:** `/finanzierung` ist jetzt die primäre Route, `/banken-sicherungsrechte` redirected dorthin
+- **KPI-Summary-Karten:** Drei Metriken-Karten oben auf der Admin-Seite: Bankkonten (Anzahl), Massekredit gesamt, Headroom mit Ampelfarbe (grün/gelb/rot)
+- **Dashboard-Tab umbenannt:** "Banken & Sicherungsrechte" → "Finanzierung & Banken" im Kunden-Portal
+- **Hilfe-Seite bereinigt:** Zwei PageCards zu einer zusammengeführt
+
+### Technisch
+
+- Alle Referenzen konsistent aktualisiert (Assumptions, MobileCaseHeader, security-rights Redirect, Hilfe-Seite)
+- `.gitignore` erweitert: `tmp/`, Backups, Build-Artefakte ausgeschlossen
+
+---
+
 ## Version 2.47.0 – Legacy-Dashboard Cleanup
 
 **Datum:** 13. Februar 2026
