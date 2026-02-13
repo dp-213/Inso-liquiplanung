@@ -36,7 +36,6 @@ import IstPlanComparisonTable from "@/components/dashboard/IstPlanComparisonTabl
 import BankAccountsTab from "@/components/dashboard/BankAccountsTab";
 import BusinessLogicContent from "@/components/business-logic/BusinessLogicContent";
 import UnklarRiskBanner from "@/components/dashboard/UnklarRiskBanner";
-import DataQualityBanner from "@/components/dashboard/DataQualityBanner";
 import DataSourceLegend from "@/components/dashboard/DataSourceLegend";
 import ExecutiveSummary from "@/components/dashboard/ExecutiveSummary";
 import Link from "next/link";
@@ -637,9 +636,9 @@ export default function UnifiedCaseDashboard({
               <PlanningAssumptions assumptions={data.assumptions} />
             ) : (
               <div className="admin-card p-6">
-                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Planungsprämissen</h2>
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Berechnungsannahmen</h2>
                 <p className="text-sm text-[var(--secondary)] mb-4">
-                  Die Planungsprämissen dokumentieren die Annahmen hinter jeder Planungsposition.
+                  Die Berechnungsannahmen dokumentieren die Annahmen hinter der Liquiditätsplanung.
                 </p>
                 <div className="p-8 bg-amber-50 rounded-lg border border-amber-200">
                   <div className="flex items-center gap-3 mb-4">
@@ -651,7 +650,7 @@ export default function UnifiedCaseDashboard({
                     <div>
                       <h3 className="font-medium text-amber-800">Dokumentation ausstehend</h3>
                       <p className="text-sm text-amber-700 mt-1">
-                        Die Planungsprämissen für diesen Fall wurden noch nicht dokumentiert.
+                        Die Berechnungsannahmen für diesen Fall wurden noch nicht dokumentiert.
                       </p>
                     </div>
                   </div>
@@ -728,9 +727,6 @@ export default function UnifiedCaseDashboard({
             {headerContent}
           </div>
         )}
-
-        {/* Datenqualitäts-Banner - prominent oberhalb der Navigation */}
-        {caseId && <DataQualityBanner caseId={caseId} />}
 
         {/* UNKLAR-Risiko Banner */}
         {data.estateAllocation && caseId && (

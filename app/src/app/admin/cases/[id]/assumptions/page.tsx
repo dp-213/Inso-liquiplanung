@@ -1,82 +1,123 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
+import { formatEUR, type AssumptionJSON } from "@/components/forecast/types";
 
-interface Assumption {
+// =============================================================================
+// Types
+// =============================================================================
+
+interface PlanningAssumption {
   id: string;
-  categoryName: string;
-  source: string;
+  caseId: string;
+  title: string;
   description: string;
-  riskLevel: string;
+  source: string;
+  status: string;
+  linkedModule: string | null;
+  linkedEntityId: string | null;
+  lastReviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-interface Category {
-  name: string;
-  flowType: string;
-}
+// =============================================================================
+// Constants
+// =============================================================================
 
-const RISK_LEVELS = [
-  { value: "conservative", label: "Konservativ", symbol: "○", color: "bg-green-100 text-green-700" },
-  { value: "low", label: "Gering", symbol: "◐", color: "bg-blue-100 text-blue-700" },
-  { value: "medium", label: "Mittel", symbol: "◑", color: "bg-yellow-100 text-yellow-700" },
-  { value: "high", label: "Hoch", symbol: "●", color: "bg-orange-100 text-orange-700" },
-  { value: "aggressive", label: "Aggressiv", symbol: "●●", color: "bg-red-100 text-red-700" },
-];
+const STATUS_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
+  ANNAHME: { label: "Annahme", icon: "○", color: "bg-amber-100 text-amber-700 border-amber-300" },
+  VERIFIZIERT: { label: "Verifiziert", icon: "✓", color: "bg-green-100 text-green-700 border-green-300" },
+  WIDERLEGT: { label: "Widerlegt", icon: "✗", color: "bg-red-100 text-red-700 border-red-300" },
+};
 
-export default function AssumptionsManagementPage() {
+const MODULE_LINKS: Record<string, { label: string; path: string }> = {
+  banken: { label: "Banken & Sicherungsrechte", path: "banken-sicherungsrechte" },
+  personal: { label: "Personal", path: "personal" },
+  "business-logic": { label: "Business-Logik", path: "business-logic" },
+  counterparties: { label: "Gegenparteien", path: "counterparties" },
+  "iv-notes": { label: "IV-Kommunikation", path: "iv-kommunikation" },
+  finanzierung: { label: "Finanzierung", path: "finanzierung" },
+};
+
+const ASSUMPTION_TYPE_LABELS: Record<string, string> = {
+  RUN_RATE: "Laufend",
+  FIXED: "Fixbetrag",
+  ONE_TIME: "Einmalig",
+  PERCENTAGE_OF_REVENUE: "% der Einnahmen",
+};
+
+// =============================================================================
+// Page Component
+// =============================================================================
+
+export default function BerechnungsannahmenPage() {
   const params = useParams();
   const caseId = params.id as string;
 
-  const [assumptions, setAssumptions] = useState<Assumption[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Block 2: PlanningAssumptions
+  const [assumptions, setAssumptions] = useState<PlanningAssumption[]>([]);
+  const [loadingAssumptions, setLoadingAssumptions] = useState(true);
+
+  // Block 3: ForecastAssumptions
+  const [forecastAssumptions, setForecastAssumptions] = useState<AssumptionJSON[]>([]);
+  const [loadingForecast, setLoadingForecast] = useState(true);
+
+  // Form state for Block 2
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState({
+    title: "",
+    source: "",
+    description: "",
+    status: "ANNAHME",
+    linkedModule: "",
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
-    categoryName: "",
-    source: "",
-    description: "",
-    riskLevel: "medium",
-  });
-
-  useEffect(() => {
-    fetchData();
-  }, [caseId]);
-
-  async function fetchData() {
+  // Fetch data
+  const fetchAssumptions = useCallback(async () => {
     try {
-      // Fetch assumptions
-      const assumptionsRes = await fetch(`/api/cases/${caseId}/plan/assumptions`);
-      if (assumptionsRes.ok) {
-        const data = await assumptionsRes.json();
+      const res = await fetch(`/api/cases/${caseId}/plan/assumptions`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
         setAssumptions(data.assumptions || []);
       }
-
-      // Fetch categories for dropdown
-      const caseRes = await fetch(`/api/cases/${caseId}`);
-      if (caseRes.ok) {
-        const caseData = await caseRes.json();
-        const plan = caseData.plans?.[0];
-        if (plan?.categories) {
-          setCategories(plan.categories.map((c: { name: string; flowType: string }) => ({
-            name: c.name,
-            flowType: c.flowType,
-          })));
-        }
-      }
-    } catch (err) {
-      setError("Fehler beim Laden der Daten");
+    } catch {
+      console.error("Fehler beim Laden der Planungsannahmen");
     } finally {
-      setLoading(false);
+      setLoadingAssumptions(false);
     }
-  }
+  }, [caseId]);
 
+  const fetchForecastAssumptions = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/cases/${caseId}/forecast/assumptions`, {
+        credentials: "include",
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setForecastAssumptions(data.assumptions || []);
+      }
+    } catch {
+      console.error("Fehler beim Laden der Prognose-Annahmen");
+    } finally {
+      setLoadingForecast(false);
+    }
+  }, [caseId]);
+
+  useEffect(() => {
+    fetchAssumptions();
+    fetchForecastAssumptions();
+  }, [fetchAssumptions, fetchForecastAssumptions]);
+
+  // Form handlers
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -87,7 +128,15 @@ export default function AssumptionsManagementPage() {
       const res = await fetch(`/api/cases/${caseId}/plan/assumptions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        credentials: "include",
+        body: JSON.stringify({
+          ...(editingId && { id: editingId }),
+          title: formData.title,
+          source: formData.source,
+          description: formData.description,
+          status: formData.status,
+          linkedModule: formData.linkedModule || null,
+        }),
       });
 
       if (!res.ok) {
@@ -95,10 +144,9 @@ export default function AssumptionsManagementPage() {
         throw new Error(data.error || "Fehler beim Speichern");
       }
 
-      setSuccess("Planungsprämisse gespeichert");
-      setFormData({ categoryName: "", source: "", description: "", riskLevel: "medium" });
-      setEditingId(null);
-      fetchData();
+      setSuccess(editingId ? "Annahme aktualisiert" : "Annahme erstellt");
+      resetForm();
+      fetchAssumptions();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler beim Speichern");
     } finally {
@@ -106,246 +154,208 @@ export default function AssumptionsManagementPage() {
     }
   }
 
-  async function handleDelete(assumptionId: string) {
-    if (!confirm("Planungsprämisse wirklich löschen?")) return;
-
+  async function handleDelete(id: string) {
+    if (!confirm("Planungsannahme wirklich löschen?")) return;
     try {
-      const res = await fetch(`/api/cases/${caseId}/plan/assumptions?assumptionId=${assumptionId}`, {
+      const res = await fetch(`/api/cases/${caseId}/plan/assumptions?assumptionId=${id}`, {
         method: "DELETE",
+        credentials: "include",
       });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Fehler beim Löschen");
-      }
-
-      setSuccess("Planungsprämisse gelöscht");
-      fetchData();
+      if (!res.ok) throw new Error("Fehler beim Löschen");
+      setSuccess("Annahme gelöscht");
+      fetchAssumptions();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler beim Löschen");
     }
   }
 
-  function startEdit(assumption: Assumption) {
-    setEditingId(assumption.id);
+  function startEdit(a: PlanningAssumption) {
+    setEditingId(a.id);
     setFormData({
-      categoryName: assumption.categoryName,
-      source: assumption.source,
-      description: assumption.description,
-      riskLevel: assumption.riskLevel,
+      title: a.title,
+      source: a.source,
+      description: a.description,
+      status: a.status,
+      linkedModule: a.linkedModule || "",
     });
+    setShowForm(true);
   }
 
-  function cancelEdit() {
+  function resetForm() {
     setEditingId(null);
-    setFormData({ categoryName: "", source: "", description: "", riskLevel: "medium" });
+    setFormData({ title: "", source: "", description: "", status: "ANNAHME", linkedModule: "" });
+    setShowForm(false);
   }
 
-  const getRiskConfig = (level: string) => {
-    return RISK_LEVELS.find((r) => r.value === level) || RISK_LEVELS[2];
-  };
-
-  // Find categories without assumptions
-  const categoriesWithoutAssumptions = categories.filter(
-    (cat) => !assumptions.find((a) => a.categoryName === cat.name)
-  );
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  // Group forecast assumptions by flowType
+  const inflowAssumptions = forecastAssumptions.filter(a => a.flowType === "INFLOW" && a.isActive);
+  const outflowAssumptions = forecastAssumptions.filter(a => a.flowType === "OUTFLOW" && a.isActive);
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="admin-card p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-[var(--foreground)]">Planungsprämissen</h1>
-            <p className="mt-1 text-sm text-[var(--secondary)]">
-              Dokumentation der Annahmen hinter jeder Planungsposition
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Info-Box: Was sind Planungsprämissen? */}
-      <div className="admin-card p-4 bg-blue-50 border-blue-200">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-            <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <div>
-            <h4 className="text-sm font-medium text-blue-800">
-              Planungsprämissen = Dokumentation
-            </h4>
-            <p className="text-xs text-blue-700 mt-1">
-              Prämissen dokumentieren die Annahmen hinter Ihrer Planung.
-              Sie erzeugen <strong>keine</strong> Zahlungsströme, sondern dienen
-              der Nachvollziehbarkeit für Gericht und Gläubiger.
-              Änderungen an Prämissen haben keinen Einfluss auf die Liquiditätsberechnung.
-            </p>
-          </div>
-        </div>
+        <h1 className="text-2xl font-bold text-[var(--foreground)]">Berechnungsannahmen</h1>
+        <p className="mt-1 text-sm text-[var(--secondary)]">
+          Datenqualität, Planungsannahmen und Prognose-Parameter auf einen Blick
+        </p>
       </div>
 
       {/* Messages */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
           {error}
+          <button onClick={() => setError(null)} className="ml-2 font-bold">×</button>
         </div>
       )}
       {success && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
           {success}
+          <button onClick={() => setSuccess(null)} className="ml-2 font-bold">×</button>
         </div>
       )}
 
-      {/* Risk Legend */}
-      <div className="admin-card p-4">
-        <h3 className="text-sm font-semibold text-[var(--foreground)] mb-3">Risiko-Bewertungsskala</h3>
-        <div className="flex flex-wrap gap-4">
-          {RISK_LEVELS.map((level) => (
-            <div key={level.value} className="flex items-center gap-2">
-              <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-bold ${level.color}`}>
-                {level.symbol}
-              </span>
-              <span className="text-sm text-[var(--secondary)]">{level.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Add/Edit Form */}
-      <div className="admin-card p-6">
-        <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">
-          {editingId ? "Prämisse bearbeiten" : "Neue Prämisse hinzufügen"}
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Kategorie *
-              </label>
-              <select
-                value={formData.categoryName}
-                onChange={(e) => setFormData({ ...formData, categoryName: e.target.value })}
-                className="input w-full"
-                required
-                disabled={!!editingId}
-              >
-                <option value="">Kategorie wählen...</option>
-                {(editingId ? categories : categoriesWithoutAssumptions).map((cat) => (
-                  <option key={cat.name} value={cat.name}>
-                    {cat.name} ({cat.flowType === "INFLOW" ? "Einzahlung" : "Auszahlung"})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Risikobewertung *
-              </label>
-              <select
-                value={formData.riskLevel}
-                onChange={(e) => setFormData({ ...formData, riskLevel: e.target.value })}
-                className="input w-full"
-                required
-              >
-                {RISK_LEVELS.map((level) => (
-                  <option key={level.value} value={level.value}>
-                    {level.symbol} {level.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-              Informationsquelle *
-            </label>
-            <input
-              type="text"
-              value={formData.source}
-              onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-              className="input w-full"
-              placeholder="z.B. OP-Debitorenliste zum 05.01.2026"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-              Planungsprämisse (Beschreibung) *
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="input w-full"
-              rows={3}
-              placeholder="Detaillierte Beschreibung der Annahme..."
-              required
-            />
-          </div>
-          <div className="flex gap-2">
-            <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? "Speichern..." : editingId ? "Aktualisieren" : "Hinzufügen"}
-            </button>
-            {editingId && (
-              <button type="button" onClick={cancelEdit} className="btn-secondary">
-                Abbrechen
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
-
-      {/* Existing Assumptions */}
+      {/* ================================================================== */}
+      {/* Planungsannahmen (Dokumentation, Case-Level)                      */}
+      {/* ================================================================== */}
       <div className="admin-card">
-        <div className="px-6 py-4 border-b border-[var(--border)]">
-          <h2 className="text-lg font-semibold text-[var(--foreground)]">
-            Dokumentierte Prämissen ({assumptions.length})
-          </h2>
+        <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--foreground)]">Planungsannahmen</h2>
+            <p className="text-xs text-[var(--muted)] mt-0.5">Fallweite Annahmen — dokumentiert, nicht berechnet</p>
+          </div>
+          <button
+            onClick={() => { setShowForm(!showForm); if (showForm) resetForm(); }}
+            className="btn-primary text-sm"
+          >
+            {showForm ? "Abbrechen" : "+ Annahme"}
+          </button>
         </div>
-        {assumptions.length === 0 ? (
-          <div className="p-8 text-center text-[var(--muted)]">
-            Noch keine Planungsprämissen dokumentiert
+
+        {/* Form */}
+        {showForm && (
+          <div className="px-6 py-4 border-b border-[var(--border)] bg-gray-50">
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Titel *</label>
+                <input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="input w-full"
+                  placeholder="z.B. Fortführung aller Praxen bis Ende Q1/2026"
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Quelle *</label>
+                  <input
+                    type="text"
+                    value={formData.source}
+                    onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                    className="input w-full"
+                    placeholder="z.B. IV-Gespräch 09.02.2026"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                      className="input w-full"
+                    >
+                      {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                        <option key={key} value={key}>{cfg.icon} {cfg.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Verlinkt mit</label>
+                    <select
+                      value={formData.linkedModule}
+                      onChange={(e) => setFormData({ ...formData, linkedModule: e.target.value })}
+                      className="input w-full"
+                    >
+                      <option value="">— Kein Link —</option>
+                      {Object.entries(MODULE_LINKS).map(([key, cfg]) => (
+                        <option key={key} value={key}>{cfg.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-[var(--muted)] mb-1">Beschreibung *</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="input w-full"
+                  rows={2}
+                  placeholder="Detaillierte Beschreibung der Annahme..."
+                  required
+                />
+              </div>
+              <div className="flex gap-2">
+                <button type="submit" className="btn-primary text-sm" disabled={saving}>
+                  {saving ? "Speichert..." : editingId ? "Aktualisieren" : "Erstellen"}
+                </button>
+                {editingId && (
+                  <button type="button" onClick={resetForm} className="btn-secondary text-sm">
+                    Abbrechen
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* List */}
+        {loadingAssumptions ? (
+          <div className="p-6 flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-[var(--secondary)]">Lade Annahmen...</span>
+          </div>
+        ) : assumptions.length === 0 ? (
+          <div className="p-8 text-center text-[var(--muted)] text-sm">
+            Noch keine Planungsannahmen dokumentiert
           </div>
         ) : (
           <div className="divide-y divide-[var(--border)]">
-            {assumptions.map((assumption) => {
-              const riskConfig = getRiskConfig(assumption.riskLevel);
+            {assumptions.map((a) => {
+              const statusCfg = STATUS_CONFIG[a.status] || STATUS_CONFIG.ANNAHME;
+              const moduleLink = a.linkedModule ? MODULE_LINKS[a.linkedModule] : null;
               return (
-                <div key={assumption.id} className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-bold ${riskConfig.color}`}>
-                          {riskConfig.symbol}
+                <div key={a.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${statusCfg.color}`}>
+                          {statusCfg.icon} {statusCfg.label}
                         </span>
-                        <h3 className="font-semibold text-[var(--foreground)]">
-                          {assumption.categoryName}
+                        <h3 className="font-medium text-sm text-[var(--foreground)] truncate">
+                          {a.title}
                         </h3>
                       </div>
-                      <div className="ml-10 space-y-2">
-                        <div>
-                          <span className="text-xs font-medium text-[var(--muted)] uppercase">Quelle:</span>
-                          <p className="text-sm text-[var(--secondary)]">{assumption.source}</p>
-                        </div>
-                        <div>
-                          <span className="text-xs font-medium text-[var(--muted)] uppercase">Prämisse:</span>
-                          <p className="text-sm text-[var(--secondary)]">{assumption.description}</p>
-                        </div>
+                      <p className="text-sm text-[var(--secondary)] mb-1">{a.description}</p>
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
+                        <span>Quelle: {a.source}</span>
+                        {moduleLink && (
+                          <Link
+                            href={`/admin/cases/${caseId}/${moduleLink.path}`}
+                            className="inline-flex items-center gap-1 text-[var(--primary)] hover:underline"
+                          >
+                            <span>→</span> {moduleLink.label}
+                          </Link>
+                        )}
                       </div>
                     </div>
-                    <div className="flex gap-2 ml-4">
+                    <div className="flex gap-1 shrink-0">
                       <button
-                        onClick={() => startEdit(assumption)}
-                        className="p-2 text-[var(--secondary)] hover:text-[var(--primary)] hover:bg-gray-100 rounded"
+                        onClick={() => startEdit(a)}
+                        className="p-1.5 text-[var(--secondary)] hover:text-[var(--primary)] hover:bg-gray-100 rounded"
                         title="Bearbeiten"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -353,8 +363,8 @@ export default function AssumptionsManagementPage() {
                         </svg>
                       </button>
                       <button
-                        onClick={() => handleDelete(assumption.id)}
-                        className="p-2 text-[var(--secondary)] hover:text-red-600 hover:bg-red-50 rounded"
+                        onClick={() => handleDelete(a.id)}
+                        className="p-1.5 text-[var(--secondary)] hover:text-red-600 hover:bg-red-50 rounded"
                         title="Löschen"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -369,6 +379,127 @@ export default function AssumptionsManagementPage() {
           </div>
         )}
       </div>
+
+      {/* ================================================================== */}
+      {/* BLOCK 3: Prognose-Annahmen (Berechnung, read-only)                */}
+      {/* ================================================================== */}
+      <div className="admin-card">
+        <div className="px-6 py-4 border-b border-[var(--border)] flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--foreground)]">Prognose-Annahmen</h2>
+            <p className="text-xs text-[var(--muted)] mt-0.5">BASE-Szenario — Bearbeitung im Prognose-Editor</p>
+          </div>
+          <Link
+            href={`/admin/cases/${caseId}/forecast`}
+            className="btn-secondary text-sm inline-flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Prognose-Editor
+          </Link>
+        </div>
+
+        {loadingForecast ? (
+          <div className="p-6 flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-[var(--primary)] border-t-transparent rounded-full animate-spin" />
+            <span className="text-sm text-[var(--secondary)]">Lade Prognose-Annahmen...</span>
+          </div>
+        ) : forecastAssumptions.length === 0 ? (
+          <div className="p-8 text-center">
+            <p className="text-sm text-[var(--muted)] mb-3">Noch keine Prognose-Annahmen konfiguriert</p>
+            <Link
+              href={`/admin/cases/${caseId}/forecast`}
+              className="btn-primary text-sm"
+            >
+              Zum Prognose-Editor
+            </Link>
+          </div>
+        ) : (
+          <div>
+            {/* EINNAHMEN */}
+            {inflowAssumptions.length > 0 && (
+              <div>
+                <div className="px-6 py-2 bg-green-50 border-b border-green-200">
+                  <span className="text-xs font-bold text-green-800 uppercase tracking-wide">Einnahmen</span>
+                </div>
+                <div className="divide-y divide-[var(--border)]">
+                  {inflowAssumptions.map((a) => (
+                    <ForecastAssumptionRow key={a.id} assumption={a} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* AUSZAHLUNGEN */}
+            {outflowAssumptions.length > 0 && (
+              <div>
+                <div className="px-6 py-2 bg-red-50 border-b border-red-200">
+                  <span className="text-xs font-bold text-red-800 uppercase tracking-wide">Auszahlungen</span>
+                </div>
+                <div className="divide-y divide-[var(--border)]">
+                  {outflowAssumptions.map((a) => (
+                    <ForecastAssumptionRow key={a.id} assumption={a} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// =============================================================================
+// Sub-Component: ForecastAssumptionRow
+// =============================================================================
+
+function ForecastAssumptionRow({ assumption: a }: { assumption: AssumptionJSON }) {
+  const hasRisk = a.riskProbability !== null && a.riskProbability !== undefined;
+
+  return (
+    <div className="px-6 py-3">
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm text-[var(--foreground)]">{a.categoryLabel}</span>
+          <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-[var(--muted)]">
+            {ASSUMPTION_TYPE_LABELS[a.assumptionType] || a.assumptionType}
+          </span>
+        </div>
+        <span className="font-semibold text-sm text-[var(--foreground)]">
+          {formatEUR(a.baseAmountCents)}
+          {a.assumptionType === "RUN_RATE" && <span className="text-xs text-[var(--muted)] ml-1">/Monat</span>}
+        </span>
+      </div>
+
+      {/* Details */}
+      <div className="space-y-0.5 text-xs text-[var(--muted)]">
+        {a.method && (
+          <div>Methode: {a.method}</div>
+        )}
+        {a.baseReferencePeriod && (
+          <div>Referenz: {a.baseReferencePeriod}</div>
+        )}
+        {!a.method && !a.baseReferencePeriod && a.baseAmountSource && (
+          <div>Quelle: {a.baseAmountSource}</div>
+        )}
+      </div>
+
+      {/* Risiko */}
+      {hasRisk && (
+        <div className="mt-1.5 flex items-center gap-2 text-xs">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+            {Math.round((a.riskProbability || 0) * 100)}%
+            {a.riskImpactCents && (
+              <> · {formatEUR(a.riskImpactCents)}</>
+            )}
+          </span>
+          {a.riskComment && (
+            <span className="text-[var(--muted)] italic">"{a.riskComment}"</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
