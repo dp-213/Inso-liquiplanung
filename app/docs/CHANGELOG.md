@@ -4,6 +4,45 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.55.0 – Dashboard-Übersicht-Redesign & Bereinigte Liquidität
+
+**Datum:** 13. Februar 2026
+
+### Neue Funktionen
+
+- **Bereinigte End-Liquidität als Hero-KPI:** Executive Summary zeigt jetzt die End-Liquidität NACH Abzug der Bankforderungen (Massekredit-Rückzahlung) als prominenteste Zahl. Für den IV ist das DIE relevante Zahl: „Wie viel bleibt nach Rückzahlung der Globalzession?"
+- **ExecutiveSummary 3-Spalten-Layout:** Komplett redesigned als KPI-Karten:
+  - Spalte 1: IST-Kontostand (echtes Banksaldo, Anzahl Konten)
+  - Spalte 2: Tiefster Stand (niedrigster Endbestand über alle Perioden, Engpass-Warnung)
+  - Spalte 3: Bereinigte Prognose (Hero-Zahl text-3xl emerald/red, mit Herleitung)
+- **Dashboard-Massekredit-Integration:** Neues Modul `dashboard-massekredit-summary.ts` – dünner Wrapper um bestehende Massekredit-Berechnung. Läuft parallel via `Promise.all` in allen 3 APIs (Admin, Customer, Share), keine zusätzliche Latenz.
+- **DataSourceLegend Compact-Modus:** Neuer `compact={true}` Parameter zeigt Datenherkunft als dezentes Einzeiler-Banner statt voller Karte.
+- **Bankforderungen-Referenzlinie im Chart:** RollingForecastChart zeigt optional eine rote gestrichelte Linie bei den Netto-Bankforderungen (nur bei GLOBAL scope). Y-Achse passt sich automatisch an.
+
+### Änderungen
+
+- **Übersicht-Tab vereinfacht:** Von 6 auf 3 Sektionen reduziert:
+  - ExecutiveSummary (redesigned) + DataSourceLegend (compact) + RollingForecastChart
+  - Entfernt: WaterfallChart (→ Vergleich-Tab), RollingForecastTable + LiquidityTable (redundant mit eigenen Tabs)
+- **WaterfallChart in Vergleich-Tab verschoben:** Als Analyse-Tool besser im Vergleich-Kontext aufgehoben. Für External/Share-View bleibt ein Fallback im Übersicht-Tab (kein API-Zugang für RollingForecast).
+- **~100 Zeilen toter Code entfernt:** KPICards, BalanceChart, ChartMarker, weeksData, paymentMarkers, currentCash, runwayPeriod, getStatusBadge, getPlanTitle – alles nicht mehr benötigt.
+
+### Bugfixes
+
+- **minCash-Berechnung korrigiert:** „Tiefster Stand" verglich bisher gegen die Opening Balance (immer 0 EUR bei cashflow-basierter Planung), was irreführend „Tiefster Stand: 0 EUR" anzeigte. Jetzt wird korrekt der niedrigste Endbestand über alle Perioden ermittelt.
+- **Prognose-Zahl zu klein:** Hero-Balance (bereinigte Prognose) war text-2xl statt text-3xl – kleiner als der Bank-Kontostand. Visuell falsche Hierarchie korrigiert.
+
+### Technisch
+
+- **Neue Datei:** `lib/credit/dashboard-massekredit-summary.ts` (Shared Helper, keine Logik-Duplikation)
+- **Neuer Type:** `MassekreditSummaryData` in `types/dashboard.ts`, optional auf `CaseDashboardData`
+- **3 APIs erweitert:** Admin-Dashboard, Customer, Share – identisches Pattern (parallel Promise.all)
+- **5 Komponenten geändert:** ExecutiveSummary (komplett neu), UnifiedCaseDashboard (vereinfacht), DataSourceLegend (compact), RollingForecastChart (bankClaimsCents), WaterfallChart (verschoben)
+- **CLAUDE.md:** Prinzip 5 „Richtigkeit vor Geschwindigkeit" hinzugefügt
+- Kein Schema-Change, keine Turso-Migration nötig
+
+---
+
 ## Version 2.54.0 – Business-Logic-Seiten dynamisch aus DB + Case-Config
 
 **Datum:** 13. Februar 2026

@@ -4,6 +4,48 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-065: Dashboard-Übersicht von 6 auf 3 Sektionen + Bereinigte Liquidität als Hero
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Problem
+
+1. **End-Liquidität ~220K EUR zu hoch:** Altforderungen (~253K) flossen als Einzahlungen in die Planung, aber die Rückzahlung an die Banken (Globalzession) fehlte als Auszahlung. Die Massekredit-Berechnung existierte bereits (`calculate-massekredit.ts`), war aber nicht in die Dashboard-API integriert.
+2. **Übersicht überladen (6 Sektionen):** KPI-Karten + DataSourceLegend (volle Karte) + RollingForecastChart + WaterfallChart + RollingForecastTable + LiquidityTable. Zu viele Informationen für einen 5-Minuten-Blick.
+3. **Irreführende KPIs:** „Aktueller Stand" zeigte 0 EUR (Plan startet bei 0), „Tiefster Stand" war ebenfalls 0 EUR (verglich gegen Opening Balance).
+
+### Entscheidung
+
+1. **Bereinigte Liquidität als Hero-Zahl:** End-Liquidität MINUS Netto-Bankforderungen (nach Fortführungsbeitrag + USt). Dynamisch berechnet aus bestehender Massekredit-Engine, keine Hardcodes.
+2. **ExecutiveSummary 3-Spalten:** Kontostand aktuell (Banksaldo) | Tiefster Stand (niedrigster Closing Balance) | Bereinigte Prognose (Hero). Klar getrennte Kontexte.
+3. **Übersicht auf 3 Sektionen reduziert:** ExecutiveSummary + DataSourceLegend (compact) + RollingForecastChart. WaterfallChart → Vergleich-Tab, Tabellen → eigene Tabs.
+4. **Dünner Wrapper statt Logik-Duplikation:** `dashboard-massekredit-summary.ts` ruft bestehende `loadBankMassekreditInputs()` + `calculateCaseMassekreditSummary()` auf.
+5. **Parallel in Promise.all:** Massekredit-Berechnung läuft parallel zu LedgerEntry-Count + BankBalances. Keine zusätzliche API-Latenz.
+
+### Begründung
+
+- Der IV will eine einzige Zahl: „Wie viel bleibt nach Rückzahlung der Banken?" Alles andere ist Kontext.
+- WaterfallChart und Tabellen sind Analyse-Tools, kein Executive Summary.
+- Massekredit-Berechnung war bereits implementiert und getestet – nur die Dashboard-Integration fehlte.
+- Graceful Fallback: Fälle ohne BankAgreements zeigen einfach den End-Bestand ohne Bereinigung.
+
+### Konsequenzen
+
+- Neue Fälle mit BankAgreements bekommen automatisch die bereinigte Ansicht
+- Fälle ohne BankAgreements zeigen „Prognose Planungsende" statt „Bereinigte Prognose"
+- External/Share-View zeigt WaterfallChart als Fallback (kein API-Zugang für RollingForecast)
+- minCash vergleicht nur Closing Balances (Opening Balance = 0 wäre irreführend)
+
+### Relevante Dateien
+
+- `app/src/lib/credit/dashboard-massekredit-summary.ts` — Shared Helper
+- `app/src/components/dashboard/ExecutiveSummary.tsx` — 3-Spalten-KPI
+- `app/src/components/dashboard/UnifiedCaseDashboard.tsx` — Vereinfachte Übersicht
+- `app/src/types/dashboard.ts` — `MassekreditSummaryData` Interface
+
+---
+
 ## ADR-064: Business-Logic-Seiten dynamisch aus DB + Case-Config-Registry
 
 **Datum:** 13. Februar 2026
