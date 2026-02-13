@@ -6,6 +6,7 @@ import { formatCurrency } from "@/types/dashboard";
 import LocationCoverageCards from "./LocationCoverageCards";
 import LocationCompareTable from "./LocationCompareTable";
 import LocationMonthlyTrend from "./LocationMonthlyTrend";
+import LocationDeltaView from "./LocationDeltaView";
 import type {
   LocationCompareResponse,
   LocationCompareItem,
@@ -14,6 +15,7 @@ import type {
 
 type EstateFilter = "NEUMASSE" | "ALTMASSE" | "GESAMT";
 type ViewMode = "total" | "average";
+type PerspectiveTab = "POST" | "PRE" | "DELTA";
 
 interface LocationViewProps {
   caseId: string;
@@ -84,7 +86,7 @@ function mergeItems(
   let entryCount = 0;
   let revenue = { ...zero };
   let costs = { ...zeroCosts };
-  let employees = { total: 0, doctors: 0 };
+  const employees = { total: 0, doctors: 0 };
 
   for (const item of items) {
     totalRev += BigInt(item.totals.revenueCents);
@@ -146,7 +148,6 @@ function mergeItems(
 /** Fasst Standort-Gruppen zusammen, behält Reihenfolge */
 function mergeLocationGroups(data: LocationCompareResponse): LocationCompareResponse {
   const result: LocationCompareItem[] = [];
-  const mergedIds = new Set<string>();
   const insertedGroups = new Set<number>();
 
   // Bestimme welche IDs zu welcher Gruppe gehören
@@ -176,7 +177,6 @@ function mergeLocationGroups(data: LocationCompareResponse): LocationCompareResp
         result.push(mergeItems(matching, group.displayName, group.displayShortName));
         insertedGroups.add(gi);
       }
-      mergedIds.add(loc.id);
     } else {
       result.push(loc);
     }
@@ -190,53 +190,108 @@ function mergeLocationGroups(data: LocationCompareResponse): LocationCompareResp
 // =============================================================================
 
 /**
- * LocationView - Standort-Vergleichsansicht
+ * LocationView - Standort-Vergleichsansicht mit 3 Perspektiven
  *
- * Beantwortet die IV-Kernfrage: "Fortführung welcher Standorte ist wirtschaftlich vertretbar?"
- *
- * Sektionen:
- * A) Datenlücken-Banner (wenn relevant)
- * B) Deckungsgrad-Cards pro Standort
- * C) Vergleichstabelle (alle Standorte nebeneinander)
- * D) Monatliche Entwicklung pro Standort
+ * Perspektiven:
+ * 1. Verfahrensphase (POST) - ISK-Daten, Estate-Filter aktiv
+ * 2. Vor Insolvenz (PRE) - Geschäftskonten, Estate-Filter deaktiviert
+ * 3. Veränderung (DELTA) - Vergleich Pre→Post Ø/Monat
  */
 export default function LocationView({ caseId }: LocationViewProps) {
-  const [rawData, setRawData] = useState<LocationCompareResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [postRawData, setPostRawData] = useState<LocationCompareResponse | null>(null);
+  const [preRawData, setPreRawData] = useState<LocationCompareResponse | null>(null);
+  const [postLoading, setPostLoading] = useState(true);
+  const [preLoading, setPreLoading] = useState(true);
+  const [postError, setPostError] = useState<string | null>(null);
+  const [preError, setPreError] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [estateFilter, setEstateFilter] = useState<EstateFilter>("NEUMASSE");
   const [viewMode, setViewMode] = useState<ViewMode>("average");
+  const [perspectiveTab, setPerspectiveTab] = useState<PerspectiveTab>("POST");
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams({ estateFilter });
-      const res = await fetch(`/api/cases/${caseId}/dashboard/locations/compare?${params}`, {
-        credentials: "include",
+  // PRE-Daten: einmalig laden (kein estateFilter)
+  useEffect(() => {
+    let cancelled = false;
+    setPreLoading(true);
+
+    const params = new URLSearchParams({ perspective: "PRE" });
+    fetch(`/api/cases/${caseId}/dashboard/locations/compare?${params}`, {
+      credentials: "include",
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Fehler beim Laden der Vorinsolvenz-Daten");
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) setPreRawData(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setPreError(err instanceof Error ? err.message : "Unbekannter Fehler");
+      })
+      .finally(() => {
+        if (!cancelled) setPreLoading(false);
       });
-      if (!res.ok) {
-        throw new Error("Fehler beim Laden der Standort-Daten");
-      }
-      const json = await res.json();
-      setRawData(json);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unbekannter Fehler");
-    } finally {
-      setLoading(false);
-    }
+
+    return () => { cancelled = true; };
+  }, [caseId]);
+
+  // POST-Daten: laden bei caseId- oder estateFilter-Änderung
+  useEffect(() => {
+    let cancelled = false;
+    setPostLoading(true);
+    setPostError(null);
+
+    const params = new URLSearchParams({ estateFilter, perspective: "POST" });
+    fetch(`/api/cases/${caseId}/dashboard/locations/compare?${params}`, {
+      credentials: "include",
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Fehler beim Laden der Verfahrensdaten");
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) setPostRawData(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setPostError(err instanceof Error ? err.message : "Unbekannter Fehler");
+      })
+      .finally(() => {
+        if (!cancelled) setPostLoading(false);
+      });
+
+    return () => { cancelled = true; };
   }, [caseId, estateFilter]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  // Initiales Laden: Skeleton bis beide Datenquellen geladen sind
+  // Bei estateFilter-Wechsel: nur POST wird neu geladen, kein Skeleton
+  const initialLoading = postRawData === null && postLoading;
+  const loading = initialLoading || preLoading;
+  const error = postError || preError;
 
   // Merge-Logik: Eitorf+Uckerath zusammenfassen
-  const data = useMemo(() => {
-    if (!rawData) return null;
-    return mergeLocationGroups(rawData);
-  }, [rawData]);
+  const postData = useMemo(() => {
+    if (!postRawData) return null;
+    return mergeLocationGroups(postRawData);
+  }, [postRawData]);
+
+  const preData = useMemo(() => {
+    if (!preRawData) return null;
+    return mergeLocationGroups(preRawData);
+  }, [preRawData]);
+
+  // Active data based on perspective
+  const activeData = perspectiveTab === "PRE" ? preData : postData;
+
+  // Meta: Welche Kontotypen hat der Case?
+  const hasBothTypes = postRawData?.meta?.hasIskAccounts && postRawData?.meta?.hasGeschaeftskonten;
+  const hasOnlyPre = !postRawData?.meta?.hasIskAccounts && postRawData?.meta?.hasGeschaeftskonten;
+
+  // Auto-Select: Wenn nur ein Typ vorhanden, fixiere Perspektive
+  useEffect(() => {
+    if (hasOnlyPre) {
+      setPerspectiveTab("PRE");
+    }
+  }, [hasOnlyPre]);
 
   if (loading) {
     return (
@@ -270,7 +325,7 @@ export default function LocationView({ caseId }: LocationViewProps) {
     );
   }
 
-  if (!data || data.locations.length === 0) {
+  if (!activeData || activeData.locations.length === 0) {
     return (
       <div className="admin-card p-6">
         <div className="text-center py-8">
@@ -287,7 +342,20 @@ export default function LocationView({ caseId }: LocationViewProps) {
     );
   }
 
-  const monthCount = data.monthLabels.length;
+  const monthCount = activeData.monthLabels.length;
+  const showEstateFilter = perspectiveTab === "POST";
+
+  const PERSPECTIVE_TABS: { key: PerspectiveTab; label: string }[] = [
+    { key: "POST", label: "Verfahrensphase" },
+    { key: "PRE", label: "Vor Insolvenz" },
+    { key: "DELTA", label: "Veränderung" },
+  ];
+
+  const subtitles: Record<PerspectiveTab, string> = {
+    POST: "Wirtschaftliche Tragfähigkeit pro Standort (seit Insolvenzeröffnung)",
+    PRE: "Wirtschaftliche Leistung pro Standort (vor Insolvenzeröffnung)",
+    DELTA: "Veränderung: Vor Insolvenz → Verfahrensphase (Ø/Monat)",
+  };
 
   return (
     <div className="space-y-6">
@@ -296,8 +364,8 @@ export default function LocationView({ caseId }: LocationViewProps) {
         <div>
           <h2 className="text-lg font-semibold text-[var(--foreground)]">Standort-Vergleich</h2>
           <p className="text-sm text-[var(--secondary)]">
-            Wirtschaftliche Tragfähigkeit pro Standort
-            {viewMode === "average" && monthCount > 0 && (
+            {subtitles[perspectiveTab]}
+            {perspectiveTab !== "DELTA" && viewMode === "average" && monthCount > 0 && (
               <span className="ml-1 text-[var(--muted)]">
                 (Ø {monthCount} Monate)
               </span>
@@ -305,104 +373,154 @@ export default function LocationView({ caseId }: LocationViewProps) {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Zeitraum-Toggle */}
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-            <button
-              onClick={() => setViewMode("average")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                viewMode === "average"
-                  ? "bg-white shadow-sm text-gray-900"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              Ø Monat
-            </button>
-            <button
-              onClick={() => setViewMode("total")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                viewMode === "total"
-                  ? "bg-white shadow-sm text-gray-900"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
-            >
-              Gesamt
-            </button>
-          </div>
-          {/* Estate-Toggle */}
-          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-            {(["NEUMASSE", "ALTMASSE", "GESAMT"] as EstateFilter[]).map((filter) => (
+          {/* Zeitraum-Toggle (nicht bei DELTA) */}
+          {perspectiveTab !== "DELTA" && (
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
               <button
-                key={filter}
-                onClick={() => setEstateFilter(filter)}
+                onClick={() => setViewMode("average")}
                 className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  estateFilter === filter
+                  viewMode === "average"
                     ? "bg-white shadow-sm text-gray-900"
                     : "text-gray-600 hover:text-gray-900"
                 }`}
               >
-                {filter === "NEUMASSE" ? "Neumasse" : filter === "ALTMASSE" ? "Altmasse" : "Gesamt"}
+                Ø Monat
               </button>
-            ))}
-          </div>
+              <button
+                onClick={() => setViewMode("total")}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  viewMode === "total"
+                    ? "bg-white shadow-sm text-gray-900"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Gesamt
+              </button>
+            </div>
+          )}
+          {/* Estate-Toggle (nur bei POST) */}
+          {showEstateFilter && (
+            <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+              {(["NEUMASSE", "ALTMASSE", "GESAMT"] as EstateFilter[]).map((filter) => (
+                <button
+                  key={filter}
+                  onClick={() => setEstateFilter(filter)}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                    estateFilter === filter
+                      ? "bg-white shadow-sm text-gray-900"
+                      : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  {filter === "NEUMASSE" ? "Neumasse" : filter === "ALTMASSE" ? "Altmasse" : "Gesamt"}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Sektion A: Datenlücken-Banner */}
-      {data.unassigned.count > 0 && (
-        <div className="admin-card p-4 bg-amber-50 border border-amber-200">
-          <div className="flex gap-3">
-            <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <div>
-              <h4 className="font-medium text-amber-800">
-                {data.unassigned.count} Buchung{data.unassigned.count !== 1 ? "en" : ""} ohne Standort-Zuordnung
-              </h4>
-              <p className="text-sm text-amber-700 mt-1">
-                Summe: {formatCurrency(data.unassigned.totalCents)} &mdash; Diese Buchungen sind in der Vergleichstabelle nicht enthalten.
-              </p>
-            </div>
-          </div>
+      {/* Perspektiven-Toggle (nur wenn Case beide Kontotypen hat) */}
+      {hasBothTypes && (
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+          {PERSPECTIVE_TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setPerspectiveTab(tab.key)}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${
+                perspectiveTab === tab.key
+                  ? "bg-white shadow-sm text-gray-900"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       )}
 
-      {/* Sektion B: Deckungsgrad-Cards */}
-      <LocationCoverageCards data={data} monthCount={monthCount} viewMode={viewMode} />
-
-      {/* Sektion C: Vergleichstabelle */}
-      <LocationCompareTable
-        data={data}
-        onSelectLocation={setSelectedLocation}
-        viewMode={viewMode}
-      />
-
-      {/* Sektion D: Monatliche Entwicklung */}
-      {data.monthLabels.length > 1 && (
-        <div>
-          <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Monatliche Entwicklung</h2>
-          <LocationMonthlyTrend data={data} />
-        </div>
+      {/* DELTA-Perspektive */}
+      {perspectiveTab === "DELTA" && postData && preData && (
+        <LocationDeltaView postData={postData} preData={preData} />
       )}
 
-      {/* Estate-Filter Info */}
-      {estateFilter !== "GESAMT" && (
-        <div className="admin-card p-4 bg-blue-50 border border-blue-200">
-          <div className="flex gap-3">
-            <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <h4 className="font-medium text-blue-800">
-                {estateFilter === "NEUMASSE" ? "Nur Neumasse-Buchungen" : "Nur Altmasse-Buchungen"}
-              </h4>
-              <p className="text-sm text-blue-700 mt-1">
-                {estateFilter === "NEUMASSE"
-                  ? "Zeigt nur Buchungen nach Insolvenzeröffnung (Fortführungsperspektive)."
-                  : "Zeigt nur Buchungen aus der Zeit vor der Insolvenzeröffnung."}
-              </p>
+      {/* POST/PRE-Perspektiven */}
+      {perspectiveTab !== "DELTA" && activeData && (
+        <>
+          {/* PRE-Info-Banner */}
+          {perspectiveTab === "PRE" && (
+            <div className="admin-card p-4 bg-amber-50 border border-amber-200">
+              <div className="flex gap-3">
+                <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h4 className="font-medium text-amber-800">Geschäftskonten-Daten</h4>
+                  <p className="text-sm text-amber-700 mt-1">
+                    Viele Buchungen sind ggf. nicht kategorisiert. Kein Estate-Filter (Alt/Neumasse) bei Vorinsolvenz-Daten.
+                  </p>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          )}
+
+          {/* Sektion A: Datenlücken-Banner */}
+          {activeData.unassigned.count > 0 && (
+            <div className="admin-card p-4 bg-amber-50 border border-amber-200">
+              <div className="flex gap-3">
+                <svg className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                  <h4 className="font-medium text-amber-800">
+                    {activeData.unassigned.count} Buchung{activeData.unassigned.count !== 1 ? "en" : ""} ohne Standort-Zuordnung
+                  </h4>
+                  <p className="text-sm text-amber-700 mt-1">
+                    Summe: {formatCurrency(activeData.unassigned.totalCents)} &mdash; Diese Buchungen sind in der Vergleichstabelle nicht enthalten.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Sektion B: Deckungsgrad-Cards */}
+          <LocationCoverageCards data={activeData} monthCount={monthCount} viewMode={viewMode} />
+
+          {/* Sektion C: Vergleichstabelle */}
+          <LocationCompareTable
+            data={activeData}
+            onSelectLocation={setSelectedLocation}
+            viewMode={viewMode}
+          />
+
+          {/* Sektion D: Monatliche Entwicklung */}
+          {activeData.monthLabels.length > 1 && (
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Monatliche Entwicklung</h2>
+              <LocationMonthlyTrend data={activeData} />
+            </div>
+          )}
+
+          {/* Estate-Filter Info (nur POST) */}
+          {perspectiveTab === "POST" && estateFilter !== "GESAMT" && (
+            <div className="admin-card p-4 bg-blue-50 border border-blue-200">
+              <div className="flex gap-3">
+                <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <h4 className="font-medium text-blue-800">
+                    {estateFilter === "NEUMASSE" ? "Nur Neumasse-Buchungen" : "Nur Altmasse-Buchungen"}
+                  </h4>
+                  <p className="text-sm text-blue-700 mt-1">
+                    {estateFilter === "NEUMASSE"
+                      ? "Zeigt nur Buchungen nach Insolvenzeröffnung (Fortführungsperspektive)."
+                      : "Zeigt nur Buchungen aus der Zeit vor der Insolvenzeröffnung."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

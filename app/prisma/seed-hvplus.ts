@@ -256,6 +256,7 @@ async function seed() {
           bankName: bank.bankName,
           accountName: bank.name,
           iban: bank.iban,
+          accountType: bank.accountType || 'GESCHAEFT',
           openingBalanceCents: BigInt(0),
           status: 'available',
           createdBy: 'seed-hvplus',

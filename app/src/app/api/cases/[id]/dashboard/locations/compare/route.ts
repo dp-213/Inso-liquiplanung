@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { EXCLUDE_SPLIT_PARENTS } from "@/lib/ledger/types";
 
 type EstateFilter = "GESAMT" | "NEUMASSE" | "ALTMASSE";
+type Perspective = "POST" | "PRE";
 
 // CategoryTag → Einnahmen-Kategorie
 const REVENUE_TAG_MAP: Record<string, "kv" | "hzv" | "pvs"> = {
@@ -64,6 +65,9 @@ function serializeCosts(c: ReturnType<typeof emptyCosts>) {
  *
  * Query-Parameter:
  * - estateFilter: GESAMT | NEUMASSE | ALTMASSE (Default: NEUMASSE)
+ * - perspective: POST | PRE (Default: POST)
+ *   POST = ISK-Konten (post-insolvency), Estate-Filter aktiv
+ *   PRE  = Geschäftskonten (pre-insolvency), Estate-Filter ignoriert (GESAMT)
  */
 export async function GET(
   request: NextRequest,
@@ -82,6 +86,9 @@ export async function GET(
       ? (estateFilterParam as EstateFilter)
       : "NEUMASSE";
 
+    const perspectiveParam = searchParams.get("perspective") || "POST";
+    const perspective: Perspective = perspectiveParam === "PRE" ? "PRE" : "POST";
+
     // Verify case exists
     const caseExists = await prisma.case.findUnique({
       where: { id: caseId },
@@ -91,6 +98,20 @@ export async function GET(
       return NextResponse.json({ error: "Fall nicht gefunden" }, { status: 404 });
     }
 
+    // Load bank accounts and determine which types exist
+    const bankAccounts = await prisma.bankAccount.findMany({
+      where: { caseId },
+      select: { id: true, accountType: true },
+    });
+
+    const iskAccountIds = bankAccounts.filter((ba) => ba.accountType === "ISK").map((ba) => ba.id);
+    const geschaeftAccountIds = bankAccounts.filter((ba) => ba.accountType === "GESCHAEFT").map((ba) => ba.id);
+
+    const meta = {
+      hasIskAccounts: iskAccountIds.length > 0,
+      hasGeschaeftskonten: geschaeftAccountIds.length > 0,
+    };
+
     // Get all locations
     const locations = await prisma.location.findMany({
       where: { caseId },
@@ -98,13 +119,42 @@ export async function GET(
       orderBy: { displayOrder: "asc" },
     });
 
-    // Build estate WHERE clause
+    // Build WHERE clause based on perspective
+    // POST: ISK accounts OR no bankAccount (null = operativ)
+    // PRE:  Geschäftskonten only (strict, null excluded)
+    const bankAccountWhere: Record<string, unknown> = {};
+    if (perspective === "POST") {
+      if (iskAccountIds.length > 0) {
+        bankAccountWhere.OR = [
+          { bankAccountId: { in: iskAccountIds } },
+          { bankAccountId: null },
+        ];
+      }
+      // If no ISK accounts, don't filter by bankAccount (show all including null)
+    } else {
+      // PRE: strict Geschäftskonten only
+      if (geschaeftAccountIds.length > 0) {
+        bankAccountWhere.bankAccountId = { in: geschaeftAccountIds };
+      } else {
+        // No Geschäftskonten → return empty
+        return NextResponse.json({
+          locations: [],
+          unassigned: { count: 0, totalCents: "0" },
+          monthLabels: [],
+          estateFilter,
+          perspective,
+          meta,
+        });
+      }
+    }
+
+    // Estate filter: only active for POST perspective
     const estateWhere: Record<string, unknown> = {};
-    if (estateFilter !== "GESAMT") {
+    if (perspective === "POST" && estateFilter !== "GESAMT") {
       estateWhere.estateAllocation = estateFilter;
     }
 
-    // Fetch ALL IST entries (confirmed/adjusted, excluding split parents)
+    // Fetch entries
     const allEntries = await prisma.ledgerEntry.findMany({
       where: {
         caseId,
@@ -112,6 +162,7 @@ export async function GET(
         ...EXCLUDE_SPLIT_PARENTS,
         reviewStatus: { in: ["CONFIRMED", "ADJUSTED"] },
         ...estateWhere,
+        ...bankAccountWhere,
       },
       select: {
         amountCents: true,
@@ -272,6 +323,8 @@ export async function GET(
       },
       monthLabels,
       estateFilter,
+      perspective,
+      meta,
     });
   } catch (error) {
     console.error("Error fetching location compare data:", error);

@@ -663,6 +663,7 @@ model BankAccount {
   openingBalanceCents BigInt   @default(0) // Anfangssaldo vor allen Ledger-Buchungen
   securityHolder      String?  // e.g., "Globalzession Bank XY"
   isLiquidityRelevant Boolean @default(false) // true = operatives Massekonto (ISK), erscheint in Liquiditätsmatrix
+  accountType     String   @default("GESCHAEFT") // ISK | GESCHAEFT
   status          String   @default("available") // available, blocked, restricted
   notes           String?  // Additional notes about this account
   displayOrder    Int      @default(0)
