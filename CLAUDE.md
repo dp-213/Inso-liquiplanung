@@ -283,7 +283,7 @@ cd app && npm run build
 | Build-Fehler "Cannot find module X" | Script in `/app` statt Root → nach Root verschieben |
 | TypeScript-Fehler bei Analyse-Scripts | Scripts gehören nicht in `/app` (werden mit-kompiliert) |
 | "Internal Server Error" Localhost | Mehrere Next.js Dev-Server parallel → alle killen, neu starten |
-| DB-Reset ohne Backup | **IMMER** `./scripts/backup-turso.sh pre-reset` VOR jedem DB-Reset! Incident 07.02: 1.248 Entries verloren! |
+| DB-Reset ohne Backup | **IMMER** `./scripts/backup-turso.sh pre-reset` VOR jedem DB-Reset! Incident 07.02: 1.248 Entries verloren! Incident 13.02: dev.db erneut geleert durch `prisma db push`! |
 | Duplikate nach Import | VOR Import: `/02-extracted/` auf doppelte JSONs prüfen (z.B. `ISK_Uckerath` + `ISK_uckerath` = Duplikate!) |
 | Opening Balance falsch | Opening Balance = **Eröffnungssaldo** (Monatsbeginn), NICHT Schlusssaldo! Incident 08.02: -235K EUR Fehler! |
 | Import-Script erkennt Duplikate nicht | Script prüft nur exakten String-Match bei Description. Verschiedene JSON-Quellen mit leicht anderen Texten → Duplikate. Immer `(bankAccountId + transactionDate + amountCents)` prüfen! |
@@ -292,6 +292,38 @@ cd app && npm run build
 | Prisma Date-Filter auf Turso liefert 0 Ergebnisse | `@prisma/adapter-libsql` v6.19.2 Bug: `transactionDate: { gte, lte }` in Prisma WHERE funktioniert NICHT auf Turso! Date-Filter IMMER in JS statt Prisma. Siehe ADR-046. `grep -r "Turso adapter date comparison bug"` |
 | Lokale DB-Änderung in falscher Datei | **Lokale DB ist `app/dev.db`**, NICHT `app/prisma/dev.db`! `DATABASE_URL="file:./dev.db"` ist relativ zu `app/`. Falls `prisma/dev.db` existiert → löschen, ist ein Artefakt. Bei `sqlite3`-Befehlen IMMER Pfad `app/dev.db` verwenden. |
 | Daten nur lokal importiert, Turso vergessen | **NACH JEDEM Import/Script: Turso-Sync prüfen!** Entry-Count vergleichen: `sqlite3 app/dev.db "SELECT COUNT(*) FROM ledger_entries WHERE valueType='IST'"` vs. `turso db shell inso-liquiplanung-v2 "SELECT COUNT(*) FROM ledger_entries WHERE valueType='IST'"`. Incident 13.02: 47 Entries, 91 CPs, 56 Breakdowns nur lokal! (ADR-056) |
+
+### 🚨🚨🚨 ABSOLUTES VERBOT: `npx prisma db push` auf dev.db mit Daten 🚨🚨🚨
+
+**`npx prisma db push` LÖSCHT ALLE DATEN in der lokalen SQLite-DB!**
+
+Prisma erstellt die DB neu (leeres Schema) → alle LedgerEntries, Counterparties, etc. UNWIDERRUFLICH WEG.
+
+**ZWEI Incidents durch diesen Fehler:**
+- **07.02.2026:** 1.248 Entries verloren, 12h Wiederherstellung
+- **13.02.2026:** dev.db erneut auf 0 Bytes, Wiederherstellung aus Turso-Backup nötig
+
+**VOR JEDEM `prisma db push` diese 3 Schritte (KEINE AUSNAHME!):**
+
+```bash
+# 1. Entry-Count prüfen – wenn > 0, dann STOPP!
+sqlite3 app/dev.db "SELECT COUNT(*) FROM ledger_entries;"
+
+# 2. Nur wenn Count = 0 (leere DB) → prisma db push erlaubt
+# 3. Wenn Count > 0 → NIEMALS prisma db push ausführen!
+#    Stattdessen: SQL-Migration manuell schreiben (ALTER TABLE)
+```
+
+**Wenn Schema-Änderungen nötig sind und dev.db Daten hat:**
+1. Backup: `cp app/dev.db app/dev.db.backup-$(date +%Y%m%d-%H%M%S)`
+2. SQL-Migration schreiben: `ALTER TABLE ... ADD COLUMN ...`
+3. Migration auf dev.db ausführen: `sqlite3 app/dev.db < migration.sql`
+4. Migration auf Turso ausführen: `turso db shell inso-liquiplanung-v2 < migration.sql`
+5. `npx prisma generate` (NUR generate, NICHT db push!)
+
+**Merksatz:** `prisma generate` = sicher. `prisma db push` = DATENVERLUST.
+
+---
 
 ### 🚨 PFLICHT: Turso-Synchronisation nach Daten-Änderungen
 
