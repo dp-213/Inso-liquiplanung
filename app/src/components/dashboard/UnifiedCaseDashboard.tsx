@@ -31,8 +31,7 @@ import IstPlanComparisonTable from "@/components/dashboard/IstPlanComparisonTabl
 import BankAccountsTab from "@/components/dashboard/BankAccountsTab";
 import BusinessLogicContent from "@/components/business-logic/BusinessLogicContent";
 import UnklarRiskBanner from "@/components/dashboard/UnklarRiskBanner";
-import DataSourceLegend from "@/components/dashboard/DataSourceLegend";
-import ExecutiveSummary from "@/components/dashboard/ExecutiveSummary";
+import OverviewMetricsBar from "@/components/dashboard/OverviewMetricsBar";
 import Link from "next/link";
 
 // =============================================================================
@@ -173,22 +172,6 @@ export default function UnifiedCaseDashboard({
   // Memoized calculations
   const periods = useMemo(() => getPeriods(data), [data]);
 
-  const { minCash, minCashPeriodLabel } = useMemo(() => {
-    if (periods.length === 0) return { minCash: BigInt(0), minCashPeriodLabel: "" };
-    // Nur Endbestände vergleichen – Opening Balance (immer 0 bei cashflow-basierter Planung)
-    // würde sonst irreführend "Tiefster Stand: 0 EUR" anzeigen
-    let min = BigInt(periods[0].closingBalanceCents);
-    let minLabel = periods[0]?.periodLabel || periods[0]?.weekLabel || "";
-    for (let i = 1; i < periods.length; i++) {
-      const balance = BigInt(periods[i].closingBalanceCents);
-      if (balance < min) {
-        min = balance;
-        minLabel = periods[i].periodLabel || periods[i].weekLabel || "";
-      }
-    }
-    return { minCash: min, minCashPeriodLabel: minLabel };
-  }, [periods]);
-
   const formatCurrencyFn = useCallback((cents: bigint | string): string => {
     return formatCurrency(cents);
   }, []);
@@ -237,37 +220,19 @@ export default function UnifiedCaseDashboard({
   const renderTabContent = (tab: TabConfig) => {
     switch (tab.id) {
       case "overview": {
-        const firstPeriodLabel = periods[0]?.periodLabel || periods[0]?.weekLabel || "";
-        const lastPeriodLabel = periods[periods.length - 1]?.periodLabel || periods[periods.length - 1]?.weekLabel || "";
         const bankClaimsCents = data.massekreditSummary
           ? BigInt(data.massekreditSummary.massekreditAltforderungenCents)
           : undefined;
 
         return (
-          <div className="space-y-6">
-            {/* Executive Summary – KPI-Karten */}
-            <ExecutiveSummary
-              bankBalanceCents={data.bankAccounts ? BigInt(data.bankAccounts.summary.totalBalanceCents) : null}
-              bankAccountCount={data.bankAccounts?.accounts.length ?? 0}
-              minCash={minCash}
-              minCashPeriodLabel={minCashPeriodLabel}
-              finalBalance={BigInt(data.calculation.finalClosingBalanceCents)}
-              massekreditSummary={data.massekreditSummary ? {
-                massekreditAltforderungenCents: BigInt(data.massekreditSummary.massekreditAltforderungenCents),
-                bereinigteEndLiquiditaetCents: BigInt(data.massekreditSummary.bereinigteEndLiquiditaetCents),
-                hasUncertainBanks: data.massekreditSummary.hasUncertainBanks,
-              } : undefined}
-              periodRange={`${firstPeriodLabel} – ${lastPeriodLabel}`}
-              formatCurrency={(cents: bigint) => formatCurrencyFn(cents)}
-            />
-
-            {/* Datenherkunft – Kompakt-Banner */}
-            {data.ledgerStats && <DataSourceLegend ledgerStats={data.ledgerStats} compact={true} />}
+          <div className="space-y-4">
+            {/* Kompakte Kennzahlen-Leiste */}
+            <OverviewMetricsBar data={data} />
 
             {/* Rolling Forecast Chart – Hero-Visual (Admin/Customer) */}
             {accessMode !== "external" && caseId && (
-              <div className="admin-card p-8">
-                <h2 className="text-xl font-bold text-[var(--foreground)] mb-6">Liquiditätsentwicklung</h2>
+              <div className="admin-card p-6">
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-4">Liquiditätsentwicklung</h2>
                 <div className="h-[500px]">
                   <RollingForecastChart
                     caseId={caseId}
