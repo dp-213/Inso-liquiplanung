@@ -381,10 +381,10 @@ export default function RollingForecastChart({
                 stroke="#ef4444"
                 strokeDasharray="8 4"
                 strokeWidth={1.5}
-                strokeOpacity={0.7}
+                strokeOpacity={0.6}
                 label={{
-                  value: "Bankforderungen",
-                  position: "right",
+                  value: `Bankforderungen ${formatCompact(Number(bankClaimsCents))}`,
+                  position: "insideTopRight",
                   fill: "#ef4444",
                   fontSize: 10,
                   fontWeight: 500,

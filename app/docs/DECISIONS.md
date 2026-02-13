@@ -4,6 +4,45 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-064: Business-Logic-Seiten dynamisch aus DB + Case-Config-Registry
+
+**Datum:** 13. Februar 2026
+**Status:** Akzeptiert
+
+### Problem
+
+Beide Business-Logic-Seiten (Dashboard-Tab `BusinessLogicContent.tsx` und Admin-Seite `business-logic/page.tsx`) enthielten alle Werte als hardcoded Strings im JSX. Bei Änderungen im realen Verfahren (z.B. apoBank-Massekreditvertrag im Januar 2026 vereinbart) wurde das UI nie aktualisiert. Konkrete Fehler: apoBank als „KEINE Vereinbarung", HZV mit KV-Regel (1/3:2/3 statt 28/31:3/31), nur SPK-Massekredit statt beide Banken, Fortführungsbeitrag von Netto statt Brutto.
+
+### Entscheidung
+
+1. **Business-Context API** (`/api/cases/[id]/business-context`): Aggregiert ALLE Stammdaten in einem Request (7 parallele Prisma-Queries + Case-Config). Keine Ledger-Berechnungen — nur Konfiguration.
+2. **Case-Config-Registry** (`/lib/cases/registry.ts`): Mappt `caseNumber` auf Config-Bundle (Settlers, Legal References). Settlement-Rules kommen aus fallspezifischer `config.ts` (nicht aus DB).
+3. **Types als Kontrakt** (`/lib/types/business-context.ts`): Saubere TypeScript-Interfaces für die API-Response. BigInt als String serialisiert.
+4. **Beide Seiten refactored**: Laden alle Daten dynamisch. Neue Fälle brauchen nur DB-Daten + optional `config.ts` für Settlement-Rules.
+
+### Begründung
+
+- Settlement-Rules bleiben in `config.ts` statt DB, weil sie fachlich komplex sind (Split-Ratios, Rechtsgrundlagen, Fallback-Regeln) und sich selten ändern
+- Stammdaten (Banken, Standorte, Mitarbeiter, IVNotes) kommen aus DB, weil sie über Admin-UI gepflegt werden
+- Ein aggregierter Endpoint statt vieler Einzelaufrufe: Performance + Einfachheit
+- Keine Ledger-Queries im Business-Context: Trennung von Stammdaten und Berechnungen
+
+### Konsequenzen
+
+- Neue Fälle: `config.ts` anlegen + in Registry registrieren, UI funktioniert automatisch
+- Fälle ohne Registry-Eintrag: Settlement-Sektionen werden ausgeblendet, Rest funktioniert
+- Massekredit-Berechnung bleibt im separaten `/api/cases/[id]/massekredit` Endpoint
+
+### Relevante Dateien
+
+- `app/src/lib/types/business-context.ts` — Response-Types
+- `app/src/lib/cases/registry.ts` — Case-Config-Registry
+- `app/src/app/api/cases/[id]/business-context/route.ts` — API-Endpoint
+- `app/src/components/business-logic/BusinessLogicContent.tsx` — Dashboard-Tab
+- `app/src/app/admin/cases/[id]/business-logic/page.tsx` — Admin-Seite
+
+---
+
 ## ADR-063: DELTA-Perspektive immer NEUMASSE + NEUTRAL-Filter
 
 **Datum:** 13. Februar 2026

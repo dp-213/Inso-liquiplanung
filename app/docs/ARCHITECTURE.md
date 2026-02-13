@@ -1,6 +1,6 @@
 # System-Architektur
 
-**Version:** 2.52.0
+**Version:** 2.54.0
 **Stand:** 13. Februar 2026
 
 ---
@@ -803,18 +803,37 @@ for (const entry of entries) {
 
 **Zweck:** Fallspezifische Business-Logik für Insolvenzverwalter visualisieren
 
-**Komponente:** `/components/business-logic/BusinessLogicContent.tsx`
+**Datenfluss (seit v2.54.0 — ADR-064):**
+```
+Case-Config-Registry ──→ /api/cases/[id]/business-context ──→ BusinessLogicContent.tsx
+  (config.ts)                 (7 parallele Prisma-Queries)       (Dashboard-Tab)
+                                                              ──→ business-logic/page.tsx
+                                                                  (Admin-Seite, 4 Tabs)
+```
 
-**Integration:** Tab im Unified Dashboard (Admin + Portal)
+**API:** `GET /api/cases/[id]/business-context` — aggregiert alle Stammdaten:
+- CaseMetadata, Locations, BankAccounts, BankAgreements
+- Employees, SettlementRules (aus Case-Config), PaymentFlows
+- Contacts (CaseContact), OpenIssues (IVNote), MassekreditSummary
 
-**Inhalt (am Beispiel HVPlus):**
-- Patientenarten & Abrechnungswege (GKV: KV+HZV, PKV: PVS)
-- Abrechnungszyklen mit Timelines (KV: Leistung → Abschlag 80% → Rest 20%)
-- Alt/Neu-Regeln mit visuellen Split-Balken (Q4/2025: 1/3 Alt, 2/3 Neu)
-- Zahlungsströme zu ISK-Konten (Velbert vs. Uckerath)
-- LANR-Übersicht (Ärzte mit HZV-Volumina)
-- Bankverbindungen & Massekredit-Status
-- Offene Punkte mit Priorisierung
+**Case-Config-Registry:** `/lib/cases/registry.ts`
+- Mappt `caseNumber` → Config-Bundle (Settlers, Legal References)
+- Settlement-Rules kommen aus fallspezifischer `/lib/cases/<case>/config.ts`
+- Fälle ohne Registry-Eintrag: Settlement-Sektionen werden ausgeblendet
+
+**Komponenten:**
+- `/components/business-logic/BusinessLogicContent.tsx` — Dashboard-Tab (prop: `caseId`)
+- `/app/admin/cases/[id]/business-logic/page.tsx` — Standalone Admin-Seite (4 Tabs)
+- `/lib/types/business-context.ts` — Shared Response-Types
+
+**Inhalt (dynamisch aus DB + Config):**
+- Verfahrenseckdaten (Case-Metadata + Massekredit-Summary)
+- Patientenarten & Abrechnungswege (aus SettlementRules)
+- Alt/Neu-Regeln mit Split-Balken (aus SplitRules der Config)
+- Zahlungsströme zu ISK-Konten (aus Locations + BankAccounts)
+- LANR-Übersicht (Employees mit LANR)
+- Bankverbindungen & Status (aus BankAgreements)
+- Offene Punkte (aus IVNotes)
 
 **Design-Prinzipien:**
 - Konservativ, faktisch, vertrauenserweckend (kein Marketing-Stil)

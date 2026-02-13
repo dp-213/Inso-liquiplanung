@@ -4,6 +4,34 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.54.0 – Business-Logic-Seiten dynamisch aus DB + Case-Config
+
+**Datum:** 13. Februar 2026
+
+### Neue Funktionen
+
+- **Business-Context API:** Neuer Endpoint `GET /api/cases/[id]/business-context` aggregiert alle fallspezifischen Stammdaten (Locations, BankAccounts, BankAgreements, Employees, SettlementRules, PaymentFlows, Contacts, IVNotes) in einem Request. Keine Ledger-Berechnungen — nur Konfiguration und Stammdaten.
+- **Case-Config-Registry:** Neues Modul `/lib/cases/registry.ts` mappt `caseNumber` auf fallspezifische Konfigurationen (Settlement-Rules, Legal References). Neue Fälle: Einfach Config-Datei anlegen + in Registry eintragen.
+- **BusinessLogicContent dynamisch:** Dashboard-Tab „Business-Logik" lädt alle Daten aus der API statt hardcoded. Alle Sektionen (Verfahrenseckdaten, Patientenarten, Split-Regeln, Zahlungsströme, LANR-Tabelle, Bankverbindungen, Offene Punkte) rendern dynamisch.
+- **Business-Logic Admin-Seite dynamisch:** Alle 4 Tabs (Grundkonzepte, Abrechnungslogik, Massekredit, Datenqualität) laden Daten aus der Business-Context API. Massekredit-Tab iteriert über ALLE Bankvereinbarungen.
+- **Massekredit-Summary im Dashboard:** Executive Summary zeigt Fortführungsbeitrag und bereinigte End-Liquidität. Neues Modul `/lib/credit/dashboard-massekredit-summary.ts`.
+
+### Bugfixes (zuvor hardcoded, jetzt korrekt aus DB)
+
+- **apoBank zeigt „Vereinbart":** Bisher hardcoded als „KEINE Vereinbarung" (seit Jan 2026 vereinbart). Jetzt dynamisch aus `BankAgreement.agreementStatus`.
+- **HZV zeigt 28/31 Alt, 3/31 Neu:** Bisher fälschlich die KV-Regel (1/3:2/3) angezeigt. Jetzt korrekt aus `haevg-plus/config.ts` HZV_SPLIT_RULES.
+- **Massekredit-Header zeigt alle Banken:** Bisher nur „137.000 EUR (Sparkasse HRV)". Jetzt „237.000 EUR (Sparkasse Velbert + apobank)" aus allen BankAgreements.
+- **Fortführungsbeitrag von Brutto:** Rechenbeispiel berechnete FB auf Netto-Basis. Jetzt korrekt: 10% von Brutto (wie im Massekreditvertrag vereinbart).
+
+### Technisch
+
+- **Neue Dateien:** `business-context.ts` (Types), `registry.ts` (Case-Config), `business-context/route.ts` (API), `dashboard-massekredit-summary.ts`
+- **Refactored:** `BusinessLogicContent.tsx` (486→583 Zeilen, aber jetzt dynamisch), `business-logic/page.tsx` (707→540 Zeilen, cleaner)
+- **Nebenher:** `DataSourceLegend` compact-Mode, `RollingForecastChart` bankClaimsCents-Prop, `ExecutiveSummary` Massekredit-Integration
+- Kein Schema-Change, kein Turso-Migration nötig
+
+---
+
 ## Version 2.53.0 – Standort-Vergleich: Fachliche Korrekturen
 
 **Datum:** 13. Februar 2026

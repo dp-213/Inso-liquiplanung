@@ -295,7 +295,6 @@ export default function UnifiedCaseDashboard({
                 massekreditAltforderungenCents: BigInt(data.massekreditSummary.massekreditAltforderungenCents),
                 bereinigteEndLiquiditaetCents: BigInt(data.massekreditSummary.bereinigteEndLiquiditaetCents),
                 hasUncertainBanks: data.massekreditSummary.hasUncertainBanks,
-                fortfuehrungsbeitragCents: BigInt(data.massekreditSummary.fortfuehrungsbeitragCents),
               } : undefined}
               periodRange={`${firstPeriodLabel} – ${lastPeriodLabel}`}
               formatCurrency={(cents: bigint) => formatCurrencyFn(cents)}
@@ -304,7 +303,7 @@ export default function UnifiedCaseDashboard({
             {/* Datenherkunft – Kompakt-Banner */}
             {data.ledgerStats && <DataSourceLegend ledgerStats={data.ledgerStats} compact={true} />}
 
-            {/* Rolling Forecast Chart – Hero-Visual */}
+            {/* Rolling Forecast Chart – Hero-Visual (Admin/Customer) */}
             {accessMode !== "external" && caseId && (
               <div className="admin-card p-8">
                 <h2 className="text-xl font-bold text-[var(--foreground)] mb-6">Liquiditätsentwicklung</h2>
@@ -315,6 +314,27 @@ export default function UnifiedCaseDashboard({
                     bankClaimsCents={scope === "GLOBAL" ? bankClaimsCents : undefined}
                   />
                 </div>
+              </div>
+            )}
+
+            {/* Wasserfall – Fallback für External/Share (kein API-Zugang für RollingForecast) */}
+            {accessMode === "external" && (
+              <div className="admin-card p-6">
+                <h2 className="text-lg font-semibold text-[var(--foreground)] mb-2">Liquiditätsentwicklung</h2>
+                <p className="text-sm text-[var(--secondary)] mb-4">
+                  Einzahlungen (grün), Auszahlungen (rot) und Endbestand (blaue Linie) pro Periode.
+                </p>
+                <WaterfallChart
+                  data={periods.map((period) => ({
+                    periodLabel: period.periodLabel || period.weekLabel || "",
+                    openingBalance: Number(BigInt(period.openingBalanceCents)) / 100,
+                    inflows: Number(BigInt(period.totalInflowsCents)) / 100,
+                    outflows: Number(BigInt(period.totalOutflowsCents)) / 100,
+                    insolvencyEffects: 0,
+                    closingBalance: Number(BigInt(period.closingBalanceCents)) / 100,
+                  }))}
+                  showInsolvencyEffects={false}
+                />
               </div>
             )}
           </div>

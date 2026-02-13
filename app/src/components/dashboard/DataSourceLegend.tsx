@@ -39,18 +39,30 @@ export default function DataSourceLegend({ ledgerStats, compact = false }: DataS
 
   if (compact) {
     return (
-      <div className="flex items-center gap-4 text-xs text-[var(--muted)] px-1">
+      <div className="flex items-center gap-3 px-4 py-2.5 bg-gray-50 border border-gray-100 rounded-lg text-xs">
         <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-medium ${quality.bgColor} ${quality.color}`}>
           {quality.label}
         </span>
         {dataSource === "LEDGER" && (
           <>
-            <span>IST: {istCount} ({istQuote.toFixed(0)}%)</span>
-            <span>PLAN: {planCount}</span>
+            <span className="text-gray-400">|</span>
+            <span className="text-gray-600">
+              Zahlungsregister: <strong>{totalRelevant}</strong> Buchungen
+            </span>
+            <span className="text-gray-400">|</span>
+            <span className="text-gray-600">
+              IST {istCount} / PLAN {planCount}
+            </span>
             {unreviewedCount > 0 && (
-              <span className="text-amber-600">{unreviewedCount} ungeprüft</span>
+              <>
+                <span className="text-gray-400">|</span>
+                <span className="text-amber-600 font-medium">{unreviewedCount} ungeprüft</span>
+              </>
             )}
           </>
+        )}
+        {dataSource === "LEGACY" && (
+          <span className="text-gray-500">Legacy-Datenmodell</span>
         )}
       </div>
     );

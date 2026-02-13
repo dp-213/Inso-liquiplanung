@@ -116,6 +116,11 @@ npx prisma db push   # Sync database schema
    - System unterstützt: `WEEKLY` (z.B. 13 Wochen) ODER `MONTHLY` (z.B. 11 Monate)
    - **HVPlus Fall:** `periodType=MONTHLY`, `periodCount=11` (11 Monate)
    - Immer aus `LiquidityPlan.periodType` + `periodCount` lesen!
+5. **Richtigkeit vor Geschwindigkeit** – Jede Änderung muss:
+   - Dynamisch sein (keine Hardcodes, alles aus Datenmodell berechnet)
+   - Nachhaltig sein (wiederverwendbar für zukünftige Fälle)
+   - Sauber und ordentlich sein (passt zur bestehenden Architektur)
+   - 100% korrekt sein (lieber nichts zeigen als falsche Zahlen)
 
 ## WICHTIG: Deutsche Umlaute
 

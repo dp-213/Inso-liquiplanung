@@ -1795,6 +1795,7 @@ Zusätzlich am Plan hängend:
 - `GET /api/cases/[id]/forecast/assumptions` - Prognose-Annahmen (Block 3)
 - `GET /api/cases/[id]/insolvency-effects` - Insolvenzeffekte
 - `GET /api/cases/[id]/bank-accounts` - Bankenspiegel
+- `GET /api/cases/[id]/business-context` - Geschäftskontext (Stammdaten, Bankvereinbarungen, Abrechnungsregeln, Kontakte, offene Punkte)
 
 ### Liquiditätsmatrix
 - `GET /api/cases/[id]/dashboard/liquidity-matrix` - Berechnete Matrix-Daten
