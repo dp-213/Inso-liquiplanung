@@ -157,6 +157,8 @@ export async function GET(
     // Category Tag Filter (multi-value)
     const categoryTags = parseMulti('categoryTag');
     const hasCategoryTagSuggestion = searchParams.get('hasCategoryTagSuggestion');
+    // Volltextsuche (server-seitig)
+    const searchQuery = searchParams.get('q')?.trim() || '';
     // Transfer-Filter (Umbuchungen)
     const isTransfer = searchParams.get('isTransfer');
     const from = searchParams.get('from');
@@ -323,6 +325,28 @@ export async function GET(
       where.transferPartnerEntryId = { not: null };
     } else if (isTransfer === 'false') {
       where.transferPartnerEntryId = null;
+    }
+
+    // Volltextsuche: durchsucht alle relevanten Text-Felder + Relations
+    if (searchQuery) {
+      andConditions.push({
+        OR: [
+          { description: { contains: searchQuery } },
+          { note: { contains: searchQuery } },
+          { bookingReference: { contains: searchQuery } },
+          { importSource: { contains: searchQuery } },
+          { splitReason: { contains: searchQuery } },
+          { allocationNote: { contains: searchQuery } },
+          { categoryTagNote: { contains: searchQuery } },
+          // Relationen: Gegenpartei, Bank, Standort
+          { counterparty: { name: { contains: searchQuery } } },
+          { bankAccount: { bankName: { contains: searchQuery } } },
+          { bankAccount: { accountName: { contains: searchQuery } } },
+          { location: { name: { contains: searchQuery } } },
+          // Split-Children durchsuchen (findet Batch-Parents über Kind-Beschreibungen)
+          { splitChildren: { some: { description: { contains: searchQuery } } } },
+        ],
+      });
     }
 
     // Combine AND conditions

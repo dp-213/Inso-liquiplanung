@@ -403,6 +403,8 @@ export default function CaseLedgerPage({
       if (filterCategoryTags.length > 0) queryParams.set("categoryTag", filterCategoryTags.join(","));
       // Transfer-Filter
       if (filterIsTransfer) queryParams.set("isTransfer", filterIsTransfer);
+      // Volltextsuche (server-seitig)
+      if (debouncedSearch.trim()) queryParams.set("q", debouncedSearch.trim());
 
       const queryString = queryParams.toString();
       const url = `/api/cases/${id}/ledger${queryString ? `?${queryString}` : ""}`;
@@ -450,7 +452,7 @@ export default function CaseLedgerPage({
     } finally {
       setLoading(false);
     }
-  }, [id, filterValueTypes, filterLegalBuckets, filterReviewStatuses, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountIds, filterCounterpartyIds, filterLocationIds, filterImportJobIds, filterEstateAllocations, filterCategoryTags, filterIsTransfer]);
+  }, [id, filterValueTypes, filterLegalBuckets, filterReviewStatuses, filterSuggestedBucket, filterFrom, filterTo, filterBankAccountIds, filterCounterpartyIds, filterLocationIds, filterImportJobIds, filterEstateAllocations, filterCategoryTags, filterIsTransfer, debouncedSearch]);
 
   // Kombifunktion für vollständiges Refresh (nach Mutationen)
   const fetchData = useCallback(async () => {
@@ -1089,24 +1091,9 @@ export default function CaseLedgerPage({
     }
   };
 
-  // Apply global search + column filters (memoized)
+  // Apply column filters (memoized) – Volltextsuche läuft jetzt server-seitig
   const filteredEntries = useMemo(() => entries.filter(entry => {
     const entryAny = entry as any;
-
-    // Globale Suche: VOR den Spalten-Filtern prüfen
-    if (debouncedSearch.trim()) {
-      const q = debouncedSearch.toLowerCase().trim();
-      const categoryLabel = entryAny.categoryTag ? (CATEGORY_TAG_LABELS[entryAny.categoryTag] || '').toLowerCase() : '';
-      const matchesSearch =
-        entry.description.toLowerCase().includes(q) ||
-        (counterpartiesMap.get(entryAny.counterpartyId)?.toLowerCase().includes(q)) ||
-        (entryAny.note?.toLowerCase().includes(q)) ||
-        (entryAny.bookingReference?.toLowerCase().includes(q)) ||
-        (entryAny.importSource?.toLowerCase().includes(q)) ||
-        (entryAny.splitReason?.toLowerCase().includes(q)) ||
-        categoryLabel.includes(q);
-      if (!matchesSearch) return false;
-    }
 
     for (const [columnId, filter] of Object.entries(columnFilters)) {
       if (filter.type === 'multiselect' && filter.values && filter.values.length > 0) {
@@ -1147,7 +1134,7 @@ export default function CaseLedgerPage({
     }
 
     return true;
-  }), [entries, columnFilters, locationsMap, bankAccountsMap, counterpartiesMap, debouncedSearch]);
+  }), [entries, columnFilters, locationsMap, bankAccountsMap, counterpartiesMap]);
 
   // Sort entries (memoized)
   const sortedEntries = useMemo(() => [...filteredEntries].sort((a, b) => {
@@ -1973,7 +1960,7 @@ export default function CaseLedgerPage({
               type="text"
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
-              placeholder="Suche in Beschreibung, Gegenpartei, Notiz, IBAN..."
+              placeholder="Suche in Beschreibung, Gegenpartei, Bank, Standort, Notiz, Referenz..."
               className="input-field w-full"
               style={{ paddingLeft: '2.5rem', paddingRight: '6rem' }}
             />
