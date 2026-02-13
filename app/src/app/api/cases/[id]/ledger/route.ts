@@ -335,60 +335,88 @@ export async function GET(
     // fail on Turso (dates stored as INT ms, adapter compares as strings).
     const dateFrom = from ? new Date(from) : undefined;
     const dateTo = to ? new Date(to) : undefined;
+    const hasDateFilter = !!(dateFrom || dateTo);
 
-    // Fetch all matching entries (without date filter), then filter + paginate in JS
-    const allEntries = await prisma.ledgerEntry.findMany({
-      where,
-      include: {
-        splitChildren: {
-          select: {
-            id: true,
-            description: true,
-            amountCents: true,
-            counterpartyId: true,
-            locationId: true,
-            categoryTag: true,
-            reviewStatus: true,
-            note: true,
-          },
-        },
-      },
-      orderBy: { transactionDate: 'asc' },
-    });
-
-    // Apply date filter in JS
-    const dateFiltered = (dateFrom || dateTo)
-      ? allEntries.filter((e) => {
-          if (dateFrom && e.transactionDate < dateFrom) return false;
-          if (dateTo && e.transactionDate > dateTo) return false;
-          return true;
-        })
-      : allEntries;
-
-    // Paginate in JS
-    const total = dateFiltered.length;
-    const entries = dateFiltered.slice(offset, offset + limit);
-
-    // Calculate stats from date-filtered entries (excl. transfers + split parents)
+    let entries: (LedgerEntry & { splitChildren: { id: string; description: string; amountCents: bigint; counterpartyId: string | null; locationId: string | null; categoryTag: string | null; reviewStatus: string; note: string | null }[] })[];
+    let total: number;
     let totalInflows = BigInt(0);
     let totalOutflows = BigInt(0);
     let transferVolume = BigInt(0);
 
-    for (const e of dateFiltered) {
-      const isTransferEntry = e.transferPartnerEntryId !== null;
-      const isSplitParent = e.splitChildren && e.splitChildren.length > 0;
+    if (hasDateFilter) {
+      // FALLBACK: Date filter → load all, filter + paginate in JS (Turso adapter bug)
+      const allEntries = await prisma.ledgerEntry.findMany({
+        where,
+        include: {
+          splitChildren: {
+            select: { id: true, description: true, amountCents: true, counterpartyId: true, locationId: true, categoryTag: true, reviewStatus: true, note: true },
+          },
+        },
+        orderBy: { transactionDate: 'asc' },
+      });
 
-      if (isTransferEntry) {
-        if (e.amountCents >= BigInt(0)) {
-          transferVolume += e.amountCents;
-        }
-      } else if (!isSplitParent) {
-        if (e.amountCents >= BigInt(0)) {
-          totalInflows += e.amountCents;
-        } else {
-          totalOutflows += e.amountCents;
+      const dateFiltered = allEntries.filter((e) => {
+        if (dateFrom && e.transactionDate < dateFrom) return false;
+        if (dateTo && e.transactionDate > dateTo) return false;
+        return true;
+      });
+
+      total = dateFiltered.length;
+      entries = dateFiltered.slice(offset, offset + limit);
+
+      // Stats from filtered entries
+      for (const e of dateFiltered) {
+        const isTransferEntry = e.transferPartnerEntryId !== null;
+        const isSplitParent = e.splitChildren && e.splitChildren.length > 0;
+        if (isTransferEntry) {
+          if (e.amountCents >= BigInt(0)) transferVolume += e.amountCents;
+        } else if (!isSplitParent) {
+          if (e.amountCents >= BigInt(0)) totalInflows += e.amountCents;
+          else totalOutflows += e.amountCents;
         }
       }
+    } else {
+      // FAST PATH: No date filter → DB pagination + 3 aggregate stats queries
+      // Statt alle 3378 Entries zu laden: 1 paginierte Query + 3 leichte Aggregationen
+      const nonTransferNonSplit = { ...where, transferPartnerEntryId: null, splitChildren: { none: {} } };
+
+      const [paginatedEntries, countResult, inflowStats, outflowStats, transferStats] = await Promise.all([
+        // 1. Paginated entries with splitChildren
+        prisma.ledgerEntry.findMany({
+          where,
+          include: {
+            splitChildren: {
+              select: { id: true, description: true, amountCents: true, counterpartyId: true, locationId: true, categoryTag: true, reviewStatus: true, note: true },
+            },
+          },
+          orderBy: { transactionDate: 'asc' },
+          skip: offset,
+          take: limit,
+        }),
+        // 2. Total count (returns 1 number)
+        prisma.ledgerEntry.count({ where }),
+        // 3. Inflows: non-transfer, non-split-parent, amount >= 0
+        prisma.ledgerEntry.aggregate({
+          where: { ...nonTransferNonSplit, amountCents: { gte: 0 } },
+          _sum: { amountCents: true },
+        }),
+        // 4. Outflows: non-transfer, non-split-parent, amount < 0
+        prisma.ledgerEntry.aggregate({
+          where: { ...nonTransferNonSplit, amountCents: { lt: 0 } },
+          _sum: { amountCents: true },
+        }),
+        // 5. Transfers: transfer entries, amount >= 0
+        prisma.ledgerEntry.aggregate({
+          where: { ...where, transferPartnerEntryId: { not: null }, amountCents: { gte: 0 } },
+          _sum: { amountCents: true },
+        }),
+      ]);
+
+      entries = paginatedEntries;
+      total = countResult;
+      totalInflows = inflowStats._sum.amountCents || BigInt(0);
+      totalOutflows = outflowStats._sum.amountCents || BigInt(0);
+      transferVolume = transferStats._sum.amountCents || BigInt(0);
     }
 
     const netAmount = totalInflows + totalOutflows;
