@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getSession } from "@/lib/auth";
 
-// GET /api/cases/[id]/contacts - Alle Ansprechpartner eines Falls abrufen
+/**
+ * GET /api/cases/[id]/contacts
+ * Lade alle Kontakte für einen Fall
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -17,15 +20,23 @@ export async function GET(
 
     const contacts = await prisma.caseContact.findMany({
       where: { caseId },
-      orderBy: [{ displayOrder: "asc" }, { name: "asc" }],
+      orderBy: { displayOrder: "asc" },
     });
 
     return NextResponse.json({
-      caseId,
-      contacts,
+      contacts: contacts.map((c) => ({
+        id: c.id,
+        role: c.role,
+        name: c.name,
+        organization: c.organization,
+        email: c.email,
+        phone: c.phone,
+        notes: c.notes,
+        displayOrder: c.displayOrder,
+      })),
     });
   } catch (error) {
-    console.error("Error fetching contacts:", error);
+    console.error("Error loading contacts:", error);
     return NextResponse.json(
       { error: "Fehler beim Laden der Kontakte" },
       { status: 500 }
@@ -33,7 +44,10 @@ export async function GET(
   }
 }
 
-// POST /api/cases/[id]/contacts - Neuen Kontakt erstellen
+/**
+ * POST /api/cases/[id]/contacts
+ * Neuen Kontakt anlegen
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -46,40 +60,42 @@ export async function POST(
 
     const { id: caseId } = await params;
     const body = await request.json();
+
     const { role, name, organization, email, phone, notes, displayOrder } = body;
 
-    if (!name?.trim() || !role?.trim()) {
-      return NextResponse.json(
-        { error: "Name und Rolle sind erforderlich" },
-        { status: 400 }
-      );
+    if (!name || !name.trim()) {
+      return NextResponse.json({ error: "Name erforderlich" }, { status: 400 });
     }
 
-    const caseData = await prisma.case.findUnique({
-      where: { id: caseId },
-    });
-
-    if (!caseData) {
-      return NextResponse.json(
-        { error: "Fall nicht gefunden" },
-        { status: 404 }
-      );
+    if (!role) {
+      return NextResponse.json({ error: "Rolle erforderlich" }, { status: 400 });
     }
 
     const contact = await prisma.caseContact.create({
       data: {
         caseId,
-        role: role.trim(),
+        role,
         name: name.trim(),
-        organization: organization?.trim() || null,
-        email: email?.trim() || null,
-        phone: phone?.trim() || null,
-        notes: notes?.trim() || null,
+        organization: organization || null,
+        email: email || null,
+        phone: phone || null,
+        notes: notes || null,
         displayOrder: displayOrder ?? 0,
       },
     });
 
-    return NextResponse.json(contact, { status: 201 });
+    return NextResponse.json({
+      contact: {
+        id: contact.id,
+        role: contact.role,
+        name: contact.name,
+        organization: contact.organization,
+        email: contact.email,
+        phone: contact.phone,
+        notes: contact.notes,
+        displayOrder: contact.displayOrder,
+      },
+    });
   } catch (error) {
     console.error("Error creating contact:", error);
     return NextResponse.json(
