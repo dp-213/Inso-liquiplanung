@@ -4,6 +4,34 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.49.0 – IST/PLAN-Vergleich Redesign + Standort-Vergleich
+
+**Datum:** 13. Februar 2026
+
+### Neue Funktionen
+
+- **IST/PLAN-Vergleich komplett neu:** Monate als Spalten, IST/PLAN/Abweichung pro Sektion (Einnahmen/Ausgaben/Netto), Chart mit Netto-Balken + kumulierter Abweichungslinie
+- **Standort-Vergleichstabelle:** Alle Standorte nebeneinander mit KV/HZV/PVS-Aufschlüsselung, Deckungsgrad-Farbkodierung (grün/gelb/orange/rot), GESAMT-Spalte
+- **Deckungsgrad-Cards:** Fortschrittsbalken pro Standort mit Einnahmen/Kosten/Netto und Fehlbetrag/Monat
+- **Monatliche Entwicklung:** Pro Standort Einnahmen/Kosten/Netto/Deckungsgrad über alle Monate mit Trend-Spalte (erster vs. letzter Monat)
+- **Ø Monat / Gesamt Toggle:** Vergleichstabelle und Coverage-Cards umschaltbar zwischen Monatsdurchschnitt und Gesamtsummen
+- **Standort-Merge:** Uckerath + Eitorf werden automatisch als "Uckerath/Eitorf" zusammengefasst (gemeinsame BSNR)
+- **Revenue-Kategorie-Drawer:** Detail-Ansicht pro Einnahmekategorie mit Tabelle
+
+### Neue API-Endpunkte
+
+- `GET /api/cases/[id]/dashboard/locations/compare` – Standort-Vergleichsdaten mit monatlicher Aufschlüsselung, Estate-Filter (Neumasse/Altmasse/Gesamt), CategoryTag-basierte Klassifikation, Employee-Kennzahlen
+
+### Technisch
+
+- Alle Finanzdaten in BigInt, serialisiert als Strings in JSON
+- Deckungsgrad in Basispunkten (39,1% = 3910) für BigInt-sichere Ganzzahl-Arithmetik
+- Monatliche Gruppierung in JavaScript statt Prisma (Turso datetime-Bug ADR-046)
+- Client-seitiger Standort-Merge via Name-Pattern-Matching (kein Schema-Change)
+- IST/PLAN-Vergleich: Auth-Check, Scope-Support, Overlap-only Totals
+
+---
+
 ## Version 2.48.0 – Finanzierung & Banken
 
 **Datum:** 13. Februar 2026
