@@ -197,11 +197,16 @@ function mergeLocationGroups(data: LocationCompareResponse): LocationCompareResp
  * 2. Vor Insolvenz (PRE) - Geschäftskonten, Estate-Filter deaktiviert
  * 3. Veränderung (DELTA) - Vergleich Pre→Post Ø/Monat
  */
+// DELTA vergleicht immer gegen NEUMASSE (operative Tragfähigkeit)
+const DELTA_ESTATE_FILTER = "NEUMASSE" as const;
+
 export default function LocationView({ caseId }: LocationViewProps) {
   const [postRawData, setPostRawData] = useState<LocationCompareResponse | null>(null);
   const [preRawData, setPreRawData] = useState<LocationCompareResponse | null>(null);
+  const [deltaPostRawData, setDeltaPostRawData] = useState<LocationCompareResponse | null>(null);
   const [postLoading, setPostLoading] = useState(true);
   const [preLoading, setPreLoading] = useState(true);
+  const [deltaPostLoading, setDeltaPostLoading] = useState(true);
   const [postError, setPostError] = useState<string | null>(null);
   const [preError, setPreError] = useState<string | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
@@ -262,10 +267,46 @@ export default function LocationView({ caseId }: LocationViewProps) {
     return () => { cancelled = true; };
   }, [caseId, estateFilter]);
 
-  // Initiales Laden: Skeleton bis beide Datenquellen geladen sind
+  // DELTA-POST-Daten: immer NEUMASSE (Konstante, nie aus State)
+  useEffect(() => {
+    // Optimierung: Wenn POST bereits mit NEUMASSE geladen, übernehmen
+    if (estateFilter === DELTA_ESTATE_FILTER && postRawData) {
+      setDeltaPostRawData(postRawData);
+      setDeltaPostLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setDeltaPostLoading(true);
+
+    const params = new URLSearchParams({
+      estateFilter: DELTA_ESTATE_FILTER,
+      perspective: "POST",
+    });
+    fetch(`/api/cases/${caseId}/dashboard/locations/compare?${params}`, {
+      credentials: "include",
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error("Fehler beim Laden der Delta-Daten");
+        return res.json();
+      })
+      .then((data) => {
+        if (!cancelled) setDeltaPostRawData(data);
+      })
+      .catch(() => {
+        // Delta-Fehler nicht separat anzeigen, POST-Fehler reicht
+      })
+      .finally(() => {
+        if (!cancelled) setDeltaPostLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [caseId, estateFilter, postRawData]);
+
+  // Initiales Laden: Skeleton bis alle Datenquellen geladen sind
   // Bei estateFilter-Wechsel: nur POST wird neu geladen, kein Skeleton
   const initialLoading = postRawData === null && postLoading;
-  const loading = initialLoading || preLoading;
+  const loading = initialLoading || preLoading || (deltaPostRawData === null && deltaPostLoading);
   const error = postError || preError;
 
   // Merge-Logik: Eitorf+Uckerath zusammenfassen
@@ -278,6 +319,12 @@ export default function LocationView({ caseId }: LocationViewProps) {
     if (!preRawData) return null;
     return mergeLocationGroups(preRawData);
   }, [preRawData]);
+
+  // deltaPostData ist IMMER mit NEUMASSE gefetcht (defensive Konstante)
+  const deltaPostData = useMemo(() => {
+    if (!deltaPostRawData) return null;
+    return mergeLocationGroups(deltaPostRawData);
+  }, [deltaPostRawData]);
 
   // Active data based on perspective
   const activeData = perspectiveTab === "PRE" ? preData : postData;
@@ -438,9 +485,9 @@ export default function LocationView({ caseId }: LocationViewProps) {
         </div>
       )}
 
-      {/* DELTA-Perspektive */}
-      {perspectiveTab === "DELTA" && postData && preData && (
-        <LocationDeltaView postData={postData} preData={preData} />
+      {/* DELTA-Perspektive (immer NEUMASSE, unabhängig vom Estate-Filter) */}
+      {perspectiveTab === "DELTA" && deltaPostData && preData && (
+        <LocationDeltaView postData={deltaPostData} preData={preData} />
       )}
 
       {/* POST/PRE-Perspektiven */}
@@ -454,9 +501,11 @@ export default function LocationView({ caseId }: LocationViewProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <div>
-                  <h4 className="font-medium text-amber-800">Geschäftskonten-Daten</h4>
+                  <h4 className="font-medium text-amber-800">
+                    Geschäftskonten-Daten ({preRawData?.monthLabels.length ?? 0} Mon.)
+                  </h4>
                   <p className="text-sm text-amber-700 mt-1">
-                    Viele Buchungen sind ggf. nicht kategorisiert. Kein Estate-Filter (Alt/Neumasse) bei Vorinsolvenz-Daten.
+                    Einige Buchungen ggf. nicht kategorisiert. Kein Estate-Filter bei Vorinsolvenz-Daten.
                   </p>
                 </div>
               </div>

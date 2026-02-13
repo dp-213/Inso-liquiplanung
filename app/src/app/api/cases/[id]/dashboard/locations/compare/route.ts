@@ -154,11 +154,12 @@ export async function GET(
       estateWhere.estateAllocation = estateFilter;
     }
 
-    // Fetch entries
+    // Fetch entries (NEUTRAL = Auskehrungen/interne Überträge ausschließen)
     const allEntries = await prisma.ledgerEntry.findMany({
       where: {
         caseId,
         valueType: "IST",
+        legalBucket: { not: "NEUTRAL" },
         ...EXCLUDE_SPLIT_PARENTS,
         reviewStatus: { in: ["CONFIRMED", "ADJUSTED"] },
         ...estateWhere,
