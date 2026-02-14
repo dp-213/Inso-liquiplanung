@@ -26,7 +26,7 @@ export async function POST(req: NextRequest, { params }: RouteProps) {
         }
 
         const body = await req.json();
-        const { label } = body;
+        const { label, notifyEmail } = body;
 
         // Token generieren (einfache UUID, könnte auch komplexer sein)
         const token = uuidv4();
@@ -36,6 +36,7 @@ export async function POST(req: NextRequest, { params }: RouteProps) {
                 caseId,
                 token,
                 label: label || "Neuer Zugang",
+                notifyEmail: notifyEmail || null,
             },
         });
 
@@ -68,5 +69,37 @@ export async function GET(req: NextRequest, { params }: RouteProps) {
         return NextResponse.json({ success: true, tokens });
     } catch (error) {
         return NextResponse.json({ error: "Fehler beim Laden" }, { status: 500 });
+    }
+}
+
+export async function PATCH(req: NextRequest, { params }: RouteProps) {
+    try {
+        const session = await requireAuth().catch(() => null);
+        const { id: caseId } = await params;
+
+        if (!session?.isAdmin) {
+            const { getCustomerSession, checkCaseAccess } = await import("@/lib/customer-auth");
+            const customerSession = await getCustomerSession();
+            if (!customerSession) return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
+
+            const access = await checkCaseAccess(customerSession.customerId, caseId);
+            if (!access.hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
+        const body = await req.json();
+        const { tokenId, notifyEmail } = body;
+
+        if (!tokenId) {
+            return NextResponse.json({ error: "tokenId ist erforderlich" }, { status: 400 });
+        }
+
+        const updated = await prisma.companyToken.update({
+            where: { id: tokenId, caseId },
+            data: { notifyEmail: notifyEmail || null },
+        });
+
+        return NextResponse.json({ success: true, token: updated });
+    } catch (error) {
+        return NextResponse.json({ error: "Fehler beim Aktualisieren" }, { status: 500 });
     }
 }

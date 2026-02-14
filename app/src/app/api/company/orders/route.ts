@@ -1,7 +1,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { createApprovalSteps, hasApprovalChain } from "@/lib/approval-engine";
+import { createApprovalSteps, hasApprovalChain, getCurrentApprover } from "@/lib/approval-engine";
+import { sendEmail } from "@/lib/email";
+import { newOrderEmail } from "@/lib/email-templates";
 
 // Maximale Dateigröße: 10MB
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -160,6 +162,7 @@ export async function POST(req: NextRequest) {
             approvedAt: new Date(),
             approvedBy: "system",
             ledgerEntryId: ledgerEntry.id,
+            companyTokenId: companyToken.id,
           },
         });
 
@@ -198,6 +201,7 @@ export async function POST(req: NextRequest) {
         documentSizeBytes,
         documentContent,
         status: "PENDING",
+        companyTokenId: companyToken.id,
       },
     });
 
@@ -206,6 +210,30 @@ export async function POST(req: NextRequest) {
     let stepsCreated = 0;
     if (chainActive) {
       stepsCreated = await createApprovalSteps(order.id, companyToken.caseId, amountBigInt);
+    }
+
+    // Email an Approver senden (nicht-blockierend)
+    const caseName = companyToken.case.debtorName;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://cases.gradify.de";
+    const portalUrl = `${appUrl}/portal/cases/${companyToken.caseId}`;
+
+    if (chainActive) {
+      // Chain-Modus: Email an ersten Approver
+      const approver = await getCurrentApprover(order.id);
+      if (approver?.email) {
+        const tpl = newOrderEmail(caseName, { creditor, amountCents: amountBigInt, description, type }, portalUrl);
+        sendEmail({ to: approver.email, ...tpl, context: { event: "NEW_ORDER_CHAIN", caseId: companyToken.caseId, orderIds: [order.id] } });
+      }
+    } else {
+      // Legacy: Email an Case-Owner
+      const owner = await prisma.customerUser.findUnique({
+        where: { id: caseData.ownerId },
+        select: { email: true },
+      });
+      if (owner?.email) {
+        const tpl = newOrderEmail(caseName, { creditor, amountCents: amountBigInt, description, type }, portalUrl);
+        sendEmail({ to: owner.email, ...tpl, context: { event: "NEW_ORDER_LEGACY", caseId: companyToken.caseId, orderIds: [order.id] } });
+      }
     }
 
     const typeLabel = type === "BESTELLUNG" ? "Bestellanfrage" : "Zahlungsanfrage";

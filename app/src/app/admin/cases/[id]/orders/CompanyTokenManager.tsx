@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Copy, Link as LinkIcon, Loader2, Check } from "lucide-react";
+import { Plus, Copy, Link as LinkIcon, Loader2, Check, Mail } from "lucide-react";
 
 interface Token {
     id: string;
     token: string;
     label: string;
+    notifyEmail: string | null;
     isActive: boolean;
     createdAt: string;
 }
@@ -20,8 +21,12 @@ export function CompanyTokenManager({ caseId }: CompanyTokenManagerProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
     const [newLabel, setNewLabel] = useState("");
+    const [newEmail, setNewEmail] = useState("");
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [createError, setCreateError] = useState<string | null>(null);
+    const [editingEmailId, setEditingEmailId] = useState<string | null>(null);
+    const [editEmailValue, setEditEmailValue] = useState("");
+    const [savingEmailId, setSavingEmailId] = useState<string | null>(null);
 
     useEffect(() => {
         loadTokens();
@@ -50,10 +55,14 @@ export function CompanyTokenManager({ caseId }: CompanyTokenManagerProps) {
                 method: "POST",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ label: newLabel }),
+                body: JSON.stringify({
+                    label: newLabel,
+                    notifyEmail: newEmail.trim() || null,
+                }),
             });
             if (res.ok) {
                 setNewLabel("");
+                setNewEmail("");
                 loadTokens();
             } else {
                 const data = await res.json().catch(() => null);
@@ -71,6 +80,27 @@ export function CompanyTokenManager({ caseId }: CompanyTokenManagerProps) {
         navigator.clipboard.writeText(url);
         setCopiedId(id);
         setTimeout(() => setCopiedId(null), 2000);
+    }
+
+    async function saveEmail(tokenId: string) {
+        setSavingEmailId(tokenId);
+        try {
+            const res = await fetch(`/api/cases/${caseId}/tokens`, {
+                method: "PATCH",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    tokenId,
+                    notifyEmail: editEmailValue.trim() || null,
+                }),
+            });
+            if (res.ok) {
+                setEditingEmailId(null);
+                loadTokens();
+            }
+        } finally {
+            setSavingEmailId(null);
+        }
     }
 
     return (
@@ -94,6 +124,14 @@ export function CompanyTokenManager({ caseId }: CompanyTokenManagerProps) {
                         value={newLabel}
                         onChange={(e) => setNewLabel(e.target.value)}
                         placeholder="Bezeichnung (z.B. Steuerbüro, Lieferanten-Portal)"
+                        className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 px-3"
+                        onKeyDown={(e) => e.key === "Enter" && createToken()}
+                    />
+                    <input
+                        type="email"
+                        value={newEmail}
+                        onChange={(e) => setNewEmail(e.target.value)}
+                        placeholder="Email für Benachrichtigungen (optional)"
                         className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5 px-3"
                         onKeyDown={(e) => e.key === "Enter" && createToken()}
                     />
@@ -132,7 +170,52 @@ export function CompanyTokenManager({ caseId }: CompanyTokenManagerProps) {
                                         {token.isActive ? 'Aktiv' : 'Inaktiv'}
                                     </span>
                                 </div>
-                                <div className="flex items-center justify-between mt-3">
+
+                                {/* Email-Anzeige / Bearbeitung */}
+                                <div className="mb-3">
+                                    {editingEmailId === token.id ? (
+                                        <div className="flex gap-2 items-center">
+                                            <input
+                                                type="email"
+                                                value={editEmailValue}
+                                                onChange={(e) => setEditEmailValue(e.target.value)}
+                                                placeholder="Email-Adresse"
+                                                className="flex-1 rounded border-gray-300 text-xs py-1 px-2 focus:border-indigo-500 focus:ring-indigo-500"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") saveEmail(token.id);
+                                                    if (e.key === "Escape") setEditingEmailId(null);
+                                                }}
+                                                autoFocus
+                                            />
+                                            <button
+                                                onClick={() => saveEmail(token.id)}
+                                                disabled={savingEmailId === token.id}
+                                                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                                            >
+                                                {savingEmailId === token.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "OK"}
+                                            </button>
+                                            <button
+                                                onClick={() => setEditingEmailId(null)}
+                                                className="text-xs text-gray-400 hover:text-gray-600"
+                                            >
+                                                Abb.
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => {
+                                                setEditingEmailId(token.id);
+                                                setEditEmailValue(token.notifyEmail || "");
+                                            }}
+                                            className="flex items-center text-xs text-gray-500 hover:text-indigo-600 transition-colors"
+                                        >
+                                            <Mail className="h-3 w-3 mr-1" />
+                                            {token.notifyEmail || "Keine Email hinterlegt"}
+                                        </button>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center justify-between">
                                     <code className="text-xs text-gray-400 font-mono bg-gray-50 px-2 py-1 rounded">
                                         ...{token.token.slice(-8)}
                                     </code>

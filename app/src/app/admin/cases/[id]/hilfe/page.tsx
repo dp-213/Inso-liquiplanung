@@ -14,25 +14,43 @@ interface FaqItem {
 }
 
 const GLOSSARY = [
-  { term: "Altmasse", definition: "Vermögenswerte und Verbindlichkeiten, die vor der Insolvenzeröffnung entstanden sind" },
-  { term: "Closing Balance", definition: "Endbestand einer Periode = Opening + Einzahlungen + Auszahlungen" },
-  { term: "Datenqualitäts-Check", definition: "Automatische Konsistenzprüfung im System Health Panel (6 Regeln, aufklappbar mit Deep-Links)" },
-  { term: "Eröffnungssaldo", definition: "Kontostand zu Beginn des Planungszeitraums" },
-  { term: "Geschäftskonten", definition: "Vorinsolvenz-Analyse: Kontobewegungen nach Kategorie mit Standort-Aufschlüsselung" },
-  { term: "Headroom", definition: "Finanzieller Spielraum = Kontostand + Kreditlinie \u2013 Rückstellungen" },
-  { term: "IST", definition: "Echte, bestätigte Bankbuchungen aus importierten Kontoauszügen" },
-  { term: "IV", definition: "Insolvenzverwalter \u2013 Ihr Mandant" },
-  { term: "Kostenart", definition: "Kategorisierung von Ausgaben (z.B. Personal, Miete) mit optionalem Budget" },
-  { term: "Kreditor", definition: "Ausgaben-Partner (Lieferant, Dienstleister, Behörde) \u2013 unter Beschaffung" },
-  { term: "Kreditlinie", definition: "Vereinbarter Massekredit mit der Bank" },
-  { term: "Neumasse", definition: "Vermögenswerte und Verbindlichkeiten, die nach der Insolvenzeröffnung entstanden sind" },
-  { term: "Periode", definition: "Zeitabschnitt (Woche oder Monat) in der Liquiditätsplanung" },
-  { term: "PLAN", definition: "Statische Planwerte (Legacy) \u2013 wird durch PROGNOSE ersetzt" },
-  { term: "PROGNOSE", definition: "Berechnete Zukunftswerte, die aus Ihren aktiven Annahmen erzeugt werden" },
-  { term: "Rolling Forecast", definition: "Automatisch kombinierte Ansicht: IST (Vergangenheit) + PROGNOSE (Zukunft)" },
-  { term: "Rückstellung", definition: "Reservierte Mittel für erwartete Verbindlichkeiten" },
-  { term: "System", definition: "Zentrales Diagnose-Dashboard: Daten-Übersicht, Health-Checks, Import-Historie" },
-  { term: "Szenario", definition: "Planungskonfiguration mit Periodentyp, Zeitraum und Eröffnungssaldo" },
+  { term: "Absonderung", definition: "Sonderrecht eines Gläubigers an einem bestimmten Vermögensgegenstand (z.B. Pfandrecht). Wird getrennt von der allgemeinen Masse behandelt." },
+  { term: "Altmasse", definition: "Vermögenswerte und Verbindlichkeiten, die vor der Insolvenzeröffnung entstanden sind. Auch: Forderungen für Leistungen vor dem Eröffnungstag." },
+  { term: "Berechnungsannahmen", definition: "Dokumentierte Planungsgrundlagen (Prämissen) für Gericht und Gläubiger. Textuelle Beschreibung, keine Zahlenwerte." },
+  { term: "BSNR", definition: "Betriebsstättennummer. Identifiziert eine Arztpraxis/Standort bei der Kassenärztlichen Vereinigung." },
+  { term: "Buchungsquelle", definition: "Herkunft einer Buchung: Bankkonto (BANK_ACCOUNT), Kasse (CASH_REGISTER), ERP-System oder manuelle Eingabe." },
+  { term: "Closing Balance", definition: "Endbestand einer Periode = Opening Balance + Einzahlungen - Auszahlungen." },
+  { term: "Datenqualitäts-Check", definition: "Automatische Konsistenzprüfung im System-Panel. Prüft 6 Regeln (z.B. Gegenpartei-Konsistenz, Stammdaten-Referenzen)." },
+  { term: "Eröffnungssaldo", definition: "Kontostand zu Beginn des Planungszeitraums (= Opening Balance)." },
+  { term: "Gegenpartei", definition: "Geschäftspartner einer Buchung (z.B. KV, HAEVG, Vermieter). Wird zur Klassifikation und Analyse verwendet." },
+  { term: "Geschäftskonten", definition: "Vorinsolvenz-Analyse: Kontobewegungen der regulären Bankkonten (vor Eröffnung der Insolvenzkonten)." },
+  { term: "Headroom", definition: "Finanzieller Spielraum = Kontostand + Kreditlinie - Rückstellungen. Wird negativ, droht Zahlungsunfähigkeit." },
+  { term: "HZV / HAEVG", definition: "Hausarztzentrierte Versorgung. Zahlungen über die HAEVG (Hausärztliche Vertragsgemeinschaft). Abrechnung ist arztgebunden (über LANR)." },
+  { term: "ISK", definition: "Insolvenz-Sonderkonto. Separates Bankkonto, das nach Insolvenzeröffnung eingerichtet wird. Neue Zahlungen laufen hierüber." },
+  { term: "IST", definition: "Echte, bestätigte Bankbuchungen aus importierten Kontoauszügen. Höchste Zuverlässigkeit." },
+  { term: "IV", definition: "Insolvenzverwalter. Der gerichtlich bestellte Verwalter des Insolvenzverfahrens (= Ihr Mandant im Kundenportal)." },
+  { term: "Klassifikation", definition: "Zuordnung einer Buchung zu Gegenpartei, Standort, Kostenart und Masse-Typ. Kann automatisch vorgeschlagen und manuell bestätigt werden." },
+  { term: "Kostenart", definition: "Kategorisierung von Ausgaben (z.B. Personal, Miete, Material) mit optionalem Budget pro Periode." },
+  { term: "Kreditor", definition: "Lieferant oder Dienstleister, an den Zahlungen geleistet werden. Verwaltet unter Beschaffung." },
+  { term: "Kreditlinie", definition: "Vereinbarter Massekredit mit der Bank. Maximalbetrag, der als Betriebsmittelkredit zur Verfügung steht." },
+  { term: "KV / KVNO", definition: "Kassenärztliche Vereinigung (Nordrhein). Zahlt Honorare an Ärzte für gesetzlich versicherte Patienten. Quartalsabrechnung." },
+  { term: "LANR", definition: "Lebenslange Arztnummer. 7-stellige Nummer, die jeden Arzt eindeutig identifiziert. Relevant für HZV-Zuordnung." },
+  { term: "LedgerEntry", definition: "Einzelne Buchung im Zahlungsregister. Zentrale Dateneinheit mit allen Dimensionen (Betrag, Datum, Gegenpartei, Masse-Typ etc.)." },
+  { term: "Massekredit", definition: "Kredit der Bank an die Insolvenzmasse zur Fortführung des Geschäftsbetriebs. Hat Höchstbetrag und Laufzeit." },
+  { term: "Neumasse", definition: "Vermögenswerte und Verbindlichkeiten, die nach der Insolvenzeröffnung entstanden sind. Auch: Forderungen für Leistungen ab dem Eröffnungstag." },
+  { term: "Opening Balance", definition: "Anfangsbestand einer Periode. Bei der ersten Periode = Eröffnungssaldo des Bankkontos." },
+  { term: "Periode", definition: "Zeitabschnitt in der Liquiditätsplanung. Je nach Fall wöchentlich (z.B. 13 Wochen) oder monatlich (z.B. 11 Monate)." },
+  { term: "PLAN", definition: "Statische Planwerte (Legacy). Wird durch PROGNOSE ersetzt, sobald Annahmen aktiv sind." },
+  { term: "PROGNOSE", definition: "Berechnete Zukunftswerte aus aktiven Annahmen. Werden automatisch für zukünftige Perioden erzeugt." },
+  { term: "PVS", definition: "Privatärztliche Verrechnungsstelle. Rechnet Privatpatienten-Honorare ab und überweist an die Praxis." },
+  { term: "Review-Status", definition: "Prüfstatus einer Buchung: UNGEPRÜFT (neu importiert), BESTÄTIGT (klassifiziert und freigegeben) oder ANGEPASST (manuell korrigiert)." },
+  { term: "Rolling Forecast", definition: "Automatisch kombinierte Ansicht: IST-Daten (Vergangenheit) + PROGNOSE (Zukunft). Aktualisiert sich laufend." },
+  { term: "Rückstellung", definition: "Reservierte Mittel für erwartete Verbindlichkeiten. Reduziert den verfügbaren Headroom." },
+  { term: "Standort", definition: "Betriebsstätte des insolventen Unternehmens (z.B. Praxis Velbert, Praxis Uckerath). Hat eigene Bankzuordnung." },
+  { term: "System", definition: "Diagnose-Dashboard: Daten-Übersicht, Konsistenz-Checks, Import-Historie, Aggregationsstatus." },
+  { term: "Szenario", definition: "Planungskonfiguration mit Periodentyp (Wochen/Monate), Zeitraum und Eröffnungssaldo." },
+  { term: "Token", definition: "Einmal-Link für externen Zugriff. Kann für Leseansicht (Share-Link) oder Bestelleinreichung (Firmen-Token) verwendet werden." },
+  { term: "Verifikation", definition: "SOLL/IST-Abgleich: Wurden geplante Zahlungen tatsächlich ausgeführt? Ampelsystem (grün/gelb/rot)." },
 ];
 
 // ============================================================================
@@ -246,6 +264,16 @@ const icons = {
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
     </svg>
   ),
+  table: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18M10 3v18M14 3v18M3 6a3 3 0 013-3h12a3 3 0 013 3v12a3 3 0 01-3 3H6a3 3 0 01-3-3V6z" />
+    </svg>
+  ),
+  trending: (
+    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+    </svg>
+  ),
 };
 
 // ============================================================================
@@ -277,21 +305,45 @@ export default function HilfePage() {
               CSV-Dateien von allen gängigen Banken. Unter{" "}
               <Link href={`${base}/ingestion`} className="text-[var(--primary)] underline font-medium">Import</Link>{" "}
               können Sie Spalten manuell zuordnen, falls das Format nicht automatisch erkannt wird.
+              Für PDF-Dokumente (z.B. Zahlbelege, Kontoauszüge) steht das AI-Preprocessing zur Verfügung, das Inhalte automatisch extrahiert.
             </span>
           ),
         },
         {
           question: "Was passiert bei doppelten Buchungen?",
-          answer: "Das System prüft auf Duplikate anhand von Bankkonto, Datum und Betrag. Erkannte Duplikate werden markiert und können beim Import übersprungen werden.",
+          answer: "Das System prüft auf Duplikate anhand von Bankkonto, Buchungsdatum und Betrag. Erkannte Duplikate werden markiert und können beim Import übersprungen werden.",
         },
         {
           question: "Warum sehe ich \u201eUngeprüfte Buchungen\u201c?",
           answer: (
             <span>
-              Neu importierte Buchungen sind zunächst ungeprüft. Unter{" "}
+              Neu importierte Buchungen haben den Status UNGEPRÜFT. Unter{" "}
               <Link href={`${base}/ist-klassifikation`} className="text-[var(--primary)] underline font-medium">Klassifikation</Link>{" "}
-              prüfen und bestätigen Sie diese. Erst bestätigte Buchungen fließen in die Planung ein.
+              ordnen Sie diese zu (Gegenpartei, Standort, Masse-Typ) und bestätigen sie.
+              Das System schlägt basierend auf Regelwerk und Buchungstext automatisch Zuordnungen vor,
+              die Sie per Klick akzeptieren oder anpassen können.
             </span>
+          ),
+        },
+        {
+          question: "Was bedeutet \u201eKlassifikation\u201c genau?",
+          answer: (
+            <div className="space-y-2">
+              <p>
+                Klassifikation bedeutet, jede Buchung mit Zusatzinformationen anzureichern:
+              </p>
+              <ul className="list-disc list-inside space-y-1 ml-2">
+                <li><strong>Gegenpartei:</strong> Wer hat gezahlt / an wen wurde gezahlt? (z.B. KV, HAEVG, Vermieter)</li>
+                <li><strong>Standort:</strong> Welchem Betriebsstandort ist die Buchung zuzuordnen?</li>
+                <li><strong>Masse-Typ:</strong> Altmasse, Neumasse oder gemischt?</li>
+                <li><strong>Kategorie-Tag:</strong> Inhaltliche Zuordnung (z.B. HZV, PERSONAL, MIETE)</li>
+              </ul>
+              <p>
+                Das System macht automatische Vorschläge. Sie prüfen und bestätigen diese unter{" "}
+                <Link href={`${base}/ist-klassifikation`} className="text-[var(--primary)] underline font-medium">Klassifikation</Link>.
+                Massenverarbeitung ist per Bulk-Accept möglich.
+              </p>
+            </div>
           ),
         },
       ],
@@ -307,7 +359,7 @@ export default function HilfePage() {
               <Link href={`${base}/forecast`} className="text-[var(--primary)] underline font-medium">Prognose-Seite</Link>.
               Jede aktive Annahme erzeugt automatisch Cashflows für zukünftige Perioden, die im{" "}
               <Link href={`${base}/dashboard`} className="text-[var(--primary)] underline font-medium">Dashboard</Link>{" "}
-              als blaue Linie erscheinen.
+              als blaue Balken erscheinen.
             </span>
           ),
         },
@@ -323,13 +375,13 @@ export default function HilfePage() {
           ),
         },
         {
-          question: "Was ist der Unterschied zwischen Prämissen und Prognose-Annahmen?",
+          question: "Was ist der Unterschied zwischen Berechnungsannahmen und Prognose-Annahmen?",
           answer: (
             <span>
-              <Link href={`${base}/assumptions`} className="text-[var(--primary)] underline font-medium">Prämissen</Link>{" "}
-              sind <strong>Textbeschreibungen</strong> für die Dokumentation (Gericht, Gläubiger) \u2013 keine Berechnung.{" "}
+              <Link href={`${base}/assumptions`} className="text-[var(--primary)] underline font-medium">Berechnungsannahmen</Link>{" "}
+              (auch Prämissen) sind <strong>Textbeschreibungen</strong> für die Dokumentation (Gericht, Gläubiger) &ndash; sie erzeugen keine Zahlen.{" "}
               <Link href={`${base}/forecast`} className="text-[var(--primary)] underline font-medium">Prognose-Annahmen</Link>{" "}
-              sind <strong>Zahlenwerte</strong> (EUR pro Periode), die direkt in die Berechnung einfließen.
+              sind <strong>Zahlenwerte</strong> (EUR pro Periode), die direkt in die Berechnung einfließen und die blauen PROGNOSE-Balken erzeugen.
             </span>
           ),
         },
@@ -337,7 +389,7 @@ export default function HilfePage() {
           question: "Was bedeutet \u201eHeadroom\u201c?",
           answer: (
             <span>
-              Headroom = Kontostand + Kreditlinie \u2013 Rückstellungen.
+              Headroom = Kontostand + Kreditlinie &ndash; Rückstellungen.
               Es ist Ihr finanzieller Spielraum. Wird er negativ, droht Zahlungsunfähigkeit.
               Kreditlinien pflegen Sie unter{" "}
               <Link href={`${base}/finanzierung`} className="text-[var(--primary)] underline font-medium">Finanzierung &amp; Banken</Link>,
@@ -356,6 +408,26 @@ export default function HilfePage() {
             </span>
           ),
         },
+        {
+          question: "Was zeigen die verschiedenen Dashboard-Tabs?",
+          answer: (
+            <div className="space-y-2">
+              <p>Das Dashboard hat mehrere Reiter, die verschiedene Perspektiven bieten:</p>
+              <ul className="list-disc list-inside space-y-1 ml-2 text-sm">
+                <li><strong>Übersicht:</strong> KPI-Leiste, Rolling-Forecast-Chart und Wasserfall-Diagramm</li>
+                <li><strong>Liquiditätstabelle:</strong> Detaillierte Tabelle aller Perioden mit Ein-/Auszahlungen</li>
+                <li><strong>Finanzierung &amp; Banken:</strong> Bankenspiegel, Kontostände, Massekredit-Übersicht</li>
+                <li><strong>Einnahmen:</strong> Aufschlüsselung nach Einnahmequelle (KV, HZV, PVS etc.)</li>
+                <li><strong>Masseübersicht:</strong> Altmasse vs. Neumasse mit Warn-Hinweisen bei unklarer Zuordnung</li>
+                <li><strong>Standorte:</strong> Standortbezogene Liquiditätsansicht</li>
+                <li><strong>Insolvenzeffekte:</strong> Sondereffekte und Rückstellungen pro Periode</li>
+                <li><strong>Berechnungsannahmen:</strong> Dokumentierte Planungsgrundlagen</li>
+                <li><strong>Vergleich:</strong> IST vs. PLAN Gegenüberstellung</li>
+                <li><strong>Business-Logik:</strong> Berechnungsmethodik und Regelwerk</li>
+              </ul>
+            </div>
+          ),
+        },
       ],
     },
     {
@@ -366,13 +438,15 @@ export default function HilfePage() {
           answer: (
             <div className="space-y-2">
               <p>
-                Unter <strong>VERWALTUNG → System</strong>. Das System Health Panel prüft automatisch <strong>6 Konsistenzregeln</strong> (Auto-Refresh alle 30s):
+                Unter{" "}
+                <Link href={`${base}/system`} className="text-[var(--primary)] underline font-medium">System</Link>{" "}
+                (VERWALTUNG). Das System Health Panel prüft automatisch <strong>6 Konsistenzregeln</strong>:
               </p>
               <ol className="list-decimal list-inside space-y-1 ml-2 text-sm">
-                <li>Gegenpartei ↔ Kategorie-Tag stimmen überein</li>
+                <li>Gegenpartei und Kategorie-Tag stimmen überein</li>
                 <li>Buchungen mit Kategorie-Tag haben passende Gegenpartei</li>
-                <li>Alt/Neu-Zuordnung passt zum Leistungszeitraum (nur KV)</li>
-                <li>Buchungstexte passen zum Pattern der Gegenpartei</li>
+                <li>Alt/Neu-Zuordnung passt zum Leistungszeitraum</li>
+                <li>Buchungstexte passen zum Match-Pattern der Gegenpartei</li>
                 <li>Alle referenzierten Stammdaten existieren</li>
                 <li>Gegenparteien mit 5+ Buchungen haben ein Match-Pattern</li>
               </ol>
@@ -382,29 +456,92 @@ export default function HilfePage() {
             </div>
           ),
         },
+        {
+          question: "Was zeigt die System-Seite noch?",
+          answer: (
+            <div className="space-y-2">
+              <p>Neben den Health-Checks bietet die{" "}
+                <Link href={`${base}/system`} className="text-[var(--primary)] underline font-medium">System-Seite</Link>{" "}
+                weitere Diagnose-Informationen:</p>
+              <ul className="list-disc list-inside space-y-1 ml-2 text-sm">
+                <li><strong>Daten-Übersicht:</strong> Anzahl IST-/PLAN-Entries, Klassifikationsgrad, Datumsbereich</li>
+                <li><strong>Masse-Verteilung:</strong> Aufschlüsselung nach ALTMASSE/NEUMASSE/MIXED/UNKLAR</li>
+                <li><strong>Aggregationsstatus:</strong> Ob der Liquiditätsplan aktuell ist oder neu berechnet wird</li>
+                <li><strong>Import-Historie:</strong> Alle bisherigen Datenimporte mit Anzahl, Beträgen und Zeitraum</li>
+                <li><strong>Share-Link-Audit:</strong> Status und Zugriffszähler aller externen Links</li>
+              </ul>
+            </div>
+          ),
+        },
       ],
     },
     {
-      title: "Beschaffung & Freigaben",
+      title: "Bestell- & Zahlfreigaben",
       items: [
+        {
+          question: "Wie funktioniert der Freigabe-Workflow?",
+          answer: (
+            <div className="space-y-2">
+              <p>Jede Bestellung oder Zahlungsanfrage durchläuft eine mehrstufige Freigabekette:</p>
+              <ol className="list-decimal list-inside space-y-1 ml-2 text-sm">
+                <li><strong>Einreichung:</strong> Eine Bestellung/Zahlung wird mit Kreditor, Betrag und optionalem Dokument angelegt</li>
+                <li><strong>Freigabekette:</strong> Die Anfrage durchläuft nacheinander die definierten Freigabestufen</li>
+                <li><strong>Entscheidung:</strong> Jeder Freigeber kann genehmigen (ggf. mit anderem Betrag) oder ablehnen</li>
+                <li><strong>Abschluss:</strong> Nach Genehmigung aller erforderlichen Stufen wird die Anfrage als freigegeben markiert</li>
+              </ol>
+              <p className="text-xs text-[var(--muted)]">
+                Die Freigabekette wird unter{" "}
+                <Link href={`${base}/edit`} className="text-[var(--primary)] underline font-medium">Fall bearbeiten</Link>{" "}
+                konfiguriert (Rollen, Schwellwerte, Reihenfolge).
+              </p>
+            </div>
+          ),
+        },
+        {
+          question: "Kann der Insolvenzverwalter selbst Freigaben erteilen?",
+          answer: (
+            <span>
+              Ja. Der IV sieht offene Anfragen in seinem{" "}
+              <strong>Kundenportal</strong> unter &quot;Bestell- &amp; Zahlfreigaben&quot;.
+              Er kann dort direkt genehmigen oder ablehnen, optional mit Kommentar.
+              Bei Ablehnung muss ein Grund angegeben werden.
+            </span>
+          ),
+        },
         {
           question: "Was ist der Auto-Freigabe-Schwellwert?",
           answer: (
             <span>
               Unter{" "}
               <Link href={`${base}/edit`} className="text-[var(--primary)] underline font-medium">Fall bearbeiten</Link>{" "}
-              → „Freigabe-Einstellungen" kann ein EUR-Betrag definiert werden.
+              &rarr; &quot;Freigabe-Einstellungen&quot; kann ein EUR-Betrag definiert werden.
               Anfragen bis einschließlich diesem Betrag werden automatisch freigegeben (AUTO_APPROVED)
               und sofort als PLAN-Buchung verbucht.
             </span>
           ),
         },
         {
+          question: "Wie funktioniert die externe Bestelleinreichung per Token?",
+          answer: (
+            <div className="space-y-2">
+              <p>
+                Für externe Partner (z.B. Praxismanager) können <strong>Firmen-Tokens</strong> generiert werden.
+                Mit diesem Token erhält der externe Partner einen Link, über den er Bestellungen oder Zahlungsanfragen einreichen kann &ndash; ohne Login.
+              </p>
+              <p className="text-xs text-[var(--muted)]">
+                Tokens werden unter{" "}
+                <Link href={`${base}/orders`} className="text-[var(--primary)] underline font-medium">Bestellfreigaben</Link>{" "}
+                erstellt und verwaltet. Jeder Token hat ein Label, kann aktiviert/deaktiviert werden und der Link ist sofort kopierbar.
+              </p>
+            </div>
+          ),
+        },
+        {
           question: "Was sind Kreditoren und Kostenarten?",
           answer: (
             <div className="space-y-1">
-              <p><strong>Kreditoren</strong> sind Ausgaben-Partner (Lieferanten, Behörden) unter BESCHAFFUNG → <Link href={`${base}/creditors`} className="text-[var(--primary)] underline font-medium">Kreditoren</Link>.</p>
-              <p><strong>Kostenarten</strong> kategorisieren Ausgaben (z.B. Personal, Miete) unter STAMMDATEN → <Link href={`${base}/cost-categories`} className="text-[var(--primary)] underline font-medium">Kostenarten</Link>.</p>
+              <p><strong>Kreditoren</strong> sind Ausgaben-Partner (Lieferanten, Behörden) unter BESCHAFFUNG &rarr; <Link href={`${base}/creditors`} className="text-[var(--primary)] underline font-medium">Kreditoren</Link>. Sie haben Name, IBAN und eine Kostenart.</p>
+              <p><strong>Kostenarten</strong> kategorisieren Ausgaben (z.B. Personal, Miete) unter STAMMDATEN &rarr; <Link href={`${base}/cost-categories`} className="text-[var(--primary)] underline font-medium">Kostenarten</Link>. Optional mit Budget pro Periode.</p>
               <p className="text-xs text-[var(--muted)]">Beide sind optional: Bestellungen können auch ohne Zuordnung eingereicht werden.</p>
             </div>
           ),
@@ -412,23 +549,63 @@ export default function HilfePage() {
       ],
     },
     {
-      title: "Masse-Zuordnung",
+      title: "Masse-Zuordnung (Alt/Neu)",
       items: [
         {
           question: "Wie wird Alt- vs. Neumasse entschieden?",
           answer: (
+            <div className="space-y-2">
+              <p>Das System verwendet eine automatische Fallback-Kette:</p>
+              <ol className="list-decimal list-inside space-y-1 ml-2 text-sm">
+                <li><strong>Vertragsregel:</strong> Vertragliche Vereinbarung (z.B. Massekreditvertrag definiert KV-Split)</li>
+                <li><strong>Leistungsdatum-Regel:</strong> Basierend auf dem Behandlungs-/Leistungszeitraum</li>
+                <li><strong>Zeitanteil (Pro Rata):</strong> Anteilige Aufteilung nach Tagen im Monat</li>
+                <li><strong>Vormonat-Logik:</strong> Zahlung in Monat M = Leistung in Monat M-1</li>
+                <li><strong>UNKLAR:</strong> Wenn keine Regel greift, wird die Zuordnung als unklar markiert</li>
+              </ol>
+              <p>
+                Jede Zuordnung hat einen Audit-Trail (Quelle + Begründung). Die Regeln konfigurieren Sie unter{" "}
+                <Link href={`${base}/business-logic`} className="text-[var(--primary)] underline font-medium">Business-Logik</Link>.
+              </p>
+            </div>
+          ),
+        },
+        {
+          question: "Was passiert mit UNKLAR-Buchungen?",
+          answer: (
             <span>
-              Automatische Fallback-Kette: 1) Vertragsregel, 2) Leistungsdatum, 3) Zeitanteil, 4) Vormonat-Logik, 5) UNKLAR.
-              Jede Zuordnung hat einen Audit-Trail. Die Regeln konfigurieren Sie unter{" "}
-              <Link href={`${base}/business-logic`} className="text-[var(--primary)] underline font-medium">Business-Logik</Link>.
+              Buchungen mit Zuordnung UNKLAR erscheinen als Warnhinweis im Dashboard (Tab &quot;Masseübersicht&quot;) und auf der{" "}
+              <Link href={`${base}/system`} className="text-[var(--primary)] underline font-medium">System-Seite</Link>.
+              Sie sollten manuell zugeordnet werden, da sie die Genauigkeit der Masse-Trennung beeinflussen.
+              Unter{" "}
+              <Link href={`${base}/ist-klassifikation`} className="text-[var(--primary)] underline font-medium">Klassifikation</Link>{" "}
+              können Sie die Zuordnung korrigieren.
             </span>
           ),
         },
       ],
     },
     {
-      title: "Kunden-Freigaben & Subdomains",
+      title: "Kundenportal & Zugänge",
       items: [
+        {
+          question: "Was sieht der Insolvenzverwalter im Kundenportal?",
+          answer: (
+            <div className="space-y-2">
+              <p>Der IV (Ihr Mandant) sieht ein eigenständiges Portal mit folgenden Funktionen:</p>
+              <ul className="list-disc list-inside space-y-1 ml-2 text-sm">
+                <li><strong>Fall-Übersicht:</strong> Alle ihm zugeteilten Fälle (eigene + geteilte)</li>
+                <li><strong>Dashboard:</strong> Komplettes Liquiditäts-Dashboard mit allen Tabs (wie im Admin)</li>
+                <li><strong>Bestell- &amp; Zahlfreigaben:</strong> Offene Anfragen genehmigen oder ablehnen</li>
+                <li><strong>Berechnungsgrundlagen:</strong> Erklärung der Methodik (Datenerfassung, Alt/Neu-Zuordnung, Prognose)</li>
+                <li><strong>PDF-Export:</strong> Dashboard als PDF exportieren</li>
+              </ul>
+              <p className="text-xs text-[var(--muted)]">
+                Der IV kann keine Daten ändern, importieren oder Stammdaten bearbeiten. Er hat eine reine Lese- und Freigabe-Sicht.
+              </p>
+            </div>
+          ),
+        },
         {
           question: "Wie gebe ich einem Kunden Zugriff auf einen Fall?",
           answer: (
@@ -444,7 +621,7 @@ export default function HilfePage() {
                 <li><strong>Text übermitteln:</strong> Per E-Mail oder Telefon an den Kunden senden</li>
               </ol>
               <p className="text-xs text-[var(--muted)]">
-                Das generierte Passwort wird nur einmalig angezeigt und enthält 14 gut lesbare Zeichen (keine verwechselbaren Zeichen wie 0/O oder 1/l).
+                Das generierte Passwort wird nur einmalig angezeigt (14 Zeichen, keine verwechselbaren Zeichen wie 0/O oder 1/l).
               </p>
             </div>
           ),
@@ -454,25 +631,10 @@ export default function HilfePage() {
           answer: (
             <span>
               Jeder Kunde kann eine eigene Subdomain erhalten, z.B. <strong>anchor.cases.gradify.de</strong>.
-              Der Kunde sieht dann ein eigenes Portal ohne sichtbare &quot;/portal&quot;-Pfade. Die Subdomain wird beim Anlegen des Kunden über das Slug-Feld vergeben.
+              Der Kunde sieht dann ein eigenes Portal ohne sichtbare &quot;/portal&quot;-Pfade.
+              Die Subdomain wird beim Anlegen des Kunden über das Slug-Feld vergeben.
+              Das Slug-Feld prüft live, ob der Name verfügbar ist, und zeigt eine Vorschau der URL.
             </span>
-          ),
-        },
-        {
-          question: "Wie richte ich eine neue Subdomain ein?",
-          answer: (
-            <div className="space-y-2">
-              <p>Drei Schritte sind nötig:</p>
-              <ol className="list-decimal list-inside space-y-1 ml-2">
-                <li><strong>Slug vergeben:</strong> Beim Kunden-Anlegen (über Freigaben-Seite) einen Slug eingeben, z.B. &quot;anchor&quot;. Das System prüft automatisch, ob der Slug verfügbar ist und zeigt eine Live-Vorschau der URL.</li>
-                <li><strong>Vercel-Domain hinzufügen:</strong> Im Vercel Dashboard unter Settings &rarr; Domains die Subdomain eintragen (z.B. anchor.cases.gradify.de). SSL wird automatisch provisioniert.</li>
-                <li><strong>Testen:</strong> Die Subdomain aufrufen &ndash; der Kunde sieht dann ein eigenes Portal unter seiner URL</li>
-              </ol>
-              <p className="text-xs text-[var(--muted)] mt-2">
-                DNS ist bereits als Wildcard konfiguriert (*.cases.gradify.de). Es muss nur der Vercel-Schritt pro Kunde erfolgen.
-                Slug-Regeln: 3&ndash;30 Zeichen, nur Kleinbuchstaben, Ziffern und Bindestriche. Reservierte Namen (admin, api, portal, etc.) sind gesperrt.
-              </p>
-            </div>
           ),
         },
         {
@@ -484,6 +646,7 @@ export default function HilfePage() {
                   <p className="text-xs font-bold text-blue-800 mb-1">Kundenzugänge</p>
                   <ul className="text-xs text-blue-700 space-y-0.5">
                     <li>Login mit E-Mail + Passwort</li>
+                    <li>Bestell- &amp; Zahlfreigaben</li>
                     <li>Session-Tracking &amp; Zugriffszähler</li>
                     <li>Optionale eigene Subdomain</li>
                     <li>Widerrufbar mit Bestätigung</li>
@@ -493,6 +656,7 @@ export default function HilfePage() {
                   <p className="text-xs font-bold text-gray-800 mb-1">Externe Links</p>
                   <ul className="text-xs text-gray-700 space-y-0.5">
                     <li>Kein Login nötig (nur Link)</li>
+                    <li>Nur Lese-Zugriff (kein Freigabe-Workflow)</li>
                     <li>Optionales Ablaufdatum</li>
                     <li>Schneller, temporärer Zugriff</li>
                     <li>Sofort kopierbar</li>
@@ -501,10 +665,59 @@ export default function HilfePage() {
               </div>
               <p className="text-xs text-[var(--muted)]">
                 Beides verwalten Sie zentral unter{" "}
-                <Link href={`${base}/freigaben`} className="text-[var(--primary)] underline font-medium">Freigaben</Link>{" "}
-                (Tabs &quot;Kundenzugänge&quot; und &quot;Externe Links&quot;).
+                <Link href={`${base}/freigaben`} className="text-[var(--primary)] underline font-medium">Freigaben</Link>.
               </p>
             </div>
+          ),
+        },
+      ],
+    },
+    {
+      title: "Analyse-Werkzeuge",
+      items: [
+        {
+          question: "Was ist der Unterschied zwischen IST-Daten, Geschäftskonten und Performance?",
+          answer: (
+            <div className="space-y-2">
+              <ul className="list-disc list-inside space-y-1 ml-2 text-sm">
+                <li>
+                  <Link href={`${base}/kontobewegungen`} className="text-[var(--primary)] underline font-medium">IST-Daten</Link>:{" "}
+                  Alle importierten Kontobewegungen mit Filterung nach Bank, Zeitraum und Gegenpartei
+                </li>
+                <li>
+                  <Link href={`${base}/vorinsolvenz-analyse`} className="text-[var(--primary)] underline font-medium">Geschäftskonten</Link>:{" "}
+                  Vorinsolvenz-Analyse der regulären Bankkonten &ndash; zeigt Muster vor der Insolvenzeröffnung
+                </li>
+                <li>
+                  <Link href={`${base}/performance`} className="text-[var(--primary)] underline font-medium">Performance (GuV)</Link>:{" "}
+                  Gewinn- und Verlustrechnung mit Einnahmen nach Quelle und Ausgaben nach Kategorie
+                </li>
+              </ul>
+            </div>
+          ),
+        },
+        {
+          question: "Wie funktioniert die Verifikation?",
+          answer: (
+            <span>
+              Die{" "}
+              <Link href={`${base}/zahlungsverifikation`} className="text-[var(--primary)] underline font-medium">Verifikation</Link>{" "}
+              vergleicht geplante mit tatsächlichen Zahlungen (SOLL/IST-Abgleich).
+              Ein Ampelsystem zeigt: Grün = Zahlung wie geplant eingegangen/geleistet,
+              Gelb = Abweichung im Betrag oder Timing, Rot = Zahlung fehlt oder deutlich abweichend.
+            </span>
+          ),
+        },
+        {
+          question: "Was ist die IV-Kommunikation?",
+          answer: (
+            <span>
+              Die{" "}
+              <Link href={`${base}/iv-kommunikation`} className="text-[var(--primary)] underline font-medium">IV-Kommunikation</Link>{" "}
+              ist ein Notiz-System für den Austausch mit dem Insolvenzverwalter.
+              Jede Notiz hat einen Status (Offen, Wartet, Erledigt) und eine Priorität.
+              So behalten Sie den Überblick über offene Rückfragen und Abstimmungen.
+            </span>
           ),
         },
       ],
@@ -518,10 +731,10 @@ export default function HilfePage() {
       {/* ================================================================ */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[var(--primary)] to-indigo-700 text-white p-8">
         <div className="relative z-10">
-          <h1 className="text-3xl font-bold">Willkommen zur Liquiditätsplanung</h1>
+          <h1 className="text-3xl font-bold">Hilfe &amp; Dokumentation</h1>
           <p className="text-white/80 mt-2 text-lg max-w-xl">
-            Von Bankdaten zum fertigen Forecast in 5 Schritten.
-            Diese Seite zeigt Ihnen, wie alles zusammenspielt.
+            Alles, was Sie brauchen, um die Liquiditätsplanung effektiv zu nutzen &ndash;
+            vom ersten Import bis zum fertigen Dashboard.
           </p>
         </div>
         {/* Decorative circles */}
@@ -530,11 +743,63 @@ export default function HilfePage() {
       </div>
 
       {/* ================================================================ */}
+      {/* SYSTEM-ÜBERBLICK */}
+      {/* ================================================================ */}
+      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+          <h2 className="text-lg font-bold text-[var(--foreground)]">Was ist dieses System?</h2>
+          <p className="text-xs text-[var(--muted)] mt-0.5">Liquiditätsplanung für Insolvenzverfahren</p>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-[var(--secondary)] leading-relaxed">
+            Diese Anwendung unterstützt <strong>Insolvenzverwalter</strong> bei der laufenden Liquiditätsplanung
+            ihrer Insolvenzverfahren. Sie erfasst echte Bankbuchungen (IST-Daten), klassifiziert diese automatisch
+            und erstellt daraus einen <strong>Rolling Forecast</strong> &ndash; eine kombinierte Ansicht aus
+            Vergangenheit (echte Daten) und Zukunft (Prognose).
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-200">
+              <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center mb-3">
+                {icons.cog}
+              </div>
+              <p className="text-sm font-bold text-indigo-800">Berater (Admin)</p>
+              <p className="text-xs text-indigo-600 mt-1">
+                Importiert Bankdaten, klassifiziert Buchungen, pflegt Stammdaten,
+                erstellt Prognosen und verwaltet Kundenzugänge.
+              </p>
+            </div>
+            <div className="p-4 rounded-xl bg-blue-50 border border-blue-200">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-3">
+                {icons.users}
+              </div>
+              <p className="text-sm font-bold text-blue-800">Insolvenzverwalter (Kunde)</p>
+              <p className="text-xs text-blue-600 mt-1">
+                Sieht das Dashboard, erteilt Bestell-/Zahlfreigaben und
+                kann den Liquiditätsplan als PDF exportieren. Eigenes Portal mit Login.
+              </p>
+            </div>
+            <div className="p-4 rounded-xl bg-gray-50 border border-gray-200">
+              <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center mb-3">
+                {icons.link}
+              </div>
+              <p className="text-sm font-bold text-gray-800">Externe (Link-Zugang)</p>
+              <p className="text-xs text-gray-600 mt-1">
+                Lese-Zugriff per Share-Link. Kein Login nötig.
+                Für Gläubigerausschuss, Gericht oder andere Beteiligte.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ================================================================ */}
       {/* QUICK START: 5 Schritte als große klickbare Karten */}
       {/* ================================================================ */}
       <div>
         <h2 className="text-xl font-bold text-[var(--foreground)] mb-1">Schnellstart</h2>
-        <p className="text-sm text-[var(--muted)] mb-4">Die 5 Schritte zum fertigen Dashboard \u2013 klicken Sie auf einen Schritt, um direkt dorthin zu springen.</p>
+        <p className="text-sm text-[var(--muted)] mb-4">Die 5 Schritte zum fertigen Dashboard &ndash; klicken Sie auf einen Schritt, um direkt dorthin zu springen.</p>
 
         <div className="grid gap-3">
           {/* Step 1 */}
@@ -578,8 +843,8 @@ export default function HilfePage() {
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <p className="text-sm font-bold text-[var(--foreground)] group-hover:text-amber-600 transition-colors">Prämissen dokumentieren</p>
-                <span className="text-xs text-[var(--muted)]">&rarr; Prämissen</span>
+                <p className="text-sm font-bold text-[var(--foreground)] group-hover:text-amber-600 transition-colors">Berechnungsannahmen dokumentieren</p>
+                <span className="text-xs text-[var(--muted)]">&rarr; Berechnungsannahmen</span>
               </div>
               <p className="text-xs text-[var(--muted)] mt-0.5">Planungsgrundlagen beschreiben, Risikolevel zuordnen (für Gericht &amp; Gläubiger)</p>
             </div>
@@ -598,7 +863,7 @@ export default function HilfePage() {
                 <p className="text-sm font-bold text-[var(--foreground)] group-hover:text-blue-600 transition-colors">Prognose-Annahmen pflegen</p>
                 <span className="text-xs text-[var(--muted)]">&rarr; Prognose</span>
               </div>
-              <p className="text-xs text-[var(--muted)] mt-0.5">Einnahmen &amp; Ausgaben pro Kategorie eingeben \u2013 fließen automatisch ins Dashboard</p>
+              <p className="text-xs text-[var(--muted)] mt-0.5">Einnahmen &amp; Ausgaben pro Kategorie eingeben &ndash; fließen automatisch ins Dashboard</p>
             </div>
             <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-medium">
               {icons.calc} Berechnung
@@ -647,7 +912,7 @@ export default function HilfePage() {
               </span>
               <div>
                 <p className="text-sm font-medium text-green-800">Echte Bankbuchungen</p>
-                <p className="text-xs text-green-600 mt-0.5">Vergangenheit \u2013 importiert und bestätigt. Höchste Zuverlässigkeit.</p>
+                <p className="text-xs text-green-600 mt-0.5">Vergangenheit &ndash; importiert und bestätigt. Höchste Zuverlässigkeit.</p>
               </div>
             </div>
             <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
@@ -657,7 +922,7 @@ export default function HilfePage() {
               <div>
                 <p className="text-sm font-medium text-blue-800">Aus Ihren Annahmen berechnet</p>
                 <p className="text-xs text-blue-600 mt-0.5">
-                  Zukunft \u2013 aktualisiert sich automatisch. Annahmen pflegen:{" "}
+                  Zukunft &ndash; aktualisiert sich automatisch. Annahmen pflegen:{" "}
                   <Link href={`${base}/forecast`} className="underline font-medium">Prognose-Seite</Link>
                 </p>
               </div>
@@ -668,7 +933,7 @@ export default function HilfePage() {
               </span>
               <div>
                 <p className="text-sm font-medium text-purple-800">Statische Planwerte</p>
-                <p className="text-xs text-purple-600 mt-0.5">Fallback \u2013 wird automatisch durch PROGNOSE ersetzt, sobald Annahmen aktiv sind.</p>
+                <p className="text-xs text-purple-600 mt-0.5">Fallback &ndash; wird automatisch durch PROGNOSE ersetzt, sobald Annahmen aktiv sind.</p>
               </div>
             </div>
             <div className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 border border-gray-200">
@@ -751,10 +1016,58 @@ export default function HilfePage() {
       </div>
 
       {/* ================================================================ */}
+      {/* KUNDENPORTAL */}
+      {/* ================================================================ */}
+      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 bg-blue-50">
+          <h2 className="text-lg font-bold text-[var(--foreground)]">Das Kundenportal</h2>
+          <p className="text-xs text-[var(--muted)] mt-0.5">Was der Insolvenzverwalter sieht und tun kann</p>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-[var(--secondary)] leading-relaxed">
+            Der Insolvenzverwalter (IV) erhält einen eigenen Login und sieht ein schlankes Portal mit seinen Fällen.
+            Optional über eine eigene Subdomain (z.B. <strong>anchor.cases.gradify.de</strong>).
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="p-3 rounded-lg border border-gray-200">
+              <p className="text-sm font-bold text-[var(--foreground)] mb-1">Fall-Dashboard</p>
+              <p className="text-xs text-[var(--muted)]">
+                Vollständiges Liquiditäts-Dashboard mit allen Tabs: Übersicht, Liquiditätstabelle,
+                Finanzierung, Einnahmen, Masseübersicht, Standorte, Insolvenzeffekte, Annahmen, Vergleich.
+              </p>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-200">
+              <p className="text-sm font-bold text-[var(--foreground)] mb-1">Bestell- &amp; Zahlfreigaben</p>
+              <p className="text-xs text-[var(--muted)]">
+                Offene Anfragen einsehen, genehmigen oder ablehnen.
+                Mehrstufige Freigabekette mit Fortschrittsanzeige und Kommentarfunktion.
+              </p>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-200">
+              <p className="text-sm font-bold text-[var(--foreground)] mb-1">Berechnungsgrundlagen</p>
+              <p className="text-xs text-[var(--muted)]">
+                Transparente Erklärung der Methodik: Wie werden Daten erfasst?
+                Wie erfolgt die Alt/Neu-Zuordnung? Wie entsteht die Prognose?
+              </p>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-200">
+              <p className="text-sm font-bold text-[var(--foreground)] mb-1">PDF-Export</p>
+              <p className="text-xs text-[var(--muted)]">
+                Das Dashboard kann als PDF exportiert werden &ndash;
+                professionell formatiert für Präsentationen, Gläubigerversammlungen oder Gerichte.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ================================================================ */}
       {/* ALLE SEITEN (klickbare Karten nach Kategorie) */}
       {/* ================================================================ */}
       <div>
-        <h2 className="text-xl font-bold text-[var(--foreground)] mb-1">Alle Bereiche</h2>
+        <h2 className="text-xl font-bold text-[var(--foreground)] mb-1">Alle Bereiche im Admin</h2>
         <p className="text-sm text-[var(--muted)] mb-4">Klicken Sie auf eine Karte, um direkt dorthin zu navigieren.</p>
 
         <div className="space-y-6">
@@ -762,8 +1075,8 @@ export default function HilfePage() {
           <div>
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Daten</h3>
             <div className="grid gap-2 sm:grid-cols-2">
-              <PageCard href={`${base}/ledger`} icon={icons.list} name="Zahlungsregister" description="Alle Buchungen in einer Übersicht" color="bg-gray-100 text-gray-600" />
-              <PageCard href={`${base}/ingestion`} icon={icons.upload} name="Import" description="Kontoauszüge als CSV importieren" color="bg-green-100 text-green-600" />
+              <PageCard href={`${base}/ledger`} icon={icons.list} name="Zahlungsregister" description="Alle Buchungen (IST + PLAN) in einer Übersicht mit Filter und Suche" color="bg-gray-100 text-gray-600" />
+              <PageCard href={`${base}/ingestion`} icon={icons.upload} name="Import" description="Kontoauszüge als CSV importieren, Spalten zuordnen, Duplikate prüfen" color="bg-green-100 text-green-600" />
             </div>
           </div>
 
@@ -771,10 +1084,10 @@ export default function HilfePage() {
           <div>
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Stammdaten</h3>
             <div className="grid gap-2 sm:grid-cols-2">
-              <PageCard href={`${base}/bank-accounts`} icon={icons.bank} name="Bankkonten" description="Konten und Liquiditätsrelevanz" color="bg-blue-100 text-blue-600" />
-              <PageCard href={`${base}/counterparties`} icon={icons.users} name="Gegenparteien" description="Einnahmen-Partner, Typ-Filter" color="bg-purple-100 text-purple-600" />
-              <PageCard href={`${base}/cost-categories`} icon={icons.tag} name="Kostenarten" description="Ausgaben-Kategorien mit Budget" color="bg-amber-100 text-amber-600" />
-              <PageCard href={`${base}/locations`} icon={icons.location} name="Standorte" description="Betriebsstätten des Unternehmens" color="bg-teal-100 text-teal-600" />
+              <PageCard href={`${base}/bank-accounts`} icon={icons.bank} name="Bankkonten" description="Konten mit IBAN, Eröffnungssaldo, Sicherungsrechte und Liquiditätsrelevanz" color="bg-blue-100 text-blue-600" />
+              <PageCard href={`${base}/counterparties`} icon={icons.users} name="Gegenparteien" description="Zahlungspartner (KV, HZV, PVS etc.) mit Match-Patterns für Auto-Klassifikation" color="bg-purple-100 text-purple-600" />
+              <PageCard href={`${base}/cost-categories`} icon={icons.tag} name="Kostenarten" description="Ausgaben-Kategorien (Personal, Miete, Material) mit optionalem Budget" color="bg-amber-100 text-amber-600" />
+              <PageCard href={`${base}/locations`} icon={icons.location} name="Standorte" description="Betriebsstätten mit Adresse und Bank-Zuordnung" color="bg-teal-100 text-teal-600" />
             </div>
           </div>
 
@@ -782,34 +1095,36 @@ export default function HilfePage() {
           <div>
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Falldaten</h3>
             <div className="grid gap-2 sm:grid-cols-2">
-              <PageCard href={`${base}/personal`} icon={icons.users} name="Personal" description="Mitarbeiter, Gehälter, LANR" color="bg-blue-100 text-blue-600" />
-              <PageCard href={`${base}/kontakte`} icon={icons.chat} name="Kontakte" description="IV, Berater, Buchhaltung, RA" color="bg-purple-100 text-purple-600" />
-              <PageCard href={`${base}/finanzierung`} icon={icons.bank} name="Finanzierung & Banken" description="Bankenspiegel, Sicherungsrechte, Massekredit" color="bg-indigo-100 text-indigo-600" />
-              <PageCard href={`${base}/insolvency-effects`} icon={icons.shield} name="Insolvenzeffekte" description="Rückstellungen und Sondereffekte" color="bg-red-100 text-red-600" />
-              <PageCard href={`${base}/business-logic`} icon={icons.cog} name="Business-Logik" description="Klassifikations-Regelwerk" color="bg-gray-100 text-gray-600" />
-              <PageCard href={`${base}/planung`} icon={icons.doc} name="Freie Planung" description="Manuelle PLAN-Werte eingeben" color="bg-amber-100 text-amber-600" />
+              <PageCard href={`${base}/personal`} icon={icons.users} name="Personal" description="Mitarbeiter mit Gehältern, LANR, Standort-Zuordnung und Rolle" color="bg-blue-100 text-blue-600" />
+              <PageCard href={`${base}/kontakte`} icon={icons.chat} name="Kontakte" description="Ansprechpartner: IV, Berater, Buchhaltung, Rechtsanwälte" color="bg-purple-100 text-purple-600" />
+              <PageCard href={`${base}/finanzierung`} icon={icons.bank} name="Finanzierung & Banken" description="Bankenspiegel, Sicherungsrechte, Massekredit-Details und -Konditionen" color="bg-indigo-100 text-indigo-600" />
+              <PageCard href={`${base}/insolvency-effects`} icon={icons.shield} name="Insolvenzeffekte" description="Rückstellungen, Sondereffekte und einmalige Posten pro Periode" color="bg-red-100 text-red-600" />
+              <PageCard href={`${base}/business-logic`} icon={icons.cog} name="Business-Logik" description="Klassifikationsregeln und Alt/Neu-Zuordnungsregeln konfigurieren" color="bg-gray-100 text-gray-600" />
+              <PageCard href={`${base}/planung`} icon={icons.doc} name="Freie Planung" description="Manuelle PLAN-Werte eingeben (unabhängig von Prognose-Engine)" color="bg-amber-100 text-amber-600" />
             </div>
           </div>
 
           {/* PLANUNG */}
           <div>
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Planung</h3>
-            <div className="grid gap-2 sm:grid-cols-3">
-              <PageCard href={`${base}/assumptions`} icon={icons.doc} name="Berechnungsannahmen" description="Datenqualität, Prämissen, Prognose" color="bg-amber-100 text-amber-600" />
-              <PageCard href={`${base}/forecast`} icon={icons.calc} name="Prognose" description="Annahmen-Editor, Headroom-Analyse" color="bg-blue-100 text-blue-600" />
-              <PageCard href={`${base}/dashboard`} icon={icons.chart} name="Liquiditätsplan" description="Dashboard mit Rolling Forecast" color="bg-indigo-100 text-indigo-600" />
+            <div className="grid gap-2 sm:grid-cols-2">
+              <PageCard href={`${base}/dashboard`} icon={icons.chart} name="Dashboard" description="Liquiditätsplan mit Rolling Forecast, Wasserfall und KPI-Leiste" color="bg-indigo-100 text-indigo-600" />
+              <PageCard href={`${base}/liquiditaetsmatrix`} icon={icons.table} name="Liquiditätstabelle" description="Detaillierte Tabelle aller Perioden mit Ein-/Auszahlungen und Salden" color="bg-indigo-100 text-indigo-600" />
+              <PageCard href={`${base}/assumptions`} icon={icons.doc} name="Berechnungsannahmen" description="Planungsgrundlagen dokumentieren (Prämissen für Gericht und Gläubiger)" color="bg-amber-100 text-amber-600" />
+              <PageCard href={`${base}/forecast`} icon={icons.calc} name="Prognose" description="Annahmen-Editor mit Headroom-Analyse und Szenario-Berechnung" color="bg-blue-100 text-blue-600" />
             </div>
           </div>
 
           {/* ANALYSE */}
           <div>
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Analyse</h3>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <PageCard href={`${base}/kontobewegungen`} icon={icons.eye} name="IST-Daten" description="Alle importierten Kontobewegungen" color="bg-green-100 text-green-600" />
-              <PageCard href={`${base}/vorinsolvenz-analyse`} icon={icons.chart} name="Geschäftskonten" description="Vorinsolvenz-Analyse mit Trends" color="bg-gray-100 text-gray-600" />
-              <PageCard href={`${base}/ist-klassifikation`} icon={icons.tag} name="Klassifikation" description="Buchungen zuordnen und bestätigen" color="bg-amber-100 text-amber-600" />
-              <PageCard href={`${base}/zahlungsverifikation`} icon={icons.check} name="Verifikation" description="SOLL/IST-Abgleich mit Ampelsystem" color="bg-emerald-100 text-emerald-600" />
-              <PageCard href={`${base}/iv-kommunikation`} icon={icons.chat} name="IV-Kommunikation" description="Austausch mit dem Insolvenzverwalter" color="bg-purple-100 text-purple-600" />
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              <PageCard href={`${base}/kontobewegungen`} icon={icons.eye} name="IST-Daten" description="Alle importierten Kontobewegungen mit Filter nach Bank, Zeitraum, Gegenpartei" color="bg-green-100 text-green-600" />
+              <PageCard href={`${base}/vorinsolvenz-analyse`} icon={icons.chart} name="Geschäftskonten" description="Vorinsolvenz-Analyse: Zahlungsmuster und Trends vor Insolvenzeröffnung" color="bg-gray-100 text-gray-600" />
+              <PageCard href={`${base}/performance`} icon={icons.trending} name="Performance (GuV)" description="Gewinn- und Verlustrechnung: Einnahmen nach Quelle, Ausgaben nach Kategorie" color="bg-emerald-100 text-emerald-600" />
+              <PageCard href={`${base}/ist-klassifikation`} icon={icons.tag} name="Klassifikation" description="Buchungen prüfen, Vorschläge akzeptieren, Bulk-Verarbeitung" color="bg-amber-100 text-amber-600" />
+              <PageCard href={`${base}/zahlungsverifikation`} icon={icons.check} name="Verifikation" description="SOLL/IST-Abgleich mit Ampelsystem (grün/gelb/rot)" color="bg-emerald-100 text-emerald-600" />
+              <PageCard href={`${base}/iv-kommunikation`} icon={icons.chat} name="IV-Kommunikation" description="Notizen und Rückfragen mit dem Insolvenzverwalter (Status + Priorität)" color="bg-purple-100 text-purple-600" />
             </div>
           </div>
 
@@ -817,8 +1132,8 @@ export default function HilfePage() {
           <div>
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Beschaffung</h3>
             <div className="grid gap-2 sm:grid-cols-2">
-              <PageCard href={`${base}/orders`} icon={icons.order} name="Bestellfreigaben" description="Auszahlungen zur IV-Freigabe" color="bg-amber-100 text-amber-600" />
-              <PageCard href={`${base}/creditors`} icon={icons.users} name="Kreditoren" description="Lieferanten, IBAN, Kostenart" color="bg-gray-100 text-gray-600" />
+              <PageCard href={`${base}/orders`} icon={icons.order} name="Bestellfreigaben" description="Bestell- und Zahlungsanfragen mit mehrstufiger Freigabekette" color="bg-amber-100 text-amber-600" />
+              <PageCard href={`${base}/creditors`} icon={icons.users} name="Kreditoren" description="Lieferanten und Dienstleister mit IBAN und Kostenart" color="bg-gray-100 text-gray-600" />
             </div>
           </div>
 
@@ -826,7 +1141,7 @@ export default function HilfePage() {
           <div>
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Zugang</h3>
             <div className="grid gap-2 sm:grid-cols-2">
-              <PageCard href={`${base}/freigaben`} icon={icons.link} name="Freigaben" description="Kundenzugänge und externe Links" color="bg-gray-100 text-gray-600" />
+              <PageCard href={`${base}/freigaben`} icon={icons.link} name="Freigaben" description="Kundenzugänge verwalten, externe Share-Links erstellen, Subdomains konfigurieren" color="bg-gray-100 text-gray-600" />
             </div>
           </div>
 
@@ -834,8 +1149,8 @@ export default function HilfePage() {
           <div>
             <h3 className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider mb-2 px-1">Verwaltung</h3>
             <div className="grid gap-2 sm:grid-cols-2">
-              <PageCard href={`${base}/system`} icon={icons.shield} name="System" description="Diagnose-Dashboard, Health-Checks" color="bg-green-100 text-green-600" />
-              <PageCard href={`${base}/edit`} icon={icons.cog} name="Fall bearbeiten" description="Name, Status, Datumsfelder" color="bg-gray-100 text-gray-600" />
+              <PageCard href={`${base}/edit`} icon={icons.cog} name="Fall bearbeiten" description="Falldaten, Planungskonfiguration und Freigabe-Regeln anpassen" color="bg-gray-100 text-gray-600" />
+              <PageCard href={`${base}/system`} icon={icons.shield} name="System" description="Diagnose-Dashboard: Datenqualität, Health-Checks, Import-Historie, Aggregation" color="bg-green-100 text-green-600" />
             </div>
           </div>
         </div>
@@ -873,10 +1188,30 @@ export default function HilfePage() {
             <p className="text-xs text-teal-600 mt-1">Nach Insolvenzeröffnung entstanden</p>
           </div>
         </div>
-        <p className="text-xs text-[var(--muted)] text-center mt-4 max-w-md mx-auto">
-          Manche Zahlungen betreffen beide Massen anteilig. Die Zuordnungsregeln konfigurieren Sie unter{" "}
-          <Link href={`${base}/business-logic`} className="text-[var(--primary)] underline font-medium">Business-Logik</Link>.
-        </p>
+
+        <div className="mt-6 space-y-3">
+          <p className="text-sm text-[var(--secondary)] leading-relaxed">
+            Die Trennung in Altmasse und Neumasse ist eine zentrale Anforderung der Insolvenzordnung (InsO).
+            Jede Einzahlung und Auszahlung muss einem Masse-Typ zugeordnet werden. Das System verwendet dafür eine Fallback-Kette
+            mit Vertragsregeln, Leistungsdatum-Analyse und anteiliger Berechnung.
+          </p>
+
+          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3">
+            <p className="text-xs font-bold text-amber-800 mb-1">Typische Splitting-Regeln (Beispiel Arztpraxis)</p>
+            <ul className="text-xs text-amber-700 space-y-1">
+              <li><strong>KV-Zahlungen:</strong> Quartalsabrechnung &ndash; Aufteilung nach Leistungszeitraum (z.B. Q4: 1/3 Alt, 2/3 Neu)</li>
+              <li><strong>HZV-Zahlungen:</strong> Monatsabrechnung &ndash; Zahlung Monat M = Leistung Monat M-1 (Vormonat-Logik)</li>
+              <li><strong>PVS-Zahlungen:</strong> Nach Behandlungsdatum des einzelnen Patienten</li>
+              <li><strong>Personal:</strong> Nach Leistungszeitraum des Gehaltsmonats</li>
+            </ul>
+          </div>
+
+          <p className="text-xs text-[var(--muted)] text-center max-w-md mx-auto">
+            Die Zuordnungsregeln konfigurieren Sie unter{" "}
+            <Link href={`${base}/business-logic`} className="text-[var(--primary)] underline font-medium">Business-Logik</Link>.
+            Buchungen mit Zuordnung &quot;UNKLAR&quot; sollten manuell geprüft werden.
+          </p>
+        </div>
       </div>
 
       {/* ================================================================ */}
@@ -909,7 +1244,7 @@ export default function HilfePage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-xl font-bold text-[var(--foreground)]">Glossar</h2>
-            <p className="text-sm text-[var(--muted)]">Fachbegriffe schnell nachschlagen</p>
+            <p className="text-sm text-[var(--muted)]">{GLOSSARY.length} Fachbegriffe schnell nachschlagen</p>
           </div>
           <input
             type="text"
@@ -922,7 +1257,7 @@ export default function HilfePage() {
         <div className="rounded-xl border border-gray-200 bg-white divide-y divide-gray-100 overflow-hidden">
           {filteredGlossary.map((item) => (
             <div key={item.term} className="flex gap-4 px-5 py-3 hover:bg-gray-50 transition-colors">
-              <span className="text-sm font-bold text-[var(--foreground)] w-36 flex-shrink-0">
+              <span className="text-sm font-bold text-[var(--foreground)] w-40 flex-shrink-0">
                 {item.term}
               </span>
               <span className="text-sm text-[var(--secondary)]">

@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
 import { processRejection, ApprovalAuthError, ApprovalRuleInactiveError } from "@/lib/approval-engine";
+import { sendEmail } from "@/lib/email";
+import { orderRejectedEmail } from "@/lib/email-templates";
 
 interface RouteProps {
     params: Promise<{
@@ -82,6 +84,23 @@ export async function POST(req: NextRequest, { params }: RouteProps) {
                 approvedBy: userId, // Wird als "bearbeitet von" genutzt
             },
         });
+
+        // Email an Einreicher (Buchhaltung) senden (nicht-blockierend)
+        if (order.companyTokenId) {
+            const token = await prisma.companyToken.findUnique({
+                where: { id: order.companyTokenId },
+                select: { notifyEmail: true },
+            });
+            if (token?.notifyEmail) {
+                const caseData = await prisma.case.findUnique({ where: { id: caseId }, select: { debtorName: true } });
+                const tpl = orderRejectedEmail(
+                    caseData?.debtorName || caseId,
+                    { creditor: order.creditor, amountCents: order.amountCents, description: order.description },
+                    reason || "Ohne Angabe von Gründen abgelehnt",
+                );
+                sendEmail({ to: token.notifyEmail, ...tpl, context: { event: "ORDER_REJECTED", caseId, orderIds: [orderId] } });
+            }
+        }
 
         const serializedOrder = JSON.parse(JSON.stringify(updatedOrder, (_key, value) =>
             typeof value === 'bigint' ? value.toString() : value

@@ -2,7 +2,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAuth } from "@/lib/auth";
-import { processApproval, getOrderSteps, ApprovalAuthError, ApprovalRuleInactiveError } from "@/lib/approval-engine";
+import { processApproval, getOrderSteps, getCurrentApprover, ApprovalAuthError, ApprovalRuleInactiveError } from "@/lib/approval-engine";
+import { sendEmail } from "@/lib/email";
+import { chainNextStepEmail } from "@/lib/email-templates";
 
 interface RouteProps {
     params: Promise<{
@@ -78,6 +80,24 @@ export async function POST(req: NextRequest, { params }: RouteProps) {
                             where: { id: orderId },
                             data: { approvedAmountCents },
                         });
+                    }
+
+                    // Email an nächsten Approver senden (nicht-blockierend)
+                    if (result.nextStep) {
+                        const nextApprover = await getCurrentApprover(orderId);
+                        if (nextApprover?.email) {
+                            const caseData = await prisma.case.findUnique({ where: { id: caseId }, select: { debtorName: true } });
+                            const allSteps = await getOrderSteps(orderId);
+                            const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://cases.gradify.de";
+                            const portalUrl = `${appUrl}/portal/cases/${caseId}`;
+                            const tpl = chainNextStepEmail(
+                                caseData?.debtorName || caseId,
+                                { creditor: order.creditor, amountCents: order.amountCents },
+                                { roleName: result.nextStep.roleName, sequence: result.nextStep.sequence, totalSteps: allSteps.length },
+                                portalUrl,
+                            );
+                            sendEmail({ to: nextApprover.email, ...tpl, context: { event: "CHAIN_NEXT_STEP", caseId, orderIds: [orderId] } });
+                        }
                     }
 
                     // Steps neu laden für Response

@@ -1078,6 +1078,14 @@ model Order {
   ledgerEntryId   String?  @unique
   ledgerEntry     LedgerEntry? @relation(fields: [ledgerEntryId], references: [id], onDelete: SetNull)
 
+  // Einreicher-Tracking (für Email-Benachrichtigungen)
+  companyTokenId        String?    // FK → CompanyToken (wer hat eingereicht?)
+  companyToken          CompanyToken? @relation(fields: [companyTokenId], references: [id], onDelete: SetNull)
+
+  // Email-Notification-Tracking
+  reminderSentAt        DateTime?  // Wann wurde Erinnerung gesendet (max. 1x)
+  approvalDigestSentAt  DateTime?  // Wann wurde Genehmigungs-Digest gesendet
+
   case            Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
   creditorRef     Creditor?     @relation(fields: [creditorId], references: [id], onDelete: SetNull)
   costCategory    CostCategory? @relation(fields: [costCategoryId], references: [id], onDelete: SetNull)
@@ -1096,10 +1104,12 @@ model CompanyToken {
   caseId      String
   token       String   @unique // Zufälliger Access Token für URL
   label       String   // z.B. "Buchhaltung Müller GmbH"
+  notifyEmail String?  // Email für Rückmeldungen (Genehmigungs-Digest, Ablehnungen)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 
   case        Case     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  orders      Order[]  // Orders die über diesen Token eingereicht wurden
 
   @@index([caseId])
   @@map("company_tokens")
