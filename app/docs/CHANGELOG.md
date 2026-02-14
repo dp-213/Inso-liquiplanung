@@ -4,6 +4,48 @@ Dieses Dokument protokolliert alle wesentlichen Änderungen an der Anwendung.
 
 ---
 
+## Version 2.59.0 – Email-Benachrichtigungen für Freigabe-Modul
+
+**Datum:** 14. Februar 2026
+
+### Neue Funktionen
+
+- **Resend-Integration:** Email-Versand via Resend mit Feature-Flag (`EMAIL_ENABLED`) und Structured Logging. Kill-Switch über ENV-Variable.
+- **5 Email-Templates:** Neue Einreichung (an Approver), Chain-Weiterleitung (nächste Stufe), Ablehnung (an Buchhaltung), Genehmigungs-Digest (Batch), Überfälligkeits-Reminder (einmalig nach 3 Tagen).
+- **CompanyToken.notifyEmail:** Optionale Email-Adresse pro Zugangs-Link für Rückmeldungen an Buchhaltung. Inline editierbar im CompanyTokenManager.
+- **Order.companyTokenId:** Einreicher-Tracking – jede Order weiß, über welchen Token sie eingereicht wurde. Ermöglicht gezielten Rückkanalbenachrichtigungen.
+- **Sofort-Emails:** Neue Einreichung → Approver, Chain-Weiterleitung → nächster Approver, Ablehnung → Buchhaltung (sofort).
+- **Digest-Emails:** Genehmigte Orders werden alle 30 Min gebündelt pro Case + Einreicher versendet (kein Spam bei Batch-Genehmigungen).
+- **Pending-Reminder:** Orders die > 3 Tage auf Freigabe warten → einmalige Erinnerung an zuständigen Approver.
+- **Cron-Route:** `/api/cron/order-notifications` (GET, CRON_SECRET-geschützt) für Digest + Reminder.
+- **Cronjob:** Alle 30 Minuten via `crontab`.
+
+### Schema-Änderungen
+
+- `company_tokens.notifyEmail` (TEXT, nullable)
+- `orders.companyTokenId` (TEXT, FK → company_tokens, nullable)
+- `orders.reminderSentAt` (TEXT, nullable)
+- `orders.approvalDigestSentAt` (TEXT, nullable)
+- Migration: `migration-email-notifications.sql`
+
+### Neue Dateien
+
+| Datei | Zweck |
+|-------|-------|
+| `lib/email.ts` | Zentrale Email-Lib mit Feature-Flag + Structured Logging |
+| `lib/email-templates.ts` | 5 HTML-Templates mit Inline-CSS |
+| `api/cron/order-notifications/route.ts` | Cron-Endpunkt für Digest + Reminder |
+
+### Neue ENV-Variablen (Production)
+
+| Variable | Beschreibung |
+|----------|-------------|
+| `RESEND_API_KEY` | Resend API Key (Domain: updates.gradify.de) |
+| `EMAIL_ENABLED` | `true` in Production, fehlt/`false` lokal |
+| `CRON_SECRET` | Authentifizierung für Cron-Route |
+
+---
+
 ## Version 2.58.0 – Mehrstufige Freigabekette (Multi-Approval)
 
 **Datum:** 13. Februar 2026

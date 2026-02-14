@@ -4,6 +4,50 @@ Dieses Dokument dokumentiert wichtige Architektur- und Design-Entscheidungen.
 
 ---
 
+## ADR-069: Email-Benachrichtigungen – Sofort vs. Digest-Architektur
+
+**Datum:** 14. Februar 2026
+**Status:** Akzeptiert
+
+### Problem
+
+Beteiligte am Freigabe-Workflow (Approver, Buchhaltung) erfahren nicht automatisch von Statusänderungen. Approver müssen manuell ins Portal schauen, Buchhaltungen wissen nicht ob ihre Einreichungen genehmigt oder abgelehnt wurden. Gleichzeitig darf bei Batch-Genehmigungen (z.B. 14 Orders nacheinander) kein Email-Spam entstehen.
+
+### Entscheidung
+
+**Zwei-Kanal-Architektur: Sofort + Digest**
+
+1. **Sofort-Emails (in API-Hooks):** Dringende Events bei denen der Empfänger handeln muss:
+   - Neue Einreichung → Approver (muss prüfen)
+   - Chain-Weiterleitung → nächster Approver (muss prüfen)
+   - Ablehnung → Buchhaltung (muss korrigieren/neu einreichen)
+
+2. **Digest-Emails (via Cron, alle 30 Min):** Informationen über Statusänderungen:
+   - Genehmigte Orders → Buchhaltung bekommt EINE Email mit allen genehmigten Orders
+   - Überfällige Anfragen (> 3 Tage) → einmalige Erinnerung an Approver
+
+**Feature-Flag:** `EMAIL_ENABLED` ENV-Variable als Kill-Switch. Lokal immer aus (kein versehentlicher Versand in Entwicklung). Production: explizit `true`.
+
+**Idempotent-Design:** Digest-Query nutzt `approvalDigestSentAt IS NULL`, Reminder nutzt `reminderSentAt IS NULL`. Robust gegen Cron-Ausfall oder Doppelausführung.
+
+**Einreicher-Tracking:** `Order.companyTokenId` speichert welcher Token die Order eingereicht hat. Damit wird bei Approval/Rejection gezielt der Einreicher benachrichtigt – nicht alle Tokens des Cases.
+
+### Begründung
+
+- Sofort-Emails für Handlungsbedarf, Digest für Informationen → kein Spam
+- Feature-Flag als Sicherheitsnetz (sofort abschaltbar bei Problemen)
+- `companyTokenId` ermöglicht präzise Zustellung statt Broadcast
+- Structured Logging für Nachvollziehbarkeit ("Warum hat X keine Mail bekommen?")
+
+### Konsequenzen
+
+- 3 neue ENV-Variablen: `RESEND_API_KEY`, `EMAIL_ENABLED`, `CRON_SECRET`
+- Cronjob alle 30 Min (lokaler Mac, nicht Vercel Cron)
+- Neue Dateien: `lib/email.ts`, `lib/email-templates.ts`, `api/cron/order-notifications/route.ts`
+- Schema-Erweiterung: `CompanyToken.notifyEmail`, `Order.companyTokenId/reminderSentAt/approvalDigestSentAt`
+
+---
+
 ## ADR-068: Mehrstufige Freigabekette (Multi-Approval)
 
 **Datum:** 13. Februar 2026

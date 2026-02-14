@@ -129,10 +129,10 @@ Belege werden als Base64 direkt in der Datenbank gespeichert. Bei vielen großen
 Das externe Einreichungsformular (`/api/company/orders`) hat kein Rate-Limiting. Theoretisch können unbegrenzt Anfragen eingereicht werden.
 **Workaround:** Token deaktivieren bei Missbrauch.
 
-### Keine Email-Benachrichtigungen
+### Email-Benachrichtigungen: Nur bei hinterlegter Email
 
-Weder der IV noch die einreichende Partei werden über Statusänderungen benachrichtigt.
-**Phase 2:** Resend-Integration für Benachrichtigungen.
+Emails werden nur versendet wenn `CompanyToken.notifyEmail` (Buchhaltung) bzw. `CustomerUser.email` (Approver) hinterlegt ist. Tokens ohne Email erhalten keine Digest/Rejection-Mails (kein Fehler, nur Log-Eintrag).
+**Workaround:** Email im CompanyTokenManager hinterlegen.
 
 ### Kein Multi-File-Upload
 
@@ -358,4 +358,10 @@ Rebranding zu "Gradify Cases | Structured Case Management" mit OG-Image für Soc
 
 ---
 
-**Letzte Aktualisierung:** 2026-02-13 (v2.56.0)
+### ~~Keine Email-Benachrichtigungen~~ GELÖST 2026-02-14
+
+Resend-Integration mit 5 Templates implementiert (v2.59.0, ADR-069). Sofort-Emails für Einreichung/Ablehnung/Chain-Weiterleitung, Digest für Genehmigungen (alle 30 Min), einmaliger Reminder bei > 3 Tagen.
+
+---
+
+**Letzte Aktualisierung:** 2026-02-14 (v2.59.0)

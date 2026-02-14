@@ -975,14 +975,16 @@ model Order {
 }
 
 model CompanyToken {
-  id        String   @id @default(uuid())
-  caseId    String
-  token     String   @unique
-  label     String
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id          String   @id @default(uuid())
+  caseId      String
+  token       String   @unique
+  label       String
+  notifyEmail String?  // Email für Rückmeldungen (Digest, Ablehnungen)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
 
-  case Case @relation(...)
+  case   Case    @relation(...)
+  orders Order[] // Eingereichte Orders über diesen Token
   @@index([caseId])
 }
 ```
@@ -994,7 +996,7 @@ model CompanyToken {
 | **OrderList** | `admin/cases/[id]/orders/OrderList.tsx` | Freigabeliste mit Filter (Typ) und Sort (Datum/Betrag/Gläubiger) |
 | **ApprovalModal** | `admin/cases/[id]/orders/ApprovalModal.tsx` | Genehmigung mit optionalem abweichendem Betrag |
 | **RejectionModal** | `admin/cases/[id]/orders/RejectionModal.tsx` | Ablehnung mit Pflicht-Begründung |
-| **CompanyTokenManager** | `admin/cases/[id]/orders/CompanyTokenManager.tsx` | Token erstellen/deaktivieren |
+| **CompanyTokenManager** | `admin/cases/[id]/orders/CompanyTokenManager.tsx` | Token erstellen/deaktivieren, Email hinterlegen |
 | **OrderSubmissionForm** | `submit/[token]/OrderSubmissionForm.tsx` | Externes Einreichungsformular |
 
 #### Bei Genehmigung: LedgerEntry-Erstellung
@@ -1109,6 +1111,49 @@ Wenn `Case.approvalThresholdCents` gesetzt ist, werden Orders **bis einschließl
 **Konfiguration:** `/admin/cases/[id]/edit` → Abschnitt "Freigabe-Einstellungen"
 
 **Technisch:** Atomare `$transaction` erstellt Order + LedgerEntry + bookingReference in einem Schritt. LedgerEntry-Werte: `PLAN, MASSE, NEUMASSE, bookingSource: MANUAL`.
+
+#### Email-Benachrichtigungen (v2.59.0)
+
+Automatische Email-Benachrichtigungen bei Freigabe-Events via Resend.
+
+##### Architektur: Sofort + Digest
+
+| Event | Kanal | Empfänger | Template |
+|-------|-------|-----------|----------|
+| Neue Einreichung | Sofort | Erster Approver (Chain) / Case-Owner (Legacy) | `newOrderEmail` |
+| Chain: Nächste Stufe | Sofort | Nächster Approver | `chainNextStepEmail` |
+| Ablehnung | Sofort | Einreicher (`CompanyToken.notifyEmail`) | `orderRejectedEmail` |
+| Genehmigung(en) | Digest (30 Min) | Einreicher (`CompanyToken.notifyEmail`) | `approvedDigestEmail` |
+| Überfällig (> 3 Tage) | Digest (30 Min) | Zuständiger Approver | `pendingReminderEmail` |
+
+##### Einreicher-Tracking
+
+`Order.companyTokenId` speichert welcher CompanyToken die Order eingereicht hat. Bei Genehmigung/Ablehnung wird gezielt `CompanyToken.notifyEmail` verwendet – kein Broadcast an alle Tokens.
+
+##### Idempotenz
+
+- `Order.approvalDigestSentAt`: Wird nach Digest-Versand gesetzt. Cron-Query: `status IN (APPROVED, AUTO_APPROVED) AND approvalDigestSentAt IS NULL`.
+- `Order.reminderSentAt`: Wird nach Reminder-Versand gesetzt. Max. 1 Reminder pro Order.
+
+##### Feature-Flag
+
+`EMAIL_ENABLED=true` (Production) / fehlt (lokal = deaktiviert). Kill-Switch: Variable auf `false` setzen → sofort keine Emails mehr.
+
+##### Dateien
+
+| Datei | Funktion |
+|-------|----------|
+| `lib/email.ts` | `sendEmail()` mit Feature-Flag + Structured Logging |
+| `lib/email-templates.ts` | 5 HTML-Templates (Inline-CSS, Mobile-kompatibel) |
+| `api/cron/order-notifications/route.ts` | Cron-Endpunkt (CRON_SECRET-geschützt) |
+
+##### ENV-Variablen
+
+| Variable | Beschreibung |
+|----------|-------------|
+| `RESEND_API_KEY` | Resend API Key (Domain: updates.gradify.de) |
+| `EMAIL_ENABLED` | `true` in Production |
+| `CRON_SECRET` | Authentifizierung für Cron-Route |
 
 #### Kreditoren & Kostenarten (v2.34.0)
 

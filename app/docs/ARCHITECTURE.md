@@ -1,7 +1,7 @@
 # System-Architektur
 
-**Version:** 2.58.0
-**Stand:** 13. Februar 2026
+**Version:** 2.59.0
+**Stand:** 14. Februar 2026
 
 ---
 
@@ -97,6 +97,26 @@
 │        /api/cases/{id}/orders/{orderId}/steps (GET)                 │
 │   UI:  Case-Edit (Konfiguration), OrderList (Fortschritt),          │
 │        ApprovalModal (Stufen-Info), Portal (personalisiert)         │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│                      EMAIL NOTIFICATIONS                              │
+│                      lib/email.ts + lib/email-templates.ts            │
+│                                                                      │
+│   Resend-Integration mit Feature-Flag (EMAIL_ENABLED)               │
+│   - sendEmail(): Zentrale Funktion mit Structured Logging           │
+│   - 5 Templates: newOrder, chainNextStep, rejected, digest, reminder│
+│                                                                      │
+│   Sofort (in API-Hooks):                                            │
+│   - Einreichung → Email an Approver/Case-Owner                      │
+│   - Chain-Weiterleitung → Email an nächsten Approver                │
+│   - Ablehnung → Email an Buchhaltung (CompanyToken.notifyEmail)     │
+│                                                                      │
+│   Digest (Cron alle 30 Min):                                        │
+│   - Genehmigte Orders → gebündelt pro Case+Einreicher               │
+│   - Überfällige Orders (>3 Tage) → einmaliger Reminder             │
+│                                                                      │
+│   API: /api/cron/order-notifications (GET, CRON_SECRET)             │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -685,6 +705,9 @@ Workflow:
 │       │   ├── engine.ts            # Cashflow-Berechnung aus Annahmen
 │       │   ├── load-and-calculate.ts # Laden + berechnen für Dashboard
 │       │   └── types.ts             # ForecastScenario, ForecastAssumption
+│       ├── email.ts                  # Email-Versand (Resend, Feature-Flag, Logging)
+│       ├── email-templates.ts        # 5 HTML-Templates (Inline-CSS)
+│       ├── approval-engine.ts        # Mehrstufige Freigabekette
 │       ├── settlement/               # Settlement-Logik
 │       │   └── split-engine.ts       # Alt/Neu-Splitting
 │       ├── credit/                   # Massekredit-Logik
